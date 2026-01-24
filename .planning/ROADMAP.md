@@ -44,10 +44,12 @@ Plans:
   3. Files matching .gitignore patterns are automatically excluded from indexing
   4. User can specify include/exclude patterns to filter which files get indexed
   5. Re-indexing a directory only processes files that changed since last index
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md — Config and file filtering: dependencies, IndexingConfig, .gitignore parsing
+- [ ] 02-02-PLAN.md — CocoIndex flow: Tree-sitter chunking, Ollama embeddings, PostgreSQL storage
+- [ ] 02-03-PLAN.md — CLI and progress: cocosearch index command, Rich progress display
 
 ### Phase 3: Search
 **Goal**: Users can search indexed code with natural language and receive relevant results
@@ -86,10 +88,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | ✓ Complete | 2026-01-24 |
-| 2. Indexing Pipeline | 0/TBD | Not started | - |
+| 2. Indexing Pipeline | 0/3 | Ready | - |
 | 3. Search | 0/TBD | Not started | - |
 | 4. Index Management | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-24*
-*Last updated: 2026-01-24 — Phase 1 complete*
+*Last updated: 2026-01-24 — Phase 2 planned (3 plans)*
