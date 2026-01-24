@@ -9,11 +9,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Indexing
 
-- [ ] **INDEX-01**: Index codebase directory under named index
-- [ ] **INDEX-02**: Language-aware chunking via Tree-sitter (15+ languages)
-- [ ] **INDEX-03**: Respect .gitignore patterns
-- [ ] **INDEX-04**: File filtering with include/exclude patterns
-- [ ] **INDEX-05**: Incremental indexing (only re-index changed files)
+- [x] **INDEX-01**: Index codebase directory under named index
+- [x] **INDEX-02**: Language-aware chunking via Tree-sitter (15+ languages)
+- [x] **INDEX-03**: Respect .gitignore patterns
+- [x] **INDEX-04**: File filtering with include/exclude patterns
+- [x] **INDEX-05**: Incremental indexing (only re-index changed files)
 
 ### Search
 
@@ -43,7 +43,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **MCP-02**: `search_code` tool
 - [ ] **MCP-03**: `clear_index` tool
 - [ ] **MCP-04**: `list_indexes` tool
-- [ ] **MCP-05**: Progress feedback during indexing
+- [x] **MCP-05**: Progress feedback during indexing
 
 ## v2 Requirements
 
@@ -80,11 +80,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INDEX-01 | Phase 2 | Pending |
-| INDEX-02 | Phase 2 | Pending |
-| INDEX-03 | Phase 2 | Pending |
-| INDEX-04 | Phase 2 | Pending |
-| INDEX-05 | Phase 2 | Pending |
+| INDEX-01 | Phase 2 | Complete |
+| INDEX-02 | Phase 2 | Complete |
+| INDEX-03 | Phase 2 | Complete |
+| INDEX-04 | Phase 2 | Complete |
+| INDEX-05 | Phase 2 | Complete |
 | SRCH-01 | Phase 3 | Pending |
 | SRCH-02 | Phase 3 | Pending |
 | SRCH-03 | Phase 3 | Pending |
@@ -102,7 +102,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-02 | Phase 4 | Pending |
 | MCP-03 | Phase 4 | Pending |
 | MCP-04 | Phase 4 | Pending |
-| MCP-05 | Phase 2 | Pending |
+| MCP-05 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 23 total
@@ -111,4 +111,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-24 — Phase 1 requirements complete*
+*Last updated: 2026-01-25 — Phase 2 requirements complete*

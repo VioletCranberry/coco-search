@@ -13,7 +13,7 @@ CocoSearch delivers local-first semantic code search through a four-phase journe
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - PostgreSQL + pgvector and Ollama infrastructure with project scaffolding
-- [ ] **Phase 2: Indexing Pipeline** - CocoIndex flow with Tree-sitter chunking and embedding generation
+- [x] **Phase 2: Indexing Pipeline** - CocoIndex flow with Tree-sitter chunking and embedding generation
 - [ ] **Phase 3: Search** - Vector similarity search with result formatting
 - [ ] **Phase 4: Index Management** - Named index lifecycle and MCP server integration
 
@@ -48,8 +48,8 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Config and file filtering: dependencies, IndexingConfig, .gitignore parsing
-- [ ] 02-02-PLAN.md — CocoIndex flow: Tree-sitter chunking, Ollama embeddings, PostgreSQL storage
-- [ ] 02-03-PLAN.md — CLI and progress: cocosearch index command, Rich progress display
+- [x] 02-02-PLAN.md — CocoIndex flow: Tree-sitter chunking, Ollama embeddings, PostgreSQL storage
+- [x] 02-03-PLAN.md — CLI and progress: cocosearch index command, Rich progress display
 
 ### Phase 3: Search
 **Goal**: Users can search indexed code with natural language and receive relevant results
@@ -88,10 +88,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | ✓ Complete | 2026-01-24 |
-| 2. Indexing Pipeline | 1/3 | In progress | - |
-| 3. Search | 0/TBD | Not started | - |
+| 2. Indexing Pipeline | 3/3 | ✓ Complete | 2026-01-25 |
+| 3. Search | 0/TBD | Ready | - |
 | 4. Index Management | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-24*
-*Last updated: 2026-01-24 — Phase 2 planned (3 plans)*
+*Last updated: 2026-01-25 — Phase 2 complete*
