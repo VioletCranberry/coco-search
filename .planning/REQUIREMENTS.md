@@ -80,35 +80,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INDEX-01 | - | Pending |
-| INDEX-02 | - | Pending |
-| INDEX-03 | - | Pending |
-| INDEX-04 | - | Pending |
-| INDEX-05 | - | Pending |
-| SRCH-01 | - | Pending |
-| SRCH-02 | - | Pending |
-| SRCH-03 | - | Pending |
-| SRCH-04 | - | Pending |
-| SRCH-05 | - | Pending |
-| SRCH-06 | - | Pending |
-| MGMT-01 | - | Pending |
-| MGMT-02 | - | Pending |
-| MGMT-03 | - | Pending |
-| MGMT-04 | - | Pending |
-| INFRA-01 | - | Pending |
-| INFRA-02 | - | Pending |
-| INFRA-03 | - | Pending |
-| MCP-01 | - | Pending |
-| MCP-02 | - | Pending |
-| MCP-03 | - | Pending |
-| MCP-04 | - | Pending |
-| MCP-05 | - | Pending |
+| INDEX-01 | Phase 2 | Pending |
+| INDEX-02 | Phase 2 | Pending |
+| INDEX-03 | Phase 2 | Pending |
+| INDEX-04 | Phase 2 | Pending |
+| INDEX-05 | Phase 2 | Pending |
+| SRCH-01 | Phase 3 | Pending |
+| SRCH-02 | Phase 3 | Pending |
+| SRCH-03 | Phase 3 | Pending |
+| SRCH-04 | Phase 3 | Pending |
+| SRCH-05 | Phase 3 | Pending |
+| SRCH-06 | Phase 3 | Pending |
+| MGMT-01 | Phase 4 | Pending |
+| MGMT-02 | Phase 4 | Pending |
+| MGMT-03 | Phase 4 | Pending |
+| MGMT-04 | Phase 4 | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Pending |
+| INFRA-03 | Phase 1 | Pending |
+| MCP-01 | Phase 2 | Pending |
+| MCP-02 | Phase 3 | Pending |
+| MCP-03 | Phase 4 | Pending |
+| MCP-04 | Phase 4 | Pending |
+| MCP-05 | Phase 2 | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- v1 requirements: 23 total
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-24 after initial definition*
+*Last updated: 2026-01-24 after roadmap creation*
