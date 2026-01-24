@@ -37,7 +37,7 @@ Plans:
 ### Phase 2: Indexing Pipeline
 **Goal**: Users can index a codebase directory and have it stored as searchable embeddings
 **Depends on**: Phase 1
-**Requirements**: INDEX-01, INDEX-02, INDEX-03, INDEX-04, INDEX-05, MCP-01, MCP-05
+**Requirements**: INDEX-01, INDEX-02, INDEX-03, INDEX-04, INDEX-05, MCP-05
 **Success Criteria** (what must be TRUE):
   1. User can index a directory and see chunks stored in PostgreSQL
   2. Code is chunked by language structure (functions, classes) not arbitrary byte boundaries
@@ -47,7 +47,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Config and file filtering: dependencies, IndexingConfig, .gitignore parsing
+- [x] 02-01-PLAN.md — Config and file filtering: dependencies, IndexingConfig, .gitignore parsing
 - [ ] 02-02-PLAN.md — CocoIndex flow: Tree-sitter chunking, Ollama embeddings, PostgreSQL storage
 - [ ] 02-03-PLAN.md — CLI and progress: cocosearch index command, Rich progress display
 
@@ -69,7 +69,7 @@ Plans:
 ### Phase 4: Index Management
 **Goal**: Users can manage multiple named indexes through MCP tools
 **Depends on**: Phase 3
-**Requirements**: MGMT-01, MGMT-02, MGMT-03, MGMT-04, MCP-03, MCP-04
+**Requirements**: MGMT-01, MGMT-02, MGMT-03, MGMT-04, MCP-01, MCP-02, MCP-03, MCP-04
 **Success Criteria** (what must be TRUE):
   1. User can create and search multiple named indexes without conflicts
   2. User can clear a specific index without affecting others
@@ -88,7 +88,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | ✓ Complete | 2026-01-24 |
-| 2. Indexing Pipeline | 0/3 | Ready | - |
+| 2. Indexing Pipeline | 1/3 | In progress | - |
 | 3. Search | 0/TBD | Not started | - |
 | 4. Index Management | 0/TBD | Not started | - |
 
