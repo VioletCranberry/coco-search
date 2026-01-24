@@ -33,9 +33,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: PostgreSQL via Docker for vector storage (pgvector)
-- [ ] **INFRA-02**: Ollama for local embeddings (nomic-embed-text)
-- [ ] **INFRA-03**: All processing local — no external API calls
+- [x] **INFRA-01**: PostgreSQL via Docker for vector storage (pgvector)
+- [x] **INFRA-02**: Ollama for local embeddings (nomic-embed-text)
+- [x] **INFRA-03**: All processing local — no external API calls
 
 ### MCP Interface
 
@@ -95,9 +95,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MGMT-02 | Phase 4 | Pending |
 | MGMT-03 | Phase 4 | Pending |
 | MGMT-04 | Phase 4 | Pending |
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
 | MCP-01 | Phase 2 | Pending |
 | MCP-02 | Phase 3 | Pending |
 | MCP-03 | Phase 4 | Pending |
@@ -111,4 +111,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-24 after roadmap creation*
+*Last updated: 2026-01-24 — Phase 1 requirements complete*

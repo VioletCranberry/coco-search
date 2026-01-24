@@ -12,7 +12,7 @@ CocoSearch delivers local-first semantic code search through a four-phase journe
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - PostgreSQL + pgvector and Ollama infrastructure with project scaffolding
+- [x] **Phase 1: Foundation** - PostgreSQL + pgvector and Ollama infrastructure with project scaffolding
 - [ ] **Phase 2: Indexing Pipeline** - CocoIndex flow with Tree-sitter chunking and embedding generation
 - [ ] **Phase 3: Search** - Vector similarity search with result formatting
 - [ ] **Phase 4: Index Management** - Named index lifecycle and MCP server integration
@@ -31,8 +31,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Infrastructure setup: Docker Compose, Ollama model, Python project
-- [ ] 01-02-PLAN.md — Verification: pgvector extension, verification script, integration check
+- [x] 01-01-PLAN.md — Infrastructure setup: Docker Compose, Ollama model, Python project
+- [x] 01-02-PLAN.md — Verification: pgvector extension, verification script, integration check
 
 ### Phase 2: Indexing Pipeline
 **Goal**: Users can index a codebase directory and have it stored as searchable embeddings
@@ -85,11 +85,11 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/2 | Planned | - |
+| 1. Foundation | 2/2 | ✓ Complete | 2026-01-24 |
 | 2. Indexing Pipeline | 0/TBD | Not started | - |
 | 3. Search | 0/TBD | Not started | - |
 | 4. Index Management | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-24*
-*Last updated: 2026-01-24*
+*Last updated: 2026-01-24 — Phase 1 complete*

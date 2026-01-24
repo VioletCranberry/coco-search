@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** Phase 1 - Foundation (Complete)
+**Current focus:** Phase 2 - Indexing Pipeline
 
 ## Current Position
 
-Phase: 1 of 4 (Foundation)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-24 — Completed 01-02-PLAN.md
+Phase: 2 of 4 (Indexing Pipeline)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-01-24 — Phase 1 verified complete
 
 Progress: [██░░░░░░░░] 25%
 
