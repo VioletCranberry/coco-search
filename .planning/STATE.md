@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 2 of 4 (Indexing Pipeline)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-24 — Completed 02-01-PLAN.md
+Last activity: 2026-01-24 — Completed 02-02-PLAN.md
 
-Progress: [██████░░░░] 60% (3/5 planned)
+Progress: [████████░░] 80% (4/5 planned)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: 3 min
-- Total execution time: 8 min
+- Total execution time: 12 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Foundation | 2/2 | 6 min | 3 min |
-| 2. Indexing Pipeline | 1/3 | 2 min | 2 min |
+| 2. Indexing Pipeline | 2/3 | 6 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-02 (2 min), 02-01 (2 min)
-- Trend: improving
+- Last 5 plans: 01-01 (4 min), 01-02 (2 min), 02-01 (2 min), 02-02 (4 min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -49,6 +49,8 @@ Recent decisions affecting current work:
 | Ollama native (not Docker) | 01-01 | Simplicity for Phase 1 per research |
 | pgvector/pgvector:pg17 image | 01-01 | Pre-compiled extension, official |
 | pgvector 0.8.1 via CREATE EXTENSION | 01-02 | Database operation vs init script (container already running) |
+| Flow name includes index_name | 02-02 | Multi-codebase isolation via CodeIndex_{name} pattern |
+| Reference-only storage | 02-02 | Store filename + location, not chunk text |
 
 ### Pending Todos
 
@@ -56,12 +58,12 @@ None yet.
 
 ### Blockers/Concerns
 
-None - Phase 1 infrastructure complete and verified.
+None - Phase 2 CocoIndex flow complete and verified.
 
 ## Session Continuity
 
-Last session: 2026-01-24T22:53:29Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-01-24T22:59:30Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
 
 ## Phase 1 Summary
@@ -80,4 +82,11 @@ Plan 02-01 complete:
 - File filter with .gitignore support and DEFAULT_EXCLUDES
 - Dependencies: pathspec, pyyaml, rich
 
-Next: Plan 02-02 (CocoIndex flow with Tree-sitter chunking)
+Plan 02-02 complete:
+- Shared embedding transform: `code_to_embedding` with @cocoindex.transform_flow
+- Extension helper: `extract_extension` for Tree-sitter language detection
+- CocoIndex flow: LocalFile -> SplitRecursively -> EmbedText -> Postgres
+- run_index() orchestration function
+- Integration tested with real codebase indexing
+
+Next: Plan 02-03 (CLI Interface with progress reporting)
