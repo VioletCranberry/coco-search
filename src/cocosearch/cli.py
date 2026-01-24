@@ -135,22 +135,20 @@ def index_command(args: argparse.Namespace) -> int:
             )
 
             # Extract stats from update_info
-            # CocoIndex returns an IndexUpdateInfo with refresh_info containing stats
+            # CocoIndex returns IndexUpdateInfo with stats dict
+            # stats structure: {'files': {'num_insertions': N, 'num_deletions': N, ...}}
             stats = {
                 "files_added": 0,
                 "files_removed": 0,
                 "files_updated": 0,
             }
 
-            # Try to extract actual stats if available
-            if hasattr(update_info, "refresh_info") and update_info.refresh_info:
-                refresh_info = update_info.refresh_info
-                if hasattr(refresh_info, "num_rows_added"):
-                    stats["files_added"] = refresh_info.num_rows_added or 0
-                if hasattr(refresh_info, "num_rows_removed"):
-                    stats["files_removed"] = refresh_info.num_rows_removed or 0
-                if hasattr(refresh_info, "num_rows_updated"):
-                    stats["files_updated"] = refresh_info.num_rows_updated or 0
+            # Extract actual stats from CocoIndex response
+            if hasattr(update_info, "stats") and isinstance(update_info.stats, dict):
+                file_stats = update_info.stats.get("files", {})
+                stats["files_added"] = file_stats.get("num_insertions", 0)
+                stats["files_removed"] = file_stats.get("num_deletions", 0)
+                stats["files_updated"] = file_stats.get("num_updates", 0)
 
             progress.complete(stats)
 
