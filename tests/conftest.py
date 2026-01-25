@@ -9,9 +9,9 @@ import pytest
 
 # Register fixtures from fixtures directory (added by subsequent plans)
 pytest_plugins = [
-    # "tests.fixtures.db",      # Added by Plan 02
+    "tests.fixtures.db",  # Added by Plan 02
     "tests.fixtures.ollama",  # Added by Plan 03
-    "tests.fixtures.data",    # Added by Plan 03
+    "tests.fixtures.data",  # Added by Plan 03
 ]
 
 
