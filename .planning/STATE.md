@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 3 of 4 (Search)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-25 — Completed 03-01-PLAN.md (Search Core)
+Last activity: 2026-01-25 — Completed 03-02-PLAN.md (Search CLI)
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 3.2 min
-- Total execution time: 19 min
+- Total plans completed: 7
+- Average duration: 3.3 min
+- Total execution time: 23 min
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [██████░░░░] 60%
 |-------|-------|-------|----------|
 | 1. Foundation | 2/2 | 6 min | 3 min |
 | 2. Indexing Pipeline | 3/3 | 11 min | 3.7 min |
-| 3. Search | 1/3 | 2 min | 2 min |
+| 3. Search | 2/3 | 6 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (2 min), 02-01 (2 min), 02-02 (4 min), 02-03 (5 min), 03-01 (2 min)
+- Last 5 plans: 02-01 (2 min), 02-02 (4 min), 02-03 (5 min), 03-01 (2 min), 03-02 (4 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -54,6 +54,8 @@ Recent decisions affecting current work:
 | Reference-only storage | 02-02 | Store filename + location, not chunk text |
 | argparse over click | 02-03 | Simplicity for single subcommand |
 | Direct PostgreSQL queries | 03-01 | Simpler than CocoIndex query handlers, more control |
+| JSON output by default | 03-02 | MCP/tool integration, --pretty for humans |
+| Default action via sys.argv | 03-02 | Clean support for `cocosearch "query"` without subcommand |
 
 ### Pending Todos
 
@@ -61,12 +63,12 @@ None yet.
 
 ### Blockers/Concerns
 
-None - Phase 3 Plan 1 complete.
+None - Phase 3 Plan 2 complete.
 
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 03-01-PLAN.md
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
 
 ## Phase 1 Summary
@@ -119,17 +121,27 @@ Plan 03-01 (Complete):
 - SearchResult dataclass with filename, byte offsets, and similarity score
 - Language filtering supporting 15 programming languages
 
-**Search API:**
-```python
-from cocosearch.search import search, SearchResult
+Plan 03-02 (Complete):
+- Utility functions: byte_to_line, read_chunk_content, get_context_lines
+- JSON formatter with file_path, lines, score, content, context
+- Pretty formatter with Rich syntax highlighting (25+ languages)
+- CLI search command with all flags from CONTEXT.md
+- Default action: `cocosearch "query"` works without subcommand
+- Inline filter parsing: `lang:python` extracted from query
 
-results = search(
-    query="authentication handler",
-    index_name="myproject",
-    limit=10,
-    min_score=0.5,
-    language_filter="python",
-)
+**Search CLI Usage:**
+```bash
+# JSON output (default)
+cocosearch search "authentication handler" --index myproject --limit 5
+
+# Pretty output with syntax highlighting
+cocosearch "config" --index myproject --pretty
+
+# Language filter
+cocosearch "database" --lang python --pretty
+
+# Or inline syntax
+cocosearch "error handling lang:typescript" --pretty
 ```
 
-Next: Plan 03-02 (Search CLI)
+Next: Plan 03-03 (Search REPL)
