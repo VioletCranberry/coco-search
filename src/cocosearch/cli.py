@@ -16,6 +16,7 @@ from rich.console import Console
 
 from cocosearch.indexer import IndexingConfig, load_config, run_index
 from cocosearch.indexer.progress import IndexingProgress
+from cocosearch.management import clear_index, derive_index_from_git, get_stats, list_indexes
 from cocosearch.search import search
 from cocosearch.search.formatter import format_json, format_pretty
 from cocosearch.search.repl import run_repl
@@ -256,6 +257,123 @@ def search_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def list_command(args: argparse.Namespace) -> int:
+    """Execute the list command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    console = Console()
+
+    # Initialize CocoIndex
+    cocoindex.init()
+
+    indexes = list_indexes()
+
+    if args.pretty:
+        from rich.table import Table
+
+        if not indexes:
+            console.print("[dim]No indexes found[/dim]")
+        else:
+            table = Table(title="Indexes")
+            table.add_column("Name", style="cyan")
+            table.add_column("Table", style="dim")
+
+            for idx in indexes:
+                table.add_row(idx["name"], idx["table_name"])
+
+            console.print(table)
+    else:
+        print(json.dumps(indexes, indent=2))
+
+    return 0
+
+
+def stats_command(args: argparse.Namespace) -> int:
+    """Execute the stats command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, 1 for error).
+    """
+    console = Console()
+
+    # Initialize CocoIndex
+    cocoindex.init()
+
+    if args.index:
+        # Stats for specific index
+        try:
+            stats = get_stats(args.index)
+            stats["name"] = args.index
+        except ValueError as e:
+            if args.pretty:
+                console.print(f"[bold red]Error:[/bold red] {e}")
+            else:
+                print(json.dumps({"error": str(e)}))
+            return 1
+
+        if args.pretty:
+            from rich.table import Table
+
+            table = Table(title=f"Index: {args.index}")
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", style="green")
+
+            table.add_row("Files", str(stats["file_count"]))
+            table.add_row("Chunks", str(stats["chunk_count"]))
+            table.add_row("Size", stats["storage_size_pretty"])
+
+            console.print(table)
+        else:
+            print(json.dumps(stats, indent=2))
+    else:
+        # Stats for all indexes
+        indexes = list_indexes()
+        all_stats = []
+
+        for idx in indexes:
+            try:
+                stats = get_stats(idx["name"])
+                stats["name"] = idx["name"]
+                all_stats.append(stats)
+            except ValueError:
+                # Skip indexes that can't be queried
+                continue
+
+        if args.pretty:
+            from rich.table import Table
+
+            if not all_stats:
+                console.print("[dim]No indexes found[/dim]")
+            else:
+                table = Table(title="Index Statistics")
+                table.add_column("Name", style="cyan")
+                table.add_column("Files", justify="right")
+                table.add_column("Chunks", justify="right")
+                table.add_column("Size", justify="right")
+
+                for stats in all_stats:
+                    table.add_row(
+                        stats["name"],
+                        str(stats["file_count"]),
+                        str(stats["chunk_count"]),
+                        stats["storage_size_pretty"],
+                    )
+
+                console.print(table)
+        else:
+            print(json.dumps(all_stats, indent=2))
+
+    return 0
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -345,10 +463,43 @@ def main() -> None:
         help="Human-readable output (default: JSON)",
     )
 
+    # List subcommand
+    list_parser = subparsers.add_parser(
+        "list",
+        help="List all indexes",
+        description="Show all available indexes.",
+    )
+    list_parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Human-readable output (default: JSON)",
+    )
+
+    # Stats subcommand
+    stats_parser = subparsers.add_parser(
+        "stats",
+        help="Show index statistics",
+        description="Display statistics for one or all indexes.",
+    )
+    stats_parser.add_argument(
+        "index",
+        nargs="?",
+        default=None,
+        help="Index name (if omitted, show stats for all indexes)",
+    )
+    stats_parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Human-readable output (default: JSON)",
+    )
+
+    # Known subcommands for routing
+    known_subcommands = ("index", "search", "list", "stats", "clear", "mcp", "-h", "--help")
+
     # Handle default action (query without subcommand)
     # Check before parsing if first argument is not a known subcommand
     # Supports: `cocosearch "query"` or `cocosearch --interactive`
-    if len(sys.argv) > 1 and sys.argv[1] not in ("index", "search", "-h", "--help"):
+    if len(sys.argv) > 1 and sys.argv[1] not in known_subcommands:
         first_arg = sys.argv[1]
         # If it's a flag (like --interactive) or a query, insert "search"
         if first_arg.startswith("-") or not first_arg.startswith("-"):
@@ -361,6 +512,10 @@ def main() -> None:
         sys.exit(index_command(args))
     elif args.command == "search":
         sys.exit(search_command(args))
+    elif args.command == "list":
+        sys.exit(list_command(args))
+    elif args.command == "stats":
+        sys.exit(stats_command(args))
     else:
         parser.print_help()
         sys.exit(1)
