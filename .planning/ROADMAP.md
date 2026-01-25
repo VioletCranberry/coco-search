@@ -44,9 +44,9 @@
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — pytest configuration and test structure setup
-- [ ] 05-02-PLAN.md — PostgreSQL mocking infrastructure
-- [ ] 05-03-PLAN.md — Ollama mocking and data fixtures
+- [x] 05-01-PLAN.md — pytest configuration and test structure setup
+- [x] 05-02-PLAN.md — PostgreSQL mocking infrastructure
+- [x] 05-03-PLAN.md — Ollama mocking and data fixtures
 
 ### Phase 6: Test Coverage
 **Goal**: Full test suite covering all modules with mocked dependencies
@@ -87,7 +87,7 @@ Plans:
 | 2. Indexing | v1.0 | 3/3 | Complete | 2026-01-25 |
 | 3. Search | v1.0 | 3/3 | Complete | 2026-01-25 |
 | 4. Management | v1.0 | 3/3 | Complete | 2026-01-25 |
-| 5. Test Infrastructure | v1.1 | 0/3 | Ready | - |
+| 5. Test Infrastructure | v1.1 | 3/3 | Complete | 2026-01-25 |
 | 6. Test Coverage | v1.1 | 0/? | Not started | - |
 | 7. Documentation | v1.1 | 0/? | Not started | - |
 

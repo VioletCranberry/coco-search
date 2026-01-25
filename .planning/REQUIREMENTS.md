@@ -112,10 +112,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | README-01 | Phase 7 | Pending |
 | README-02 | Phase 7 | Pending |
 | README-03 | Phase 7 | Pending |
-| INFRA-01 | Phase 5 | Pending |
-| INFRA-02 | Phase 5 | Pending |
-| INFRA-03 | Phase 5 | Pending |
-| INFRA-04 | Phase 5 | Pending |
+| INFRA-01 | Phase 5 | Complete |
+| INFRA-02 | Phase 5 | Complete |
+| INFRA-03 | Phase 5 | Complete |
+| INFRA-04 | Phase 5 | Complete |
 | TEST-IDX-01 | Phase 6 | Pending |
 | TEST-IDX-02 | Phase 6 | Pending |
 | TEST-IDX-03 | Phase 6 | Pending |
@@ -143,4 +143,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-25*
-*Last updated: 2026-01-25 after roadmap creation*
+*Last updated: 2026-01-25 after Phase 5 completion*
