@@ -69,7 +69,7 @@ Plans:
 - [x] 03-03-PLAN.md — Interactive REPL: --interactive mode with settings commands
 
 ### Phase 4: Index Management
-**Goal**: Users can manage multiple named indexes through MCP tools
+**Goal**: Users can manage multiple named indexes and access all features through MCP tools
 **Depends on**: Phase 3
 **Requirements**: MGMT-01, MGMT-02, MGMT-03, MGMT-04, MCP-01, MCP-02, MCP-03, MCP-04
 **Success Criteria** (what must be TRUE):
@@ -77,10 +77,12 @@ Plans:
   2. User can clear a specific index without affecting others
   3. User can list all existing indexes
   4. User can see statistics for an index (file count, chunk count, size)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Management core: list_indexes, get_stats, clear_index, git root detection
+- [ ] 04-02-PLAN.md — CLI commands: list, stats, clear subcommands with JSON/pretty output
+- [ ] 04-03-PLAN.md — MCP server: FastMCP with search, list, stats, clear, index tools
 
 ## Progress
 
@@ -92,8 +94,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Foundation | 2/2 | ✓ Complete | 2026-01-24 |
 | 2. Indexing Pipeline | 3/3 | ✓ Complete | 2026-01-25 |
 | 3. Search | 3/3 | ✓ Complete | 2026-01-25 |
-| 4. Index Management | 0/TBD | Not started | - |
+| 4. Index Management | 0/3 | Ready to execute | - |
 
 ---
 *Roadmap created: 2026-01-24*
-*Last updated: 2026-01-25 — Phase 3 complete*
+*Last updated: 2026-01-25 — Phase 4 planned*
