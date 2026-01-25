@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 4 of 4 (Index Management)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-01-25 — Phase 3 verified complete
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-25 — Completed 04-01-PLAN.md
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 82% (9/11 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 3.4 min
-- Total execution time: 27 min
+- Total plans completed: 9
+- Average duration: 3.3 min
+- Total execution time: 30 min
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [████████░░] 75%
 | 1. Foundation | 2/2 | 6 min | 3 min |
 | 2. Indexing Pipeline | 3/3 | 11 min | 3.7 min |
 | 3. Search | 3/3 | 10 min | 3.3 min |
+| 4. Index Management | 1/3 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (4 min), 02-03 (5 min), 03-01 (2 min), 03-02 (4 min), 03-03 (4 min)
+- Last 5 plans: 02-03 (5 min), 03-01 (2 min), 03-02 (4 min), 03-03 (4 min), 04-01 (3 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -57,6 +58,8 @@ Recent decisions affecting current work:
 | JSON output by default | 03-02 | MCP/tool integration, --pretty for humans |
 | Default action via sys.argv | 03-02 | Clean support for `cocosearch "query"` without subcommand |
 | cmd module over prompt_toolkit | 03-03 | Standard library sufficient for REPL |
+| Reuse connection pool from search.db | 04-01 | Singleton pattern already handles pgvector registration |
+| Import derive_index_name from cli | 04-01 | Single source of truth, no duplicate logic |
 
 ### Pending Todos
 
@@ -64,12 +67,12 @@ None yet.
 
 ### Blockers/Concerns
 
-None - Phase 3 verified complete, ready for Phase 4 planning.
+None - Phase 4 plan 01 complete, ready for 04-02.
 
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Phase 3 verified complete
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
 
 ## Phase 1 Summary
@@ -156,3 +159,25 @@ cocosearch --interactive --index myproject
 ```
 
 Next: Phase 4 (Index Management)
+
+## Phase 4 Summary (In Progress)
+
+Index management module development:
+
+Plan 04-01:
+- Management module created at `src/cocosearch/management/`
+- `list_indexes()`: Queries information_schema for CocoIndex tables
+- `get_stats()`: Returns file/chunk count and storage size
+- `clear_index()`: Validates existence before DROP TABLE
+- `get_git_root()` / `derive_index_from_git()`: Git-based auto-detection
+
+**Management Functions:**
+```python
+from cocosearch.management import (
+    list_indexes,      # -> list[dict] with name, table_name
+    get_stats,         # -> dict with file_count, chunk_count, storage_size
+    clear_index,       # -> dict with success, message
+    get_git_root,      # -> Path | None
+    derive_index_from_git,  # -> str | None
+)
+```
