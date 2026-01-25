@@ -154,7 +154,7 @@ CocoSearch provides an MCP (Model Context Protocol) server for semantic code sea
 - `index_codebase` - Index a directory for semantic search
 - `search_code` - Search indexed code with natural language queries
 - `list_indexes` - List all available indexes
-- `get_stats` - Get statistics for an index
+- `index_stats` - Get statistics for an index
 - `clear_index` - Remove an index from the database
 
 ### Claude Code
