@@ -76,10 +76,12 @@ Plans:
   2. User can follow MCP guides to configure CocoSearch in Claude Code, Claude Desktop, or OpenCode
   3. User can reference CLI documentation for all commands with examples
   4. README provides quick start path from install to first search (CLI and MCP)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md — README structure, introduction, Quick Start, and Installation guide
+- [ ] 07-02-PLAN.md — MCP configuration guides (Claude Code, Claude Desktop, OpenCode)
+- [ ] 07-03-PLAN.md — CLI reference and configuration documentation
 
 ## Progress
 
@@ -93,7 +95,7 @@ Plans:
 | 4. Management | v1.0 | 3/3 | Complete | 2026-01-25 |
 | 5. Test Infrastructure | v1.1 | 3/3 | Complete | 2026-01-25 |
 | 6. Test Coverage | v1.1 | 5/5 | Complete | 2026-01-25 |
-| 7. Documentation | v1.1 | 0/? | Not started | - |
+| 7. Documentation | v1.1 | 0/3 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-25 for v1.1 Docs & Tests milestone*
