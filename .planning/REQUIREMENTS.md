@@ -101,46 +101,46 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INST-01 | TBD | Pending |
-| INST-02 | TBD | Pending |
-| INST-03 | TBD | Pending |
-| MCP-01 | TBD | Pending |
-| MCP-02 | TBD | Pending |
-| MCP-03 | TBD | Pending |
-| CLI-01 | TBD | Pending |
-| CLI-02 | TBD | Pending |
-| README-01 | TBD | Pending |
-| README-02 | TBD | Pending |
-| README-03 | TBD | Pending |
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| INFRA-04 | TBD | Pending |
-| TEST-IDX-01 | TBD | Pending |
-| TEST-IDX-02 | TBD | Pending |
-| TEST-IDX-03 | TBD | Pending |
-| TEST-IDX-04 | TBD | Pending |
-| TEST-IDX-05 | TBD | Pending |
-| TEST-SRC-01 | TBD | Pending |
-| TEST-SRC-02 | TBD | Pending |
-| TEST-SRC-03 | TBD | Pending |
-| TEST-SRC-04 | TBD | Pending |
-| TEST-MGT-01 | TBD | Pending |
-| TEST-MGT-02 | TBD | Pending |
-| TEST-MGT-03 | TBD | Pending |
-| TEST-MGT-04 | TBD | Pending |
-| TEST-CLI-01 | TBD | Pending |
-| TEST-CLI-02 | TBD | Pending |
-| TEST-CLI-03 | TBD | Pending |
-| TEST-MCP-01 | TBD | Pending |
-| TEST-MCP-02 | TBD | Pending |
-| TEST-MCP-03 | TBD | Pending |
+| INST-01 | Phase 7 | Pending |
+| INST-02 | Phase 7 | Pending |
+| INST-03 | Phase 7 | Pending |
+| MCP-01 | Phase 7 | Pending |
+| MCP-02 | Phase 7 | Pending |
+| MCP-03 | Phase 7 | Pending |
+| CLI-01 | Phase 7 | Pending |
+| CLI-02 | Phase 7 | Pending |
+| README-01 | Phase 7 | Pending |
+| README-02 | Phase 7 | Pending |
+| README-03 | Phase 7 | Pending |
+| INFRA-01 | Phase 5 | Pending |
+| INFRA-02 | Phase 5 | Pending |
+| INFRA-03 | Phase 5 | Pending |
+| INFRA-04 | Phase 5 | Pending |
+| TEST-IDX-01 | Phase 6 | Pending |
+| TEST-IDX-02 | Phase 6 | Pending |
+| TEST-IDX-03 | Phase 6 | Pending |
+| TEST-IDX-04 | Phase 6 | Pending |
+| TEST-IDX-05 | Phase 6 | Pending |
+| TEST-SRC-01 | Phase 6 | Pending |
+| TEST-SRC-02 | Phase 6 | Pending |
+| TEST-SRC-03 | Phase 6 | Pending |
+| TEST-SRC-04 | Phase 6 | Pending |
+| TEST-MGT-01 | Phase 6 | Pending |
+| TEST-MGT-02 | Phase 6 | Pending |
+| TEST-MGT-03 | Phase 6 | Pending |
+| TEST-MGT-04 | Phase 6 | Pending |
+| TEST-CLI-01 | Phase 6 | Pending |
+| TEST-CLI-02 | Phase 6 | Pending |
+| TEST-CLI-03 | Phase 6 | Pending |
+| TEST-MCP-01 | Phase 6 | Pending |
+| TEST-MCP-02 | Phase 6 | Pending |
+| TEST-MCP-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 34 total
-- Mapped to phases: 0
-- Unmapped: 34
+- Mapped to phases: 34
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-25*
-*Last updated: 2026-01-25 after initial definition*
+*Last updated: 2026-01-25 after roadmap creation*
