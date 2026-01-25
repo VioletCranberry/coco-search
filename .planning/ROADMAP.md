@@ -61,11 +61,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Indexer module tests (config, file_filter, embedder, progress, flow)
-- [ ] 06-02-PLAN.md — Search module tests (db, query, utils, formatter)
-- [ ] 06-03-PLAN.md — Management module tests (git, discovery, clear, stats)
-- [ ] 06-04-PLAN.md — CLI tests (commands, output, error handling)
-- [ ] 06-05-PLAN.md — MCP server tests (tools, execution, errors)
+- [x] 06-01-PLAN.md — Indexer module tests (config, file_filter, embedder, progress, flow)
+- [x] 06-02-PLAN.md — Search module tests (db, query, utils, formatter)
+- [x] 06-03-PLAN.md — Management module tests (git, discovery, clear, stats)
+- [x] 06-04-PLAN.md — CLI tests (commands, output, error handling)
+- [x] 06-05-PLAN.md — MCP server tests (tools, execution, errors)
 
 ### Phase 7: Documentation
 **Goal**: User documentation enabling new users to install, configure, and use CocoSearch
@@ -92,7 +92,7 @@ Plans:
 | 3. Search | v1.0 | 3/3 | Complete | 2026-01-25 |
 | 4. Management | v1.0 | 3/3 | Complete | 2026-01-25 |
 | 5. Test Infrastructure | v1.1 | 3/3 | Complete | 2026-01-25 |
-| 6. Test Coverage | v1.1 | 0/5 | Planned | - |
+| 6. Test Coverage | v1.1 | 5/5 | Complete | 2026-01-25 |
 | 7. Documentation | v1.1 | 0/? | Not started | - |
 
 ---
