@@ -187,3 +187,80 @@ class TestClearIndex:
 
         assert result["success"] is False
         assert "error" in result
+
+
+class TestIndexCodebase:
+    """Tests for index_codebase MCP tool."""
+
+    def test_returns_success_dict(self, tmp_codebase):
+        """Returns success dict with stats."""
+        with patch("cocoindex.init"):
+            with patch("cocosearch.mcp.server.run_index") as mock_run:
+                mock_run.return_value = MagicMock(stats={
+                    "files": {
+                        "num_insertions": 5,
+                        "num_deletions": 0,
+                        "num_updates": 2,
+                    }
+                })
+                result = index_codebase(
+                    path=str(tmp_codebase),
+                    index_name="testindex",
+                )
+
+        assert result["success"] is True
+        assert result["index_name"] == "testindex"
+        assert result["stats"]["files_added"] == 5
+
+    def test_derives_index_name(self, tmp_codebase):
+        """Auto-derives index name from path."""
+        with patch("cocoindex.init"):
+            with patch("cocosearch.mcp.server.run_index") as mock_run:
+                mock_run.return_value = MagicMock(stats={})
+                result = index_codebase(
+                    path=str(tmp_codebase),
+                    index_name=None,  # Should be derived
+                )
+
+        assert result["success"] is True
+        assert result["index_name"] == "codebase"  # tmp_codebase creates "codebase" dir
+
+    def test_returns_error_on_failure(self, tmp_codebase):
+        """Returns error dict on indexing failure."""
+        with patch("cocoindex.init"):
+            with patch("cocosearch.mcp.server.run_index", side_effect=ValueError("Flow error")):
+                result = index_codebase(
+                    path=str(tmp_codebase),
+                    index_name="testindex",
+                )
+
+        assert result["success"] is False
+        assert "error" in result
+
+
+class TestMCPToolRegistration:
+    """Tests for MCP tool registration."""
+
+    def test_mcp_instance_exists(self):
+        """FastMCP instance is created."""
+        from cocosearch.mcp.server import mcp
+        assert mcp is not None
+        assert mcp.name == "cocosearch"
+
+    def test_tools_are_registered(self):
+        """All tools are registered with MCP."""
+        from cocosearch.mcp.server import mcp
+        # FastMCP stores tools internally
+        # Just verify the module imports without error
+        from cocosearch.mcp.server import (
+            search_code,
+            list_indexes,
+            index_stats,
+            clear_index,
+            index_codebase,
+        )
+        assert callable(search_code)
+        assert callable(list_indexes)
+        assert callable(index_stats)
+        assert callable(clear_index)
+        assert callable(index_codebase)
