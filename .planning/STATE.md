@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-25)
 ## Current Position
 
 Phase: 5 of 7 (Test Infrastructure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-25 — v1.1 roadmap created
+Plan: 3 of 5
+Status: In progress
+Last activity: 2026-01-25 — Completed 05-03-PLAN.md (Ollama Mocks and Data Fixtures)
 
-Progress: [##########----------] 57% (v1.0: 12/12 plans, v1.1: 0/? plans)
+Progress: [###########---------] 60% (v1.0: 12/12 plans, v1.1: 1/9 plans)
 
 ## Performance Metrics
 
@@ -32,7 +32,13 @@ Progress: [##########----------] 57% (v1.0: 12/12 plans, v1.1: 0/? plans)
 | 3. Search | 3 | Complete |
 | 4. Management | 3 | Complete |
 
-*v1.1 metrics will be tracked as plans complete*
+**v1.1 Progress:**
+
+| Phase | Plans | Completed | Status |
+|-------|-------|-----------|--------|
+| 5. Test Infrastructure | 5 | 1 | In progress |
+| 6. Unit Tests | 2 | 0 | Not started |
+| 7. Documentation | 2 | 0 | Not started |
 
 ## Accumulated Context
 
@@ -43,6 +49,9 @@ Recent decisions affecting current work:
 
 - [v1.0]: JSON output by default for MCP/tool integration
 - [v1.0]: Logging to stderr in MCP prevents stdout corruption
+- [v1.1-05-03]: Hash-based deterministic embeddings (same input = same output)
+- [v1.1-05-03]: Dual patching for code_to_embedding (embedder.py and query.py)
+- [v1.1-05-03]: Factory + ready-to-use fixture pattern (make_X and sample_X)
 
 ### Pending Todos
 
@@ -54,9 +63,9 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-25
-Stopped at: v1.1 roadmap created, ready to plan Phase 5
+Last session: 2026-01-25T22:15:22Z
+Stopped at: Completed 05-03-PLAN.md (Ollama Mocks and Data Fixtures)
 Resume file: None
 
 ---
-*Updated: 2026-01-25 after v1.1 roadmap creation*
+*Updated: 2026-01-25 after completing 05-03-PLAN.md*
