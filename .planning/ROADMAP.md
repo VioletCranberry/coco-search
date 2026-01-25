@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - PostgreSQL + pgvector and Ollama infrastructure with project scaffolding
 - [x] **Phase 2: Indexing Pipeline** - CocoIndex flow with Tree-sitter chunking and embedding generation
-- [ ] **Phase 3: Search** - Vector similarity search with result formatting
+- [x] **Phase 3: Search** - Vector similarity search with result formatting
 - [ ] **Phase 4: Index Management** - Named index lifecycle and MCP server integration
 
 ## Phase Details
@@ -64,9 +64,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Search core: database connection pool, query embedding, vector similarity search
-- [ ] 03-02-PLAN.md — CLI search command: JSON/pretty formatting, all flags, language filtering
-- [ ] 03-03-PLAN.md — Interactive REPL: --interactive mode with settings commands
+- [x] 03-01-PLAN.md — Search core: database connection pool, query embedding, vector similarity search
+- [x] 03-02-PLAN.md — CLI search command: JSON/pretty formatting, all flags, language filtering
+- [x] 03-03-PLAN.md — Interactive REPL: --interactive mode with settings commands
 
 ### Phase 4: Index Management
 **Goal**: Users can manage multiple named indexes through MCP tools
@@ -91,9 +91,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | ✓ Complete | 2026-01-24 |
 | 2. Indexing Pipeline | 3/3 | ✓ Complete | 2026-01-25 |
-| 3. Search | 0/3 | Planned | - |
+| 3. Search | 3/3 | ✓ Complete | 2026-01-25 |
 | 4. Index Management | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-24*
-*Last updated: 2026-01-25 — Phase 3 planned*
+*Last updated: 2026-01-25 — Phase 3 complete*

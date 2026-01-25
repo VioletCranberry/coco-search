@@ -17,12 +17,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Search
 
-- [ ] **SRCH-01**: Semantic search with natural language queries
-- [ ] **SRCH-02**: Return file paths in results
-- [ ] **SRCH-03**: Return line numbers in results
-- [ ] **SRCH-04**: Return relevance scores (cosine similarity)
-- [ ] **SRCH-05**: Limit results to avoid overwhelming context
-- [ ] **SRCH-06**: Filter results by programming language
+- [x] **SRCH-01**: Semantic search with natural language queries
+- [x] **SRCH-02**: Return file paths in results
+- [x] **SRCH-03**: Return line numbers in results
+- [x] **SRCH-04**: Return relevance scores (cosine similarity)
+- [x] **SRCH-05**: Limit results to avoid overwhelming context
+- [x] **SRCH-06**: Filter results by programming language
 
 ### Index Management
 
@@ -85,12 +85,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INDEX-03 | Phase 2 | Complete |
 | INDEX-04 | Phase 2 | Complete |
 | INDEX-05 | Phase 2 | Complete |
-| SRCH-01 | Phase 3 | Pending |
-| SRCH-02 | Phase 3 | Pending |
-| SRCH-03 | Phase 3 | Pending |
-| SRCH-04 | Phase 3 | Pending |
-| SRCH-05 | Phase 3 | Pending |
-| SRCH-06 | Phase 3 | Pending |
+| SRCH-01 | Phase 3 | Complete |
+| SRCH-02 | Phase 3 | Complete |
+| SRCH-03 | Phase 3 | Complete |
+| SRCH-04 | Phase 3 | Complete |
+| SRCH-05 | Phase 3 | Complete |
+| SRCH-06 | Phase 3 | Complete |
 | MGMT-01 | Phase 4 | Pending |
 | MGMT-02 | Phase 4 | Pending |
 | MGMT-03 | Phase 4 | Pending |
@@ -111,4 +111,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-25 — Phase 2 requirements complete*
+*Last updated: 2026-01-25 — Phase 3 requirements complete*
