@@ -14,25 +14,27 @@ from tests.mocks.db import MockConnectionPool, MockCursor, MockConnection
 def mock_db_pool():
     """Factory fixture for creating mock database pools.
 
-    Returns a function that creates a configured (pool, cursor) tuple.
+    Returns a function that creates a configured (pool, cursor, connection) tuple.
     The cursor can be pre-loaded with results for testing.
+    The connection exposes commit tracking.
 
     Usage:
         def test_something(mock_db_pool):
-            pool, cursor = mock_db_pool(results=[
+            pool, cursor, conn = mock_db_pool(results=[
                 ("/path/file.py", 0, 100, 0.85),
             ])
             # Use pool in test...
             cursor.assert_query_contains("SELECT")
+            assert conn.committed  # verify commit was called
     """
 
     def _make_pool(
         results: list[tuple] | None = None,
-    ) -> tuple[MockConnectionPool, MockCursor]:
+    ) -> tuple[MockConnectionPool, MockCursor, MockConnection]:
         cursor = MockCursor(results=results)
         conn = MockConnection(cursor=cursor)
         pool = MockConnectionPool(connection=conn)
-        return pool, cursor
+        return pool, cursor, conn
 
     return _make_pool
 
@@ -42,16 +44,16 @@ def patched_db_pool(mock_db_pool):
     """Fixture that auto-patches get_connection_pool.
 
     Patches cocosearch.search.db.get_connection_pool to return a mock pool.
-    Returns (pool, cursor) for test assertions.
+    Returns (pool, cursor, conn) for test assertions.
 
     Usage:
         def test_search(patched_db_pool):
-            pool, cursor = patched_db_pool
+            pool, cursor, conn = patched_db_pool
             # Now any code calling get_connection_pool() gets the mock
     """
-    pool, cursor = mock_db_pool()
+    pool, cursor, conn = mock_db_pool()
     with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
-        yield pool, cursor
+        yield pool, cursor, conn
 
 
 @pytest.fixture

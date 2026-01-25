@@ -16,7 +16,7 @@ class TestSearchCode:
 
     def test_returns_result_list(self, mock_code_to_embedding, mock_db_pool):
         """Returns list of result dicts."""
-        pool, cursor = mock_db_pool(results=[
+        pool, cursor, _conn = mock_db_pool(results=[
             ("/test/file.py", 0, 100, 0.9),
         ])
 
@@ -38,7 +38,7 @@ class TestSearchCode:
 
     def test_applies_limit(self, mock_code_to_embedding, mock_db_pool):
         """Respects limit parameter."""
-        pool, cursor = mock_db_pool(results=[
+        pool, cursor, _conn = mock_db_pool(results=[
             ("/test/file1.py", 0, 100, 0.9),
             ("/test/file2.py", 0, 100, 0.8),
         ])
@@ -59,7 +59,7 @@ class TestSearchCode:
 
     def test_language_filter(self, mock_code_to_embedding, mock_db_pool):
         """Applies language filter."""
-        pool, cursor = mock_db_pool(results=[
+        pool, cursor, _conn = mock_db_pool(results=[
             ("/test/file.py", 0, 100, 0.9),
         ])
 
@@ -78,3 +78,112 @@ class TestSearchCode:
         # Verify query contains language filter
         calls = cursor.calls
         assert any("python" in str(call) or ".py" in str(call) for call in calls) or True
+
+
+class TestListIndexes:
+    """Tests for list_indexes MCP tool."""
+
+    def test_returns_index_list(self, mock_db_pool):
+        """Returns list of index dicts."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("codeindex_myproject__myproject_chunks",),
+            ("codeindex_other__other_chunks",),
+        ])
+
+        with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
+            result = list_indexes()
+
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0]["name"] == "myproject"
+
+    def test_returns_empty_when_no_indexes(self, mock_db_pool):
+        """Returns empty list when no indexes exist."""
+        pool, cursor, _conn = mock_db_pool(results=[])
+
+        with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
+            result = list_indexes()
+
+        assert result == []
+
+
+class TestIndexStats:
+    """Tests for index_stats MCP tool."""
+
+    def test_returns_stats_for_specific_index(self, mock_db_pool):
+        """Returns stats dict for named index."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            (True,),  # EXISTS check
+            (10, 50),  # file_count, chunk_count
+            (1024 * 1024,),  # storage_size
+        ])
+
+        with patch("cocosearch.management.stats.get_connection_pool", return_value=pool):
+            result = index_stats(index_name="testindex")
+
+        assert isinstance(result, dict)
+        assert result["file_count"] == 10
+        assert result["chunk_count"] == 50
+        assert "storage_size_pretty" in result
+
+    def test_returns_error_for_nonexistent(self, mock_db_pool):
+        """Returns error dict for missing index."""
+        pool, cursor, _conn = mock_db_pool(results=[(False,)])
+
+        with patch("cocosearch.management.stats.get_connection_pool", return_value=pool):
+            result = index_stats(index_name="missing")
+
+        assert result["success"] is False
+        assert "error" in result
+
+    def test_returns_all_indexes_when_no_name(self, mock_db_pool):
+        """Returns list of stats for all indexes when no name provided."""
+        # First call: list_indexes
+        # Then: get_stats for each
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("codeindex_proj1__proj1_chunks",),  # list_indexes
+        ])
+
+        with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.get_stats") as mock_stats:
+                mock_stats.return_value = {"name": "proj1", "file_count": 5, "chunk_count": 20}
+                result = index_stats(index_name=None)
+
+        assert isinstance(result, list)
+
+
+class TestClearIndex:
+    """Tests for clear_index MCP tool."""
+
+    def test_returns_success_on_delete(self, mock_db_pool):
+        """Returns success dict when index deleted."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            (True,),  # EXISTS check
+        ])
+
+        with patch("cocosearch.management.clear.get_connection_pool", return_value=pool):
+            result = clear_index(index_name="testindex")
+
+        assert result["success"] is True
+        assert "message" in result
+
+    def test_returns_error_for_nonexistent(self, mock_db_pool):
+        """Returns error dict for missing index."""
+        pool, cursor, _conn = mock_db_pool(results=[(False,)])
+
+        with patch("cocosearch.management.clear.get_connection_pool", return_value=pool):
+            result = clear_index(index_name="missing")
+
+        assert result["success"] is False
+        assert "error" in result
+
+    def test_handles_unexpected_error(self, mock_db_pool):
+        """Returns error dict on unexpected exception."""
+        pool, cursor, _conn = mock_db_pool(results=[(True,)])
+
+        with patch("cocosearch.management.clear.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.mgmt_clear_index", side_effect=RuntimeError("DB crashed")):
+                result = clear_index(index_name="testindex")
+
+        assert result["success"] is False
+        assert "error" in result

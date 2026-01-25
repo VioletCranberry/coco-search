@@ -73,10 +73,15 @@ class MockConnection:
     def __init__(self, cursor: MockCursor | None = None):
         """Initialize with optional pre-configured cursor."""
         self._cursor = cursor or MockCursor()
+        self.committed = False
 
     def cursor(self) -> MockCursor:
         """Return the mock cursor."""
         return self._cursor
+
+    def commit(self) -> None:
+        """Record that commit was called."""
+        self.committed = True
 
     def __enter__(self) -> "MockConnection":
         return self
