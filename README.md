@@ -145,3 +145,56 @@ export COCOINDEX_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/c
 ```
 
 **Windows users:** Use WSL2 for best compatibility.
+
+## MCP Configuration
+
+CocoSearch provides an MCP (Model Context Protocol) server for semantic code search integration with LLM clients. When configured, your AI assistant can search your codebase using natural language.
+
+**Available MCP tools:**
+- `index_codebase` - Index a directory for semantic search
+- `search_code` - Search indexed code with natural language queries
+- `list_indexes` - List all available indexes
+- `get_stats` - Get statistics for an index
+- `clear_index` - Remove an index from the database
+
+### Claude Code
+
+**Option A - CLI (recommended):**
+
+```bash
+claude mcp add --transport stdio --scope user \
+  --env COCOINDEX_DATABASE_URL=postgresql://cocoindex:cocoindex@localhost:5432/cocoindex \
+  cocosearch -- uv run --directory /absolute/path/to/cocosearch cocosearch mcp
+```
+
+Replace `/absolute/path/to/cocosearch` with the actual path where you cloned the repository. Use `pwd` in the cocosearch directory to get the absolute path.
+
+**Verify CLI setup:**
+```bash
+claude mcp list
+```
+
+**Option B - JSON config:**
+
+Add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "cocosearch": {
+      "command": "uv",
+      "args": ["run", "--directory", "/absolute/path/to/cocosearch", "cocosearch", "mcp"],
+      "env": {
+        "COCOINDEX_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
+      }
+    }
+  }
+}
+```
+
+> **Important:** JSON does not expand `~` paths. Always use absolute paths like `/Users/yourname/cocosearch` or `/home/yourname/cocosearch`.
+
+**Verification:**
+1. Restart Claude Code (or run `/mcp` command to refresh)
+2. Run `/mcp` - you should see `cocosearch` listed with status "connected"
+3. Ask Claude: "Search for authentication logic in my codebase"
