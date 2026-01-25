@@ -397,3 +397,34 @@ Start the MCP server for LLM integration. Typically invoked by MCP clients, not 
 ```bash
 cocosearch mcp  # Runs until killed, used by Claude/OpenCode
 ```
+
+## Configuration
+
+### .cocosearch.yaml
+
+Create `.cocosearch.yaml` in your project root to customize indexing:
+
+```yaml
+indexing:
+  include_patterns:
+    - "*.py"
+    - "*.js"
+    - "*.ts"
+    - "*.go"
+    - "*.rs"
+  exclude_patterns:
+    - "*_test.go"
+    - "*.min.js"
+  chunk_size: 1000      # bytes
+  chunk_overlap: 300    # bytes
+```
+
+Default include patterns (when no config):
+`*.py`, `*.js`, `*.ts`, `*.tsx`, `*.jsx`, `*.rs`, `*.go`, `*.java`, `*.c`, `*.cpp`, `*.h`, `*.hpp`, `*.rb`, `*.php`, `*.swift`, `*.kt`, `*.scala`, `*.md`, `*.mdx`
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `COCOINDEX_DATABASE_URL` | PostgreSQL connection URL | `postgresql://cocoindex:cocoindex@localhost:5432/cocoindex` |
+| `OLLAMA_HOST` | Ollama API host | `http://localhost:11434` |
