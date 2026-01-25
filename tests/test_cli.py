@@ -60,3 +60,105 @@ class TestParseQueryFilters:
         query, lang = parse_query_filters("find lang:typescript auth code")
         assert query == "find  auth code"  # Note double space from removal
         assert lang == "typescript"
+
+
+class TestIndexCommand:
+    """Tests for index_command."""
+
+    def test_invalid_path_returns_error(self, capsys):
+        """Returns 1 for nonexistent path."""
+        args = argparse.Namespace(
+            path="/nonexistent/path",
+            name=None,
+            include=None,
+            exclude=None,
+            no_gitignore=False,
+        )
+        result = index_command(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Error" in captured.out
+        assert "does not exist" in captured.out
+
+    def test_valid_path_runs_indexing(self, capsys, tmp_codebase):
+        """Returns 0 for valid path with mocked indexing."""
+        with patch("cocosearch.cli.run_index") as mock_run:
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            with patch("cocosearch.cli.IndexingProgress"):
+                args = argparse.Namespace(
+                    path=str(tmp_codebase),
+                    name="testindex",
+                    include=None,
+                    exclude=None,
+                    no_gitignore=False,
+                )
+                result = index_command(args)
+        assert result == 0
+
+
+class TestSearchCommand:
+    """Tests for search_command."""
+
+    def test_requires_query_without_interactive(self, capsys):
+        """Returns 1 when no query and not interactive."""
+        with patch("cocoindex.init"):
+            args = argparse.Namespace(
+                query=None,
+                index="testindex",
+                limit=10,
+                lang=None,
+                min_score=0.3,
+                context=5,
+                pretty=False,
+                interactive=False,
+            )
+            result = search_command(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Query required" in captured.out
+
+    def test_json_output_is_valid(self, capsys, make_search_result):
+        """Search returns parseable JSON."""
+        # Create mock search results
+        mock_results = [
+            make_search_result(filename="/test/file.py", start_byte=0, end_byte=100, score=0.9),
+        ]
+
+        with patch("cocoindex.init"):
+            with patch("cocosearch.cli.search", return_value=mock_results):
+                args = argparse.Namespace(
+                    query="test query",
+                    index="testindex",
+                    limit=10,
+                    lang=None,
+                    min_score=0.3,
+                    context=5,
+                    pretty=False,
+                    interactive=False,
+                )
+                result = search_command(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert isinstance(output, list)
+
+
+class TestListCommand:
+    """Tests for list_command."""
+
+    def test_json_output(self, capsys, mock_db_pool):
+        """Returns JSON list of indexes."""
+        pool, cursor = mock_db_pool(results=[
+            ("codeindex_myproject__myproject_chunks",),
+        ])
+
+        with patch("cocoindex.init"):
+            with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
+                args = argparse.Namespace(pretty=False)
+                result = list_command(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert isinstance(output, list)
