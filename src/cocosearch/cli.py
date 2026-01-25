@@ -205,11 +205,20 @@ def search_command(args: argparse.Namespace) -> int:
     if args.index:
         index_name = args.index
     else:
-        # Auto-detect from cwd
-        index_name = derive_index_name(os.getcwd())
-        if args.pretty or args.interactive:
-            # Only show in pretty/interactive mode to keep JSON clean
-            console.print(f"[dim]Using index: {index_name}[/dim]")
+        # Auto-detect: try git root first, fall back to cwd
+        git_index = derive_index_from_git()
+        if git_index:
+            index_name = git_index
+        else:
+            index_name = derive_index_name(os.getcwd())
+
+    # Always print "Using index:" hint (per CONTEXT.md requirement)
+    if args.pretty or args.interactive:
+        console.print(f"[dim]Using index: {index_name}[/dim]")
+    else:
+        # For JSON mode, print to stderr to keep stdout clean
+        import sys as _sys
+        print(f"Using index: {index_name}", file=_sys.stderr)
 
     # Handle interactive mode
     if args.interactive:
