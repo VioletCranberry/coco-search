@@ -335,3 +335,65 @@ Output (--pretty):
         """Authenticate user credentials against database."""
         ...
 ```
+
+### Managing Indexes
+
+**List indexes:** `cocosearch list [--pretty]`
+
+Show all available indexes.
+
+```bash
+cocosearch list --pretty
+```
+
+Output:
+```
+       Indexes
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Name       ┃ Table                  ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ myproject  │ cocosearch_myproject   │
+│ another    │ cocosearch_another     │
+└────────────┴────────────────────────┘
+```
+
+**Index statistics:** `cocosearch stats [index] [--pretty]`
+
+Show statistics for one or all indexes.
+
+```bash
+cocosearch stats myproject --pretty
+```
+
+Output:
+```
+    Index: myproject
+┏━━━━━━━━━┳━━━━━━━━━━━┓
+┃ Metric  ┃ Value     ┃
+┡━━━━━━━━━╇━━━━━━━━━━━┩
+│ Files   │ 42        │
+│ Chunks  │ 127       │
+│ Size    │ 2.3 MB    │
+└─────────┴───────────┘
+```
+
+**Clear index:** `cocosearch clear <index> [--force] [--pretty]`
+
+Delete an index and all its data. Prompts for confirmation unless `--force`.
+
+```bash
+cocosearch clear myproject --force
+```
+
+Output:
+```
+Index 'myproject' deleted successfully
+```
+
+**Start MCP server:** `cocosearch mcp`
+
+Start the MCP server for LLM integration. Typically invoked by MCP clients, not directly.
+
+```bash
+cocosearch mcp  # Runs until killed, used by Claude/OpenCode
+```
