@@ -27,15 +27,15 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Limit results to avoid context overflow — v1.0
 - Filter results by programming language — v1.0
 - List all indexes and show statistics — v1.0
+- User documentation with installation guide and quick start — v1.1
+- MCP setup guides for Claude Code, Claude Desktop, and OpenCode — v1.1
+- CLI reference documentation — v1.1
+- Full pytest test suite with mocked dependencies — v1.1
+- README.md quick start (CLI demo → MCP setup) — v1.1
 
 ### Active
 
-**v1.1 Docs & Tests:**
-- User documentation with installation guide and quick start
-- MCP setup guides for Claude Code, Claude Desktop, and OpenCode
-- CLI reference documentation
-- Full pytest test suite with mocked dependencies
-- README.md quick start (CLI demo → MCP setup)
+(No active milestone — v1.1 complete, ready for v2 planning)
 
 ### Out of Scope
 
@@ -44,21 +44,13 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Real-time file watching / auto-reindex — manual index trigger only
 - Web UI — MCP and CLI interface only
 
-## Current Milestone: v1.1 Docs & Tests
+## Current State
 
-**Goal:** Make CocoSearch approachable for new users and maintainable with comprehensive test coverage.
-
-**Target deliverables:**
-- Installation guide (Ollama via brew, PostgreSQL via Docker)
-- MCP setup guides for Claude Code, Claude Desktop, OpenCode
-- CLI reference documentation
-- Full pytest test suite with mocked dependencies
-
-## Context
-
-Shipped v1.0 with 2,432 LOC Python.
+Shipped v1.1 with 5,401 LOC Python (2,432 app + 2,969 tests).
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP.
 Primary use case: onboarding to unfamiliar codebases via semantic search.
+Test coverage: 190 unit tests with mocked dependencies.
+Documentation: Comprehensive README with Quick Start, Installation, MCP config, CLI reference.
 
 ## Constraints
 
@@ -87,4 +79,4 @@ Primary use case: onboarding to unfamiliar codebases via semantic search.
 | Logging to stderr in MCP | Prevents stdout corruption of JSON-RPC protocol | Good |
 
 ---
-*Last updated: 2026-01-25 after starting v1.1 milestone*
+*Last updated: 2026-01-26 after v1.1 milestone*
