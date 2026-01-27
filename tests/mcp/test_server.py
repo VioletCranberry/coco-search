@@ -17,7 +17,7 @@ class TestSearchCode:
     def test_returns_result_list(self, mock_code_to_embedding, mock_db_pool):
         """Returns list of result dicts."""
         pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9),
+            ("/test/file.py", 0, 100, 0.9, "", "", ""),
         ])
 
         with patch("cocoindex.init"):
@@ -39,8 +39,8 @@ class TestSearchCode:
     def test_applies_limit(self, mock_code_to_embedding, mock_db_pool):
         """Respects limit parameter."""
         pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file1.py", 0, 100, 0.9),
-            ("/test/file2.py", 0, 100, 0.8),
+            ("/test/file1.py", 0, 100, 0.9, "", "", ""),
+            ("/test/file2.py", 0, 100, 0.8, "", "", ""),
         ])
 
         with patch("cocoindex.init"):
@@ -60,7 +60,7 @@ class TestSearchCode:
     def test_language_filter(self, mock_code_to_embedding, mock_db_pool):
         """Applies language filter."""
         pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9),
+            ("/test/file.py", 0, 100, 0.9, "", "", ""),
         ])
 
         with patch("cocoindex.init"):
