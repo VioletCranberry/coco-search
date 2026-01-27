@@ -81,3 +81,101 @@ class TestExtractExtension:
 
         result = extract_extension("file.test.spec.ts")
         assert result == "ts"
+
+
+class TestExtractLanguage:
+    """Tests for extract_language function.
+
+    The extract_language function routes extensionless files like Dockerfile
+    by filename pattern, and all other files by extension (same as extract_extension).
+    """
+
+    def test_hcl_tf_extension(self):
+        """Routes .tf files by extension."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("main.tf") == "tf"
+
+    def test_hcl_tfvars_extension(self):
+        """Routes .tfvars files by extension."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("variables.tfvars") == "tfvars"
+
+    def test_hcl_hcl_extension(self):
+        """Routes .hcl files by extension."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("config.hcl") == "hcl"
+
+    def test_dockerfile_exact(self):
+        """Routes Dockerfile by filename pattern."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("Dockerfile") == "dockerfile"
+
+    def test_dockerfile_dev_variant(self):
+        """Routes Dockerfile.dev by filename prefix."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("Dockerfile.dev") == "dockerfile"
+
+    def test_dockerfile_production_variant(self):
+        """Routes Dockerfile.production by filename prefix."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("Dockerfile.production") == "dockerfile"
+
+    def test_containerfile_exact_match(self):
+        """Routes Containerfile by exact filename match."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("Containerfile") == "dockerfile"
+
+    def test_shell_sh_extension(self):
+        """Routes .sh files by extension."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("deploy.sh") == "sh"
+
+    def test_shell_bash_extension(self):
+        """Routes .bash files by extension."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("build.bash") == "bash"
+
+    def test_non_devops_python(self):
+        """Routes .py files by extension (non-DevOps, unchanged)."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("test.py") == "py"
+
+    def test_non_devops_javascript(self):
+        """Routes .js files by extension (non-DevOps, unchanged)."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("app.js") == "js"
+
+    def test_extensionless_non_dockerfile(self):
+        """Returns empty string for extensionless non-Dockerfile files."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("Makefile") == ""
+
+    def test_full_path_dockerfile(self):
+        """Routes Dockerfile from full path."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("/path/to/Dockerfile") == "dockerfile"
+
+    def test_full_path_dockerfile_variant(self):
+        """Routes Dockerfile.dev from full path."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("/path/to/Dockerfile.dev") == "dockerfile"
+
+    def test_full_path_hcl(self):
+        """Routes .tf from full path."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("/infra/main.tf") == "tf"
