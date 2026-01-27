@@ -1,5 +1,7 @@
 """Tests for cocosearch.indexer.flow module."""
 
+import inspect
+
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -224,6 +226,70 @@ class TestCustomLanguageIntegration:
 
         flow = create_code_index_flow(
             index_name="test_custom_lang",
+            codebase_path="/test/path",
+            include_patterns=["*.py", "*.tf", "Dockerfile"],
+            exclude_patterns=[],
+        )
+
+        assert flow is not None
+
+
+class TestMetadataIntegration:
+    """Tests for metadata extraction integration in flow module."""
+
+    def test_extract_devops_metadata_importable_from_flow(self):
+        """flow module successfully imports extract_devops_metadata."""
+        import cocosearch.indexer.flow as flow_module
+
+        assert hasattr(flow_module, 'extract_devops_metadata')
+
+    def test_extract_devops_metadata_is_cocoindex_op(self):
+        """extract_devops_metadata is a callable that returns DevOpsMetadata."""
+        from cocosearch.indexer.metadata import extract_devops_metadata, DevOpsMetadata
+
+        assert callable(extract_devops_metadata)
+        # Verify the function works and returns the expected type
+        result = extract_devops_metadata("some text", "py")
+        assert isinstance(result, DevOpsMetadata)
+
+    def test_flow_source_has_metadata_import(self):
+        """flow module source contains the metadata import statement."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert "from cocosearch.indexer.metadata import extract_devops_metadata" in source
+
+    def test_flow_source_has_metadata_transform(self):
+        """flow module source contains the metadata transform call."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert 'chunk["metadata"]' in source
+        assert 'extract_devops_metadata' in source
+        assert 'language=file["extension"]' in source
+
+    def test_flow_source_collects_metadata_fields(self):
+        """flow module source collects all three metadata fields via bracket notation."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert 'block_type=chunk["metadata"]["block_type"]' in source
+        assert 'hierarchy=chunk["metadata"]["hierarchy"]' in source
+        assert 'language_id=chunk["metadata"]["language_id"]' in source
+
+    def test_flow_source_preserves_primary_keys(self):
+        """flow module source preserves primary keys as ["filename", "location"]."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert 'primary_key_fields=["filename", "location"]' in source
+
+    def test_create_code_index_flow_with_metadata_succeeds(self):
+        """create_code_index_flow builds flow without errors after metadata wiring."""
+        from cocosearch.indexer.flow import create_code_index_flow
+
+        flow = create_code_index_flow(
+            index_name="test_metadata",
             codebase_path="/test/path",
             include_patterns=["*.py", "*.tf", "Dockerfile"],
             exclude_patterns=[],
