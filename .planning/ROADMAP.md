@@ -121,6 +121,12 @@ Plans:
 
 **Dependencies:** Phase 3 (metadata must be populated in PostgreSQL before search can surface it).
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Search query layer: extended SearchResult, metadata SQL, DevOps language filter, graceful degradation
+- [ ] 04-02-PLAN.md -- Output integration: JSON/pretty formatters with metadata annotations, MCP response with metadata fields
+
 **Requirements:**
 - REQ-18: Extended `SearchResult` with `block_type`, `hierarchy`, `language_id` fields
 - REQ-19: SQL queries select new metadata columns
@@ -188,7 +194,7 @@ Plans:
 | 1 | Custom Language Definitions and File Routing | 6 | ✓ Complete (2/2 plans) |
 | 2 | Metadata Extraction | 7 | ✓ Complete (1/1 plans) |
 | 3 | Flow Integration and Schema | 4 | ✓ Verified (1/1 plans) |
-| 4 | Search and Output Integration | 9 | Pending |
+| 4 | Search and Output Integration | 9 | Planned (0/2 plans) |
 
 ---
 *Created: 2026-01-27*
