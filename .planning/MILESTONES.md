@@ -1,5 +1,34 @@
 # Project Milestones: CocoSearch
 
+## v1.2 DevOps Language Support (Shipped: 2026-01-27)
+
+**Delivered:** Language-aware chunking and rich metadata extraction for HCL (Terraform), Dockerfile, and Bash/Shell files — zero new dependencies, single-flow pipeline with DevOps search filtering and metadata annotations.
+
+**Phases completed:** 8-10, 4-soi (6 plans total)
+
+**Key accomplishments:**
+
+- Language-aware chunking for HCL, Dockerfile, and Bash via CocoIndex `CustomLanguageSpec` regex separators
+- Rich metadata extraction (block type, hierarchy, language ID) for every DevOps chunk
+- Zero-dependency pipeline integration with three new PostgreSQL columns via additive schema
+- DevOps search filtering (`--lang terraform/dockerfile/bash`) with alias resolution
+- Graceful degradation for pre-v1.2 indexes
+- Full output surface coverage: JSON, pretty, and MCP metadata annotations with syntax highlighting
+
+**Stats:**
+
+- 51 files created/modified
+- +8,253 / -1,148 lines (7,303 total Python LOC)
+- 4 phases, 6 plans, 26 requirements
+- 327 tests (all passing)
+- 1 day (2026-01-27)
+
+**Git range:** `8c86580` → `a753938`
+
+**What's next:** v1.3+ features (block type search filter, hierarchy filter, Terraform provider inference)
+
+---
+
 ## v1.1 Docs & Tests (Shipped: 2026-01-26)
 
 **Delivered:** Test infrastructure and user documentation — 190 unit tests with mocked dependencies, comprehensive README with installation, MCP configuration, and CLI reference.

@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A local-first semantic code search tool exposed via MCP and CLI. Point it at a codebase, it indexes using CocoIndex with Ollama embeddings and PostgreSQL storage, then search semantically through natural language queries. Built for understanding unfamiliar codebases without sending code to external services.
+A local-first semantic code search tool exposed via MCP and CLI. Point it at a codebase, it indexes using CocoIndex with Ollama embeddings and PostgreSQL storage, then search semantically through natural language queries. Built for understanding unfamiliar codebases without sending code to external services. Supports DevOps files (Terraform, Dockerfile, Bash) with language-aware chunking and rich metadata extraction.
 
 ## Core Value
 
@@ -32,18 +32,17 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - CLI reference documentation — v1.1
 - Full pytest test suite with mocked dependencies — v1.1
 - README.md quick start (CLI demo → MCP setup) — v1.1
+- Custom chunking rules for HCL (Terraform) via CocoIndex custom_languages — v1.2
+- Custom chunking rules for Dockerfile via CocoIndex custom_languages — v1.2
+- Custom chunking rules for Bash/Shell via CocoIndex custom_languages — v1.2
+- File patterns for DevOps files (*.tf, *.hcl, Dockerfile, *.sh, *.bash) — v1.2
+- Rich metadata: block type, hierarchy, language ID extraction for DevOps chunks — v1.2
+- DevOps language search filtering with alias resolution — v1.2
+- Graceful degradation for pre-v1.2 indexes — v1.2
 
 ### Active
 
-**v1.2 — DevOps Language Support**
-
-- [ ] Custom chunking rules for HCL (Terraform) via CocoIndex custom_languages
-- [ ] Custom chunking rules for Dockerfile via CocoIndex custom_languages
-- [ ] Custom chunking rules for Bash/Shell via CocoIndex custom_languages
-- [ ] File patterns for DevOps files (*.tf, *.hcl, Dockerfile, *.sh, *.bash)
-- [ ] Rich metadata: resource/block type extraction (e.g., "aws_s3_bucket resource", "build stage", "function deploy_app")
-- [ ] Rich metadata: hierarchy context in search results (e.g., "module.vpc > resource.aws_subnet", "services > nginx > volumes")
-- [ ] Works for pure infrastructure repos and mixed codebases
+(No active milestone — use `/gsd:new-milestone` to start next)
 
 ### Out of Scope
 
@@ -51,13 +50,16 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Cloud storage or external embedding APIs — this is local-first
 - Real-time file watching / auto-reindex — manual index trigger only
 - Web UI — MCP and CLI interface only
+- Dockerfile stage tracking for non-FROM instructions — requires two-pass processing
+- Block type / hierarchy search filters — validate demand first
 
 ## Current State
 
-Shipped v1.1 with 5,401 LOC Python (2,432 app + 2,969 tests).
+Shipped v1.2 with 7,303 LOC Python.
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP.
 Primary use case: onboarding to unfamiliar codebases via semantic search.
-Test coverage: 190 unit tests with mocked dependencies.
+DevOps support: HCL (Terraform), Dockerfile, Bash with language-aware chunking and metadata.
+Test coverage: 327 unit tests with mocked dependencies.
 Documentation: Comprehensive README with Quick Start, Installation, MCP config, CLI reference.
 
 ## Constraints
@@ -85,6 +87,14 @@ Documentation: Comprehensive README with Quick Start, Installation, MCP config, 
 | cmd module over prompt_toolkit | Standard library sufficient for REPL | Good |
 | Git root detection for auto-index | More reliable than cwd when in subdirectories | Good |
 | Logging to stderr in MCP | Prevents stdout corruption of JSON-RPC protocol | Good |
+| Zero new dependencies for DevOps | CocoIndex custom_languages + Python stdlib re only | Good |
+| Single flow architecture for DevOps | All file types through same pipeline, not separate flows | Good |
+| Regex-only metadata extraction | No external parsers; upgrade path to python-hcl2 exists | Good |
+| Empty strings over NULLs for metadata | Simplifies SQL, consistent pattern across all files | Good |
+| Standard Rust regex for separators | CocoIndex uses regex v1.12.2, not fancy-regex | Good |
+| Additive schema only | No primary key changes, safe schema migration | Good |
+| Module-level graceful degradation | One-time flag prevents repeated failing SQL for pre-v1.2 indexes | Good |
+| Flat metadata in MCP response | Top-level fields, not nested, for simplicity | Good |
 
 ---
-*Last updated: 2026-01-27 after v1.2 milestone start*
+*Last updated: 2026-01-27 after v1.2 milestone*
