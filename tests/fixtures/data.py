@@ -21,12 +21,18 @@ def make_search_result():
         start_byte: int = 0,
         end_byte: int = 100,
         score: float = 0.85,
+        block_type: str = "",
+        hierarchy: str = "",
+        language_id: str = "",
     ) -> SearchResult:
         return SearchResult(
             filename=filename,
             start_byte=start_byte,
             end_byte=end_byte,
             score=score,
+            block_type=block_type,
+            hierarchy=hierarchy,
+            language_id=language_id,
         )
 
     return _make

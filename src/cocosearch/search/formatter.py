@@ -188,10 +188,12 @@ def format_pretty(
                 f"  [{score_color}]{r.score:.2f}[/{score_color}] Lines {start_line}-{end_line}"
             )
 
-            # Language annotation
+            # Language annotation (escape brackets for Rich markup)
             display_lang = _get_display_language(r, filepath)
             annotation = _get_annotation(r, display_lang)
-            console.print(f"  [dim cyan]{annotation}[/dim cyan]")
+            # Rich interprets [...] as markup; escape with backslash
+            escaped = annotation.replace("[", "\\[")
+            console.print(f"  [dim cyan]{escaped}[/dim cyan]")
 
             # Show content with syntax highlighting
             content = read_chunk_content(r.filename, r.start_byte, r.end_byte)

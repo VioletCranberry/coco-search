@@ -10,7 +10,13 @@ from unittest.mock import patch
 import pytest
 from rich.console import Console
 
-from cocosearch.search.formatter import format_json, format_pretty, EXTENSION_LANG_MAP
+from cocosearch.search.formatter import (
+    format_json,
+    format_pretty,
+    EXTENSION_LANG_MAP,
+    _get_display_language,
+    _get_annotation,
+)
 
 
 class TestFormatJson:
@@ -256,3 +262,145 @@ class TestExtensionLangMap:
         expected = ["py", "js", "ts", "go", "rs", "java", "rb", "cpp", "c"]
         for ext in expected:
             assert ext in EXTENSION_LANG_MAP
+
+
+class TestFormatJsonMetadata:
+    """Tests for metadata fields in format_json output."""
+
+    def test_json_includes_metadata_fields(self, make_search_result):
+        """JSON output should include block_type, hierarchy, language_id for DevOps results."""
+        results = [make_search_result(
+            filename="/infra/main.tf",
+            score=0.9,
+            block_type="resource",
+            hierarchy="resource.aws_s3_bucket.data",
+            language_id="hcl",
+        )]
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="resource {}"):
+                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+                    output = format_json(results)
+
+        parsed = json.loads(output)
+        item = parsed[0]
+        assert item["block_type"] == "resource"
+        assert item["hierarchy"] == "resource.aws_s3_bucket.data"
+        assert item["language_id"] == "hcl"
+
+    def test_json_empty_metadata_for_non_devops(self, make_search_result):
+        """Non-DevOps results should have empty string metadata fields."""
+        results = [make_search_result(filename="/test/file.py", score=0.85)]
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+                    output = format_json(results)
+
+        parsed = json.loads(output)
+        item = parsed[0]
+        assert item["block_type"] == ""
+        assert item["hierarchy"] == ""
+        assert item["language_id"] == ""
+
+    def test_json_metadata_consistent_shape(self, make_search_result):
+        """DevOps and non-DevOps results should have identical key sets."""
+        devops_result = make_search_result(
+            filename="/infra/main.tf",
+            block_type="resource",
+            hierarchy="resource.aws_s3_bucket.data",
+            language_id="hcl",
+        )
+        non_devops_result = make_search_result(filename="/test/file.py")
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+                    devops_output = format_json([devops_result])
+                    non_devops_output = format_json([non_devops_result])
+
+        devops_keys = set(json.loads(devops_output)[0].keys())
+        non_devops_keys = set(json.loads(non_devops_output)[0].keys())
+        assert devops_keys == non_devops_keys
+
+
+class TestFormatPrettyAnnotation:
+    """Tests for annotation prefix in format_pretty output."""
+
+    def _make_console(self) -> tuple[Console, io.StringIO]:
+        """Create a Rich Console that captures plain text (no ANSI codes)."""
+        output = io.StringIO()
+        console = Console(file=output, no_color=True, width=100)
+        return console, output
+
+    def test_shows_language_annotation(self, make_search_result):
+        """Pretty output should show [language] hierarchy annotation."""
+        results = [make_search_result(
+            filename="/infra/main.tf",
+            language_id="hcl",
+            hierarchy="resource.aws_s3_bucket.data",
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="resource {}"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        assert "[hcl] resource.aws_s3_bucket.data" in captured
+
+    def test_shows_language_only_without_hierarchy(self, make_search_result):
+        """When hierarchy is empty, show only [language] annotation."""
+        results = [make_search_result(
+            filename="/infra/main.tf",
+            language_id="hcl",
+            hierarchy="",
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        assert "[hcl]" in captured
+        assert "resource" not in captured
+
+    def test_non_devops_shows_extension_language(self, make_search_result):
+        """Non-DevOps files should show extension-derived language tag."""
+        results = [make_search_result(filename="/test/file.py")]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="def test(): pass"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        assert "[python]" in captured
+
+    def test_dockerfile_syntax_highlighting_uses_docker_lexer(self, make_search_result):
+        """Dockerfile with language_id should render without error (uses docker lexer)."""
+        results = [make_search_result(
+            filename="/app/Dockerfile",
+            language_id="dockerfile",
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="FROM ubuntu:22.04"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        # Should render content without crashing
+        assert len(captured) > 0
+        assert "[dockerfile]" in captured
+
+
+class TestExtensionLangMapDevOps:
+    """Tests for DevOps entries in EXTENSION_LANG_MAP."""
+
+    def test_hcl_extensions(self):
+        """HCL/Terraform extensions should map to 'hcl'."""
+        assert EXTENSION_LANG_MAP["tf"] == "hcl"
+        assert EXTENSION_LANG_MAP["hcl"] == "hcl"
+        assert EXTENSION_LANG_MAP["tfvars"] == "hcl"
