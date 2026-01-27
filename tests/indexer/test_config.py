@@ -37,6 +37,39 @@ class TestIndexingConfig:
         assert config.exclude_patterns == []
 
 
+class TestDevOpsPatterns:
+    """Tests for DevOps file patterns in IndexingConfig."""
+
+    def test_hcl_terraform_patterns(self):
+        """Include patterns should contain HCL/Terraform file patterns."""
+        config = IndexingConfig()
+        assert "*.tf" in config.include_patterns
+        assert "*.hcl" in config.include_patterns
+        assert "*.tfvars" in config.include_patterns
+
+    def test_dockerfile_patterns(self):
+        """Include patterns should contain Dockerfile file patterns."""
+        config = IndexingConfig()
+        assert "Dockerfile" in config.include_patterns
+        assert "Dockerfile.*" in config.include_patterns
+        assert "Containerfile" in config.include_patterns
+
+    def test_bash_shell_patterns(self):
+        """Include patterns should contain Bash/Shell file patterns."""
+        config = IndexingConfig()
+        assert "*.sh" in config.include_patterns
+        assert "*.bash" in config.include_patterns
+
+    def test_existing_patterns_still_present(self):
+        """Existing programming language patterns must not be removed (regression check)."""
+        config = IndexingConfig()
+        existing = ["*.py", "*.js", "*.ts", "*.go", "*.rs", "*.java", "*.rb"]
+        for pattern in existing:
+            assert pattern in config.include_patterns, (
+                f"Existing pattern '{pattern}' missing after DevOps additions"
+            )
+
+
 class TestLoadConfig:
     """Tests for load_config function."""
 

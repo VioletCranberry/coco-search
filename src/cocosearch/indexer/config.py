@@ -53,6 +53,17 @@ class IndexingConfig(BaseModel):
         "*.xml",
         "*.yaml",
         "*.yml",
+        # DevOps files (HCL/Terraform)
+        "*.tf",
+        "*.hcl",
+        "*.tfvars",
+        # DevOps files (Dockerfile)
+        "Dockerfile",
+        "Dockerfile.*",
+        "Containerfile",
+        # DevOps files (Bash/Shell)
+        "*.sh",
+        "*.bash",
     ]
     exclude_patterns: list[str] = []
     chunk_size: int = 1000  # bytes
