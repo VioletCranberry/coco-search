@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** v1.2 DevOps Language Support -- Phase 4 in progress (plan 1 of 2 complete)
+**Current focus:** v1.2 DevOps Language Support -- COMPLETE (all 4 phases, 8 plans shipped)
 
 ## Current Position
 
 Phase: 4 of 4 (Search and Output Integration)
-Plan: 1 of 2 complete (04-01-PLAN.md)
-Status: In progress
-Last activity: 2026-01-27 -- Completed 04-01-PLAN.md (search query layer)
+Plan: 2 of 2 complete (04-02-PLAN.md)
+Status: Phase complete -- v1.2 milestone complete
+Last activity: 2026-01-27 -- Completed 04-02-PLAN.md (output integration)
 
-Progress: [################----] 83% (v1.2: 3/4 phases complete, 5/8 plans)
+Progress: [####################] 100% (v1.2: 4/4 phases complete, 8/8 plans)
 
 ## Milestones Shipped
 
@@ -22,22 +22,20 @@ Progress: [################----] 83% (v1.2: 3/4 phases complete, 5/8 plans)
 |-----------|--------|-------|---------|
 | v1.0 MVP | 1-4 | 12 | 2026-01-25 |
 | v1.1 Docs & Tests | 5-7 | 11 | 2026-01-26 |
+| v1.2 DevOps Language Support | 1-4 | 8 | 2026-01-27 |
 
-**Total shipped:** 7 phases, 23 plans
+**Total shipped:** 11 phases, 31 plans
 
-## Active Milestone: v1.2 DevOps Language Support
+## Completed Milestone: v1.2 DevOps Language Support
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Custom Language Definitions and File Routing | 6 | ✓ Verified |
-| 2 | Metadata Extraction | 7 | ✓ Verified |
-| 3 | Flow Integration and Schema | 4 | ✓ Verified |
-| 4 | Search and Output Integration | 9 | In Progress (1/2 plans) |
+| 1 | Custom Language Definitions and File Routing | 6 | Complete |
+| 2 | Metadata Extraction | 7 | Complete |
+| 3 | Flow Integration and Schema | 4 | Complete |
+| 4 | Search and Output Integration | 9 | Complete |
 
-**Research flags:**
-- Phase 1: RESOLVED & VERIFIED -- Bash confirmed NOT built-in, standard Rust regex, all 6 requirements complete
-- Phase 2: RESOLVED & VERIFIED -- metadata.py created, 53 tests passing, all 7 requirements verified
-- Phase 3: RESOLVED -- metadata wired into flow, schema extends via CocoIndex inference, all 4 requirements complete
+**All 26 requirements implemented and verified.**
 
 ## Performance Metrics
 
@@ -45,10 +43,11 @@ Progress: [################----] 83% (v1.2: 3/4 phases complete, 5/8 plans)
 |--------|-------|
 | v1.2 requirements | 26 |
 | v1.2 phases | 4 |
-| Research confidence | HIGH |
+| v1.2 plans | 8 |
 | New dependencies | 0 |
 | New files | 3 (languages.py, metadata.py, test_metadata.py) |
 | Modified files | 6 (config.py, flow.py, query.py, cli.py, formatter.py, server.py) |
+| Total tests | 327 (all passing) |
 
 ## Accumulated Context
 
@@ -81,10 +80,13 @@ Key decisions for v1.2:
 - ALL_LANGUAGES = LANGUAGE_EXTENSIONS keys + DEVOPS_LANGUAGES keys; alias keys excluded
 - Module-level _has_metadata_columns flag for one-time graceful degradation
 - DevOps languages filter via language_id column; extension-based via filename LIKE
+- Rich bracket escaping with backslash for literal [lang] annotation display
+- _PYGMENTS_LEXER_MAP maps dockerfile->docker for Pygments lexer lookup
+- Flat metadata fields in MCP response (not nested)
 
 ### Pending Todos
 
-- Execute Phase 4 Plan 2 (Output Integration: formatters + MCP)
+None -- v1.2 milestone complete.
 
 ### Blockers/Concerns
 
@@ -92,9 +94,9 @@ Key decisions for v1.2:
 
 ## Session Continuity
 
-Last session: 2026-01-27T18:40:31Z
-Stopped at: Completed 04-01-PLAN.md, ready for 04-02-PLAN.md
-Resume file: .planning/phases/04-search-and-output-integration/04-02-PLAN.md
+Last session: 2026-01-27T18:47:18Z
+Stopped at: Completed 04-02-PLAN.md -- v1.2 milestone complete
+Resume file: None
 
 ---
-*Updated: 2026-01-27 after completing 04-01-PLAN.md*
+*Updated: 2026-01-27 after completing 04-02-PLAN.md (v1.2 complete)*
