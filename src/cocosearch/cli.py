@@ -525,7 +525,7 @@ def main() -> None:
     )
     search_parser.add_argument(
         "--lang",
-        help="Filter by language (e.g., python, typescript)",
+        help="Filter by language (e.g., python, typescript, hcl, dockerfile, bash). Aliases: terraform=hcl, shell/sh=bash",
     )
     search_parser.add_argument(
         "--min-score",
