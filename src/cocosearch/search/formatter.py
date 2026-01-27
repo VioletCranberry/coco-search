@@ -38,6 +38,9 @@ def format_json(
             "start_line": start_line,
             "end_line": end_line,
             "score": round(r.score, 4),
+            "block_type": r.block_type,
+            "hierarchy": r.hierarchy,
+            "language_id": r.language_id,
         }
 
         if include_content:
@@ -93,7 +96,53 @@ EXTENSION_LANG_MAP = {
     "yml": "yaml",
     "toml": "toml",
     "sql": "sql",
+    "tf": "hcl",
+    "hcl": "hcl",
+    "tfvars": "hcl",
 }
+
+# Mapping from display language name to Pygments lexer name
+# Only needed when display name differs from Pygments lexer name
+_PYGMENTS_LEXER_MAP = {
+    "dockerfile": "docker",
+}
+
+
+def _get_display_language(result: SearchResult, filepath: str) -> str:
+    """Determine the display language for a search result.
+
+    If the result has a language_id (DevOps file), use that directly.
+    Otherwise, derive from file extension using EXTENSION_LANG_MAP.
+
+    Args:
+        result: SearchResult with optional language_id.
+        filepath: File path for extension-based fallback.
+
+    Returns:
+        Language name string (e.g., "hcl", "python", "dockerfile").
+    """
+    if result.language_id:
+        return result.language_id
+    ext = os.path.splitext(filepath)[1].lstrip(".")
+    return EXTENSION_LANG_MAP.get(ext, ext)
+
+
+def _get_annotation(result: SearchResult, display_lang: str) -> str:
+    """Build annotation string for pretty output.
+
+    If hierarchy is available, shows [lang] hierarchy.
+    Otherwise, shows [lang] only.
+
+    Args:
+        result: SearchResult with optional hierarchy.
+        display_lang: Language name from _get_display_language.
+
+    Returns:
+        Annotation string (e.g., "[hcl] resource.aws_s3_bucket.data" or "[python]").
+    """
+    if result.hierarchy:
+        return f"[{display_lang}] {result.hierarchy}"
+    return f"[{display_lang}]"
 
 
 def format_pretty(
@@ -139,17 +188,21 @@ def format_pretty(
                 f"  [{score_color}]{r.score:.2f}[/{score_color}] Lines {start_line}-{end_line}"
             )
 
+            # Language annotation
+            display_lang = _get_display_language(r, filepath)
+            annotation = _get_annotation(r, display_lang)
+            console.print(f"  [dim cyan]{annotation}[/dim cyan]")
+
             # Show content with syntax highlighting
             content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
             if content:
-                # Determine language from extension
-                ext = os.path.splitext(filepath)[1].lstrip(".")
-                lang = EXTENSION_LANG_MAP.get(ext, ext)
+                # Use language_id-aware language for syntax highlighting
+                lexer = _PYGMENTS_LEXER_MAP.get(display_lang, display_lang)
 
                 try:
                     syntax = Syntax(
                         content,
-                        lang,
+                        lexer,
                         line_numbers=True,
                         start_line=start_line,
                         theme="monokai",
