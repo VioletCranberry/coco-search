@@ -1,7 +1,7 @@
 # Requirements: v1.2 DevOps Language Support
 
 **Milestone:** v1.2
-**Status:** Roadmapped
+**Status:** Complete
 **Source:** User questioning + research synthesis (2026-01-27)
 
 ## Scope Summary
@@ -112,15 +112,15 @@ Add language-aware chunking and rich metadata extraction for HCL (Terraform), Do
 | REQ-15 | Phase 3 | Complete |
 | REQ-16 | Phase 3 | Complete |
 | REQ-17 | Phase 3 | Complete |
-| REQ-18 | Phase 4 | Pending |
-| REQ-19 | Phase 4 | Pending |
-| REQ-20 | Phase 4 | Pending |
-| REQ-21 | Phase 4 | Pending |
-| REQ-22 | Phase 4 | Pending |
-| REQ-23 | Phase 4 | Pending |
-| REQ-24 | Phase 4 | Pending |
-| REQ-25 | Phase 4 | Pending |
-| REQ-26 | Phase 4 | Pending |
+| REQ-18 | Phase 4 | Complete |
+| REQ-19 | Phase 4 | Complete |
+| REQ-20 | Phase 4 | Complete |
+| REQ-21 | Phase 4 | Complete |
+| REQ-22 | Phase 4 | Complete |
+| REQ-23 | Phase 4 | Complete |
+| REQ-24 | Phase 4 | Complete |
+| REQ-25 | Phase 4 | Complete |
+| REQ-26 | Phase 4 | Complete |
 
 ---
 *Scoped: 2026-01-27*
