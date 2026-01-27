@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-26)
+See: .planning/PROJECT.md (updated 2026-01-27)
 
-**Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** v1.1 complete — ready for v2 planning
+**Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
+**Current focus:** v1.2 DevOps Language Support -- roadmap created, ready for phase planning
 
 ## Current Position
 
-Phase: 7 of 7 (Documentation) — COMPLETE
-Plan: All plans complete
-Status: Milestone v1.1 shipped
-Last activity: 2026-01-26 — v1.1 Docs & Tests milestone complete
+Phase: 1 of 4 (Custom Language Definitions and File Routing) -- NOT STARTED
+Plan: None (phase not yet planned)
+Status: Roadmap complete, awaiting phase planning
+Last activity: 2026-01-27 -- v1.2 roadmap created
 
-Progress: [####################] 100% (v1.0: 12/12 plans, v1.1: 11/11 plans)
+Progress: [--------------------] 0% (v1.2: 0/4 phases)
 
 ## Milestones Shipped
 
@@ -23,34 +23,60 @@ Progress: [####################] 100% (v1.0: 12/12 plans, v1.1: 11/11 plans)
 | v1.0 MVP | 1-4 | 12 | 2026-01-25 |
 | v1.1 Docs & Tests | 5-7 | 11 | 2026-01-26 |
 
-**Total:** 7 phases, 23 plans shipped
+**Total shipped:** 7 phases, 23 plans
+
+## Active Milestone: v1.2 DevOps Language Support
+
+| Phase | Name | Requirements | Status |
+|-------|------|--------------|--------|
+| 1 | Custom Language Definitions and File Routing | 6 | Pending |
+| 2 | Metadata Extraction | 7 | Pending |
+| 3 | Flow Integration and Schema | 4 | Pending |
+| 4 | Search and Output Integration | 9 | Pending |
+
+**Research flags:**
+- Phase 1: Needs deeper research (Bash built-in collision, chunk_size, fancy-regex validation)
+- Phase 3: Needs deeper research (schema migration behavior, op function dataclass mapping)
+
+## Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| v1.2 requirements | 26 |
+| v1.2 phases | 4 |
+| Research confidence | HIGH |
+| New dependencies | 0 |
+| New files | 2 (languages.py, metadata.py) |
+| Modified files | 5 (config.py, flow.py, query.py, formatter.py, server.py) |
 
 ## Accumulated Context
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Major decisions from v1.1:
+Key decisions for v1.2:
 
-- asyncio_mode = strict for explicit @pytest.mark.asyncio markers
-- MockCursor uses canned results (not in-memory state tracking)
-- Factory fixture pattern for configurable mock pools
-- Hash-based deterministic embeddings (same input = same output)
-- Single README.md file structure (everything in one place)
+- Zero new dependencies (CocoIndex custom_languages + Python stdlib re)
+- Single flow architecture (not separate DevOps flow)
+- Regex-only approach (no external parsers)
+- Empty strings over NULLs for metadata
+- Metadata extraction inside the flow (not post-processing)
+- Additive schema only (no primary key changes)
 
 ### Pending Todos
 
-None.
+- Plan Phase 1 (next step)
 
 ### Blockers/Concerns
 
-None.
+- Bash built-in status contradiction must be resolved in Phase 1 research
+- CocoIndex schema migration behavior needs Phase 3 validation
 
 ## Session Continuity
 
-Last session: 2026-01-26
-Stopped at: v1.1 milestone complete and archived
-Resume file: None
+Last session: 2026-01-27
+Stopped at: v1.2 roadmap created, ready for `/gsd:plan-phase 1`
+Resume file: .planning/ROADMAP.md
 
 ---
-*Updated: 2026-01-26 after v1.1 milestone completion*
+*Updated: 2026-01-27 after v1.2 roadmap creation*
