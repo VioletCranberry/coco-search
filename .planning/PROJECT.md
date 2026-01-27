@@ -35,7 +35,15 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ### Active
 
-(No active milestone — v1.1 complete, ready for v2 planning)
+**v1.2 — DevOps Language Support**
+
+- [ ] Custom chunking rules for HCL (Terraform) via CocoIndex custom_languages
+- [ ] Custom chunking rules for Dockerfile via CocoIndex custom_languages
+- [ ] Custom chunking rules for Bash/Shell via CocoIndex custom_languages
+- [ ] File patterns for DevOps files (*.tf, *.hcl, Dockerfile, *.sh, *.bash)
+- [ ] Rich metadata: resource/block type extraction (e.g., "aws_s3_bucket resource", "build stage", "function deploy_app")
+- [ ] Rich metadata: hierarchy context in search results (e.g., "module.vpc > resource.aws_subnet", "services > nginx > volumes")
+- [ ] Works for pure infrastructure repos and mixed codebases
 
 ### Out of Scope
 
@@ -79,4 +87,4 @@ Documentation: Comprehensive README with Quick Start, Installation, MCP config, 
 | Logging to stderr in MCP | Prevents stdout corruption of JSON-RPC protocol | Good |
 
 ---
-*Last updated: 2026-01-26 after v1.1 milestone*
+*Last updated: 2026-01-27 after v1.2 milestone start*
