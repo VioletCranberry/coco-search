@@ -12,6 +12,7 @@ import cocoindex
 from cocosearch.indexer.config import IndexingConfig
 from cocosearch.indexer.embedder import code_to_embedding, extract_extension, extract_language
 from cocosearch.indexer.languages import DEVOPS_CUSTOM_LANGUAGES
+from cocosearch.indexer.metadata import extract_devops_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
 
 
@@ -76,11 +77,20 @@ def create_code_index_flow(
                 # Generate embedding via Ollama using shared transform
                 chunk["embedding"] = chunk["text"].call(code_to_embedding)
 
+                # Extract DevOps metadata (block_type, hierarchy, language_id)
+                chunk["metadata"] = chunk["text"].transform(
+                    extract_devops_metadata,
+                    language=file["extension"],
+                )
+
                 # Collect with metadata (reference-only: no full text stored)
                 code_embeddings.collect(
                     filename=file["filename"],
                     location=chunk["location"],
                     embedding=chunk["embedding"],
+                    block_type=chunk["metadata"]["block_type"],
+                    hierarchy=chunk["metadata"]["hierarchy"],
+                    language_id=chunk["metadata"]["language_id"],
                 )
 
         # Step 5: Export to PostgreSQL with vector index
