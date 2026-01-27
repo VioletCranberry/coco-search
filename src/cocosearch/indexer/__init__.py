@@ -2,6 +2,7 @@
 
 from cocosearch.indexer.config import IndexingConfig, load_config
 from cocosearch.indexer.embedder import code_to_embedding, extract_extension, extract_language
+from cocosearch.indexer.metadata import DevOpsMetadata, extract_devops_metadata
 from cocosearch.indexer.file_filter import (
     DEFAULT_EXCLUDES,
     build_exclude_patterns,
@@ -12,11 +13,13 @@ from cocosearch.indexer.progress import IndexingProgress, print_summary
 
 __all__ = [
     "DEFAULT_EXCLUDES",
+    "DevOpsMetadata",
     "IndexingConfig",
     "IndexingProgress",
     "build_exclude_patterns",
     "code_to_embedding",
     "create_code_index_flow",
+    "extract_devops_metadata",
     "extract_extension",
     "extract_language",
     "load_config",
