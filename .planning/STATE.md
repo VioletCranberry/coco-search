@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 12 of 15 (Container Infrastructure PostgreSQL)
-Plan: 01 of 03 (Docker Container Infrastructure)
+Plan: 02 of 03 (Database Fixtures)
 Status: In progress
-Last activity: 2026-01-30 -- Completed 12-01-PLAN.md
+Last activity: 2026-01-30 -- Completed 12-02-PLAN.md
 
-Progress: [████████████████████████..................] 76% (33 plans complete, ~1 estimated remaining)
+Progress: [█████████████████████████.................] 79% (34 plans complete)
 
 ## Performance Metrics
 
@@ -59,6 +59,8 @@ Recent decisions affecting current work:
 - v1.3 (Phase 11): Integration tests require explicit -m integration flag to prevent accidental slow runs
 - v1.3 (Phase 12): Port 5433 for test PostgreSQL to avoid conflict with local 5432
 - v1.3 (Phase 12): Session-scoped container fixtures for performance (one container per test session)
+- v1.3 (Phase 12): TRUNCATE CASCADE for test cleanup (fast, keeps schema)
+- v1.3 (Phase 12): autouse cleanup fixture only runs for @pytest.mark.integration tests
 
 ### Pending Todos
 
@@ -66,13 +68,13 @@ None -- starting v1.3 milestone.
 
 ### Blockers/Concerns
 
-None - 12-01 complete. Container infrastructure ready. Proceeding with 12-02.
+None - 12-02 complete. Database fixtures ready. Proceeding with 12-03.
 
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 12-01-PLAN.md
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
 
 ---
-*Updated: 2026-01-30 after 12-01-PLAN.md completion*
+*Updated: 2026-01-30 after 12-02-PLAN.md completion*
