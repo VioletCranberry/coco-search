@@ -150,10 +150,12 @@ Plans:
   3. pgvector extension initializes automatically in test database
   4. Database state cleans between tests without container recreation
   5. Vector similarity search returns correct results with real pgvector
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01-PLAN.md - Docker container infrastructure (docker-compose.test.yml, container fixtures, Docker check)
+- [ ] 12-02-PLAN.md - Database initialization and cleanup (pgvector extension, TRUNCATE fixtures)
+- [ ] 12-03-PLAN.md - PostgreSQL integration tests (pgvector validation, similarity search)
 
 #### Phase 13: Ollama Integration
 **Goal**: Real Ollama embedding generation with warmup handling for 30-second first-request timeout
@@ -215,7 +217,7 @@ Plans:
 | 10. DevOps Search & Output | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 4-soi. Search Output Integration | v1.2 | 1/1 | Complete | 2026-01-27 |
 | 11. Test Reorganization | v1.3 | 3/3 | Complete | 2026-01-30 |
-| 12. Container Infrastructure & PostgreSQL | v1.3 | 0/TBD | Not started | - |
+| 12. Container Infrastructure & PostgreSQL | v1.3 | 0/3 | Not started | - |
 | 13. Ollama Integration | v1.3 | 0/TBD | Not started | - |
 | 14. End-to-End Flows | v1.3 | 0/TBD | Not started | - |
 | 15. CI/CD Integration | v1.3 | 0/TBD | Not started | - |
