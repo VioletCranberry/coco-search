@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** v1.3 Docker Integration Tests & Infrastructure (Phase 13 in progress)
+**Current focus:** v1.3 Docker Integration Tests & Infrastructure (Phase 14 next)
 
 ## Current Position
 

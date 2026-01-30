@@ -170,8 +170,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md - Ollama fixture infrastructure (native detection, Docker fallback, warmup)
-- [ ] 13-02-PLAN.md - Ollama integration tests (embedding validation, similarity tests)
+- [x] 13-01-PLAN.md - Ollama fixture infrastructure (native detection, Docker fallback, warmup)
+- [x] 13-02-PLAN.md - Ollama integration tests (embedding validation, similarity tests)
 
 #### Phase 14: End-to-End Flows
 **Goal**: Full-flow integration tests validating complete index and search pipelines
@@ -219,6 +219,6 @@ Plans:
 | 4-soi. Search Output Integration | v1.2 | 1/1 | Complete | 2026-01-27 |
 | 11. Test Reorganization | v1.3 | 3/3 | Complete | 2026-01-30 |
 | 12. Container Infrastructure & PostgreSQL | v1.3 | 3/3 | Complete | 2026-01-30 |
-| 13. Ollama Integration | v1.3 | 0/2 | Not started | - |
+| 13. Ollama Integration | v1.3 | 2/2 | Complete | 2026-01-30 |
 | 14. End-to-End Flows | v1.3 | 0/TBD | Not started | - |
 | 15. CI/CD Integration | v1.3 | 0/TBD | Not started | - |
