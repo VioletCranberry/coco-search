@@ -42,7 +42,12 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ### Active
 
-(No active milestone — use `/gsd:new-milestone` to start next)
+**v1.3 — Docker Integration Tests & Infrastructure:**
+- Docker-based integration tests (real PostgreSQL+pgvector, real Ollama)
+- Optional dockerized Ollama (users can choose native or Docker)
+- Unified docker-compose for one-command setup
+- Full-flow integration tests (index → search → verify results)
+- Component integration tests (PostgreSQL, Ollama separately)
 
 ### Out of Scope
 
@@ -97,4 +102,4 @@ Documentation: Comprehensive README with Quick Start, Installation, MCP config, 
 | Flat metadata in MCP response | Top-level fields, not nested, for simplicity | Good |
 
 ---
-*Last updated: 2026-01-27 after v1.2 milestone*
+*Last updated: 2026-01-30 after v1.3 milestone start*
