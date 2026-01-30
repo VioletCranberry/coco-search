@@ -32,7 +32,7 @@ def postgres_container():
     with PostgresContainer(
         image="pgvector/pgvector:pg16",
         port=5432,  # Internal port, testcontainers maps to random external port
-        user=TEST_DB_USER,
+        username=TEST_DB_USER,
         password=TEST_DB_PASSWORD,
         dbname=TEST_DB_NAME,
     ).with_env("POSTGRES_HOST_AUTH_METHOD", "trust") as postgres:
