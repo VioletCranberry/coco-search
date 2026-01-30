@@ -133,11 +133,12 @@ Plans:
   3. pytest markers enable selective execution (unit vs integration)
   4. Default test run executes only unit tests (fast feedback)
   5. Integration tests run only when explicitly requested or in CI
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 11-01-PLAN.md - Create test directory structure and pytest marker configuration
-- [ ] 11-02-PLAN.md - Migrate all 327 unit tests to tests/unit/
+- [x] 11-01-PLAN.md - Create test directory structure and pytest marker configuration
+- [x] 11-02-PLAN.md - Migrate all 327 unit tests to tests/unit/
+- [ ] 11-03-PLAN.md - Fix default execution to unit-only (gap closure)
 
 #### Phase 12: Container Infrastructure & PostgreSQL
 **Goal**: Docker-based PostgreSQL testing with session-scoped containers and function-scoped cleanup
@@ -213,7 +214,7 @@ Plans:
 | 9. DevOps Metadata | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 10. DevOps Search & Output | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 4-soi. Search Output Integration | v1.2 | 1/1 | Complete | 2026-01-27 |
-| 11. Test Reorganization | v1.3 | 0/2 | Planned | - |
+| 11. Test Reorganization | v1.3 | 2/3 | In Progress | - |
 | 12. Container Infrastructure & PostgreSQL | v1.3 | 0/TBD | Not started | - |
 | 13. Ollama Integration | v1.3 | 0/TBD | Not started | - |
 | 14. End-to-End Flows | v1.3 | 0/TBD | Not started | - |
