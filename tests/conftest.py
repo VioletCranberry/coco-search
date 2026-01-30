@@ -5,7 +5,38 @@ This module provides common fixtures used across all test modules:
 - tmp_codebase: Creates temporary directory with sample Python files
 """
 
+import warnings
+
 import pytest
+
+# Built-in markers to ignore when checking for custom markers
+BUILTIN_MARKERS = {
+    'parametrize', 'skip', 'skipif', 'xfail', 'usefixtures',
+    'filterwarnings', 'asyncio'
+}
+
+# Required custom markers - tests must have at least one
+REQUIRED_MARKERS = {'unit', 'integration'}
+
+
+def pytest_collection_modifyitems(items):
+    """Warn if tests are missing unit/integration markers.
+
+    This hook runs during test collection and emits warnings for any
+    test that doesn't have a @pytest.mark.unit or @pytest.mark.integration
+    marker. Tests in tests/unit/ and tests/integration/ get markers
+    auto-applied by their respective conftest.py files.
+    """
+    for item in items:
+        marker_names = {mark.name for mark in item.iter_markers()}
+        custom_markers = marker_names - BUILTIN_MARKERS
+
+        if not custom_markers.intersection(REQUIRED_MARKERS):
+            warnings.warn(
+                f"Test '{item.nodeid}' has no @pytest.mark.unit or "
+                f"@pytest.mark.integration marker",
+                UserWarning
+            )
 
 # Register fixtures from fixtures directory (added by subsequent plans)
 pytest_plugins = [
