@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 14 of 15 (E2E Flows) - IN PROGRESS
-Plan: 01 of 03 (E2E Test Infrastructure)
+Plan: 03 of 03 (DevOps File Validation)
 Status: Plan complete
-Last activity: 2026-01-30 -- Completed 14-01-PLAN.md
+Last activity: 2026-01-30 -- Completed 14-03-PLAN.md
 
-Progress: [████████████████████████████░...............] 88% (38 plans complete)
+Progress: [████████████████████████████░...............] 90% (39 plans complete)
 
 ## Performance Metrics
 
@@ -32,7 +32,7 @@ Progress: [███████████████████████
 
 **Current Milestone (v1.3):**
 - Phases: 5 (11-15)
-- Plans completed: 9
+- Plans completed: 10
 - Focus: Integration test infrastructure & E2E flows
 
 ## Milestones Shipped
@@ -70,10 +70,12 @@ Recent decisions affecting current work:
 - v1.3 (Phase 14): OLLAMA_HOST explicitly passed to EmbedText(address=...) for container support
 - v1.3 (Phase 14): Native Ollama recommended over containerized (session management issues)
 - v1.3 (Phase 14): E2E fixtures use realistic code with predictable search terms
+- v1.3 (Phase 14): Module-scoped e2e_fixtures_path for consistency with indexed fixture scope
+- v1.3 (Phase 14): CLI uses -n for index name (not --name), JSON output is default (no --json flag)
 
 ### Pending Todos
 
-None -- Phase 14-01 complete. Ready for 14-02 (Search E2E Tests).
+None -- Phase 14 plans complete. Ready for Phase 15 (Polish & Documentation).
 
 ### Blockers/Concerns
 
@@ -86,8 +88,8 @@ None -- Phase 14-01 complete. Ready for 14-02 (Search E2E Tests).
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 14-01-PLAN.md (E2E Test Infrastructure)
+Stopped at: Completed 14-03-PLAN.md (DevOps File Validation)
 Resume file: None
 
 ---
-*Updated: 2026-01-30 after 14-01-PLAN.md completion*
+*Updated: 2026-01-30 after 14-03-PLAN.md completion*
