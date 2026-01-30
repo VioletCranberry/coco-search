@@ -40,7 +40,7 @@ asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --strict-markers"
+addopts = "-v --tb=short --strict-markers -m unit"
 markers = [
     "unit: marks tests as unit tests (use mocks, no infrastructure)",
     "integration: marks tests as integration tests (use real PostgreSQL, Ollama)",
