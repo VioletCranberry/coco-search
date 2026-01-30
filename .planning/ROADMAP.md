@@ -183,10 +183,12 @@ Plans:
   3. CLI index command successfully indexes test codebase with real services
   4. CLI search command returns correct results with file paths and line numbers
   5. DevOps files (Terraform, Dockerfile, Bash) index correctly with metadata
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 14-01: TBD
+- [ ] 14-01-PLAN.md - Test fixtures + E2E indexing flow (subprocess CLI, incremental indexing)
+- [ ] 14-02-PLAN.md - E2E search + CLI validation (JSON output, result structure, language filtering)
+- [ ] 14-03-PLAN.md - DevOps validation (Terraform, Dockerfile, Bash, language aliases)
 
 #### Phase 15: CI/CD Integration
 **Goal**: GitHub Actions workflow running integration tests with Docker services
@@ -220,5 +222,5 @@ Plans:
 | 11. Test Reorganization | v1.3 | 3/3 | Complete | 2026-01-30 |
 | 12. Container Infrastructure & PostgreSQL | v1.3 | 3/3 | Complete | 2026-01-30 |
 | 13. Ollama Integration | v1.3 | 2/2 | Complete | 2026-01-30 |
-| 14. End-to-End Flows | v1.3 | 0/TBD | Not started | - |
+| 14. End-to-End Flows | v1.3 | 0/3 | Not started | - |
 | 15. CI/CD Integration | v1.3 | 0/TBD | Not started | - |
