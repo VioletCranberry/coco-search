@@ -89,11 +89,11 @@ Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ORG-01 | Phase 11 | Pending |
-| ORG-02 | Phase 11 | Pending |
-| ORG-03 | Phase 11 | Pending |
-| ORG-04 | Phase 11 | Pending |
-| ORG-05 | Phase 11 | Pending |
+| ORG-01 | Phase 11 | Complete |
+| ORG-02 | Phase 11 | Complete |
+| ORG-03 | Phase 11 | Complete |
+| ORG-04 | Phase 11 | Complete |
+| ORG-05 | Phase 11 | Complete |
 | INFRA-01 | Phase 12 | Pending |
 | INFRA-02 | Phase 12 | Pending |
 | INFRA-03 | Phase 12 | Pending |
