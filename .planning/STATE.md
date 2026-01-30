@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** v1.3 Docker Integration Tests & Infrastructure (Phase 13 next)
+**Current focus:** v1.3 Docker Integration Tests & Infrastructure (Phase 13 in progress)
 
 ## Current Position
 
-Phase: 12 of 15 (Container Infrastructure PostgreSQL) - COMPLETE
-Plan: 03 of 03 (PostgreSQL Integration Tests)
-Status: Phase complete
-Last activity: 2026-01-30 -- Completed 12-03-PLAN.md (Phase 12 complete)
+Phase: 13 of 15 (Ollama Integration) - IN PROGRESS
+Plan: 01 of 02 (Ollama Integration Fixtures)
+Status: In progress
+Last activity: 2026-01-30 -- Completed 13-01-PLAN.md
 
-Progress: [██████████████████████████..................] 81% (35 plans complete)
+Progress: [███████████████████████████.................] 84% (36 plans complete)
 
 ## Performance Metrics
 
@@ -32,7 +32,7 @@ Progress: [███████████████████████
 
 **Current Milestone (v1.3):**
 - Phases: 5 (11-15)
-- Plans completed: 6
+- Plans completed: 7
 - Focus: Integration test infrastructure
 
 ## Milestones Shipped
@@ -62,20 +62,22 @@ Recent decisions affecting current work:
 - v1.3 (Phase 12): TRUNCATE CASCADE for test cleanup (fast, keeps schema)
 - v1.3 (Phase 12): autouse cleanup fixture only runs for @pytest.mark.integration tests
 - v1.3 (Phase 12): Fixed testcontainers API: user -> username parameter for compatibility
+- v1.3 (Phase 13): Native-first Ollama detection checks localhost:11434 before Docker fallback
+- v1.3 (Phase 13): Session-scoped warmup fixture prevents 30-second first-request timeout
 
 ### Pending Todos
 
-None -- Phase 12 complete. Ready for Phase 13.
+None -- Phase 13-01 complete. Ready for Phase 13-02.
 
 ### Blockers/Concerns
 
-None - Phase 12 complete. Container infrastructure ready. Integration test patterns established.
+None - Phase 13-01 complete. Ollama fixture infrastructure ready for integration tests.
 
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 12-03-PLAN.md (Phase 12 complete)
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
 
 ---
-*Updated: 2026-01-30 after 12-03-PLAN.md completion*
+*Updated: 2026-01-30 after 13-01-PLAN.md completion*
