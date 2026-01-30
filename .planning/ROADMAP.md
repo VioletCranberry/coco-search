@@ -5,7 +5,7 @@
 - v1.0 MVP - Phases 1-4 (shipped 2026-01-25)
 - v1.1 Docs & Tests - Phases 5-7 (shipped 2026-01-26)
 - v1.2 DevOps Language Support - Phases 8-10, 4-soi (shipped 2026-01-27)
-- v1.3 Docker Integration Tests - Phases 11-14 (in progress)
+- v1.3 Docker Integration Tests - Phases 11-14 (shipped 2026-01-30)
 
 ## Phases
 
@@ -119,76 +119,45 @@ Plans:
 
 </details>
 
-### v1.3 Docker Integration Tests (In Progress)
+<details>
+<summary>v1.3 Docker Integration Tests (Phases 11-14) - SHIPPED 2026-01-30</summary>
 
-**Milestone Goal:** Add Docker-based integration tests validating real PostgreSQL+pgvector and Ollama behavior beyond existing 327 unit tests with mocked dependencies.
-
-#### Phase 11: Test Reorganization
+### Phase 11: Test Reorganization
 **Goal**: Separate unit tests from integration tests with clear execution boundaries
-**Depends on**: Nothing (foundation phase)
-**Requirements**: ORG-01, ORG-02, ORG-03, ORG-04, ORG-05
-**Success Criteria** (what must be TRUE):
-  1. Existing 327 unit tests run from tests/unit/ directory unchanged
-  2. Integration test structure exists in tests/integration/ with conftest.py
-  3. pytest markers enable selective execution (unit vs integration)
-  4. Default test run executes only unit tests (fast feedback)
-  5. Integration tests run only when explicitly requested or in CI
 **Plans**: 3 plans
 
 Plans:
-- [x] 11-01-PLAN.md - Create test directory structure and pytest marker configuration
-- [x] 11-02-PLAN.md - Migrate all 327 unit tests to tests/unit/
-- [x] 11-03-PLAN.md - Fix default execution to unit-only (gap closure)
+- [x] 11-01: Test directory structure and pytest marker configuration
+- [x] 11-02: Migrate all 327 unit tests to tests/unit/
+- [x] 11-03: Fix default execution to unit-only
 
-#### Phase 12: Container Infrastructure & PostgreSQL
-**Goal**: Docker-based PostgreSQL testing with session-scoped containers and function-scoped cleanup
-**Depends on**: Phase 11
-**Requirements**: INFRA-01, INFRA-02, INFRA-03, INFRA-04, INFRA-05, PG-01, PG-02, PG-03, PG-04, PG-05
-**Success Criteria** (what must be TRUE):
-  1. Integration tests connect to real PostgreSQL+pgvector container
-  2. Containers start with health checks before tests execute
-  3. pgvector extension initializes automatically in test database
-  4. Database state cleans between tests without container recreation
-  5. Vector similarity search returns correct results with real pgvector
+### Phase 12: Container Infrastructure & PostgreSQL
+**Goal**: Docker-based PostgreSQL testing with session-scoped containers
 **Plans**: 3 plans
 
 Plans:
-- [x] 12-01-PLAN.md - Docker container infrastructure (docker-compose.test.yml, container fixtures, Docker check)
-- [x] 12-02-PLAN.md - Database initialization and cleanup (pgvector extension, TRUNCATE fixtures)
-- [x] 12-03-PLAN.md - PostgreSQL integration tests (pgvector validation, similarity search)
+- [x] 12-01: Docker container infrastructure
+- [x] 12-02: Database initialization and cleanup
+- [x] 12-03: PostgreSQL integration tests
 
-#### Phase 13: Ollama Integration
-**Goal**: Real Ollama embedding generation with warmup handling for 30-second first-request timeout
-**Depends on**: Phase 12
-**Requirements**: OLLAMA-01, OLLAMA-02, OLLAMA-03, OLLAMA-04, OLLAMA-05
-**Success Criteria** (what must be TRUE):
-  1. Integration tests generate embeddings with real Ollama container
-  2. Warmup fixture prevents 30-second timeout on first embedding request
-  3. Embeddings match expected dimensions (768 for nomic-embed-text)
-  4. Tests detect native Ollama availability and fallback to Docker
-  5. Optional dockerized Ollama works alongside native installation
+### Phase 13: Ollama Integration
+**Goal**: Real Ollama embedding generation with warmup handling
 **Plans**: 2 plans
 
 Plans:
-- [x] 13-01-PLAN.md - Ollama fixture infrastructure (native detection, Docker fallback, warmup)
-- [x] 13-02-PLAN.md - Ollama integration tests (embedding validation, similarity tests)
+- [x] 13-01: Ollama fixture infrastructure
+- [x] 13-02: Ollama integration tests
 
-#### Phase 14: End-to-End Flows
-**Goal**: Full-flow integration tests validating complete index and search pipelines
-**Depends on**: Phase 13
-**Requirements**: E2E-01, E2E-02, E2E-03, E2E-04, E2E-05, E2E-06
-**Success Criteria** (what must be TRUE):
-  1. Full indexing flow works end-to-end (files -> chunks -> embeddings -> storage)
-  2. Full search flow works end-to-end (query -> embedding -> vector search -> results)
-  3. CLI index command successfully indexes test codebase with real services
-  4. CLI search command returns correct results with file paths and line numbers
-  5. DevOps files (Terraform, Dockerfile, Bash) index correctly with metadata
+### Phase 14: End-to-End Flows
+**Goal**: Full-flow integration tests for index and search
 **Plans**: 3 plans
 
 Plans:
-- [x] 14-01-PLAN.md - Test fixtures + E2E indexing flow (subprocess CLI, incremental indexing)
-- [x] 14-02-PLAN.md - E2E search + CLI validation (JSON output, result structure, language filtering)
-- [x] 14-03-PLAN.md - DevOps validation (Terraform, Dockerfile, Bash, language aliases)
+- [x] 14-01: E2E test infrastructure and indexing flow
+- [x] 14-02: E2E search and CLI validation
+- [x] 14-03: DevOps file validation
+
+</details>
 
 ## Progress
 

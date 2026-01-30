@@ -1,5 +1,33 @@
 # Project Milestones: CocoSearch
 
+## v1.3 Docker Integration Tests (Shipped: 2026-01-30)
+
+**Delivered:** Docker-based integration test infrastructure validating real PostgreSQL+pgvector and Ollama behavior — E2E flows for indexing and search with DevOps file validation.
+
+**Phases completed:** 11-14 (11 plans total)
+
+**Key accomplishments:**
+
+- Test infrastructure reorganized with pytest markers (unit vs integration)
+- Docker container fixtures for PostgreSQL+pgvector with session-scoped containers
+- Real pgvector integration tests validating vector similarity search
+- Ollama embedding integration with native detection and warmup fixture
+- End-to-end flow tests for CLI index/search with real services
+- DevOps E2E validation for Terraform, Dockerfile, Bash with alias resolution
+
+**Stats:**
+
+- 45 files created/modified
+- +6,676 lines (8,983 total Python LOC)
+- 4 phases, 11 plans
+- 1 day (2026-01-30)
+
+**Git range:** `21d8d10` → `67f029a`
+
+**What's next:** CI/CD integration deferred; ready for next feature milestone
+
+---
+
 ## v1.2 DevOps Language Support (Shipped: 2026-01-27)
 
 **Delivered:** Language-aware chunking and rich metadata extraction for HCL (Terraform), Dockerfile, and Bash/Shell files — zero new dependencies, single-flow pipeline with DevOps search filtering and metadata annotations.

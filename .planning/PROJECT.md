@@ -39,15 +39,16 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Rich metadata: block type, hierarchy, language ID extraction for DevOps chunks — v1.2
 - DevOps language search filtering with alias resolution — v1.2
 - Graceful degradation for pre-v1.2 indexes — v1.2
+- Docker-based integration tests (real PostgreSQL+pgvector) — v1.3
+- Ollama integration tests with native detection and Docker fallback — v1.3
+- E2E flow tests (index → search → verify results) — v1.3
+- Test organization with unit/integration separation and pytest markers — v1.3
+- Session-scoped container fixtures for test performance — v1.3
+- DevOps E2E validation (Terraform, Dockerfile, Bash with alias resolution) — v1.3
 
 ### Active
 
-**v1.3 — Docker Integration Tests & Infrastructure:**
-- Docker-based integration tests (real PostgreSQL+pgvector, real Ollama)
-- Optional dockerized Ollama (users can choose native or Docker)
-- Unified docker-compose for one-command setup
-- Full-flow integration tests (index → search → verify results)
-- Component integration tests (PostgreSQL, Ollama separately)
+(None — ready for next milestone)
 
 ### Out of Scope
 
@@ -60,11 +61,11 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ## Current State
 
-Shipped v1.2 with 7,303 LOC Python.
+Shipped v1.3 with 8,983 LOC Python.
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP.
 Primary use case: onboarding to unfamiliar codebases via semantic search.
 DevOps support: HCL (Terraform), Dockerfile, Bash with language-aware chunking and metadata.
-Test coverage: 327 unit tests with mocked dependencies.
+Test coverage: 327 unit tests + integration tests with real PostgreSQL and Ollama.
 Documentation: Comprehensive README with Quick Start, Installation, MCP config, CLI reference.
 
 ## Constraints
@@ -100,6 +101,11 @@ Documentation: Comprehensive README with Quick Start, Installation, MCP config, 
 | Additive schema only | No primary key changes, safe schema migration | Good |
 | Module-level graceful degradation | One-time flag prevents repeated failing SQL for pre-v1.2 indexes | Good |
 | Flat metadata in MCP response | Top-level fields, not nested, for simplicity | Good |
+| Default unit-only test execution | Fast feedback via -m unit marker in pytest addopts | Good |
+| Session-scoped container fixtures | One container per session for performance | Good |
+| TRUNCATE CASCADE for test cleanup | Fast cleanup, preserves schema | Good |
+| Native-first Ollama detection | Check localhost:11434 before Docker fallback | Good |
+| E2E tests via subprocess CLI | Environment propagation, realistic testing | Good |
 
 ---
-*Last updated: 2026-01-30 after v1.3 milestone start*
+*Last updated: 2026-01-30 after v1.3 milestone completion*
