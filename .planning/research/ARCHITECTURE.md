@@ -1,595 +1,699 @@
-# Architecture Research: DevOps Language Support Integration
+# Architecture Research: Docker Integration Testing
 
-**Domain:** Custom language chunking and metadata extraction for DevOps files (HCL, Dockerfile, Bash)
-**Researched:** 2026-01-27
-**Confidence:** HIGH (CocoIndex API verified with official docs; codebase integration points verified by reading source)
+**Project:** CocoSearch
+**Focus:** Integration test architecture alongside existing unit tests
+**Researched:** 2026-01-30
+**Overall Confidence:** HIGH
 
-## Recommended Architecture
+## Executive Summary
 
-The v1.2 DevOps language support integrates into the existing CocoSearch architecture at four points: (1) the `SplitRecursively` constructor gains `custom_languages`, (2) a new metadata extraction step runs inside the CocoIndex flow after chunking, (3) the PostgreSQL collector stores additional metadata columns, and (4) search query and formatters surface metadata in results.
+Docker integration tests should live in `tests/integration/` alongside existing `tests/unit/`, using pytest markers for selective execution and session-scoped fixtures for container lifecycle management. Docker Compose profiles enable a single compose file for dev, testing, and CI with different service combinations. This architecture preserves existing unit test isolation while adding real-environment validation.
 
-### Integration Overview
+**Key Recommendation:** Use pytest-docker plugin + Docker Compose profiles + pytest markers for clean separation without duplicating configuration.
+
+## Recommended Test Organization
+
+### Directory Structure
 
 ```
-EXISTING (untouched)                    NEW (v1.2 additions)
-========================               ===========================
-
-IndexingConfig                         + DevOps file patterns (*.tf, Dockerfile, *.sh)
-    |
-    v
-create_code_index_flow()
-    |
-    v
-LocalFile source           <unchanged>
-    |
-    v
-SplitRecursively()         + custom_languages=[HCL_SPEC, DOCKERFILE_SPEC, BASH_SPEC]
-    |
-    v
-chunk["text"]              + chunk["metadata"] = extract_devops_metadata(filename, text)
-    |
-    v
-code_to_embedding          <unchanged>
-    |
-    v
-code_embeddings.collect(   + block_type=chunk["metadata"]["block_type"],
-    filename, location,    + hierarchy=chunk["metadata"]["hierarchy"],
-    embedding              + language_id=chunk["metadata"]["language_id"]
-)
-    |
-    v
-PostgreSQL export          + 3 new TEXT columns in chunks table
-    |
-    v
-SearchResult               + block_type, hierarchy, language_id fields
-    |
-    v
-format_json / format_pretty + metadata fields in output
+tests/
+├── conftest.py                    # Root-level shared fixtures (existing)
+├── fixtures/                      # Shared fixture modules (existing)
+│   ├── __init__.py
+│   ├── db.py                      # Mock DB fixtures (existing)
+│   ├── ollama.py                  # Mock Ollama fixtures (existing)
+│   └── data.py                    # Test data (existing)
+├── mocks/                         # Mock implementations (existing)
+│   ├── db.py
+│   └── ollama.py
+├── unit/                          # NEW: Unit tests with mocks (move existing)
+│   ├── conftest.py                # Unit-specific fixtures
+│   ├── indexer/
+│   ├── search/
+│   ├── management/
+│   ├── mcp/
+│   └── test_*.py
+└── integration/                   # NEW: Integration tests with Docker
+    ├── conftest.py                # Docker fixtures (pytest-docker integration)
+    ├── docker-compose.yml         # Test-specific compose config
+    ├── test_postgres_integration.py
+    ├── test_ollama_integration.py
+    └── test_full_flow_integration.py
 ```
 
-### Component Boundaries
+**Rationale:**
+- Clear separation enables running fast unit tests without Docker overhead
+- Hierarchical conftest.py files allow shared and specialized fixtures
+- Existing fixtures remain available throughout (pytest discovers parent conftest.py)
+- Integration tests can import/reuse test data from `tests/fixtures/data.py`
 
-| Component | Responsibility | Changes in v1.2 |
-|-----------|---------------|------------------|
-| **IndexingConfig** (`config.py`) | File include/exclude patterns | Add `*.tf`, `*.hcl`, `Dockerfile*`, `*.sh`, `*.bash` to `include_patterns` |
-| **Language definitions** (`languages.py` NEW) | Define `CustomLanguageSpec` for HCL, Dockerfile, Bash | New module with regex separator specs |
-| **Metadata extractors** (`metadata.py` NEW) | Extract block_type and hierarchy from chunk text | New module with `@cocoindex.op.function()` |
-| **Flow** (`flow.py`) | Orchestrate indexing pipeline | Pass `custom_languages` to `SplitRecursively()`, add metadata extraction step, add new collector fields |
-| **SearchResult** (`query.py`) | Search result data class | Add optional `block_type`, `hierarchy`, `language_id` fields |
-| **Search SQL** (`query.py`) | PostgreSQL similarity query | SELECT new columns from chunks table |
-| **Formatters** (`formatter.py`) | JSON and pretty output | Include metadata in output |
-| **MCP server** (`server.py`) | MCP tool responses | Include metadata in search_code return dicts |
-| **LANGUAGE_EXTENSIONS** (`query.py`) | Language filter mapping | Add `hcl`, `terraform`, `dockerfile`, `bash` entries |
+**Sources:**
+- [Pytest Good Integration Practices](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html) - Directory structure recommendations
+- [5 Best Practices for Organizing Tests](https://pytest-with-eric.com/pytest-best-practices/pytest-organize-tests/) - Separation patterns
+- [How to Keep Unit and Integration Tests Separate](https://www.pythontutorials.net/blog/how-to-keep-unit-tests-and-integrations-tests-separate-in-pytest/) - Marker and directory strategies
 
-## Data Flow: Detailed
+### Pytest Markers Configuration
 
-### Step 1: Custom Language Definitions (New Module)
+Add to `pyproject.toml`:
 
-The `custom_languages` parameter is passed to the `SplitRecursively()` constructor (not at transform-call time). This means the language specs must be defined before the flow is created.
+```toml
+[tool.pytest.ini_options]
+markers = [
+    "unit: Fast unit tests with mocked dependencies (default)",
+    "integration: Slower integration tests with Docker containers",
+    "postgres: Integration tests requiring PostgreSQL",
+    "ollama: Integration tests requiring Ollama embeddings",
+    "slow: Tests that take >10 seconds (skip in pre-commit)",
+]
+```
 
-**Where it plugs in:** `SplitRecursively(custom_languages=[...])` in `flow.py`
+**Usage patterns:**
+```bash
+# Fast feedback during development (unit tests only)
+pytest -m unit                      # ~2-5 seconds
 
-**How the language parameter routes:** CocoIndex's `SplitRecursively` matches the `language` parameter (passed at transform time from `file["extension"]`) against both built-in Tree-sitter languages and custom language specs. When a file has extension `tf`, it does not match any built-in language (HCL is not in Tree-sitter's language pack). CocoIndex then checks `custom_languages` for a match against `language_name` or `aliases`. If found, it uses the `separators_regex` list. If not found, it falls back to plain text splitting.
+# Full validation before commit (unit + integration)
+pytest                              # All tests, ~30-60 seconds
 
-**Critical insight:** The `language` parameter at transform time already receives the file extension (e.g., `"tf"`, `"sh"`). The custom language specs need `aliases` that match these extensions. Bash (`sh`) IS in Tree-sitter's built-in list but HCL (`tf`, `hcl`) and Dockerfile are NOT. For Bash, the built-in Tree-sitter chunking is likely adequate, but custom regex could provide better DevOps-specific splitting.
+# Skip slow integration tests in pre-commit hooks
+pytest -m "not slow"                # Unit + fast integration
+
+# CI runs everything
+pytest --verbose                    # Full suite with detailed output
+
+# Specific integration test category
+pytest -m postgres                  # Only PostgreSQL integration tests
+```
+
+**Rationale:**
+- Markers provide flexibility beyond directory structure
+- Can combine markers: `@pytest.mark.integration @pytest.mark.postgres @pytest.mark.slow`
+- CI can run all, developers can skip slow tests during iteration
+- Registration in pyproject.toml prevents warnings
+
+**Sources:**
+- [Ultimate Guide to Pytest Markers](https://pytest-with-eric.com/pytest-best-practices/pytest-markers/) - Marker patterns
+- [Pytest Markers Documentation](https://docs.pytest.org/en/stable/how-to/skipping.html) - Skip and selection
+- [pytest-skip-slow plugin](https://github.com/okken/pytest-skip-slow) - Skipping slow tests pattern
+
+## Docker Compose Strategy
+
+### Single File with Profiles (Recommended)
+
+**Location:** Root `docker-compose.yml` (enhance existing)
+
+```yaml
+services:
+  # Core service - always runs (dev + test + CI)
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: cocosearch-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: cocoindex
+      POSTGRES_PASSWORD: cocoindex
+      POSTGRES_DB: cocoindex
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cocoindex -d cocoindex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Optional: Dockerized Ollama (test profile only)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cocosearch-ollama
+    profiles: [test, ollama-docker]  # Only start when profile active
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  ollama_data:
+```
+
+**Activation examples:**
+```bash
+# Development: PostgreSQL only (existing workflow)
+docker compose up -d
+
+# Integration tests: PostgreSQL + Ollama (if not using native)
+docker compose --profile test up -d
+
+# Explicit Ollama Docker usage
+docker compose --profile ollama-docker up -d
+
+# CI: Start containers, let pytest-docker manage lifecycle
+# (CI just ensures Docker is available; pytest-docker handles up/down)
+```
+
+**Rationale:**
+- Single source of truth prevents config drift
+- Profiles avoid "separate file proliferation" (docker-compose.test.yml, docker-compose.dev.yml, etc.)
+- Core services (db) always available for development
+- Optional services (dockerized Ollama) only when needed
+- Healthchecks ensure containers are ready before tests run
+- pytest-docker respects existing compose files
+
+**Alternative Approach (Not Recommended):**
+Separate `tests/integration/docker-compose.yml` could be used if integration test containers differ significantly from dev environment. However, this creates duplication and configuration drift risk.
+
+**Sources:**
+- [Docker Compose Profiles Official Docs](https://docs.docker.com/compose/how-tos/profiles/) - Profile activation patterns
+- [Leveraging Compose Profiles for Environments](https://collabnix.com/leveraging-compose-profiles-for-dev-prod-test-and-staging-environments/) - Multi-environment patterns
+- [Managing Environment Configs with Profiles](https://oneuptime.com/blog/post/2025-11-27-manage-docker-compose-profiles/view) - Best practices
+
+## Fixture Architecture
+
+### Session-Scoped Docker Fixtures
+
+**Pattern:** Use pytest-docker plugin for automatic lifecycle management
+
+**Add to `tests/integration/conftest.py`:**
 
 ```python
-# src/cocosearch/indexer/languages.py (NEW)
+"""Integration test fixtures for Docker containers."""
 
-import cocoindex
+import pytest
+from pathlib import Path
 
-# HCL/Terraform: Split at top-level block boundaries
-HCL_LANGUAGE = cocoindex.functions.CustomLanguageSpec(
-    language_name="hcl",
-    aliases=["tf", "hcl", "tfvars"],
-    separators_regex=[
-        # Level 1: Top-level block boundaries (resource, data, module, etc.)
-        r"\n(?=(?:resource|data|variable|output|locals|module|provider|terraform)\s)",
-        # Level 2: Nested block boundaries
-        r"\n(?=\s+\w+\s*\{)",
-        # Level 3: Blank lines
-        r"\n\n+",
-        # Level 4: Single newlines
-        r"\n",
-    ],
-)
+# pytest-docker configuration fixtures
+@pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    """Point to root docker-compose.yml."""
+    return Path(pytestconfig.rootdir) / "docker-compose.yml"
 
-# Dockerfile: Split at instruction boundaries
-DOCKERFILE_LANGUAGE = cocoindex.functions.CustomLanguageSpec(
-    language_name="dockerfile",
-    aliases=["Dockerfile"],
-    separators_regex=[
-        # Level 1: FROM (build stage boundaries)
-        r"\n(?=FROM\s)",
-        # Level 2: Major instructions
-        r"\n(?=(?:RUN|COPY|ADD|ENV|EXPOSE|VOLUME|WORKDIR|USER|LABEL|ARG|ENTRYPOINT|CMD|HEALTHCHECK|SHELL|ONBUILD)\s)",
-        # Level 3: Blank lines / comments
-        r"\n\n+",
-        r"\n(?=#\s)",
-        # Level 4: Single newlines
-        r"\n",
-    ],
-)
+@pytest.fixture(scope="session")
+def docker_compose_project_name():
+    """Use fixed name for easier debugging."""
+    return "cocosearch-integration-tests"
 
-# Bash/Shell: Split at function and major structure boundaries
-BASH_LANGUAGE = cocoindex.functions.CustomLanguageSpec(
-    language_name="bash",
-    aliases=["sh", "bash", "zsh", "shell"],
-    separators_regex=[
-        # Level 1: Function definitions
-        r"\n(?=\w+\s*\(\)\s*\{)",
-        r"\n(?=function\s+\w+)",
-        # Level 2: Major flow control
-        r"\n(?=(?:if|for|while|case|until)\s)",
-        # Level 3: Blank lines (logical sections)
-        r"\n\n+",
-        # Level 4: Comments that mark sections
-        r"\n(?=#+\s)",
-        # Level 5: Single newlines
-        r"\n",
-    ],
-)
+@pytest.fixture(scope="session")
+def docker_setup():
+    """Start containers with --wait for healthchecks."""
+    return ["up --build --wait"]
 
-DEVOPS_CUSTOM_LANGUAGES = [HCL_LANGUAGE, DOCKERFILE_LANGUAGE, BASH_LANGUAGE]
-```
+@pytest.fixture(scope="session")
+def docker_cleanup():
+    """Clean up containers and volumes after tests."""
+    return ["down -v"]
 
-**Confidence:** HIGH for the API pattern (verified from CocoIndex official docs and academic papers example). MEDIUM for the specific regex patterns (will need validation with real DevOps files during implementation).
+# Service readiness fixtures
+@pytest.fixture(scope="session")
+def postgres_service(docker_ip, docker_services):
+    """Ensure PostgreSQL is ready and return connection details."""
+    port = docker_services.port_for("db", 5432)
 
-**Important note on Bash:** Tree-sitter has a built-in `bash` language. When `custom_languages` defines a language with the same name as a built-in, the behavior needs verification. If custom definitions override builtins, the custom Bash spec above works. If builtins take priority, the custom spec would be ignored for `.sh` files. This must be tested in Phase 1.
-
-### Step 2: Metadata Extraction (New Module)
-
-Metadata extraction happens INSIDE the CocoIndex flow, after chunking but before embedding. This is the right place because:
-- We have access to the chunk text and filename
-- The metadata can be stored alongside the chunk via `collector.collect()`
-- No post-processing step needed; metadata flows through the standard pipeline
-
-**Where it plugs in:** New `@cocoindex.op.function()` called between chunking and embedding in `flow.py`
-
-```python
-# src/cocosearch/indexer/metadata.py (NEW)
-
-import os
-import re
-from dataclasses import dataclass
-
-import cocoindex
-
-
-@dataclass
-class DevOpsMetadata:
-    """Metadata extracted from a DevOps code chunk."""
-    block_type: str    # e.g., "resource", "FROM", "function"
-    hierarchy: str     # e.g., "resource.aws_s3_bucket.main", "stage:build", "function:deploy"
-    language_id: str   # e.g., "hcl", "dockerfile", "bash"
-
-
-@cocoindex.op.function()
-def extract_devops_metadata(filename: str, chunk_text: str) -> DevOpsMetadata:
-    """Extract DevOps-specific metadata from a code chunk.
-
-    Returns structured metadata about the block type, hierarchy,
-    and language of the chunk.
-    """
-    ext = os.path.splitext(filename)[1].lstrip(".")
-    basename = os.path.basename(filename)
-
-    if ext in ("tf", "hcl", "tfvars"):
-        return _extract_hcl_metadata(chunk_text)
-    elif basename.startswith("Dockerfile") or basename == "Containerfile":
-        return _extract_dockerfile_metadata(chunk_text)
-    elif ext in ("sh", "bash", "zsh"):
-        return _extract_bash_metadata(chunk_text)
-    else:
-        return DevOpsMetadata(block_type="", hierarchy="", language_id="")
-
-
-def _extract_hcl_metadata(text: str) -> DevOpsMetadata:
-    """Extract HCL block type and hierarchy."""
-    # Match: resource "type" "name" {
-    match = re.match(
-        r'^\s*(resource|data|variable|output|locals|module|provider|terraform)'
-        r'\s+"([^"]+)"(?:\s+"([^"]+)")?\s*\{',
-        text, re.MULTILINE
+    # Wait until PostgreSQL accepts connections
+    docker_services.wait_until_responsive(
+        timeout=30.0,
+        pause=0.5,
+        check=lambda: is_postgres_responsive(docker_ip, port),
     )
-    if match:
-        block_kind = match.group(1)      # resource, data, module, etc.
-        type_label = match.group(2)       # aws_s3_bucket
-        name_label = match.group(3) or "" # main
-        hierarchy = f"{block_kind}.{type_label}"
-        if name_label:
-            hierarchy += f".{name_label}"
-        return DevOpsMetadata(
-            block_type=block_kind,
-            hierarchy=hierarchy,
-            language_id="hcl",
-        )
-    return DevOpsMetadata(block_type="block", hierarchy="", language_id="hcl")
 
+    return {
+        "host": docker_ip,
+        "port": port,
+        "user": "cocoindex",
+        "password": "cocoindex",
+        "database": "cocoindex",
+    }
 
-def _extract_dockerfile_metadata(text: str) -> DevOpsMetadata:
-    """Extract Dockerfile instruction type and stage context."""
-    # Check for FROM with AS (build stage)
-    from_match = re.match(r'^\s*FROM\s+\S+(?:\s+AS\s+(\S+))?', text, re.IGNORECASE)
-    if from_match:
-        stage = from_match.group(1) or "base"
-        return DevOpsMetadata(
-            block_type="FROM",
-            hierarchy=f"stage:{stage}",
-            language_id="dockerfile",
-        )
-    # Other instructions
-    instr_match = re.match(r'^\s*(RUN|COPY|ADD|ENV|EXPOSE|VOLUME|WORKDIR|USER|LABEL|ARG|ENTRYPOINT|CMD|HEALTHCHECK|SHELL|ONBUILD)\s', text, re.IGNORECASE)
-    if instr_match:
-        return DevOpsMetadata(
-            block_type=instr_match.group(1).upper(),
-            hierarchy="",
-            language_id="dockerfile",
-        )
-    return DevOpsMetadata(block_type="instruction", hierarchy="", language_id="dockerfile")
+@pytest.fixture(scope="session")
+def ollama_service(docker_ip, docker_services):
+    """Ensure Ollama is ready if using Docker profile."""
+    # This fixture only runs for tests marked with @pytest.mark.ollama
+    # If native Ollama is running, tests won't use this fixture
+    port = docker_services.port_for("ollama", 11434)
 
+    docker_services.wait_until_responsive(
+        timeout=60.0,  # Ollama takes longer to start
+        pause=1.0,
+        check=lambda: is_ollama_responsive(docker_ip, port),
+    )
 
-def _extract_bash_metadata(text: str) -> DevOpsMetadata:
-    """Extract Bash function name and structure."""
-    # Match: function_name() {  OR  function func_name
-    func_match = re.match(r'^\s*(\w+)\s*\(\)\s*\{', text, re.MULTILINE)
-    if not func_match:
-        func_match = re.match(r'^\s*function\s+(\w+)', text, re.MULTILINE)
-    if func_match:
-        return DevOpsMetadata(
-            block_type="function",
-            hierarchy=f"function:{func_match.group(1)}",
-            language_id="bash",
+    return {
+        "host": docker_ip,
+        "port": port,
+        "base_url": f"http://{docker_ip}:{port}",
+    }
+
+def is_postgres_responsive(host, port):
+    """Check if PostgreSQL accepts connections."""
+    import psycopg
+    try:
+        conn = psycopg.connect(
+            host=host, port=port,
+            user="cocoindex", password="cocoindex",
+            dbname="cocoindex",
+            connect_timeout=3
         )
-    return DevOpsMetadata(block_type="script", hierarchy="", language_id="bash")
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+def is_ollama_responsive(host, port):
+    """Check if Ollama API responds."""
+    import httpx
+    try:
+        response = httpx.get(f"http://{host}:{port}/api/tags", timeout=3.0)
+        return response.status_code == 200
+    except Exception:
+        return False
 ```
 
-**Confidence:** HIGH for the approach (CocoIndex supports dataclass return types from `@cocoindex.op.function()`). MEDIUM for individual regex patterns (need validation with real files).
+**Rationale:**
+- Session scope minimizes container startup overhead (once per test run)
+- pytest-docker handles lifecycle automatically (up before tests, down after)
+- `wait_until_responsive` prevents test failures from race conditions
+- `is_*_responsive` functions use actual connections, not just port checks
+- Fixtures return connection details, not containers themselves
+- Tests import these fixtures to ensure containers are ready
 
-### Step 3: Flow Integration
+**Function-Scoped Cleanup Fixtures:**
 
-The flow changes are minimal but crucial. Three modifications to `create_code_index_flow()`:
+For tests that modify database state:
 
 ```python
-# Modified flow.py (conceptual diff)
+@pytest.fixture
+def clean_postgres_db(postgres_service):
+    """Clean database before each test."""
+    # Setup: clear all data
+    conn = psycopg.connect(**postgres_service)
+    cursor = conn.cursor()
+    cursor.execute("DROP SCHEMA IF EXISTS public CASCADE")
+    cursor.execute("CREATE SCHEMA public")
+    cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    conn.commit()
+    conn.close()
 
-from cocosearch.indexer.languages import DEVOPS_CUSTOM_LANGUAGES
-from cocosearch.indexer.metadata import extract_devops_metadata
+    yield postgres_service
 
-def create_code_index_flow(...):
-    @cocoindex.flow_def(name=f"CodeIndex_{index_name}")
-    def code_index_flow(flow_builder, data_scope):
-        # ... LocalFile source unchanged ...
-
-        with data_scope["files"].row() as file:
-            file["extension"] = file["filename"].transform(extract_extension)
-
-            # CHANGE 1: Pass custom_languages to SplitRecursively constructor
-            file["chunks"] = file["content"].transform(
-                cocoindex.functions.SplitRecursively(
-                    custom_languages=DEVOPS_CUSTOM_LANGUAGES,  # NEW
-                ),
-                language=file["extension"],
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap,
-            )
-
-            with file["chunks"].row() as chunk:
-                chunk["embedding"] = chunk["text"].call(code_to_embedding)
-
-                # CHANGE 2: Extract metadata for each chunk
-                chunk["metadata"] = chunk["text"].transform(
-                    extract_devops_metadata,
-                    filename=file["filename"],
-                )
-
-                # CHANGE 3: Collect with metadata fields
-                code_embeddings.collect(
-                    filename=file["filename"],
-                    location=chunk["location"],
-                    embedding=chunk["embedding"],
-                    block_type=chunk["metadata"]["block_type"],      # NEW
-                    hierarchy=chunk["metadata"]["hierarchy"],        # NEW
-                    language_id=chunk["metadata"]["language_id"],    # NEW
-                )
-
-        code_embeddings.export(
-            f"{index_name}_chunks",
-            cocoindex.storages.Postgres(),
-            primary_key_fields=["filename", "location"],
-            vector_indexes=[...],  # unchanged
-        )
+    # Teardown: could clean again if needed, but usually not necessary
 ```
 
-**Key design decision:** Metadata extraction runs for ALL files, not just DevOps files. For non-DevOps files, the function returns empty strings for all three fields. This avoids conditional branching in the flow (which CocoIndex does not support well) and keeps the schema consistent across all chunks.
+**Sources:**
+- [pytest-docker GitHub](https://github.com/avast/pytest-docker) - Plugin usage and fixture examples
+- [Pytest Fixture Scopes Official Docs](https://docs.pytest.org/en/stable/how-to/fixtures.html) - Session vs function scope
+- [Managing Containers with Pytest Fixtures](https://blog.oddbit.com/post/2023-07-15-pytest-and-containers/) - Lifecycle patterns
 
-### Step 4: Schema Changes
+## Integration Points
 
-CocoIndex automatically creates PostgreSQL columns based on `collector.collect()` fields. Adding `block_type`, `hierarchy`, and `language_id` to the collect call creates three new TEXT columns in the chunks table.
+### With Existing Unit Tests
 
-**Current schema** (per-index table, e.g., `codeindex_myproject__myproject_chunks`):
+**Preserved Isolation:**
+- Unit tests continue using mocks (no Docker dependency)
+- Unit tests remain fast (<5 seconds for full suite)
+- Existing conftest.py fixtures remain available to all tests
 
-| Column | Type | Source |
-|--------|------|--------|
-| `filename` | TEXT | Primary key part 1 |
-| `location` | INT4RANGE | Primary key part 2 (byte range) |
-| `embedding` | VECTOR(768) | Ollama nomic-embed-text |
+**Shared Resources:**
+- Test data fixtures in `tests/fixtures/data.py` used by both
+- Utility functions can be shared
+- Mocks still useful for integration test edge cases
 
-**New schema** (v1.2):
+**Migration Path:**
+1. Move existing tests to `tests/unit/` directory (Phase 1)
+2. Add pytest markers to existing tests: `@pytest.mark.unit` (Phase 1)
+3. Create `tests/integration/` structure (Phase 2)
+4. Add pytest-docker fixtures (Phase 2)
+5. Write integration tests incrementally (Phase 3)
 
-| Column | Type | Source | Notes |
-|--------|------|--------|-------|
-| `filename` | TEXT | Primary key part 1 | Unchanged |
-| `location` | INT4RANGE | Primary key part 2 | Unchanged |
-| `embedding` | VECTOR(768) | Ollama | Unchanged |
-| `block_type` | TEXT | `extract_devops_metadata` | e.g., "resource", "FROM", "function", "" for non-DevOps |
-| `hierarchy` | TEXT | `extract_devops_metadata` | e.g., "resource.aws_s3_bucket.main", "" for non-DevOps |
-| `language_id` | TEXT | `extract_devops_metadata` | e.g., "hcl", "dockerfile", "bash", "" for non-DevOps |
+**No Breaking Changes:**
+- `pytest` still runs all tests
+- Existing test commands work unchanged
+- CI can adopt integration tests gradually
 
-**Migration consideration:** Existing indexes will NOT have these columns. When a user re-indexes a codebase, CocoIndex's `flow.setup()` will attempt to reconcile the schema. If CocoIndex does not add columns automatically, a migration step or full re-index may be required. This needs testing.
+### With CI/CD
 
-**Alternative considered:** Store metadata as a single JSONB column instead of three TEXT columns. Rejected because: (1) TEXT columns are simpler to query with WHERE clauses, (2) individual columns can be indexed if needed, (3) the schema is stable (three known fields, not arbitrary).
+**GitHub Actions Example:**
 
-### Step 5: Search Query Changes
+```yaml
+name: Tests
 
-The search SQL needs to SELECT the new columns, and `SearchResult` needs new fields.
+on: [push, pull_request]
 
-```python
-# Modified query.py (conceptual)
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Run unit tests
+        run: |
+          uv sync --all-groups
+          uv run pytest -m unit --verbose
 
-@dataclass
-class SearchResult:
-    filename: str
-    start_byte: int
-    end_byte: int
-    score: float
-    block_type: str = ""      # NEW
-    hierarchy: str = ""       # NEW
-    language_id: str = ""     # NEW
-
-# SQL query adds: block_type, hierarchy, language_id to SELECT
-sql = f"""
-    SELECT filename, lower(location) as start_byte, upper(location) as end_byte,
-           1 - (embedding <=> %s::vector) AS score,
-           COALESCE(block_type, '') as block_type,
-           COALESCE(hierarchy, '') as hierarchy,
-           COALESCE(language_id, '') as language_id
-    FROM {table_name}
-    ORDER BY embedding <=> %s::vector
-    LIMIT %s
-"""
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Start Docker containers
+        run: docker compose up -d --wait
+      - name: Run integration tests
+        run: |
+          uv sync --all-groups
+          uv run pytest -m integration --verbose
+      - name: Cleanup containers
+        if: always()
+        run: docker compose down -v
 ```
 
-**COALESCE usage:** Handles backward compatibility with existing indexes that lack the new columns. If columns don't exist in older indexes, the query would fail -- so either we need column existence checking or accept that v1.2 requires re-indexing. The simpler approach is to require re-indexing for DevOps metadata, since semantic search still works without metadata columns on older indexes.
+**Rationale:**
+- Separate jobs allow parallel execution (faster CI)
+- Unit tests run without Docker overhead
+- Integration tests use Docker Compose (not pytest-docker in CI)
+- `--wait` flag respects healthchecks (containers ready before pytest)
+- `if: always()` ensures cleanup even if tests fail
+- Can add test result caching, coverage reports later
 
-**Decision:** Use a try/except around the metadata-enriched query. If it fails (missing columns), fall back to the original query. This provides graceful degradation for pre-v1.2 indexes.
-
-### Step 6: Formatter Changes
-
-```python
-# Modified format_json output
-{
-    "file_path": "/infra/main.tf",
-    "start_line": 10,
-    "end_line": 25,
-    "score": 0.87,
-    "content": "resource \"aws_s3_bucket\" \"data\" { ... }",
-    "block_type": "resource",                          # NEW
-    "hierarchy": "resource.aws_s3_bucket.data",        # NEW
-    "language_id": "hcl",                              # NEW
-    "context_before": [...],
-    "context_after": [...]
-}
+**Alternative (Single Job):**
+```yaml
+integration-tests:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5
+    - name: Install pytest-docker
+      run: uv add --dev pytest-docker
+    - name: Run all tests
+      run: uv run pytest --verbose  # pytest-docker manages containers
 ```
 
-For pretty output, metadata appears as an annotation line:
+Simpler but slower (containers start/stop per test run).
 
-```
-/infra/main.tf
-  0.87 Lines 10-25  [hcl] resource.aws_s3_bucket.data
-  resource "aws_s3_bucket" "data" {
-    bucket = "my-data-bucket"
-    ...
-  }
-```
+**Sources:**
+- [Pytest GitHub Actions Integration](https://pytest-with-eric.com/integrations/pytest-github-actions/) - CI patterns (edited 2026-01-22)
+- [Setup Docker for Integration Testing in GitHub Actions](https://dev.to/sahanonp/setup-docker-for-integration-testing-in-github-action-39fn) - Workflow examples
+- [pytest-docker-compose Actions](https://github.com/pytest-docker-compose/pytest-docker-compose/actions) - Real-world CI configs
 
-Metadata is only shown when non-empty. For standard programming language files (where all metadata fields are ""), nothing extra appears -- output is identical to v1.0.
+## Comparison: pytest-docker vs testcontainers
 
-### Step 7: MCP Server Changes
+### pytest-docker (Recommended for CocoSearch)
 
-The `search_code` MCP tool includes metadata in its response dicts:
+**Pros:**
+- Leverages existing docker-compose.yml (no duplication)
+- Simple pytest integration (just fixtures)
+- Works with existing healthchecks
+- Session scope minimizes overhead
+- Team already familiar with Docker Compose
 
-```python
-output.append({
-    "file_path": r.filename,
-    "start_line": start_line,
-    "end_line": end_line,
-    "score": r.score,
-    "content": content,
-    "block_type": r.block_type,      # NEW (empty string for non-DevOps)
-    "hierarchy": r.hierarchy,        # NEW (empty string for non-DevOps)
-    "language_id": r.language_id,    # NEW (empty string for non-DevOps)
-})
-```
+**Cons:**
+- Less dynamic (can't easily create containers per test)
+- Tied to Docker Compose (not just Docker API)
 
-No new MCP tools needed. The calling LLM (Claude) can use `block_type` and `hierarchy` to provide richer context when synthesizing answers from search results.
+**Best for:** Projects with stable infrastructure needs where docker-compose already exists for development.
 
-## Patterns to Follow
+### testcontainers-python (Alternative)
 
-### Pattern 1: Custom Languages as Static Definitions
+**Pros:**
+- Full control from Python code
+- Can create containers dynamically per test
+- Built-in wait strategies for many services
+- Language-agnostic (Java, Python, Go, etc.)
 
-**What:** Define `CustomLanguageSpec` objects as module-level constants, not generated dynamically.
-**When:** Always. Language specs don't change between flow runs.
-**Why:** Simplifies testing (can test specs independently), avoids reconstruction on every flow creation, enables import from multiple modules.
+**Cons:**
+- Requires code changes beyond tests
+- Longer test execution (containers per test or test class)
+- Duplicates infrastructure config (not DRY)
+- Another abstraction layer to learn
 
-### Pattern 2: Metadata Extraction as CocoIndex Op Function
+**Best for:** Projects needing dynamic test infrastructure or testing multiple DB versions.
 
-**What:** Use `@cocoindex.op.function()` for metadata extraction, not a plain Python function.
-**When:** Metadata extraction happens inside the CocoIndex flow.
-**Why:** CocoIndex's op.function decorator enables caching, proper type mapping to PostgreSQL columns, and integration with the incremental processing system. A plain function would not participate in CocoIndex's dependency tracking.
+### Decision for CocoSearch
 
-### Pattern 3: Empty Strings Over Nulls for Optional Metadata
+**Use pytest-docker** because:
+1. docker-compose.yml already exists and maintained
+2. Infrastructure needs are stable (PostgreSQL + optional Ollama)
+3. Session scope sufficient (don't need per-test isolation)
+4. Team familiarity with Compose
+5. Simpler mental model (compose file = all infrastructure)
 
-**What:** Return empty string `""` instead of `None` for chunks without metadata.
-**When:** Non-DevOps files processed through the same pipeline.
-**Why:** Avoids NULL handling complexity in SQL queries and downstream formatters. `WHERE block_type != ''` is cleaner than `WHERE block_type IS NOT NULL AND block_type != ''`. Consistent with the existing pattern of using empty strings (e.g., `extract_extension` returns `""` for files without extensions).
+**Sources:**
+- [Python Integration Tests: docker-compose vs testcontainers](https://medium.com/codex/python-integration-tests-docker-compose-vs-testcontainers-94986d7547ce) - Detailed comparison
+- [Testcontainers Python GitHub](https://github.com/testcontainers/testcontainers-python) - API and patterns
 
-### Pattern 4: Graceful Degradation for Pre-v1.2 Indexes
+## Build Order
 
-**What:** Search queries fall back to the v1.0 column set if metadata columns don't exist.
-**When:** Querying indexes created before v1.2.
-**Why:** Users should not be forced to re-index all codebases immediately after upgrading.
+Recommended implementation sequence balancing risk and value.
+
+### Phase 1: Reorganize Existing Tests (Low Risk)
+
+**Goal:** Separate unit/integration without breaking anything
+
+**Tasks:**
+1. Create `tests/unit/` directory
+2. Move existing test files to `tests/unit/` (preserve structure)
+3. Add pytest markers to existing tests: `@pytest.mark.unit`
+4. Update `pyproject.toml` to register markers
+5. Verify `pytest` and `pytest -m unit` produce same results
+6. Update CI to use markers (no functional change yet)
+
+**Validation:**
+- All existing tests pass
+- No new dependencies
+- CI passes unchanged
+
+**Estimated effort:** 2-4 hours
+
+**Risk:** LOW (mechanical refactoring)
+
+### Phase 2: Add Docker Infrastructure (Medium Risk)
+
+**Goal:** Enable Docker-based testing without writing integration tests yet
+
+**Tasks:**
+1. Add pytest-docker to dev dependencies: `uv add --dev pytest-docker`
+2. Enhance root `docker-compose.yml` with Ollama service + test profile
+3. Create `tests/integration/conftest.py` with Docker fixtures
+4. Create empty `tests/integration/` directory structure
+5. Write fixture test: `test_docker_fixtures.py` (validates containers start/stop)
+6. Document Docker setup in development guide
+
+**Validation:**
+- `pytest tests/integration/test_docker_fixtures.py` passes
+- Containers start with healthchecks
+- Containers clean up after tests
+- No interference with unit tests
+
+**Estimated effort:** 4-8 hours
+
+**Risk:** MEDIUM (new infrastructure, potential Docker issues)
+
+**Dependencies:** Docker installed locally + in CI
+
+### Phase 3: PostgreSQL Integration Tests (Medium Risk)
+
+**Goal:** Validate database operations with real PostgreSQL
+
+**Tasks:**
+1. Write `test_postgres_integration.py`:
+   - Test schema creation (extensions, tables)
+   - Test index storage (write chunks, verify persistence)
+   - Test vector search (insert, search, verify results)
+   - Test index management (clear, stats)
+2. Create `clean_postgres_db` fixture for test isolation
+3. Add `@pytest.mark.postgres @pytest.mark.integration` to tests
+4. Update CI to run PostgreSQL integration tests
+
+**Validation:**
+- Tests pass with real PostgreSQL
+- Tests isolated (no state leakage)
+- CI runs PostgreSQL tests successfully
+- Unit tests still fast (unaffected)
+
+**Estimated effort:** 8-12 hours
+
+**Risk:** MEDIUM (real DB adds complexity, timing issues)
+
+### Phase 4: Ollama Integration Tests (High Risk)
+
+**Goal:** Validate embedding generation with real Ollama
+
+**Tasks:**
+1. Write `test_ollama_integration.py`:
+   - Test embedding generation (text -> vector)
+   - Test model availability checks
+   - Test error handling (model not loaded, service down)
+2. Add fixture to pull nomic-embed-text model if missing
+3. Add `@pytest.mark.ollama @pytest.mark.slow` markers
+4. Support both native and Docker Ollama (env var toggle)
+5. Update CI to use Docker Ollama or skip Ollama tests
+
+**Validation:**
+- Tests pass with real embeddings
+- Tests skip gracefully if Ollama unavailable
+- CI strategy defined (Docker Ollama or skip)
+
+**Estimated effort:** 6-10 hours
+
+**Risk:** HIGH (Ollama slow to start, large model downloads, CI complexity)
+
+**Note:** May decide to keep Ollama mocked in CI (download cost/time) while supporting local integration testing.
+
+### Phase 5: Full Flow Integration Tests (Low-Medium Risk)
+
+**Goal:** End-to-end validation of index -> search workflow
+
+**Tasks:**
+1. Write `test_full_flow_integration.py`:
+   - Index a real codebase (tests/fixtures/sample_project/)
+   - Search with natural language queries
+   - Verify returned chunks match expected files
+   - Test incremental indexing (add file, reindex, search)
+   - Test DevOps file handling (Terraform, Dockerfile, Bash)
+2. Add `@pytest.mark.integration @pytest.mark.slow` markers
+3. Create fixture sample codebase with diverse languages
+
+**Validation:**
+- Full workflow works end-to-end
+- Results match expected behavior
+- Incremental indexing detected correctly
+- DevOps metadata extracted properly
+
+**Estimated effort:** 8-12 hours
+
+**Risk:** MEDIUM (complex test, many moving parts, but builds on previous phases)
+
+### Summary: Total Estimated Effort
+
+**Total:** 28-46 hours (3.5-5.75 working days)
+
+**Critical path:** Phase 1 → Phase 2 → Phase 3 → Phase 5 (PostgreSQL must work before full flow)
+
+**Parallel work:** Phase 4 (Ollama) can be developed alongside Phase 3 or after Phase 5
+
+**De-risk strategy:** Phases 1-2 establish foundation with minimal breaking changes. Phase 3 proves Docker integration works. Phases 4-5 add comprehensive coverage.
+
+## Key Architectural Decisions Summary
+
+| Decision | Rationale |
+|----------|-----------|
+| Separate `tests/unit/` and `tests/integration/` | Clear separation, enables fast unit tests without Docker |
+| pytest markers in addition to directories | Flexible test selection, CI can combine filters |
+| pytest-docker over testcontainers | Leverages existing docker-compose.yml, simpler model |
+| Session-scoped fixtures | Minimize container overhead, tests share infrastructure |
+| Docker Compose profiles over separate files | Single source of truth, prevents config drift |
+| Root conftest.py + directory-specific conftest.py | Hierarchical fixture organization, shared + specialized |
+| Healthchecks + wait_until_responsive | Prevent race conditions, reliable test startup |
+| Optional Docker Ollama via profile | Supports both native and Docker workflows |
+| CI runs unit and integration separately | Faster feedback, parallel execution |
+| Incremental adoption (5 phases) | De-risk changes, validate at each step |
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Post-Processing Metadata Outside the Flow
+### Don't: Mix Docker and Mocks in Same Test
 
-**What people do:** Run a separate pass after indexing to extract metadata and UPDATE rows.
-**Why it's wrong:** Breaks CocoIndex's incremental processing model. The second pass would need to track which chunks changed independently. Doubles write operations. Creates a window where chunks exist without metadata.
-**Do this instead:** Extract metadata inside the flow, before the collector, so metadata is stored atomically with each chunk.
+**Why:** Confusing, defeats purpose of integration testing
 
-### Anti-Pattern 2: Conditional Flow Branching by Language
+**Instead:** Integration tests use real services, unit tests use mocks exclusively
 
-**What people do:** Create separate flow paths for DevOps vs. programming language files.
-**Why it's wrong:** CocoIndex flows are declarative data pipelines, not imperative programs. Conditional branching (if file is HCL, do X, else do Y) is not well-supported. Maintaining two paths doubles complexity and testing burden.
-**Do this instead:** Run the same pipeline for all files. The `extract_devops_metadata` function returns empty metadata for non-DevOps files. The `custom_languages` parameter gracefully falls back to built-in Tree-sitter or plain text for unsupported extensions.
+### Don't: Function-Scoped Docker Fixtures by Default
 
-### Anti-Pattern 3: Storing Metadata as JSONB Blob
+**Why:** Slow (containers restart per test), unnecessary overhead
 
-**What people do:** Pack all metadata into a single `metadata JSONB` column.
-**Why it's wrong:** Harder to query (`WHERE metadata->>'block_type' = 'resource'` vs. `WHERE block_type = 'resource'`), can't add standard indexes, CocoIndex's type system handles struct fields as individual columns naturally.
-**Do this instead:** Use individual typed columns. CocoIndex maps dataclass fields to separate PostgreSQL columns automatically.
+**Instead:** Session scope for containers, function scope only for data cleanup
 
-### Anti-Pattern 4: Overriding Built-in Tree-sitter with Custom Regex
+### Don't: Skip Healthchecks
 
-**What people do:** Define custom regex for languages that Tree-sitter already handles (e.g., Python, JavaScript).
-**Why it's wrong:** Tree-sitter parses actual ASTs and produces semantically meaningful boundaries. Regex approximations are always inferior for languages with complex syntax.
-**Do this instead:** Only use `custom_languages` for languages NOT in Tree-sitter's language pack. For Bash: test whether Tree-sitter's built-in bash support is adequate before adding a custom spec.
+**Why:** Race conditions (tests start before services ready)
 
-## Decision: Metadata Extraction Inside vs. Outside the Flow
+**Instead:** Always use healthchecks + wait_until_responsive
 
-| Approach | Inside Flow | Outside Flow (Post-Processing) |
-|----------|-------------|-------------------------------|
-| **Incremental support** | Automatic (CocoIndex tracks) | Must implement separately |
-| **Atomicity** | Chunk + metadata stored together | Window without metadata |
-| **Complexity** | Single pipeline | Two-pass system |
-| **Performance** | One pass over files | Two passes |
-| **Flexibility** | Limited to CocoIndex ops | Any Python code |
-| **Testing** | Test as CocoIndex op | Test independently |
+### Don't: Separate docker-compose.test.yml
 
-**Decision:** Inside the flow. The incremental processing benefit alone justifies this. When a file changes, CocoIndex re-processes only that file's chunks, and metadata is automatically updated along with the new chunks.
+**Why:** Configuration drift, duplication, maintenance burden
 
-## Decision: Separate Flow vs. Single Flow with Custom Languages
+**Instead:** Use profiles in single docker-compose.yml
 
-| Approach | Single Flow + custom_languages | Separate DevOps Flow |
-|----------|-------------------------------|---------------------|
-| **Index management** | One index per codebase | Two indexes per codebase |
-| **Search** | Single query searches all files | Must query two indexes and merge |
-| **Complexity** | Lower (extend existing flow) | Higher (new flow, merge logic) |
-| **Schema** | Unified with optional metadata | Clean separation |
-| **User experience** | Transparent (same commands) | New flags/options needed |
+### Don't: Commit Running Containers in CI
 
-**Decision:** Single flow with `custom_languages`. Users should not need to manage separate indexes for DevOps files. A mixed codebase (Python + Terraform) should be searchable from a single index. The metadata columns being empty for non-DevOps files is a small cost for much simpler UX.
+**Why:** Resource leaks, port conflicts in subsequent runs
 
-## Build Order Dependencies
+**Instead:** Always `docker compose down -v` in cleanup step with `if: always()`
 
-```
-Phase 1: Custom Language Definitions
-|  - Define CustomLanguageSpec for HCL, Dockerfile, Bash
-|  - Verify custom_languages parameter works with SplitRecursively
-|  - Test: Bash override behavior (custom vs. Tree-sitter built-in)
-|  - Test: Extension-to-language routing (tf -> hcl, Dockerfile -> dockerfile)
-|  No dependencies.
-|
-Phase 2: Metadata Extraction
-|  - Create extract_devops_metadata op function
-|  - Implement HCL, Dockerfile, Bash extractors
-|  - Test: regex patterns against real DevOps files
-|  Depends on: Phase 1 (need to know chunk boundaries to test extraction)
-|
-Phase 3: Flow Integration + Schema
-|  - Modify create_code_index_flow to add custom_languages
-|  - Add metadata extraction step
-|  - Add metadata fields to collector
-|  - Update IndexingConfig with DevOps file patterns
-|  - Test: End-to-end indexing of DevOps files
-|  Depends on: Phase 1 + Phase 2
-|
-Phase 4: Search + Output Integration
-|  - Extend SearchResult with metadata fields
-|  - Update SQL queries to include metadata columns
-|  - Implement graceful degradation for pre-v1.2 indexes
-|  - Update format_json and format_pretty
-|  - Update MCP server search_code response
-|  - Update LANGUAGE_EXTENSIONS mapping
-|  - Test: Search results include metadata
-|  Depends on: Phase 3 (needs populated metadata in DB)
-```
+### Don't: Rely on pytest-docker in CI (Debatable)
 
-**Critical path:** Language definitions -> Flow integration -> Search integration
+**Why:** Extra abstraction, harder to debug CI failures
 
-**Parallelizable:** Metadata extraction development can start in parallel with language definition testing, since the extraction function is unit-testable without a running CocoIndex flow.
+**Instead:** Let CI start containers explicitly, pytest just runs tests
 
-## New File Structure
+**Alternative view:** pytest-docker in CI is fine if it works reliably
 
-```
-src/cocosearch/
-    indexer/
-        __init__.py          # Add new module exports
-        config.py            # MODIFY: Add DevOps file patterns
-        embedder.py          # UNCHANGED
-        file_filter.py       # UNCHANGED
-        flow.py              # MODIFY: Add custom_languages + metadata extraction
-        languages.py         # NEW: CustomLanguageSpec definitions
-        metadata.py          # NEW: extract_devops_metadata function
-        progress.py          # UNCHANGED
-    search/
-        __init__.py          # Update exports if needed
-        db.py                # UNCHANGED
-        formatter.py         # MODIFY: Include metadata in output
-        query.py             # MODIFY: SearchResult fields + SQL columns + language mapping
-        repl.py              # UNCHANGED (calls search, gets metadata automatically)
-        utils.py             # UNCHANGED
-    management/             # UNCHANGED
-    mcp/
-        server.py            # MODIFY: Include metadata in search_code response
-    cli.py                   # MINOR: DevOps language filter support
-```
+## Confidence Assessment
 
-**Total new files:** 2 (`languages.py`, `metadata.py`)
-**Total modified files:** 5 (`config.py`, `flow.py`, `query.py`, `formatter.py`, `server.py`)
-**Modified with minor changes:** 1 (`cli.py`)
+| Area | Confidence | Source Quality |
+|------|------------|----------------|
+| Test directory structure | HIGH | Official pytest docs + multiple credible sources |
+| Pytest markers | HIGH | Official pytest docs + community best practices |
+| Docker Compose profiles | HIGH | Official Docker docs + 2025-2026 articles |
+| pytest-docker vs testcontainers | MEDIUM | Community comparison articles (2020-2024) |
+| Fixture scoping | HIGH | Official pytest docs + plugin docs |
+| CI/CD patterns | MEDIUM | GitHub Actions examples + community articles |
+| Build order | MEDIUM | Based on CocoSearch architecture + general best practices |
 
-## Scalability Considerations
+**Gaps identified:**
+- No 2026-specific pytest-docker updates found (plugin stable since 2020)
+- Limited examples of pytest + Docker Compose profiles together (pattern is new)
+- Ollama Docker healthcheck reliability unknown (may need custom wait logic)
 
-| Concern | Impact | Mitigation |
-|---------|--------|------------|
-| Metadata columns increase row size | ~100-200 bytes per row (3 TEXT fields, mostly short strings) | Negligible vs. 768-dim vector (~3KB) |
-| Metadata extraction adds processing time | Regex matching is sub-millisecond per chunk | No measurable impact |
-| Custom language regex for large files | Regex separators are O(n) per file | Same as built-in, acceptable |
-| Schema migration for existing indexes | Requires re-index | One-time cost, documented |
+## Recommended Next Steps
 
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| `custom_languages` conflicts with built-in Bash | MEDIUM | Needs workaround | Test early in Phase 1; if conflict, rename custom spec |
-| CocoIndex dataclass return from op.function doesn't map to separate columns | LOW | Must restructure | Verified in docs; academic papers example uses structured returns |
-| Regex patterns don't capture all HCL/Dockerfile variants | MEDIUM | Incomplete metadata | Start with common patterns, iterate; empty metadata is safe fallback |
-| Existing index schema incompatible with new columns | HIGH | Must re-index | Implement graceful degradation; document re-index requirement |
-| `extract_devops_metadata` perf on large repos | LOW | Slower indexing | Regex is fast; only meaningful if >100K files |
-
-## Sources
-
-- [CocoIndex Functions Documentation](https://cocoindex.io/docs/ops/functions) -- `SplitRecursively` API, `CustomLanguageSpec` structure [HIGH confidence]
-- [CocoIndex Academic Papers Example](https://cocoindex.io/docs/examples/academic_papers_index) -- `CustomLanguageSpec` usage with `SplitRecursively` constructor [HIGH confidence]
-- [CocoIndex Custom Functions](https://cocoindex.io/docs/custom_ops/custom_functions) -- `@cocoindex.op.function()` decorator, return type annotations [HIGH confidence]
-- [CocoIndex Data Types](https://cocoindex.io/docs/core/data_types) -- Struct/dataclass return types supported [HIGH confidence]
-- [CocoIndex Real-time Codebase Indexing Example](https://cocoindex.io/docs/examples/code_index) -- Existing flow pattern [HIGH confidence]
-- [Terraform Syntax Documentation](https://developer.hashicorp.com/terraform/language/syntax/configuration) -- HCL block structure [HIGH confidence]
-- [Dockerfile Reference](https://docs.docker.com/reference/dockerfile/) -- Instruction structure [HIGH confidence]
-- CocoSearch source code analysis (flow.py, query.py, formatter.py, server.py, config.py) -- Integration points [HIGH confidence, direct code reading]
+1. **Review this architecture** with team/stakeholder
+2. **Validate Docker setup** on development machine (docker-compose.yml enhancements)
+3. **Start with Phase 1** (reorganize tests) - lowest risk, immediate clarity
+4. **Prototype Phase 2** (Docker fixtures) in spike branch - validate pytest-docker works with existing setup
+5. **Decide on Ollama strategy** - Docker vs native vs mocked in CI
+6. **Create roadmap phases** based on this research
 
 ---
-*Architecture research for: CocoSearch v1.2 DevOps Language Support*
-*Researched: 2026-01-27*
+
+**Sources:**
+
+*Test Organization:*
+- [Pytest Good Integration Practices](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html)
+- [5 Best Practices for Organizing Tests | Pytest with Eric](https://pytest-with-eric.com/pytest-best-practices/pytest-organize-tests/)
+- [How to Keep Unit and Integration Tests Separate | Python Tutorials](https://www.pythontutorials.net/blog/how-to-keep-unit-tests-and-integrations-tests-separate-in-pytest/)
+- [Pytest Conftest.py Hierarchy | Pytest with Eric](https://pytest-with-eric.com/pytest-best-practices/pytest-conftest/)
+
+*Docker Integration:*
+- [pytest-docker GitHub](https://github.com/avast/pytest-docker)
+- [pytest-docker-compose GitHub](https://github.com/pytest-docker-compose/pytest-docker-compose)
+- [Building Resilient API Test Automation: Pytest + Docker Integration | Medium](https://manishsaini74.medium.com/building-resilient-api-test-automation-pytest-docker-integration-guide-9710359b6d9b)
+- [Integration Testing with Pytest & Docker Compose | Medium](https://xnuinside.medium.com/integration-testing-for-bunch-of-services-with-pytest-docker-compose-4892668f9cba)
+
+*Docker Compose Patterns:*
+- [Docker Compose Profiles Official Docs](https://docs.docker.com/compose/how-tos/profiles/)
+- [Leveraging Compose Profiles for Environments | Collabnix](https://collabnix.com/leveraging-compose-profiles-for-dev-prod-test-and-staging-environments/)
+- [Managing Environment Configs with Docker Compose Profiles | OneUptime](https://oneuptime.com/blog/post/2025-11-27-manage-docker-compose-profiles/view)
+
+*Fixture Patterns:*
+- [Pytest Fixture Scopes Official Docs](https://docs.pytest.org/en/stable/how-to/fixtures.html)
+- [Managing Containers with Pytest Fixtures | blog.oddbit.com](https://blog.oddbit.com/post/2023-07-15-pytest-and-containers/)
+- [Testcontainers in Python | Medium](https://medium.com/@kandemirozenc/testcontainers-in-python-for-integration-testing-with-mysql-63160a004fb5)
+
+*CI/CD:*
+- [Pytest GitHub Actions Integration | Pytest with Eric](https://pytest-with-eric.com/integrations/pytest-github-actions/)
+- [Setup Docker for Integration Testing in GitHub Actions | DEV](https://dev.to/sahanonp/setup-docker-for-integration-testing-in-github-action-39fn)
+- [Speed up pytest GitHub Actions with Docker | Towards Data Science](https://towardsdatascience.com/speed-up-your-pytest-github-actions-with-docker-6b3a85b943f/)
+
+*Comparison & Strategy:*
+- [Python Integration Tests: docker-compose vs testcontainers | Medium](https://medium.com/codex/python-integration-tests-docker-compose-vs-testcontainers-94986d7547ce)
+- [Ultimate Guide to Pytest Markers | Pytest with Eric](https://pytest-with-eric.com/pytest-best-practices/pytest-markers/)
+- [pytest-skip-slow plugin](https://github.com/okken/pytest-skip-slow)
+
+---
+
+*Researched: 2026-01-30*

@@ -1,203 +1,674 @@
-# Technology Stack: v1.2 DevOps Language Support
+# Technology Stack: v1.3 Docker Integration Testing
 
 **Project:** CocoSearch -- Local-first semantic code search via MCP
-**Milestone:** v1.2 -- DevOps Language Support (HCL, Dockerfile, Bash)
-**Researched:** 2026-01-27
-**Confidence:** HIGH (CocoIndex API verified locally; parsing libraries verified via PyPI/official docs)
+**Milestone:** v1.3 -- Docker Integration Tests & Infrastructure
+**Researched:** 2026-01-30
+**Confidence:** HIGH (testcontainers versions verified via PyPI; pytest integration patterns verified via official guides)
 
 ## Executive Summary
 
-v1.2 requires **no new runtime dependencies** for its core functionality. CocoIndex's `SplitRecursively` with `custom_languages` handles chunking via regex patterns (using Rust's `fancy-regex` engine with lookahead support). Metadata extraction uses Python's stdlib `re` module -- no external parser libraries needed for the regex-based approach chosen in the architecture. Optional future enhancements could add `python-hcl2` or `dockerfile-parse` for deeper structural parsing, but these are not required for v1.2 goals.
+v1.3 requires **one new dev dependency: testcontainers-python** for programmatic Docker container management in integration tests. Your existing pytest + pytest-asyncio setup already supports the integration patterns needed. Do NOT add pytest-docker plugins or docker-compose Python libraries -- they add complexity for workflows you can manage more simply with testcontainers (tests) and native docker-compose CLI (user setup).
 
-## Recommended Stack
+## Recommended Stack Additions
 
-### Core (Unchanged from v1.0/v1.1)
+### testcontainers[postgres] (New)
 
-| Technology | Version | Purpose | Status in v1.2 |
-|------------|---------|---------|----------------|
-| CocoIndex | >=0.3.28 | Indexing pipeline with `SplitRecursively` | **Unchanged** -- `custom_languages` param already exists |
-| PostgreSQL + pgvector | pg17 / 0.8.1 | Vector storage | **Unchanged** -- new TEXT columns added automatically |
-| Ollama (nomic-embed-text) | latest / 768-dim | Local embeddings | **Unchanged** |
-| FastMCP (via `mcp[cli]`) | >=1.26.0 | MCP server interface | **Unchanged** |
-| Python | >=3.11 | Runtime | **Unchanged** |
-| UV | latest | Package manager | **Unchanged** |
+- **Version:** >=4.14.0
+- **Released:** 2026-01-07 (actively maintained)
+- **Python requirement:** >=3.10 (your project is >=3.11, compatible)
+- **License:** Apache 2.0
+- **Purpose:** Programmatic Docker container lifecycle management for integration tests
+- **Install:** `uv add --dev "testcontainers[postgres]>=4.14.0"`
 
-### v1.2 Additions: Zero New Dependencies Required
+**Why testcontainers:**
 
-| Component | Solution | Why No New Dependency |
-|-----------|----------|----------------------|
-| HCL chunking | `CustomLanguageSpec` with regex separators | CocoIndex built-in feature |
-| Dockerfile chunking | `CustomLanguageSpec` with regex separators | CocoIndex built-in feature |
-| Bash chunking | `CustomLanguageSpec` with regex separators | CocoIndex built-in feature |
-| HCL metadata extraction | `re` module (stdlib) | Regex sufficient for block type/name extraction |
-| Dockerfile metadata extraction | `re` module (stdlib) | Regex sufficient for instruction/stage extraction |
-| Bash metadata extraction | `re` module (stdlib) | Regex sufficient for function name extraction |
+1. **Industry standard** - Cross-language project (Java, Node, Python, .NET, Go) with consistent patterns and active community
+2. **PostgreSQL module** - Pre-configured container with health checks and connection URL helpers
+3. **GenericContainer** - For Ollama Docker container (custom image support)
+4. **pytest-friendly** - Context managers (`with PostgresContainer() as postgres`) integrate naturally with pytest fixtures
+5. **Automatic cleanup** - Finalizers ensure containers stop/remove even on test failures
+6. **Dynamic port mapping** - No hardcoded ports, supports parallel test execution
+7. **Minimal API** - `.start()`, `.stop()`, `.get_connection_url()` -- no complex configuration
 
-### CocoIndex `custom_languages` API (Verified Locally)
-
-The `SplitRecursively` constructor accepts `custom_languages: list[CustomLanguageSpec]` where each `CustomLanguageSpec` is a dataclass with:
+**What you get:**
 
 ```python
-@dataclass
-class CustomLanguageSpec:
-    language_name: str           # e.g., "hcl"
-    separators_regex: list[str]  # Hierarchical regex patterns (high-level first)
-    aliases: list[str] = []      # e.g., ["tf", "tfvars"]
+from testcontainers.postgres import PostgresContainer
+from testcontainers.core.generic import GenericContainer
+
+# PostgreSQL with pgvector
+postgres = PostgresContainer("pgvector/pgvector:pg17")
+postgres.start()
+conn_url = postgres.get_connection_url()  # postgresql://test:test@localhost:DYNAMIC_PORT/test
+
+# Ollama (generic container)
+ollama = GenericContainer("ollama/ollama:latest")
+ollama.with_exposed_ports(11434)
+ollama.start()
+host = ollama.get_container_host_ip()
+port = ollama.get_exposed_port(11434)
 ```
 
-**Regex engine:** Rust `fancy-regex` crate -- supports lookaheads (`(?=...)`), lookbehinds (`(?<=...)`), backreferences, and atomic groups. This is critical because the chunking regex patterns use positive lookaheads to split before block boundaries without consuming the boundary text.
+**Integration with existing pytest:**
 
-**Language matching logic** (verified from official docs):
-1. Check `custom_languages` against `language_name` or `aliases` (case-insensitive)
-2. Check built-in Tree-sitter languages (28 languages: Python, JS, Go, Rust, etc.)
-3. Fallback to plain text
+Module-scoped fixtures for container reuse (fast tests):
 
-**Confirmed NOT in built-in language list:** HCL, Dockerfile. These require `custom_languages`.
+```python
+# tests/integration/conftest.py
+import pytest
+from testcontainers.postgres import PostgresContainer
 
-**Confirmed in built-in language list:** Bash is NOT in CocoIndex's curated 28-language list despite Tree-sitter having a bash grammar. CocoIndex uses a fixed subset of tree-sitter-language-pack, and bash is absent from the documented supported languages table.
+@pytest.fixture(scope="module")
+def postgres_url(request):
+    """PostgreSQL container shared across module tests."""
+    container = PostgresContainer("pgvector/pgvector:pg17")
+    container.start()
 
-**Source:** Verified by running `help(cocoindex.functions.SplitRecursively)` and `help(cocoindex.functions.CustomLanguageSpec)` in the project virtualenv. Built-in language list confirmed from [CocoIndex Functions docs](https://cocoindex.io/docs/ops/functions).
+    def cleanup():
+        container.stop()
 
-## Alternatives Evaluated
+    request.addfinalizer(cleanup)
+    return container.get_connection_url()
 
-### HCL/Terraform Parsing Libraries
+# Async tests work with existing pytest-asyncio (function-scoped)
+@pytest.mark.asyncio
+async def test_index_and_search(postgres_url):
+    async with await psycopg.AsyncConnection.connect(postgres_url) as conn:
+        # Your existing async test patterns unchanged
+        pass
+```
 
-| Library | Version | License | What It Does | Recommendation |
-|---------|---------|---------|-------------|----------------|
-| **python-hcl2** | 7.3.1 | MIT | Parse HCL2 into Python dicts using Lark | **NOT NEEDED for v1.2.** Useful for future deep parsing if regex metadata extraction proves insufficient. Safe to add later (MIT license, pure Python). |
-| **python-hcl2-tf** | latest | MIT | Terraform-aware wrapper around python-hcl2 | **NOT NEEDED.** Overkill -- provides Terraform-specific dict structure, variable resolution. Only useful if we need to understand Terraform module semantics. |
-| **tfparse** | 0.6.18 | Apache 2.0 | Full Terraform evaluation via Go bindings | **DO NOT USE.** Requires `terraform init` to resolve modules. Binary wheels only (macOS/Linux/Windows). Heavy dependency for metadata extraction. Designed for security scanning, not chunking. |
-| **pyhcl** | 0.4.x | MPL 2.0 | HCL v1 parser | **DO NOT USE.** HCL v1 only. Modern Terraform uses HCL2. Legacy, not maintained for current Terraform syntax. |
+**Confidence:** HIGH (verified via PyPI page, official testcontainers-python docs, and testcontainers.com getting started guide)
 
-**Rationale for regex-only approach:** HCL block boundaries follow a predictable pattern (`resource "type" "name" {`). The metadata we need (block kind, resource type, resource name) is extractable with a single regex. A full AST parser adds a dependency and complexity for no additional value in the v1.2 use case. If future milestones need to understand nested attributes, variable interpolation, or module dependencies, `python-hcl2` (MIT, pure Python) is the right upgrade path.
+**Source:** [testcontainers PyPI](https://pypi.org/project/testcontainers/)
 
-### Dockerfile Parsing Libraries
+## Stack Unchanged
 
-| Library | Version | License | What It Does | Recommendation |
-|---------|---------|---------|-------------|----------------|
-| **dockerfile-parse** | 2.0.1 | BSD-3-Clause | Parse Dockerfile into structured instructions | **NOT NEEDED for v1.2.** Provides `structure`, `labels`, `baseimage` properties. Useful for multi-stage build analysis. Could be a future enhancement. License-compatible (BSD). |
-| **dockerfile** (asottile) | archived | MIT | Parse via Go's official parser | **DO NOT USE.** Archived/unmaintained since ~2023. |
+### Existing Dependencies (No Changes Needed)
 
-**Rationale for regex-only approach:** Dockerfile instructions are line-oriented (`FROM`, `RUN`, `COPY`, etc.). A regex match on the first token of each line captures the instruction type perfectly. Multi-stage `FROM ... AS stage_name` is a simple regex. The `dockerfile-parse` library would provide multi-stage tracking and label extraction, but these are beyond v1.2 scope.
+| Dependency | Version | Status in v1.3 |
+|------------|---------|---------------|
+| pytest | >=9.0.2 | **Unchanged** -- integration tests use same pytest runner |
+| pytest-asyncio | >=1.3.0 | **Unchanged** -- async fixtures work with sync container setup |
+| pytest-mock | >=3.15.1 | **Unchanged** -- still used for unit tests (no containers) |
+| pytest-httpx | >=0.36.0 | **Unchanged** -- mock Ollama HTTP in unit tests |
+| pytest-subprocess | >=1.5.3 | **Unchanged** -- mock CLI subprocess in unit tests |
+| psycopg[binary,pool] | >=3.3.2 | **Unchanged** -- connection library for integration tests |
+| Docker daemon | user-installed | **Required** -- testcontainers needs Docker running |
 
-### Bash/Shell Parsing Libraries
+**Why no changes:**
 
-| Library | Version | License | What It Does | Recommendation |
-|---------|---------|---------|-------------|----------------|
-| **bashlex** | 0.18 | **GPLv3** | Parse bash into AST (port of GNU bash parser) | **DO NOT USE.** GPLv3 license is incompatible with this project's MIT license. Adding bashlex as a dependency would require relicensing the project. |
-| **tree-sitter-language-pack** | 0.13.0 | MIT/Apache | Pre-built tree-sitter grammars for 165+ languages | **NOT NEEDED for v1.2.** CocoIndex bundles its own tree-sitter integration. External tree-sitter access would bypass CocoIndex's pipeline. Useful only if building a standalone metadata extractor outside CocoIndex. |
-| **tree-sitter-languages** | 1.10.x | Apache 2.0 | Legacy bundled tree-sitter grammars | **DO NOT USE.** Unmaintained. Successor is `tree-sitter-language-pack`. |
+- pytest handles both unit tests (mocked) and integration tests (real containers)
+- pytest-asyncio supports async tests with sync container fixtures (different scopes)
+- Existing test helpers (pytest-httpx, pytest-mock) still needed for fast unit tests
 
-**Rationale for regex-only approach:** Bash function definitions follow two patterns: `func_name() {` and `function func_name`. These are trivially captured by regex. Control structures (`if`, `for`, `while`, `case`) are line-oriented. A full AST parser would help with nested constructs, but v1.2 only needs function names and top-level structure -- regex handles this cleanly.
+**Confidence:** HIGH (existing pyproject.toml reviewed)
 
-**Critical licensing note:** bashlex is GPLv3. This project is MIT. GPLv3 dependencies are incompatible with MIT-licensed projects -- including bashlex would require either relicensing the project or removing it. This eliminates bashlex from consideration regardless of its technical merits.
+## Alternatives Considered
 
-## Tree-sitter Grammar Availability (Future Reference)
+### pytest-docker (NOT recommended)
 
-All three target languages have tree-sitter grammars, though CocoIndex does not include them in its built-in set:
+- **Version:** 3.2.5 (maintained, released 2025-11-12)
+- **What it does:** Spins up docker-compose.yml services as pytest fixtures
+- **Why NOT:**
+  - Requires external docker-compose.yml management
+  - Less programmatic control (can't modify containers from test code)
+  - Your use case needs dynamic containers (start/stop Ollama conditionally)
+  - docker-compose.yml is for **user setup**, not test infrastructure
+  - Adds indirection: docker-compose.yml → pytest fixture → test code
 
-| Language | Grammar Repository | License | In tree-sitter-language-pack | In CocoIndex Built-in |
-|----------|-------------------|---------|-------|------|
-| HCL | tree-sitter-grammars/tree-sitter-hcl | Apache 2.0 | Yes | **No** |
-| Dockerfile | camdencheek/tree-sitter-dockerfile | MIT | Yes | **No** |
-| Bash | tree-sitter/tree-sitter-bash | MIT | Yes | **No** |
+**When pytest-docker is better:** Static docker-compose setups that never change from tests. Not your case.
 
-**Why this matters for future:** If CocoIndex adds these languages to its built-in Tree-sitter support in a future version (the grammars exist, they just have not been included in CocoIndex's curated list), the custom regex separators would become unnecessary for chunking. The metadata extraction (`extract_devops_metadata`) would still be needed regardless, since Tree-sitter provides structural chunking but not semantic metadata like "this is an aws_s3_bucket resource."
+**Source:** [pytest-docker PyPI](https://pypi.org/project/pytest-docker/)
 
-## Installation (v1.2)
+### pytest-docker-compose (NOT recommended)
 
-No changes to `pyproject.toml` dependencies. The v1.2 feature is implemented entirely with:
-- CocoIndex's existing `custom_languages` parameter
-- Python stdlib `re` module
-- Python stdlib `os` module
+- **Similar limitations to pytest-docker**
+- Depends on docker-compose CLI being in PATH
+- Your v1.3 goal is "unified docker-compose for one-command setup" **for users**, not for test infrastructure
+
+**When it's better:** When docker-compose.yml already defines your test environment. You're building that compose file for users, not tests.
+
+### pytest-docker-tools (NOT recommended)
+
+- **Version:** 0.x (less active)
+- **What it does:** Advanced fixture model with port collision avoidance
+- **Why NOT:**
+  - More complex fixture DSL
+  - Smaller community than testcontainers
+  - Less documentation
+  - Overkill for your needs
+
+**When it's better:** Highly parallel test scenarios with complex port management. Not needed here.
+
+### docker-py SDK (NOT recommended as direct dependency)
+
+- **Version:** 7.1.0 (official Docker SDK for Python)
+- **What it does:** Low-level Docker API (containers, images, networks, volumes)
+- **Why NOT:**
+  - Requires reimplementing testcontainers patterns (health checks, wait strategies, cleanup)
+  - No pytest integration helpers
+  - No PostgreSQL-specific conveniences
+  - More code to maintain
+
+**When it's better:** Building custom container orchestration tools. Not for tests.
+
+**Note:** testcontainers-python uses docker-py internally, so you get the mature Docker API without boilerplate.
+
+**Source:** [docker-py PyPI](https://pypi.org/project/docker/)
+
+### docker-compose Python libraries (NOT recommended)
+
+**Options:**
+- `docker-composer` (v2 wrapper)
+- `python-on-whales` (calls Docker Compose v2 Go binary)
+- `pytest-docker-compose-v2` (pytest plugin for compose v2)
+
+**Why NOT:**
+- These are for **programmatic manipulation** of docker-compose.yml
+- Your user setup is **static config + shell commands**
+- Integration tests need **dynamic containers** (testcontainers)
+- No value add over native docker-compose CLI for user setup
+
+**User setup pattern (no Python library needed):**
 
 ```bash
-# No new packages to install. Existing setup works:
-uv sync
+# In your Makefile or docs
+docker compose up -d postgres ollama  # Native CLI, zero Python deps
 ```
+
+**Confidence:** MEDIUM (libraries exist per WebSearch, but rationale is clear from use case analysis)
+
+**Source:** [WebSearch: docker-compose v2 python API](https://www.cloudbees.com/blog/using-docker-compose-for-python-development)
+
+## No New Dependencies Needed For
+
+### Async Testing (Already Covered)
+
+**pytest-asyncio 1.3.0 is current** (released 2025-11-10). No changes needed.
+
+**Pattern that works:**
+
+```python
+# Container fixture: sync, module-scoped
+@pytest.fixture(scope="module")
+def db_url(request):
+    container = PostgresContainer("pgvector/pgvector:pg17").start()
+    request.addfinalizer(container.stop)
+    return container.get_connection_url()
+
+# Test: async, function-scoped
+@pytest.mark.asyncio
+async def test_search(db_url):
+    async with await psycopg.AsyncConnection.connect(db_url) as conn:
+        # Async test body
+        pass
+```
+
+**Why this works:**
+
+- Async event loop is function-scoped in pytest-asyncio
+- Container fixtures are sync (no event loop needed)
+- Test bodies are async (use the event loop)
+- Different scopes don't conflict
+
+**Confidence:** HIGH (verified via pytest-asyncio PyPI docs and testcontainers guides)
+
+**Source:** [pytest-asyncio PyPI](https://pypi.org/project/pytest-asyncio/)
+
+### Container Wait Strategies (Built Into testcontainers)
+
+**Available patterns:**
+
+- `PostgresContainer` - Waits for `pg_isready` automatically
+- `GenericContainer` - `.with_exposed_ports()` waits for port to open
+- Custom wait - `.waiting_for()` with log messages or HTTP endpoints
+
+**Example (Ollama):**
+
+```python
+ollama = (
+    GenericContainer("ollama/ollama:latest")
+    .with_exposed_ports(11434)  # Port exposure = readiness check
+    .with_env("OLLAMA_MODELS", "/models")
+)
+```
+
+**Why no separate library:** Wait strategies are part of testcontainers core. No pytest-wait or similar needed.
+
+**Confidence:** MEDIUM (wait strategies confirmed via GitHub source code and community examples; specific API details not in official docs but pattern is standard across testcontainers implementations in Java/Node/Python)
+
+**Source:** [testcontainers-python GitHub](https://github.com/testcontainers/testcontainers-python/blob/main/core/testcontainers/core/waiting_utils.py)
+
+### Test Discovery (Already Configured)
+
+**Your existing pytest config is complete:**
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+```
+
+**For integration tests:** Add `tests/integration/` directory, same discovery rules apply. No pytest plugins needed.
+
+**Recommended structure:**
+
+```
+tests/
+  unit/          # Use pytest-mock, no containers (fast)
+  integration/   # Use testcontainers, no mocks (slower)
+    conftest.py  # Container fixtures
+    test_postgres.py
+    test_ollama.py
+    test_full_flow.py
+```
+
+### Mocking (Still Used for Unit Tests)
+
+**pytest-mock 3.15.1 stays for unit tests.** Integration tests use real containers (no mocks).
+
+**Pattern separation:**
+
+| Test Type | Dependencies | Speed | When to Run |
+|-----------|-------------|-------|-------------|
+| Unit tests (`tests/unit/`) | pytest-mock, pytest-httpx | Fast (ms) | Every save, pre-commit |
+| Integration tests (`tests/integration/`) | testcontainers, real containers | Slow (seconds) | Pre-push, CI |
+
+**Confidence:** HIGH (standard testing pyramid pattern)
+
+## Installation
+
+**Update `pyproject.toml`:**
+
+```toml
+[dependency-groups]
+dev = [
+    # Existing deps
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-httpx>=0.36.0",
+    "pytest-mock>=3.15.1",
+    "pytest-subprocess>=1.5.3",
+    "ruff>=0.14.14",
+
+    # NEW for v1.3
+    "testcontainers[postgres]>=4.14.0",
+]
+```
+
+**Install with UV:**
+
+```bash
+uv sync --dev
+```
+
+**What gets installed:**
+
+- `testcontainers` core (4.14.0)
+- `testcontainers-postgres` module (included via `[postgres]` extra)
+- `docker-py` (transitive dependency, automatic)
+
+**Docker runtime requirement:** Docker daemon must be running. Tests will fail fast if Docker unavailable.
+
+**Verify installation:**
+
+```bash
+# Check testcontainers installed
+uv run python -c "import testcontainers; print(testcontainers.__version__)"
+
+# Run sample integration test (will pull containers on first run)
+uv run pytest tests/integration/test_postgres.py -v
+
+# Verify cleanup (no leftover containers)
+docker ps -a | grep testcontainers  # Should be empty
+```
+
+## Integration Patterns
+
+### Module-Scoped Containers (Recommended)
+
+**Pattern:** Start containers once per test module, reuse across tests.
+
+```python
+# tests/integration/conftest.py
+import pytest
+from testcontainers.postgres import PostgresContainer
+
+@pytest.fixture(scope="module")
+def postgres_url(request):
+    """PostgreSQL container shared across all module tests."""
+    container = PostgresContainer("pgvector/pgvector:pg17")
+    container.start()
+
+    def cleanup():
+        container.stop()
+
+    request.addfinalizer(cleanup)
+    return container.get_connection_url()
+```
+
+**Why module scope:**
+
+- Faster test suite (container startup is expensive: 2-5 seconds)
+- Amortize startup cost across all tests in module
+- Matches your "component integration tests" goal (PostgreSQL separately, Ollama separately)
+
+**Data cleanup between tests:**
+
+Data persists across tests in the module. Reset state with function-scoped fixtures:
+
+```python
+@pytest.fixture(scope="function")
+async def clean_db(postgres_url):
+    """Truncate tables before each test."""
+    async with await psycopg.AsyncConnection.connect(postgres_url) as conn:
+        await conn.execute("TRUNCATE TABLE embeddings CASCADE")
+        await conn.execute("DELETE FROM indexes WHERE 1=1")
+```
+
+**Confidence:** HIGH (recommended pattern in testcontainers guides)
+
+**Source:** [Getting started with Testcontainers for Python](https://testcontainers.com/guides/getting-started-with-testcontainers-for-python/)
+
+### Optional Ollama Container (Native vs Docker)
+
+**Your v1.3 requirement:** "Optional dockerized Ollama (users can choose native or Docker)"
+
+**Pattern:** Try native first, fallback to Docker.
+
+```python
+@pytest.fixture(scope="module")
+def ollama_base_url(request):
+    """Ollama URL (native or Docker fallback)."""
+    import httpx
+    from testcontainers.core.generic import GenericContainer
+
+    # Try native Ollama
+    try:
+        response = httpx.get("http://localhost:11434/api/tags", timeout=2)
+        if response.status_code == 200:
+            return "http://localhost:11434"  # Use native
+    except httpx.RequestError:
+        pass
+
+    # Fallback: Docker Ollama
+    container = GenericContainer("ollama/ollama:latest")
+    container.with_exposed_ports(11434)
+    container.start()
+
+    def cleanup():
+        container.stop()
+
+    request.addfinalizer(cleanup)
+
+    host = container.get_container_host_ip()
+    port = container.get_exposed_port(11434)
+    return f"http://{host}:{port}"
+```
+
+**Why this pattern:**
+
+- Matches user flexibility (native or Docker)
+- Tests work in both scenarios
+- Faster when native Ollama available (CI can use Docker)
+
+**Confidence:** HIGH (pattern matches v1.3 requirement)
+
+### Component vs Full-Flow Tests
+
+**Component tests:** One container at a time.
+
+```python
+# tests/integration/test_postgres.py
+def test_postgres_vector_storage(postgres_url):
+    """Test PostgreSQL + pgvector only."""
+    # No Ollama dependency
+    pass
+
+# tests/integration/test_ollama.py
+def test_ollama_embedding_generation(ollama_base_url):
+    """Test Ollama only."""
+    # No PostgreSQL dependency
+    pass
+```
+
+**Full-flow tests:** Both containers together.
+
+```python
+# tests/integration/test_full_flow.py
+@pytest.mark.asyncio
+async def test_index_and_search_integration(postgres_url, ollama_base_url):
+    """Test complete pipeline: index → embed → store → search."""
+    # Both dependencies
+    pass
+```
+
+**Why separate:**
+
+- Component tests isolate failures (easier debugging)
+- Full-flow tests validate integration (catch cross-component issues)
+- Matches your v1.3 requirements: "Component integration tests (PostgreSQL, Ollama separately)" + "Full-flow integration tests"
+
+**Confidence:** HIGH (matches milestone requirements)
+
+## Common Pitfalls (and How to Avoid Them)
+
+### Pitfall 1: Mixing docker-compose.yml and testcontainers
+
+**Bad pattern:**
+
+```python
+# Don't do this
+pytest_plugins = ["docker_compose"]  # Plugin for docker-compose.yml
+# AND
+from testcontainers.postgres import PostgresContainer  # Programmatic
+```
+
+**Why bad:** Two competing container lifecycles. Race conditions, port conflicts, cleanup issues.
+
+**Good pattern:** Pick one approach:
+
+- **Integration tests:** testcontainers (programmatic, dynamic)
+- **User setup:** docker-compose.yml (declarative, CLI-driven)
+
+### Pitfall 2: Assuming containers auto-commit
+
+**Bad pattern:**
+
+```python
+container = PostgresContainer("pgvector/pgvector:pg17")
+container.start()
+# Test runs
+# Container never stops (leaked)
+```
+
+**Good pattern:** Always use finalizers or context managers.
+
+```python
+# Option 1: Finalizer (pytest fixture)
+@pytest.fixture(scope="module")
+def postgres_url(request):
+    container = PostgresContainer("pgvector/pgvector:pg17").start()
+    request.addfinalizer(container.stop)  # Always runs, even on failure
+    return container.get_connection_url()
+
+# Option 2: Context manager (one-off test)
+def test_something():
+    with PostgresContainer("pgvector/pgvector:pg17") as postgres:
+        # Test code
+        pass  # Container stops automatically
+```
+
+**Why this matters:** testcontainers cleans up automatically IF you use finalizers/context managers. Manual `.start()` without `.stop()` leaks containers.
+
+**Confidence:** HIGH (testcontainers best practice)
+
+### Pitfall 3: Hardcoding ports
+
+**Bad pattern:**
+
+```python
+conn = await psycopg.connect("postgresql://localhost:5432/test")  # Hardcoded 5432
+```
+
+**Why bad:** testcontainers dynamically assigns ports to avoid conflicts. Hardcoded ports fail when 5432 is in use.
+
+**Good pattern:**
+
+```python
+conn = await psycopg.connect(postgres_url)  # From fixture, dynamic port
+```
+
+**Benefit:** Parallel test execution, CI environments, port conflict resilience.
+
+**Confidence:** HIGH (testcontainers design principle)
+
+### Pitfall 4: Async fixture scope mismatch
+
+**Bad pattern:**
+
+```python
+@pytest.fixture(scope="module")  # Module scope
+async def postgres_url(request):  # Async fixture
+    # Error: async module fixtures don't work (event loop is function-scoped)
+```
+
+**Why bad:** pytest-asyncio event loop is function-scoped. Module-scoped async fixtures fail.
+
+**Good pattern:**
+
+```python
+@pytest.fixture(scope="module")  # Module scope, SYNC
+def postgres_url(request):
+    container = PostgresContainer("pgvector/pgvector:pg17").start()
+    # Container setup is sync
+    request.addfinalizer(container.stop)
+    return container.get_connection_url()
+
+@pytest.mark.asyncio  # Function scope, ASYNC
+async def test_search(postgres_url):
+    # Test body is async
+    async with await psycopg.AsyncConnection.connect(postgres_url):
+        pass
+```
+
+**Why this works:** Container lifecycle is sync. Test logic is async. Different scopes, no conflict.
+
+**Confidence:** HIGH (pytest-asyncio limitation documented)
+
+**Source:** [pytest-asyncio async fixture scoping limitations](https://pytest-asyncio.readthedocs.io/)
+
+## Testing the Tests
+
+**Verification steps after adding testcontainers:**
+
+```bash
+# 1. Install dependency
+uv sync --dev
+
+# 2. Verify import
+uv run python -c "from testcontainers.postgres import PostgresContainer; print('OK')"
+
+# 3. Run single integration test (first run pulls images)
+uv run pytest tests/integration/test_postgres.py -v
+
+# 4. Check cleanup (should be empty)
+docker ps -a | grep testcontainers
+
+# 5. Run full integration suite
+uv run pytest tests/integration/ -v
+```
+
+**Expected behavior:**
+
+1. First run pulls `pgvector/pgvector:pg17` image (slow, ~200MB)
+2. Subsequent runs reuse cached image (fast)
+3. Each test starts container, runs, stops container
+4. No leftover containers after tests complete
+5. Failures still clean up containers (finalizers run)
+
+**Confidence:** HIGH (standard testcontainers workflow)
+
+## Version Strategy
+
+**Pinning approach:**
+
+```toml
+"testcontainers[postgres]>=4.14.0,<5.0.0"
+```
+
+**Why:**
+
+- Major version 4 is current (released 2026-01-07, actively maintained)
+- Minor/patch updates are backward compatible per semantic versioning
+- Avoid surprise breakage from major version bumps
+
+**When to upgrade:** Major version 5.x releases. Review changelog for breaking changes first.
+
+**Confidence:** HIGH (semantic versioning standard practice)
+
+## CI Considerations (Future, Not v1.3 Scope)
+
+**For reference when adding CI later:**
+
+- CI needs Docker daemon running (GitHub Actions has it pre-installed)
+- Container images pulled on first run (cache in CI for speed)
+- Integration tests are slower than unit tests (separate CI job recommended)
+- Use `pytest --maxfail=1` to fail fast on container issues
+- Consider `pytest -m "not integration"` for fast unit-only runs
+
+**Confidence:** MEDIUM (standard CI patterns, not validated for this project yet)
 
 ## What NOT to Use (and Why)
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **bashlex** | GPLv3 -- incompatible with MIT license | Regex via `re` stdlib for function/structure extraction |
-| **tfparse** | Requires `terraform init`, binary wheels, heavy | Regex for block type/name extraction |
-| **pyhcl** | HCL v1 only, does not parse modern Terraform | Regex or `python-hcl2` (if needed) |
-| **dockerfile** (asottile) | Archived, unmaintained | Regex or `dockerfile-parse` (if needed) |
-| **tree-sitter-languages** | Unmaintained | `tree-sitter-language-pack` if external TS needed |
-| **External tree-sitter for chunking** | Bypasses CocoIndex pipeline, adds complexity | CocoIndex `custom_languages` regex separators |
-| **Full HCL/Dockerfile AST parsers** | Over-engineered for v1.2 metadata needs | Regex -- revisit if deeper parsing required |
-
-## Upgrade Path (Post-v1.2)
-
-If regex-based metadata extraction proves insufficient for future requirements:
-
-| Trigger | Library to Add | Version | License | Purpose |
-|---------|---------------|---------|---------|---------|
-| Need nested HCL attribute parsing | `python-hcl2` | >=7.3.1 | MIT | Full HCL2 -> dict parsing |
-| Need multi-stage Dockerfile tracking | `dockerfile-parse` | >=2.0.1 | BSD-3-Clause | Structured Dockerfile analysis |
-| Need external tree-sitter AST access | `tree-sitter-language-pack` | >=0.13.0 | MIT/Apache 2.0 | Pre-built grammars for standalone parsing |
-
-All upgrade options are MIT/BSD/Apache compatible with the project license. No license risk.
-
-## Regex Engine Compatibility Note
-
-The `separators_regex` patterns in `CustomLanguageSpec` are executed by CocoIndex's Rust core using the `fancy-regex` crate. Key differences from Python `re`:
-
-| Feature | Python `re` | CocoIndex `fancy-regex` |
-|---------|-------------|------------------------|
-| Lookahead `(?=...)` | Supported | Supported |
-| Lookbehind `(?<=...)` | Supported (fixed-width only) | Supported (variable-width) |
-| Backreferences `\1` | Supported | Supported |
-| Atomic groups `(?>...)` | Not supported | Supported |
-| Unicode `\p{...}` | Limited | Full Unicode property support |
-| `re.MULTILINE` flag | Via `(?m)` | Via `(?m)` |
-
-**Practical implication:** Regex patterns for `separators_regex` should be tested in a Rust regex context, not just Python. The patterns used in v1.2 (lookaheads for block boundaries) work in both engines, so this is informational, not blocking.
+| **pytest-docker** | Requires external docker-compose.yml, less dynamic | testcontainers (programmatic) |
+| **pytest-docker-compose** | Same limitations as pytest-docker | testcontainers (programmatic) |
+| **docker-py** directly | Low-level API, no test helpers, reimplements testcontainers | testcontainers (built on docker-py) |
+| **docker-composer** / **python-on-whales** | For programmatic compose manipulation, not needed | Native `docker compose` CLI for user setup |
+| **pytest-docker-tools** | More complex, smaller community | testcontainers (industry standard) |
 
 ## Confidence Assessment
 
 | Component | Confidence | Rationale |
 |-----------|------------|-----------|
-| CocoIndex `custom_languages` API | **HIGH** | Verified locally via `help()`, confirmed with official docs and examples |
-| CocoIndex regex engine (fancy-regex) | **HIGH** | Official docs link to fancy-regex; lookahead patterns confirmed supported |
-| No new dependencies needed | **HIGH** | Architecture uses only stdlib `re` + CocoIndex's existing API |
-| Regex metadata extraction sufficiency | **MEDIUM** | Will handle common patterns; edge cases (heredocs, complex interpolation) may need refinement |
-| Bash not in CocoIndex built-ins | **HIGH** | Verified against documented language list; bash/sh absent from the 28-language table |
-| bashlex GPL incompatibility | **HIGH** | bashlex PyPI confirms GPLv3; project LICENSE confirms MIT |
-| python-hcl2 as future upgrade | **HIGH** | PyPI confirms MIT, v7.3.1, Python >=3.7 |
-| dockerfile-parse as future upgrade | **HIGH** | PyPI confirms BSD-3-Clause, v2.0.1 |
+| testcontainers-python version | **HIGH** | Verified via PyPI (4.14.0, 2026-01-07) |
+| PostgreSQL module availability | **HIGH** | Confirmed via PyPI extras and official docs |
+| GenericContainer for Ollama | **HIGH** | Documented in testcontainers-python docs |
+| pytest integration patterns | **HIGH** | Verified via official getting started guide |
+| Module-scoped fixtures | **HIGH** | Recommended pattern in testcontainers guides |
+| Async test compatibility | **HIGH** | Verified via pytest-asyncio docs |
+| Wait strategies API | **MEDIUM** | Confirmed via GitHub source, not in full official docs |
+| Alternatives evaluation | **HIGH** | PyPI pages verified for pytest-docker, docker-py |
 
 ## Sources
 
-**Verified via local environment:**
-- `help(cocoindex.functions.SplitRecursively)` -- constructor signature, `custom_languages` parameter
-- `help(cocoindex.functions.CustomLanguageSpec)` -- `language_name`, `separators_regex`, `aliases` fields
-- `/Users/fzhdanov/GIT/personal/coco-s/LICENSE` -- MIT license confirmed
+**HIGH confidence (official sources):**
 
-**Official documentation (HIGH confidence):**
-- [CocoIndex Functions](https://cocoindex.io/docs/ops/functions) -- `SplitRecursively` API, `CustomLanguageSpec`, supported languages list, regex syntax reference
-- [CocoIndex Academic Papers Example](https://cocoindex.io/examples/academic_papers_index) -- `CustomLanguageSpec` usage with `SplitRecursively` constructor
-- [CocoIndex PDF Elements Example](https://cocoindex.io/examples/pdf_elements) -- another `CustomLanguageSpec` usage example
-- [fancy-regex crate docs](https://docs.rs/fancy-regex/) -- regex syntax supported by CocoIndex separators
-- [python-hcl2 PyPI](https://pypi.org/project/python-hcl2/) -- v7.3.1, MIT license, Python >=3.7
-- [dockerfile-parse PyPI](https://pypi.org/project/dockerfile-parse/) -- v2.0.1, BSD-3-Clause license
-- [bashlex PyPI](https://pypi.org/project/bashlex/) -- v0.18, GPLv3+ license
-- [tree-sitter-language-pack PyPI](https://pypi.org/project/tree-sitter-language-pack/) -- v0.13.0, 165+ languages
+- [testcontainers PyPI](https://pypi.org/project/testcontainers/) - Version 4.14.0, Python >=3.10, Apache 2.0 license
+- [testcontainers-python documentation](https://testcontainers-python.readthedocs.io/) - PostgreSQL module, context managers
+- [Getting started with Testcontainers for Python](https://testcontainers.com/guides/getting-started-with-testcontainers-for-python/) - Fixture patterns, best practices
+- [pytest-asyncio PyPI](https://pypi.org/project/pytest-asyncio/) - Version 1.3.0 (2025-11-10), async fixture scoping
+- [docker-py PyPI](https://pypi.org/project/docker/) - Version 7.1.0, official Docker SDK
+- [pytest-docker PyPI](https://pypi.org/project/pytest-docker/) - Version 3.2.5, alternative evaluation
 
-**GitHub repositories (HIGH confidence):**
-- [tree-sitter-grammars/tree-sitter-hcl](https://github.com/tree-sitter-grammars/tree-sitter-hcl) -- HCL grammar, Apache 2.0
-- [tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash) -- Bash grammar, MIT
-- [camdencheek/tree-sitter-dockerfile](https://github.com/camdencheek/tree-sitter-dockerfile) -- Dockerfile grammar, MIT
-- [containerbuildsystem/dockerfile-parse](https://github.com/containerbuildsystem/dockerfile-parse) -- Dockerfile parser, BSD
-- [amplify-education/python-hcl2](https://github.com/amplify-education/python-hcl2) -- HCL2 parser, MIT
-- [idank/bashlex](https://github.com/idank/bashlex) -- Bash parser, GPLv3
+**MEDIUM confidence (verified via multiple sources):**
 
-**WebSearch findings (MEDIUM confidence, verified with official sources):**
-- HCL/Terraform parsing ecosystem survey
-- Dockerfile parsing library landscape
-- Bash AST parsing options and licensing implications
+- [Python Integration Tests: docker-compose vs testcontainers](https://medium.com/codex/python-integration-tests-docker-compose-vs-testcontainers-94986d7547ce) - Comparison rationale
+- [testcontainers-python GitHub](https://github.com/testcontainers/testcontainers-python) - Wait strategies source code
+- WebSearch findings on docker-compose Python libraries - Multiple options exist, rationale for not using them is clear from use case
+
+**LOW confidence (WebSearch only, not critical):**
+
+- Specific wait strategy API methods - Pattern confirmed via source code, but full API not documented. Safe to use `.with_exposed_ports()` and `.waiting_for()` based on cross-language testcontainers consistency.
 
 ---
-*Stack research for: CocoSearch v1.2 DevOps Language Support*
-*Researched: 2026-01-27*
+
+*Stack research for: CocoSearch v1.3 Docker Integration Tests & Infrastructure*
+*Researched: 2026-01-30*
+*Previous milestones: v1.0 MVP (4 phases, shipped 2026-01-25), v1.1 Docs & Tests (3 phases, shipped 2026-01-26), v1.2 DevOps Language Support (3 phases, shipped 2026-01-27)*
