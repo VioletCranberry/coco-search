@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** v1.3 Docker Integration Tests & Infrastructure (Phase 12)
+**Current focus:** v1.3 Docker Integration Tests & Infrastructure (Phase 13 next)
 
 ## Current Position
 
-Phase: 12 of 15 (Container Infrastructure PostgreSQL)
-Plan: 02 of 03 (Database Fixtures)
-Status: In progress
-Last activity: 2026-01-30 -- Completed 12-02-PLAN.md
+Phase: 12 of 15 (Container Infrastructure PostgreSQL) - COMPLETE
+Plan: 03 of 03 (PostgreSQL Integration Tests)
+Status: Phase complete
+Last activity: 2026-01-30 -- Completed 12-03-PLAN.md (Phase 12 complete)
 
-Progress: [█████████████████████████.................] 79% (34 plans complete)
+Progress: [██████████████████████████..................] 81% (35 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 32
+- Total plans completed: 35
 - Total execution time: ~5 days across 3 milestones
 
 **By Milestone:**
@@ -32,7 +32,7 @@ Progress: [███████████████████████
 
 **Current Milestone (v1.3):**
 - Phases: 5 (11-15)
-- Plans completed: 4
+- Plans completed: 6
 - Focus: Integration test infrastructure
 
 ## Milestones Shipped
@@ -61,20 +61,21 @@ Recent decisions affecting current work:
 - v1.3 (Phase 12): Session-scoped container fixtures for performance (one container per test session)
 - v1.3 (Phase 12): TRUNCATE CASCADE for test cleanup (fast, keeps schema)
 - v1.3 (Phase 12): autouse cleanup fixture only runs for @pytest.mark.integration tests
+- v1.3 (Phase 12): Fixed testcontainers API: user -> username parameter for compatibility
 
 ### Pending Todos
 
-None -- starting v1.3 milestone.
+None -- Phase 12 complete. Ready for Phase 13.
 
 ### Blockers/Concerns
 
-None - 12-02 complete. Database fixtures ready. Proceeding with 12-03.
+None - Phase 12 complete. Container infrastructure ready. Integration test patterns established.
 
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 12-02-PLAN.md
+Stopped at: Completed 12-03-PLAN.md (Phase 12 complete)
 Resume file: None
 
 ---
-*Updated: 2026-01-30 after 12-02-PLAN.md completion*
+*Updated: 2026-01-30 after 12-03-PLAN.md completion*
