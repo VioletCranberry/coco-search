@@ -10,10 +10,10 @@ See: .planning/PROJECT.md (updated 2026-01-31)
 ## Current Position
 
 Milestone: v1.5 Configuration & Architecture Polish
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-01-31 — Milestone v1.5 started
+Phase: 19 of 22 (Config Env Var Substitution)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-31 — Roadmap created for v1.5
 
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 
@@ -49,7 +49,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 
 ### Decisions
 
-See PROJECT.md Key Decisions table (updated with all v1.4 decisions).
+See PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
@@ -57,14 +57,14 @@ None.
 
 ### Blockers/Concerns
 
-None — Milestone v1.4 complete.
+None.
 
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Defining v1.5 requirements
+Stopped at: Roadmap created for v1.5
 Resume file: None
-Next action: Complete requirements and roadmap
+Next action: `/gsd:plan-phase 19`
 
 ---
-*Updated: 2026-01-31 after v1.5 milestone started*
+*Updated: 2026-01-31 after roadmap creation*

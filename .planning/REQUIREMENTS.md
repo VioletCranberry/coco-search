@@ -59,27 +59,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONFIG-01 | TBD | Pending |
-| CONFIG-02 | TBD | Pending |
-| CONFIG-03 | TBD | Pending |
-| ENV-01 | TBD | Pending |
-| ENV-02 | TBD | Pending |
-| ENV-03 | TBD | Pending |
-| ENV-04 | TBD | Pending |
-| ENV-05 | TBD | Pending |
-| LANG-01 | TBD | Pending |
-| LANG-02 | TBD | Pending |
-| LANG-03 | TBD | Pending |
-| LANG-04 | TBD | Pending |
-| LANG-05 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
+| CONFIG-01 | Phase 19 | Pending |
+| CONFIG-02 | Phase 19 | Pending |
+| CONFIG-03 | Phase 19 | Pending |
+| ENV-01 | Phase 20 | Pending |
+| ENV-02 | Phase 20 | Pending |
+| ENV-03 | Phase 20 | Pending |
+| ENV-04 | Phase 20 | Pending |
+| ENV-05 | Phase 20 | Pending |
+| LANG-01 | Phase 21 | Pending |
+| LANG-02 | Phase 21 | Pending |
+| LANG-03 | Phase 21 | Pending |
+| LANG-04 | Phase 21 | Pending |
+| LANG-05 | Phase 21 | Pending |
+| DOCS-01 | Phase 22 | Pending |
+| DOCS-02 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after initial definition*
+*Last updated: 2026-01-31 after roadmap creation*
