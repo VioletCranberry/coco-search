@@ -182,17 +182,20 @@ Plans:
 - [x] 15-03: CLI init command and integration
 
 ### Phase 16: CLI Config Integration
-**Goal**: CLI flags take precedence over config file settings
+**Goal**: CLI flags take precedence over config file settings with env var support
 **Dependencies**: Phase 15
 **Requirements**: CONF-09
 
 **Success Criteria:**
-1. User can override any config setting via CLI flag (e.g., `--index-name` overrides `index_name` in YAML)
+1. User can override any config setting via CLI flag (e.g., `--name` overrides `indexName` in YAML)
 2. CLI help shows which flags have config file equivalents
-3. Precedence is clear: CLI flag > config file > default
+3. Precedence is clear: CLI flag > env var > config file > default
+
+**Plans:** 2 plans
 
 Plans:
-- [ ] 16-01: TBD
+- [ ] 16-01-PLAN.md - ConfigResolver with TDD (precedence logic)
+- [ ] 16-02-PLAN.md - Config subcommands and CLI integration
 
 ### Phase 17: Developer Setup Script
 **Goal**: One-command setup for new developers working on CocoSearch
@@ -245,6 +248,6 @@ Plans:
 | 13. Ollama Integration | v1.3 | 2/2 | Complete | 2026-01-30 |
 | 14. End-to-End Flows | v1.3 | 3/3 | Complete | 2026-01-30 |
 | 15. Configuration System | v1.4 | 3/3 | Complete | 2026-01-31 |
-| 16. CLI Config Integration | v1.4 | 0/? | Pending | - |
+| 16. CLI Config Integration | v1.4 | 0/2 | Planned | - |
 | 17. Developer Setup Script | v1.4 | 0/? | Pending | - |
 | 18. Dogfooding Validation | v1.4 | 0/? | Pending | - |
