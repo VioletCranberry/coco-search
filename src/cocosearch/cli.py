@@ -129,15 +129,23 @@ def index_command(args: argparse.Namespace) -> int:
         console.print("[dim]No cocosearch.yaml found, using defaults[/dim]")
         project_config = CocoSearchConfig()
 
-    # Determine index name
-    if args.name:
-        index_name = args.name
-    elif project_config.indexName:
-        index_name = project_config.indexName
-        console.print(f"[dim]Using config index name: {index_name}[/dim]")
-    else:
+    # Create resolver with loaded config
+    resolver = ConfigResolver(project_config, config_path)
+
+    # Resolve index name with CLI > env > config > default precedence
+    index_name, index_source = resolver.resolve(
+        "indexName",
+        cli_value=args.name,
+        env_var="COCOSEARCH_INDEX_NAME"
+    )
+    if not index_name:
         index_name = derive_index_name(codebase_path)
         console.print(f"[dim]Using derived index name: {index_name}[/dim]")
+    elif index_source not in ("default", "CLI flag"):
+        console.print(f"[dim]Using index name: {index_name} ({index_source})[/dim]")
+    elif index_source == "CLI flag":
+        # CLI flag is explicit, no need to show source
+        pass
 
     # Map project config to IndexingConfig
     config = IndexingConfig(
@@ -241,17 +249,6 @@ def search_command(args: argparse.Namespace) -> int:
     # Initialize CocoIndex
     cocoindex.init()
 
-    # Determine index name
-    if args.index:
-        index_name = args.index
-    else:
-        # Auto-detect: try git root first, fall back to cwd
-        git_index = derive_index_from_git()
-        if git_index:
-            index_name = git_index
-        else:
-            index_name = derive_index_name(os.getcwd())
-
     # Load config for search settings
     config_path = find_config_file()
     if config_path:
@@ -261,6 +258,35 @@ def search_command(args: argparse.Namespace) -> int:
             project_config = CocoSearchConfig()
     else:
         project_config = CocoSearchConfig()
+
+    # Create resolver with loaded config
+    resolver = ConfigResolver(project_config, config_path)
+
+    # Resolve index name with CLI > env > config > default precedence
+    index_name, _ = resolver.resolve(
+        "indexName",
+        cli_value=args.index,
+        env_var="COCOSEARCH_INDEX_NAME"
+    )
+    if not index_name:
+        # Auto-detect: try git root first, fall back to cwd
+        git_index = derive_index_from_git()
+        if git_index:
+            index_name = git_index
+        else:
+            index_name = derive_index_name(os.getcwd())
+
+    # Resolve search settings with precedence
+    limit, _ = resolver.resolve(
+        "search.resultLimit",
+        cli_value=args.limit if args.limit != 10 else None,  # Only use CLI if not default
+        env_var="COCOSEARCH_SEARCH_RESULT_LIMIT"
+    )
+    min_score, _ = resolver.resolve(
+        "search.minScore",
+        cli_value=args.min_score if args.min_score != 0.3 else None,  # Only use CLI if not default
+        env_var="COCOSEARCH_SEARCH_MIN_SCORE"
+    )
 
     # Always print "Using index:" hint (per CONTEXT.md requirement)
     if args.pretty or args.interactive:
@@ -274,9 +300,9 @@ def search_command(args: argparse.Namespace) -> int:
     if args.interactive:
         run_repl(
             index_name=index_name,
-            limit=args.limit,
+            limit=limit,
             context_lines=args.context,
-            min_score=args.min_score,
+            min_score=min_score,
         )
         return 0
 
@@ -296,8 +322,8 @@ def search_command(args: argparse.Namespace) -> int:
         results = search(
             query=query,
             index_name=index_name,
-            limit=args.limit,
-            min_score=args.min_score,
+            limit=limit,
+            min_score=min_score,
             language_filter=lang_filter,
         )
     except Exception as e:
