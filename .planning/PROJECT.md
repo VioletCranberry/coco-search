@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A local-first semantic code search tool exposed via MCP and CLI. Point it at a codebase, it indexes using CocoIndex with Ollama embeddings and PostgreSQL storage, then search semantically through natural language queries. Built for understanding unfamiliar codebases without sending code to external services. Supports DevOps files (Terraform, Dockerfile, Bash) with language-aware chunking and rich metadata extraction.
+A local-first semantic code search tool exposed via MCP and CLI. Point it at a codebase, it indexes using CocoIndex with Ollama embeddings and PostgreSQL storage, then search semantically through natural language queries. Built for understanding unfamiliar codebases without sending code to external services. Supports DevOps files (Terraform, Dockerfile, Bash) with language-aware chunking and rich metadata extraction. Configurable via YAML config file with developer setup automation.
 
 ## Core Value
 
@@ -45,14 +45,14 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Test organization with unit/integration separation and pytest markers — v1.3
 - Session-scoped container fixtures for test performance — v1.3
 - DevOps E2E validation (Terraform, Dockerfile, Bash with alias resolution) — v1.3
+- ✓ Project config file (cocosearch.yaml) with index settings, patterns, and custom options — v1.4
+- ✓ CLI flag precedence over config file with environment variable support — v1.4
+- ✓ Developer setup script (dev-setup.sh) for Docker infrastructure and auto-indexing — v1.4
+- ✓ Self-indexing CocoSearch's own codebase as dogfooding validation — v1.4
 
 ### Active
 
-**v1.4 Dogfooding Infrastructure**
-
-- Project config file (cocosearch.yaml) with index settings, patterns, and custom options
-- Developer setup script (dev-setup.sh) for Docker infrastructure and auto-indexing
-- Self-indexing CocoSearch's own codebase as dogfooding validation
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -62,19 +62,24 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Web UI — MCP and CLI interface only
 - Dockerfile stage tracking for non-FROM instructions — requires two-pass processing
 - Block type / hierarchy search filters — validate demand first
+- Environment variable substitution in config values — deferred to later milestone
+- Config inheritance (base + override) — deferred to later milestone
+- Per-directory config overrides — deferred to later milestone
 
 ## Current State
 
-Shipped v1.3 with 8,983 LOC Python.
+Shipped v1.4 with 3,801 LOC Python (src/).
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP.
 Primary use case: onboarding to unfamiliar codebases via semantic search.
 DevOps support: HCL (Terraform), Dockerfile, Bash with language-aware chunking and metadata.
 Test coverage: 327 unit tests + integration tests with real PostgreSQL and Ollama.
-Documentation: Comprehensive README with Quick Start, Installation, MCP config, CLI reference.
+Documentation: Comprehensive README with Quick Start, Installation, MCP config, CLI reference, dogfooding example.
+Configuration: YAML config file with init command, 4-level precedence (CLI > env > config > default).
+Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
 
 ## Constraints
 
-- **Runtime**: PostgreSQL in Docker, Ollama running locally
+- **Runtime**: PostgreSQL in Docker, Ollama in Docker (dev-setup.sh) or native
 - **Package manager**: UV (not pip)
 - **Interface**: MCP server + CLI
 - **Privacy**: All processing local — no external API calls
@@ -83,33 +88,39 @@ Documentation: Comprehensive README with Quick Start, Installation, MCP config, 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| CocoIndex as indexing engine | User-specified, designed for this use case | Good |
-| Ollama for embeddings | Local-first requirement, no external APIs | Good |
-| PostgreSQL in Docker | Vector storage with pgvector, easy local setup | Good |
-| MCP returns chunks only | Simpler architecture, calling LLM synthesizes | Good |
-| Named indexes | Support multiple codebases without conflicts | Good |
-| Package name: cocosearch | Clarity over default coco_s from directory | Good |
-| Ollama native (not Docker) | Simplicity for Phase 1 per research | Good |
-| pgvector/pgvector:pg17 image | Pre-compiled extension, official | Good |
-| Reference-only storage | Store filename + location, not chunk text | Good |
-| Direct PostgreSQL queries | Simpler than CocoIndex query handlers, more control | Good |
-| JSON output by default | MCP/tool integration, --pretty for humans | Good |
-| cmd module over prompt_toolkit | Standard library sufficient for REPL | Good |
-| Git root detection for auto-index | More reliable than cwd when in subdirectories | Good |
-| Logging to stderr in MCP | Prevents stdout corruption of JSON-RPC protocol | Good |
-| Zero new dependencies for DevOps | CocoIndex custom_languages + Python stdlib re only | Good |
-| Single flow architecture for DevOps | All file types through same pipeline, not separate flows | Good |
-| Regex-only metadata extraction | No external parsers; upgrade path to python-hcl2 exists | Good |
-| Empty strings over NULLs for metadata | Simplifies SQL, consistent pattern across all files | Good |
-| Standard Rust regex for separators | CocoIndex uses regex v1.12.2, not fancy-regex | Good |
-| Additive schema only | No primary key changes, safe schema migration | Good |
-| Module-level graceful degradation | One-time flag prevents repeated failing SQL for pre-v1.2 indexes | Good |
-| Flat metadata in MCP response | Top-level fields, not nested, for simplicity | Good |
-| Default unit-only test execution | Fast feedback via -m unit marker in pytest addopts | Good |
-| Session-scoped container fixtures | One container per session for performance | Good |
-| TRUNCATE CASCADE for test cleanup | Fast cleanup, preserves schema | Good |
-| Native-first Ollama detection | Check localhost:11434 before Docker fallback | Good |
-| E2E tests via subprocess CLI | Environment propagation, realistic testing | Good |
+| CocoIndex as indexing engine | User-specified, designed for this use case | ✓ Good |
+| Ollama for embeddings | Local-first requirement, no external APIs | ✓ Good |
+| PostgreSQL in Docker | Vector storage with pgvector, easy local setup | ✓ Good |
+| MCP returns chunks only | Simpler architecture, calling LLM synthesizes | ✓ Good |
+| Named indexes | Support multiple codebases without conflicts | ✓ Good |
+| Package name: cocosearch | Clarity over default coco_s from directory | ✓ Good |
+| Ollama native (not Docker) | Simplicity for Phase 1 per research | ✓ Good |
+| pgvector/pgvector:pg17 image | Pre-compiled extension, official | ✓ Good |
+| Reference-only storage | Store filename + location, not chunk text | ✓ Good |
+| Direct PostgreSQL queries | Simpler than CocoIndex query handlers, more control | ✓ Good |
+| JSON output by default | MCP/tool integration, --pretty for humans | ✓ Good |
+| cmd module over prompt_toolkit | Standard library sufficient for REPL | ✓ Good |
+| Git root detection for auto-index | More reliable than cwd when in subdirectories | ✓ Good |
+| Logging to stderr in MCP | Prevents stdout corruption of JSON-RPC protocol | ✓ Good |
+| Zero new dependencies for DevOps | CocoIndex custom_languages + Python stdlib re only | ✓ Good |
+| Single flow architecture for DevOps | All file types through same pipeline, not separate flows | ✓ Good |
+| Regex-only metadata extraction | No external parsers; upgrade path to python-hcl2 exists | ✓ Good |
+| Empty strings over NULLs for metadata | Simplifies SQL, consistent pattern across all files | ✓ Good |
+| Standard Rust regex for separators | CocoIndex uses regex v1.12.2, not fancy-regex | ✓ Good |
+| Additive schema only | No primary key changes, safe schema migration | ✓ Good |
+| Module-level graceful degradation | One-time flag prevents repeated failing SQL for pre-v1.2 indexes | ✓ Good |
+| Flat metadata in MCP response | Top-level fields, not nested, for simplicity | ✓ Good |
+| Default unit-only test execution | Fast feedback via -m unit marker in pytest addopts | ✓ Good |
+| Session-scoped container fixtures | One container per session for performance | ✓ Good |
+| TRUNCATE CASCADE for test cleanup | Fast cleanup, preserves schema | ✓ Good |
+| Native-first Ollama detection | Check localhost:11434 before Docker fallback | ✓ Good |
+| E2E tests via subprocess CLI | Environment propagation, realistic testing | ✓ Good |
+| Nested config sections (indexing, search, embedding) | Better organization, clear grouping | ✓ Good |
+| camelCase config keys | Consistency across config, JavaScript-friendly | ✓ Good |
+| CLI > env > config > default precedence | Intuitive override model | ✓ Good |
+| Docker-based Ollama for dev-setup | Consistency across developer environments | ✓ Good |
+| Plain text output in dev-setup.sh | CI-friendly, grep-able, works in all terminals | ✓ Good |
+| Minimal dogfooding config | Shows defaults work well, lowers barrier | ✓ Good |
 
 ---
-*Last updated: 2026-01-31 after v1.4 milestone started*
+*Last updated: 2026-01-31 after v1.4 milestone complete*

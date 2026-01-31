@@ -1,5 +1,33 @@
 # Project Milestones: CocoSearch
 
+## v1.4 Dogfooding Infrastructure (Shipped: 2026-01-31)
+
+**Delivered:** Configuration system with YAML config file, developer setup script for one-command bootstrap, and dogfooding validation with CocoSearch indexing itself — four-level precedence chain (CLI > env > config > default) with helpful error messages.
+
+**Phases completed:** 15-18 (7 plans total)
+
+**Key accomplishments:**
+
+- Configuration system with cocosearch.yaml supporting index settings, patterns, and embedding options
+- Four-level precedence chain (CLI flag > environment variable > config file > default) with source tracking
+- Developer setup script (dev-setup.sh) for one-command Docker environment bootstrap
+- Dogfooding validation with CocoSearch indexing its own codebase
+- Config commands (`coco config show/path`) for configuration inspection
+- Typo detection and user-friendly error messages for config validation
+
+**Stats:**
+
+- 53 files created/modified
+- +9,092 lines (3,801 Python LOC in src/)
+- 4 phases, 7 plans, ~18 tasks
+- 2 days (2026-01-30 → 2026-01-31)
+
+**Git range:** `feat(15-01)` → `docs(18)`
+
+**What's next:** v1.5 features (environment variable substitution, config inheritance, per-directory overrides)
+
+---
+
 ## v1.3 Docker Integration Tests (Shipped: 2026-01-30)
 
 **Delivered:** Docker-based integration test infrastructure validating real PostgreSQL+pgvector and Ollama behavior — E2E flows for indexing and search with DevOps file validation.
