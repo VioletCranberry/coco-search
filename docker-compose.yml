@@ -18,5 +18,21 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: cocosearch-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  ollama_data:
