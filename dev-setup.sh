@@ -125,7 +125,7 @@ show_next_steps() {
   echo "  uv run cocosearch index /path/to/codebase --name my-index"
   echo ""
   echo "  # Interactive REPL"
-  echo "  uv run cocosearch repl --index cocosearch"
+  echo "  uv run cocosearch search -i --index cocosearch"
   echo ""
   echo "Teardown instructions:"
   echo ""
