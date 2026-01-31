@@ -37,10 +37,11 @@ See project history. 19 phases, 47 plans completed across 5 milestones.
   1. User can write `${DATABASE_URL}` in config and it resolves to env var value
   2. User sees clear error message when referenced env var is missing
   3. User can use env var substitution in indexing, search, and embedding config sections
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 19-01: TBD
+- [ ] 19-01-PLAN.md — TDD: Environment variable substitution function
+- [ ] 19-02-PLAN.md — Integration into config loader
 
 ### Phase 20: Env Var Standardization
 **Goal**: All CocoSearch environment variables use consistent COCOSEARCH_* naming
@@ -90,7 +91,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 19. Config Env Var Substitution | v1.5 | 0/TBD | Not started | - |
+| 19. Config Env Var Substitution | v1.5 | 0/2 | Planned | - |
 | 20. Env Var Standardization | v1.5 | 0/TBD | Not started | - |
 | 21. Language Chunking Refactor | v1.5 | 0/TBD | Not started | - |
 | 22. Documentation Polish | v1.5 | 0/TBD | Not started | - |
