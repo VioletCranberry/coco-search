@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Variables
 CLEANUP_NEEDED=false
+export COCOINDEX_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
 
 # Trap handlers
 cleanup_on_exit() {
@@ -103,7 +104,7 @@ index_codebase() {
 run_demo_search() {
     echo ""
     echo "cocosearch: Running demo search..."
-    uv run cocosearch search "how does indexing work" --name cocosearch --limit 3 --pretty
+    uv run cocosearch search "how does indexing work" --index cocosearch --limit 3 --pretty
 }
 
 show_next_steps() {
@@ -114,13 +115,13 @@ show_next_steps() {
     echo "Quick reference commands:"
     echo ""
     echo "  # Search codebase"
-    echo "  uv run cocosearch search \"query\" --name cocosearch --pretty"
+    echo "  uv run cocosearch search \"query\" --index cocosearch --pretty"
     echo ""
     echo "  # Index a different codebase"
     echo "  uv run cocosearch index /path/to/codebase --name my-index"
     echo ""
     echo "  # Interactive REPL"
-    echo "  uv run cocosearch repl --name cocosearch"
+    echo "  uv run cocosearch repl --index cocosearch"
     echo ""
     echo "Teardown instructions:"
     echo ""
