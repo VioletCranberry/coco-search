@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
+from .errors import format_validation_errors
 from .schema import CocoSearchConfig, ConfigError
 
 
@@ -70,8 +71,9 @@ def load_config(path: Path | None = None) -> CocoSearchConfig:
         try:
             return CocoSearchConfig.model_validate(data)
         except ValidationError as e:
-            # Re-raise as ConfigError (formatting will be improved in Plan 02)
-            raise ConfigError(f"Configuration validation failed: {e}") from e
+            # Format validation errors with typo suggestions
+            formatted_message = format_validation_errors(e, path)
+            raise ConfigError(formatted_message) from e
 
     except yaml.YAMLError as e:
         # Extract line and column information if available
