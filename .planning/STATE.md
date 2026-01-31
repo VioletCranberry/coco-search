@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-01-31)
 
 **Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** Planning next milestone
+**Current focus:** v1.5 Configuration & Architecture Polish
 
 ## Current Position
 
-Milestone: v1.4 Dogfooding Infrastructure — SHIPPED
-Phase: Complete
-Plan: Complete
-Status: Milestone archived, ready for next milestone
-Last activity: 2026-01-31 — v1.4 milestone complete
+Milestone: v1.5 Configuration & Architecture Polish
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-31 — Milestone v1.5 started
 
-Progress: [████████████████████████████████████████████████████] 100% — Milestone shipped
+Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Milestones Shipped
 
@@ -62,9 +62,9 @@ None — Milestone v1.4 complete.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Milestone v1.4 archived
+Stopped at: Defining v1.5 requirements
 Resume file: None
-Next action: Start new milestone with `/gsd:new-milestone`
+Next action: Complete requirements and roadmap
 
 ---
-*Updated: 2026-01-31 after v1.4 milestone archived*
+*Updated: 2026-01-31 after v1.5 milestone started*

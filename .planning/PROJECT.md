@@ -52,7 +52,12 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ### Active
 
-(None — planning next milestone)
+**v1.5 Configuration & Architecture Polish**
+
+- Environment variable substitution in config values (e.g., `${COCOSEARCH_DATABASE_URL}`)
+- Standardize all env vars to COCOSEARCH_* prefix across code, .env, docs
+- Pluggable language chunking with per-language modules and registry pattern
+- README table of contents for navigation
 
 ### Out of Scope
 
@@ -62,9 +67,8 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Web UI — MCP and CLI interface only
 - Dockerfile stage tracking for non-FROM instructions — requires two-pass processing
 - Block type / hierarchy search filters — validate demand first
-- Environment variable substitution in config values — deferred to later milestone
-- Config inheritance (base + override) — deferred to later milestone
-- Per-directory config overrides — deferred to later milestone
+- Config inheritance (base + override) — complexity vs value tradeoff, skip for now
+- Per-directory config overrides — skip for now, reassess if demand emerges
 
 ## Current State
 
@@ -123,4 +127,4 @@ Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
 | Minimal dogfooding config | Shows defaults work well, lowers barrier | ✓ Good |
 
 ---
-*Last updated: 2026-01-31 after v1.4 milestone complete*
+*Last updated: 2026-01-31 after v1.5 milestone started*
