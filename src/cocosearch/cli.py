@@ -17,6 +17,8 @@ from rich.console import Console
 from cocosearch.config import (
     CocoSearchConfig,
     ConfigError as ConfigLoadError,
+    ConfigResolver,
+    config_key_to_env_var,
     find_config_file,
     generate_config,
     load_config as load_project_config,
@@ -511,6 +513,78 @@ def mcp_command(args: argparse.Namespace) -> int:
     return 0  # Never reached, server runs until killed
 
 
+def config_show_command(args: argparse.Namespace) -> int:
+    """Execute the config show command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, 1 for error).
+    """
+    from rich.table import Table
+
+    console = Console()
+
+    # Load config
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError as e:
+            console.print(f"[bold red]Configuration error:[/bold red]\n{e}")
+            return 1
+    else:
+        project_config = CocoSearchConfig()
+
+    # Create resolver
+    resolver = ConfigResolver(project_config, config_path)
+
+    # Build table
+    table = Table(title="Configuration")
+    table.add_column("KEY", style="cyan")
+    table.add_column("VALUE", style="white")
+    table.add_column("SOURCE", style="dim")
+
+    # Get all field paths and resolve each
+    for field_path in resolver.all_field_paths():
+        env_var = config_key_to_env_var(field_path)
+        value, source = resolver.resolve(field_path, cli_value=None, env_var=env_var)
+
+        # Format value for display
+        if value is None:
+            value_str = "[dim]null[/dim]"
+        elif isinstance(value, list):
+            value_str = ", ".join(str(v) for v in value) if value else "[dim]empty[/dim]"
+        else:
+            value_str = str(value)
+
+        table.add_row(field_path, value_str, source)
+
+    console.print(table)
+    return 0
+
+
+def config_path_command(args: argparse.Namespace) -> int:
+    """Execute the config path command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    console = Console()
+
+    config_path = find_config_file()
+    if config_path:
+        console.print(str(config_path))
+    else:
+        console.print("No config file found")
+
+    return 0
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -665,8 +739,30 @@ def main() -> None:
         description="Start the Model Context Protocol server for use with Claude and other LLM clients.",
     )
 
+    # Config subcommand
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Configuration management",
+        description="Inspect and manage CocoSearch configuration.",
+    )
+    config_subparsers = config_parser.add_subparsers(dest="config_command")
+
+    # Config show subcommand
+    config_subparsers.add_parser(
+        "show",
+        help="Show effective configuration with sources",
+        description="Display all configuration values and their sources (CLI, env, config file, or default).",
+    )
+
+    # Config path subcommand
+    config_subparsers.add_parser(
+        "path",
+        help="Show config file location",
+        description="Display the path to the config file, or indicate if none is found.",
+    )
+
     # Known subcommands for routing
-    known_subcommands = ("index", "search", "list", "stats", "clear", "init", "mcp", "-h", "--help")
+    known_subcommands = ("index", "search", "list", "stats", "clear", "init", "mcp", "config", "-h", "--help")
 
     # Handle default action (query without subcommand)
     # Check before parsing if first argument is not a known subcommand
@@ -694,6 +790,14 @@ def main() -> None:
         sys.exit(init_command(args))
     elif args.command == "mcp":
         sys.exit(mcp_command(args))
+    elif args.command == "config":
+        if args.config_command == "show":
+            sys.exit(config_show_command(args))
+        elif args.config_command == "path":
+            sys.exit(config_path_command(args))
+        else:
+            parser.print_help()
+            sys.exit(1)
     else:
         parser.print_help()
         sys.exit(1)
