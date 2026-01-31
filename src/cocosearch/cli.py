@@ -14,7 +14,13 @@ from pathlib import Path
 import cocoindex
 from rich.console import Console
 
-from cocosearch.config import ConfigError as ConfigLoadError, generate_config
+from cocosearch.config import (
+    CocoSearchConfig,
+    ConfigError as ConfigLoadError,
+    find_config_file,
+    generate_config,
+    load_config as load_project_config,
+)
 from cocosearch.indexer import IndexingConfig, load_config, run_index
 from cocosearch.indexer.progress import IndexingProgress
 from cocosearch.management import clear_index, derive_index_from_git, get_stats, list_indexes
@@ -93,20 +99,36 @@ def index_command(args: argparse.Namespace) -> int:
         console.print(f"[bold red]Error:[/bold red] Path does not exist or is not a directory: {args.path}")
         return 1
 
+    # Load config from cocosearch.yaml if present
+    config_path = find_config_file()
+    if config_path:
+        console.print(f"[dim]Loading config from {config_path}[/dim]")
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError as e:
+            console.print(f"[bold red]Configuration error:[/bold red]\n{e}")
+            return 1
+    else:
+        console.print("[dim]No cocosearch.yaml found, using defaults[/dim]")
+        project_config = CocoSearchConfig()
+
     # Determine index name
     if args.name:
         index_name = args.name
+    elif project_config.indexName:
+        index_name = project_config.indexName
+        console.print(f"[dim]Using config index name: {index_name}[/dim]")
     else:
         index_name = derive_index_name(codebase_path)
         console.print(f"[dim]Using derived index name: {index_name}[/dim]")
 
-    # Load config from .cocosearch.yaml if present
-    config_path = Path(codebase_path) / ".cocosearch.yaml"
-    if config_path.exists():
-        console.print(f"[dim]Loading config from {config_path}[/dim]")
-        config = load_config(config_path)
-    else:
-        config = IndexingConfig()
+    # Map project config to IndexingConfig
+    config = IndexingConfig(
+        include_patterns=project_config.indexing.includePatterns or [],
+        exclude_patterns=project_config.indexing.excludePatterns or [],
+        chunk_size=project_config.indexing.chunkSize,
+        chunk_overlap=project_config.indexing.chunkOverlap,
+    )
 
     # Merge CLI args with config (CLI overrides config)
     if args.include:
@@ -212,6 +234,16 @@ def search_command(args: argparse.Namespace) -> int:
             index_name = git_index
         else:
             index_name = derive_index_name(os.getcwd())
+
+    # Load config for search settings
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
 
     # Always print "Using index:" hint (per CONTEXT.md requirement)
     if args.pretty or args.interactive:
