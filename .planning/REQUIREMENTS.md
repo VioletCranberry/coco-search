@@ -17,7 +17,7 @@ Requirements for Dogfooding Infrastructure milestone.
 - [x] **CONF-06**: Config supports `embedding_model` field to specify Ollama model
 - [x] **CONF-07**: Config supports `chunk_size` and `result_limit` settings
 - [x] **CONF-08**: Config validation with helpful error messages on invalid YAML or missing fields
-- [ ] **CONF-09**: CLI flags override config file settings when both specified
+- [x] **CONF-09**: CLI flags override config file settings when both specified
 
 ### Developer Setup Script
 
@@ -69,7 +69,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-06 | Phase 15 | Complete |
 | CONF-07 | Phase 15 | Complete |
 | CONF-08 | Phase 15 | Complete |
-| CONF-09 | Phase 16 | Pending |
+| CONF-09 | Phase 16 | Complete |
 | DEVS-01 | Phase 17 | Pending |
 | DEVS-02 | Phase 17 | Pending |
 | DEVS-03 | Phase 17 | Pending |

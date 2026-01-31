@@ -194,8 +194,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md - ConfigResolver with TDD (precedence logic)
-- [ ] 16-02-PLAN.md - Config subcommands and CLI integration
+- [x] 16-01-PLAN.md - ConfigResolver with TDD (precedence logic)
+- [x] 16-02-PLAN.md - Config subcommands and CLI integration
 
 ### Phase 17: Developer Setup Script
 **Goal**: One-command setup for new developers working on CocoSearch
@@ -248,6 +248,6 @@ Plans:
 | 13. Ollama Integration | v1.3 | 2/2 | Complete | 2026-01-30 |
 | 14. End-to-End Flows | v1.3 | 3/3 | Complete | 2026-01-30 |
 | 15. Configuration System | v1.4 | 3/3 | Complete | 2026-01-31 |
-| 16. CLI Config Integration | v1.4 | 0/2 | Planned | - |
+| 16. CLI Config Integration | v1.4 | 2/2 | Complete | 2026-01-31 |
 | 17. Developer Setup Script | v1.4 | 0/? | Pending | - |
 | 18. Dogfooding Validation | v1.4 | 0/? | Pending | - |
