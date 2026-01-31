@@ -31,6 +31,21 @@ from cocosearch.search.formatter import format_json, format_pretty
 from cocosearch.search.repl import run_repl
 
 
+def add_config_arg(parser: argparse.ArgumentParser, *flags, config_key: str, help_text: str, **kwargs) -> None:
+    """Add argument with config key and env var in help text.
+
+    Args:
+        parser: Argument parser to add argument to.
+        *flags: Flag names (e.g., '-n', '--name').
+        config_key: Config key in dot.notation format.
+        help_text: Base help text.
+        **kwargs: Additional arguments for add_argument.
+    """
+    env_var = config_key_to_env_var(config_key)
+    full_help = f"{help_text} [config: {config_key}] [env: {env_var}]"
+    parser.add_argument(*flags, help=full_help, **kwargs)
+
+
 def derive_index_name(path: str) -> str:
     """Derive an index name from a directory path.
 
@@ -605,19 +620,25 @@ def main() -> None:
         "path",
         help="Path to the codebase directory to index",
     )
-    index_parser.add_argument(
+    add_config_arg(
+        index_parser,
         "-n", "--name",
-        help="Index name (default: derived from directory name)",
+        config_key="indexName",
+        help_text="Index name (default: derived from directory name)",
     )
-    index_parser.add_argument(
+    add_config_arg(
+        index_parser,
         "-i", "--include",
+        config_key="indexing.includePatterns",
+        help_text="Additional file patterns to include (can be repeated)",
         action="append",
-        help="Additional file patterns to include (can be repeated)",
     )
-    index_parser.add_argument(
+    add_config_arg(
+        index_parser,
         "-e", "--exclude",
+        config_key="indexing.excludePatterns",
+        help_text="Additional file patterns to exclude (can be repeated)",
         action="append",
-        help="Additional file patterns to exclude (can be repeated)",
     )
     index_parser.add_argument(
         "--no-gitignore",
@@ -642,25 +663,31 @@ def main() -> None:
         action="store_true",
         help="Enter interactive search mode",
     )
-    search_parser.add_argument(
+    add_config_arg(
+        search_parser,
         "-n", "--index",
-        help="Index name (default: auto-detect from cwd)",
+        config_key="indexName",
+        help_text="Index name (default: auto-detect from cwd)",
     )
-    search_parser.add_argument(
+    add_config_arg(
+        search_parser,
         "-l", "--limit",
+        config_key="search.resultLimit",
+        help_text="Maximum results (default: 10)",
         type=int,
         default=10,
-        help="Maximum results (default: 10)",
     )
     search_parser.add_argument(
         "--lang",
         help="Filter by language (e.g., python, typescript, hcl, dockerfile, bash). Aliases: terraform=hcl, shell/sh=bash",
     )
-    search_parser.add_argument(
+    add_config_arg(
+        search_parser,
         "--min-score",
+        config_key="search.minScore",
+        help_text="Minimum similarity score 0-1 (default: 0.3)",
         type=float,
         default=0.3,
-        help="Minimum similarity score 0-1 (default: 0.3)",
     )
     search_parser.add_argument(
         "-c", "--context",
