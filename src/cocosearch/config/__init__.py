@@ -1,5 +1,6 @@
 """Configuration module for CocoSearch."""
 
+from .errors import format_validation_errors, suggest_field_name
 from .loader import find_config_file, load_config
 from .schema import (
     CocoSearchConfig,
@@ -17,4 +18,6 @@ __all__ = [
     "SearchSection",
     "find_config_file",
     "load_config",
+    "format_validation_errors",
+    "suggest_field_name",
 ]
