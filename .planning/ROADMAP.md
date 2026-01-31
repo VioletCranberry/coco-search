@@ -177,9 +177,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 15-01: Config schema and loader
-- [ ] 15-02: Validation and error formatting
-- [ ] 15-03: CLI init command and integration
+- [x] 15-01: Config schema and loader
+- [x] 15-02: Validation and error formatting
+- [x] 15-03: CLI init command and integration
 
 ### Phase 16: CLI Config Integration
 **Goal**: CLI flags take precedence over config file settings
@@ -244,7 +244,7 @@ Plans:
 | 12. Container Infrastructure & PostgreSQL | v1.3 | 3/3 | Complete | 2026-01-30 |
 | 13. Ollama Integration | v1.3 | 2/2 | Complete | 2026-01-30 |
 | 14. End-to-End Flows | v1.3 | 3/3 | Complete | 2026-01-30 |
-| 15. Configuration System | v1.4 | 0/3 | Pending | - |
+| 15. Configuration System | v1.4 | 3/3 | Complete | 2026-01-31 |
 | 16. CLI Config Integration | v1.4 | 0/? | Pending | - |
 | 17. Developer Setup Script | v1.4 | 0/? | Pending | - |
 | 18. Dogfooding Validation | v1.4 | 0/? | Pending | - |

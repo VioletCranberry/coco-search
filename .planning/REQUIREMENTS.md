@@ -9,14 +9,14 @@ Requirements for Dogfooding Infrastructure milestone.
 
 ### Project Configuration
 
-- [ ] **CONF-01**: CLI loads configuration from `cocosearch.yaml` in project root or git root
-- [ ] **CONF-02**: Config supports `index_name` field to set the index name
-- [ ] **CONF-03**: Config supports `include_patterns` list for file inclusion globs
-- [ ] **CONF-04**: Config supports `exclude_patterns` list for file exclusion globs
-- [ ] **CONF-05**: Config supports `languages` list to filter indexed languages
-- [ ] **CONF-06**: Config supports `embedding_model` field to specify Ollama model
-- [ ] **CONF-07**: Config supports `chunk_size` and `result_limit` settings
-- [ ] **CONF-08**: Config validation with helpful error messages on invalid YAML or missing fields
+- [x] **CONF-01**: CLI loads configuration from `cocosearch.yaml` in project root or git root
+- [x] **CONF-02**: Config supports `index_name` field to set the index name
+- [x] **CONF-03**: Config supports `include_patterns` list for file inclusion globs
+- [x] **CONF-04**: Config supports `exclude_patterns` list for file exclusion globs
+- [x] **CONF-05**: Config supports `languages` list to filter indexed languages
+- [x] **CONF-06**: Config supports `embedding_model` field to specify Ollama model
+- [x] **CONF-07**: Config supports `chunk_size` and `result_limit` settings
+- [x] **CONF-08**: Config validation with helpful error messages on invalid YAML or missing fields
 - [ ] **CONF-09**: CLI flags override config file settings when both specified
 
 ### Developer Setup Script
@@ -61,14 +61,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONF-01 | Phase 15 | Pending |
-| CONF-02 | Phase 15 | Pending |
-| CONF-03 | Phase 15 | Pending |
-| CONF-04 | Phase 15 | Pending |
-| CONF-05 | Phase 15 | Pending |
-| CONF-06 | Phase 15 | Pending |
-| CONF-07 | Phase 15 | Pending |
-| CONF-08 | Phase 15 | Pending |
+| CONF-01 | Phase 15 | Complete |
+| CONF-02 | Phase 15 | Complete |
+| CONF-03 | Phase 15 | Complete |
+| CONF-04 | Phase 15 | Complete |
+| CONF-05 | Phase 15 | Complete |
+| CONF-06 | Phase 15 | Complete |
+| CONF-07 | Phase 15 | Complete |
+| CONF-08 | Phase 15 | Complete |
 | CONF-09 | Phase 16 | Pending |
 | DEVS-01 | Phase 17 | Pending |
 | DEVS-02 | Phase 17 | Pending |
