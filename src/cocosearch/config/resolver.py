@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
-from pydantic.fields import FieldInfo
 
 from .schema import CocoSearchConfig
 
@@ -119,7 +118,6 @@ class ConfigResolver:
         """
         self.config = config
         self.config_path = config_path
-        self._cache: dict[str, tuple[Any, str]] = {}
 
     def resolve(
         self,
