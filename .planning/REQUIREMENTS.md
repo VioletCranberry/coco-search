@@ -32,8 +32,8 @@ Requirements for Dogfooding Infrastructure milestone.
 
 ### Dogfooding
 
-- [ ] **DOGF-01**: Repository includes working `cocosearch.yaml` configured for CocoSearch codebase
-- [ ] **DOGF-02**: README documents dogfooding setup as example usage
+- [x] **DOGF-01**: Repository includes working `cocosearch.yaml` configured for CocoSearch codebase
+- [x] **DOGF-02**: README documents dogfooding setup as example usage
 
 ## Future Requirements
 
@@ -78,8 +78,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEVS-06 | Phase 17 | Complete |
 | DEVS-07 | Phase 17 | Complete |
 | DEVS-08 | Phase 17 | Complete (plain text) |
-| DOGF-01 | Phase 18 | Pending |
-| DOGF-02 | Phase 18 | Pending |
+| DOGF-01 | Phase 18 | Complete |
+| DOGF-02 | Phase 18 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 19 total

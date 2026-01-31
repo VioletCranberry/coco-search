@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** v1.4 Dogfooding Infrastructure - Configuration system and developer setup
+**Current focus:** v1.4 Dogfooding Infrastructure - COMPLETE
 
 ## Current Position
 
 Milestone: v1.4 Dogfooding Infrastructure
 Phase: 18 of 18 (Dogfooding Validation)
-Plan: 1 of 2 complete
-Status: In progress - Plan 18-01 complete
-Last activity: 2026-01-31 — Completed 18-01-PLAN.md (dogfooding config and README)
+Plan: 1 of 1 complete
+Status: Phase 18 verified, milestone complete
+Last activity: 2026-01-31 — Phase 18 verified, v1.4 milestone complete
 
-Progress: [████████████████████████████████████████____________] 70% (4/4 phases planned, 1/2 phase 18 plans complete)
+Progress: [████████████████████████████████████████████████████] 100% (4/4 phases complete)
 
 ## v1.4 Phase Overview
 
@@ -24,13 +24,13 @@ Progress: [███████████████████████
 | 15 | Configuration System | 8 (CONF-01 to CONF-08) | Complete ✓ (verified) |
 | 16 | CLI Config Integration | 1 (CONF-09) | Complete ✓ (verified) |
 | 17 | Developer Setup Script | 8 (DEVS-01 to DEVS-08) | Complete ✓ (verified) |
-| 18 | Dogfooding Validation | 2 (DOGF-01, DOGF-02) | In progress (1/2 plans complete) |
+| 18 | Dogfooding Validation | 2 (DOGF-01, DOGF-02) | Complete ✓ (verified) |
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 47
-- Total execution time: ~6 days across 4 milestones
+- Total execution time: ~6 days across 5 milestones
 
 **By Milestone:**
 
@@ -40,6 +40,7 @@ Progress: [███████████████████████
 | v1.1 | 5-7 | 11 | 2 days |
 | v1.2 | 8-10, 4-soi | 6 | 1 day |
 | v1.3 | 11-14 | 11 | 1 day |
+| v1.4 | 15-18 | 7 | 1 day |
 
 ## Milestones Shipped
 
@@ -49,8 +50,9 @@ Progress: [███████████████████████
 | v1.1 Docs & Tests | 5-7 | 11 | 2026-01-26 |
 | v1.2 DevOps Language Support | 8-10, 4-soi | 6 | 2026-01-27 |
 | v1.3 Docker Integration Tests | 11-14 | 11 | 2026-01-30 |
+| v1.4 Dogfooding Infrastructure | 15-18 | 7 | 2026-01-31 |
 
-**Total shipped:** 15 phases, 40 plans
+**Total shipped:** 19 phases, 47 plans
 
 ## Accumulated Context
 
@@ -81,10 +83,10 @@ Progress: [███████████████████████
 | DEVS-TRAP-CLEANUP | 17-01 | Trap-based cleanup prompting user on failure | Balance auto-cleanup with debuggability |
 | DEVS-PORT-CONFLICT-CHECK | 17-01 | Port conflict detection before service start | Fail fast with clear error showing which process |
 | DEVS-IDEMPOTENT-OPS | 17-01 | Idempotent operations throughout setup script | Safe to re-run script at any time |
-| DOGF-CONFIG-MINIMAL | 18-01 | Minimal cocosearch.yaml (only indexName + includePatterns) | Demonstrates defaults work well, lowers barrier to entry |
-| DOGF-EXAMPLE-MIX | 18-01 | Mix architecture and implementation queries in README | Shows CocoSearch handles both high-level and code-level searches |
-| DOGF-STANDALONE-COMMANDS | 18-01 | Use "uv run cocosearch" in README examples | Examples work from any state, no setup assumptions |
-| DOGF-ANNOTATED-OUTPUT | 18-01 | Show truncated, annotated output in examples | Balances showing value vs maintaining readable docs |
+| DOGF-CONFIG-MINIMAL | 18-01 | Keep config minimal to demonstrate defaults | Shows users they don't need extensive configuration |
+| DOGF-EXAMPLE-MIX | 18-01 | Mix architecture and implementation queries | Demonstrates breadth of search capabilities |
+| DOGF-STANDALONE-COMMANDS | 18-01 | Use `uv run cocosearch` for any-state examples | Works regardless of whether dev-setup.sh was run |
+| DOGF-ANNOTATED-OUTPUT | 18-01 | Show truncated output balancing value vs detail | Clear demonstration without overwhelming output |
 
 ### Pending Todos
 
@@ -92,14 +94,14 @@ None.
 
 ### Blockers/Concerns
 
-None -- Plan 18-01 complete. Plan 18-02 (manual dogfooding validation) ready to execute.
+None -- Milestone v1.4 complete.
 
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 18-01-PLAN.md
+Stopped at: Milestone v1.4 complete
 Resume file: None
-Next action: Execute 18-02-PLAN.md (manual dogfooding validation checkpoint)
+Next action: Audit milestone v1.4 or start new milestone
 
 ---
-*Updated: 2026-01-31 after completing 18-01-PLAN.md*
+*Updated: 2026-01-31 after Phase 18 verified, milestone v1.4 complete*

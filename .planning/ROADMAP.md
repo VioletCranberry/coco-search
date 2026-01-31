@@ -6,7 +6,7 @@
 - v1.1 Docs & Tests - Phases 5-7 (shipped 2026-01-26)
 - v1.2 DevOps Language Support - Phases 8-10, 4-soi (shipped 2026-01-27)
 - v1.3 Docker Integration Tests - Phases 11-14 (shipped 2026-01-30)
-- v1.4 Dogfooding Infrastructure - Phases 15-18 (in progress)
+- v1.4 Dogfooding Infrastructure - Phases 15-18 (shipped 2026-01-31)
 
 ## Phases
 
@@ -160,8 +160,8 @@ Plans:
 
 </details>
 
-<details open>
-<summary>v1.4 Dogfooding Infrastructure (Phases 15-18) - IN PROGRESS</summary>
+<details>
+<summary>v1.4 Dogfooding Infrastructure (Phases 15-18) - SHIPPED 2026-01-31</summary>
 
 ### Phase 15: Configuration System
 **Goal**: Users can configure CocoSearch behavior via YAML config file
@@ -227,7 +227,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 18-01-PLAN.md - Dogfooding config and README section
+- [x] 18-01-PLAN.md - Dogfooding config and README section
 
 </details>
 
@@ -253,4 +253,4 @@ Plans:
 | 15. Configuration System | v1.4 | 3/3 | Complete | 2026-01-31 |
 | 16. CLI Config Integration | v1.4 | 2/2 | Complete | 2026-01-31 |
 | 17. Developer Setup Script | v1.4 | 1/1 | Complete | 2026-01-31 |
-| 18. Dogfooding Validation | v1.4 | 0/1 | Pending | - |
+| 18. Dogfooding Validation | v1.4 | 1/1 | Complete | 2026-01-31 |
