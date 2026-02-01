@@ -39,18 +39,117 @@ flowchart LR
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Searching CocoSearch](#searching-cocosearch)
-- [Installation](#installation)
-- [MCP Configuration](#mcp-configuration)
-- [CLI Reference](#cli-reference)
-- [Configuration](#configuration)
+- [📦 Installing](#-installing)
+  - [Installing Ollama](#installing-ollama)
+  - [Starting PostgreSQL](#starting-postgresql)
+  - [Installing CocoSearch](#installing-cocosearch)
+- [🚀 Getting Started](#-getting-started)
+  - [Indexing Your Code](#indexing-your-code)
+  - [Searching Semantically](#searching-semantically)
+  - [Using with MCP](#using-with-mcp)
+- [🔍 Dogfooding](#-dogfooding)
+  - [Prerequisites](#prerequisites)
+  - [Indexing the Codebase](#indexing-the-codebase)
+  - [Verifying Indexing](#verifying-indexing)
+  - [Example Searches](#example-searches)
+  - [Full Development Environment](#full-development-environment)
+- [⚙️ Configuring MCP](#️-configuring-mcp)
+  - [Configuring Claude Code](#configuring-claude-code)
+  - [Configuring Claude Desktop](#configuring-claude-desktop)
+  - [Configuring OpenCode](#configuring-opencode)
+- [💻 CLI Reference](#-cli-reference)
+  - [Indexing Commands](#indexing-commands)
+  - [Searching Commands](#searching-commands)
+  - [Managing Indexes](#managing-indexes)
+- [🛠️ Configuration](#️-configuration)
+  - [Configuration File](#configuration-file)
+  - [Environment Variables](#environment-variables)
 
-## Quick Start
+## 📦 Installing
 
-**Prerequisites:** Ollama, PostgreSQL with pgvector, and CocoSearch installed. See [Installation](#installation) for setup.
+### Installing Ollama
 
-### Index Your Code
+Ollama runs the embedding model locally.
+
+**macOS:**
+
+```bash
+brew install ollama
+```
+
+**Linux:**
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**Start Ollama and pull the embedding model:**
+
+```bash
+# Start Ollama (runs as service on macOS, or in separate terminal)
+ollama serve
+
+# Pull the embedding model
+ollama pull nomic-embed-text
+```
+
+**Verify:** `ollama list` should show `nomic-embed-text`.
+
+### Starting PostgreSQL
+
+pgvector is a PostgreSQL extension for vector similarity search.
+
+**Option A - Docker (recommended):**
+
+```bash
+# Uses docker-compose.yml from this repository
+docker compose up -d
+```
+
+This creates a container `cocosearch-db` on port 5432 with pgvector pre-installed.
+
+**Option B - Native PostgreSQL:**
+
+```bash
+# macOS with Homebrew
+brew install postgresql@17 pgvector
+brew services start postgresql@17
+createdb cocoindex
+psql cocoindex -c "CREATE EXTENSION vector;"
+```
+
+**Verify:**
+
+- Docker: `docker ps` shows `cocosearch-db` running
+- Native: `psql -c "SELECT 1"` succeeds
+
+### Installing CocoSearch
+
+```bash
+# Clone and install
+git clone https://github.com/VioletCranberry/coco-s.git
+cd coco-s
+uv sync
+
+# Verify installation
+uv run cocosearch --help
+```
+
+**Set database URL** (if not using default Docker setup):
+
+```bash
+export COCOSEARCH_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
+```
+
+**Windows users:** Use WSL2 for best compatibility.
+
+[↑ Back to top](#table-of-contents)
+
+## 🚀 Getting Started
+
+**Prerequisites:** Ollama, PostgreSQL with pgvector, and CocoSearch installed. See [Installing](#-installing) for setup.
+
+### Indexing Your Code
 
 ```bash
 # Index a project
@@ -63,7 +162,7 @@ cocosearch index ./my-project
 # Indexed 42 files (127 chunks)
 ```
 
-### Search Semantically
+### Searching Semantically
 
 ```bash
 # Search with natural language
@@ -73,11 +172,13 @@ cocosearch search "authentication logic" --pretty
 cocosearch search --interactive
 ```
 
-### Use with MCP
+### Using with MCP
 
-For AI assistant integration with Claude Code, Claude Desktop, or OpenCode, see [MCP Configuration](#mcp-configuration) below.
+For AI assistant integration with Claude Code, Claude Desktop, or OpenCode, see [Configuring MCP](#️-configuring-mcp) below.
 
-## Searching CocoSearch
+[↑ Back to top](#table-of-contents)
+
+## 🔍 Dogfooding
 
 CocoSearch uses CocoSearch to index its own codebase. This demonstrates real-world usage and lets you explore the implementation.
 
@@ -85,7 +186,7 @@ CocoSearch uses CocoSearch to index its own codebase. This demonstrates real-wor
 
 Docker (for PostgreSQL) and Python 3.12+ with [uv](https://docs.astral.sh/uv/) installed.
 
-### Index the Codebase
+### Indexing the Codebase
 
 ```bash
 uv run cocosearch index . --name self
@@ -98,7 +199,7 @@ Indexing .
 Indexed 45 files (287 chunks)
 ```
 
-### Verify Indexing
+### Verifying Indexing
 
 ```bash
 uv run cocosearch stats self --pretty
@@ -185,89 +286,13 @@ Finds the configuration loader logic:
             return config_path
 ```
 
-### Need Full Development Environment?
+### Full Development Environment
 
 Run `./dev-setup.sh` for automated setup including Docker services, database initialization, and Ollama configuration.
 
-## Installation
+[↑ Back to top](#table-of-contents)
 
-### 1. Install Ollama
-
-Ollama runs the embedding model locally.
-
-**macOS:**
-
-```bash
-brew install ollama
-```
-
-**Linux:**
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-**Start Ollama and pull the embedding model:**
-
-```bash
-# Start Ollama (runs as service on macOS, or in separate terminal)
-ollama serve
-
-# Pull the embedding model
-ollama pull nomic-embed-text
-```
-
-**Verify:** `ollama list` should show `nomic-embed-text`.
-
-### 2. Start PostgreSQL with pgvector
-
-pgvector is a PostgreSQL extension for vector similarity search.
-
-**Option A - Docker (recommended):**
-
-```bash
-# Uses docker-compose.yml from this repository
-docker compose up -d
-```
-
-This creates a container `cocosearch-db` on port 5432 with pgvector pre-installed.
-
-**Option B - Native PostgreSQL:**
-
-```bash
-# macOS with Homebrew
-brew install postgresql@17 pgvector
-brew services start postgresql@17
-createdb cocoindex
-psql cocoindex -c "CREATE EXTENSION vector;"
-```
-
-**Verify:**
-
-- Docker: `docker ps` shows `cocosearch-db` running
-- Native: `psql -c "SELECT 1"` succeeds
-
-### 3. Install CocoSearch
-
-```bash
-# Clone and install
-git clone https://github.com/VioletCranberry/coco-s.git
-cd coco-s
-uv sync
-
-# Verify installation
-uv run cocosearch --help
-```
-
-**Set database URL** (if not using default Docker setup):
-
-```bash
-export COCOSEARCH_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
-```
-
-**Windows users:** Use WSL2 for best compatibility.
-
-## MCP Configuration
+## ⚙️ Configuring MCP
 
 CocoSearch provides an MCP (Model Context Protocol) server for semantic code search integration with LLM clients. When configured, your AI assistant can search your codebase using natural language.
 
@@ -279,7 +304,7 @@ CocoSearch provides an MCP (Model Context Protocol) server for semantic code sea
 - `index_stats` - Get statistics for an index
 - `clear_index` - Remove an index from the database
 
-### Claude Code
+### Configuring Claude Code
 
 **Option A - CLI (recommended):**
 
@@ -329,7 +354,7 @@ Add to `~/.claude.json`:
 2. Run `/mcp` - you should see `cocosearch` listed with status "connected"
 3. Ask Claude: "Search for authentication logic in my codebase"
 
-### Claude Desktop
+### Configuring Claude Desktop
 
 **Config file locations:**
 
@@ -366,7 +391,7 @@ Add to `~/.claude.json`:
 3. Click the hammer to see "cocosearch" tools listed
 4. Start a new conversation and ask Claude to search your codebase
 
-### OpenCode
+### Configuring OpenCode
 
 **Config file locations:**
 
@@ -415,11 +440,13 @@ Add to `~/.claude.json`:
 
 **Remember:** Replace `/absolute/path/to/cocosearch` in all configs with the actual path where you cloned the repository.
 
-## CLI Reference
+[↑ Back to top](#table-of-contents)
+
+## 💻 CLI Reference
 
 CocoSearch provides a command-line interface for indexing and searching code. Output is JSON by default (for scripting/MCP); use `--pretty` for human-readable output.
 
-### Indexing
+### Indexing Commands
 
 `cocosearch index <path> [options]`
 
@@ -446,7 +473,7 @@ Indexing ./my-project...
 Indexed 42 files
 ```
 
-### Searching
+### Searching Commands
 
 `cocosearch search <query> [options]`
 `cocosearch search --interactive`
@@ -553,9 +580,11 @@ Start the MCP server for LLM integration. Typically invoked by MCP clients, not 
 cocosearch mcp  # Runs until killed, used by Claude/OpenCode
 ```
 
-## Configuration
+[↑ Back to top](#table-of-contents)
 
-### .cocosearch.yaml
+## 🛠️ Configuration
+
+### Configuration File
 
 Create `.cocosearch.yaml` in your project root to customize indexing:
 
@@ -581,3 +610,5 @@ indexing:
 | ------------------------ | ------------------------- | ----------------------------------------------------------- |
 | `COCOSEARCH_DATABASE_URL` | PostgreSQL connection URL | `postgresql://cocoindex:cocoindex@localhost:5432/cocoindex` |
 | `COCOSEARCH_OLLAMA_URL`            | Ollama API URL            | `http://localhost:11434`                                    |
+
+[↑ Back to top](#table-of-contents)
