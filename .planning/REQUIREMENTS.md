@@ -23,11 +23,11 @@ Requirements for v1.5 Configuration & Architecture Polish. Each maps to roadmap 
 
 ### Language Chunking
 
-- [ ] **LANG-01**: Each language (HCL, Dockerfile, Bash) has its own module file
-- [ ] **LANG-02**: Language modules follow consistent interface (separator, metadata extractor)
-- [ ] **LANG-03**: Registry pattern allows discovering available language handlers
-- [ ] **LANG-04**: Adding new language requires only creating new module file
-- [ ] **LANG-05**: Existing chunking behavior preserved (no regression)
+- [x] **LANG-01**: Each language (HCL, Dockerfile, Bash) has its own module file
+- [x] **LANG-02**: Language modules follow consistent interface (separator, metadata extractor)
+- [x] **LANG-03**: Registry pattern allows discovering available language handlers
+- [x] **LANG-04**: Adding new language requires only creating new module file
+- [x] **LANG-05**: Existing chunking behavior preserved (no regression)
 
 ### Documentation
 
@@ -67,11 +67,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENV-03 | Phase 20 | Complete |
 | ENV-04 | Phase 20 | Complete |
 | ENV-05 | Phase 20 | Complete |
-| LANG-01 | Phase 21 | Pending |
-| LANG-02 | Phase 21 | Pending |
-| LANG-03 | Phase 21 | Pending |
-| LANG-04 | Phase 21 | Pending |
-| LANG-05 | Phase 21 | Pending |
+| LANG-01 | Phase 21 | Complete |
+| LANG-02 | Phase 21 | Complete |
+| LANG-03 | Phase 21 | Complete |
+| LANG-04 | Phase 21 | Complete |
+| LANG-05 | Phase 21 | Complete |
 | DOCS-01 | Phase 22 | Pending |
 | DOCS-02 | Phase 22 | Pending |
 
@@ -82,4 +82,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-02-01 after Phase 20 completion*
+*Last updated: 2026-02-01 after Phase 21 completion*

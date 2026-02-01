@@ -24,7 +24,7 @@ See project history. 19 phases, 47 plans completed across 5 milestones.
 
 - [x] **Phase 19: Config Env Var Substitution** - Support ${VAR} syntax in config files
 - [x] **Phase 20: Env Var Standardization** - Migrate to COCOSEARCH_* prefix everywhere
-- [ ] **Phase 21: Language Chunking Refactor** - Registry-based language handler architecture
+- [x] **Phase 21: Language Chunking Refactor** - Registry-based language handler architecture
 - [ ] **Phase 22: Documentation Polish** - README with clickable table of contents
 
 ## Phase Details
@@ -74,10 +74,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 21-01-PLAN.md — Handlers package foundation (Protocol, registry, text fallback)
-- [ ] 21-02-PLAN.md — Language handler modules (HCL, Dockerfile, Bash)
-- [ ] 21-03-PLAN.md — Flow integration and backward-compatible re-exports
-- [ ] 21-04-PLAN.md — Handler tests and extension documentation
+- [x] 21-01-PLAN.md — Handlers package foundation (Protocol, registry, text fallback)
+- [x] 21-02-PLAN.md — Language handler modules (HCL, Dockerfile, Bash)
+- [x] 21-03-PLAN.md — Flow integration and backward-compatible re-exports
+- [x] 21-04-PLAN.md — Handler tests and extension documentation
 
 ### Phase 22: Documentation Polish
 **Goal**: README has professional navigation via table of contents
@@ -99,7 +99,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 19. Config Env Var Substitution | v1.5 | 2/2 | Complete | 2026-02-01 |
 | 20. Env Var Standardization | v1.5 | 4/4 | Complete | 2026-02-01 |
-| 21. Language Chunking Refactor | v1.5 | 0/4 | Not started | - |
+| 21. Language Chunking Refactor | v1.5 | 4/4 | Complete | 2026-02-01 |
 | 22. Documentation Polish | v1.5 | 0/TBD | Not started | - |
 
 ---
