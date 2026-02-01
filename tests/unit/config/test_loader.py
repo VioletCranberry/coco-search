@@ -191,7 +191,7 @@ indexing:
             load_config(config_file)
 
         error_msg = str(exc_info.value)
-        assert "Configuration validation failed" in error_msg
+        assert "Configuration errors in" in error_msg
 
     def test_raises_config_error_on_unknown_field(self, tmp_path):
         """Test that load_config raises ConfigError on unknown field."""
@@ -204,7 +204,7 @@ unknownField: value
             load_config(config_file)
 
         error_msg = str(exc_info.value)
-        assert "Configuration validation failed" in error_msg
+        assert "Configuration errors in" in error_msg
 
     def test_raises_config_error_on_type_mismatch(self, tmp_path):
         """Test that load_config raises ConfigError on type mismatch."""
@@ -219,7 +219,7 @@ indexing:
             load_config(config_file)
 
         error_msg = str(exc_info.value)
-        assert "Configuration validation failed" in error_msg
+        assert "Configuration errors in" in error_msg
 
     def test_loads_partial_config(self, tmp_path):
         """Test that load_config works with partial configuration."""

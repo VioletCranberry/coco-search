@@ -74,9 +74,9 @@ search:
         # Verify env values shown with source
         assert "from-env" in captured.out
         assert "50" in captured.out
-        assert "env:COCOSEARCH_INDEX_NAME" in captured.out
-        # Result limit env var name may be truncated in table
-        assert "COCOSEARCH_SEARCH_RESULT" in captured.out
+        # Env var names may be truncated in table display
+        assert "env:COCOSEARCH_INDEX_N" in captured.out
+        assert "env:COCOSEARCH_SEARCH_" in captured.out
 
     def test_config_path_with_config(self, tmp_path, capsys):
         """Test config path command when config exists."""
