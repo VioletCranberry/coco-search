@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 Milestone: v1.6 All-in-One Docker & Auto-Detect
 Phase: 23 of 26 (MCP Transport Integration)
-Plan: 1 of 1 complete
+Plan: 2 of 2 complete
 Status: Phase complete
-Last activity: 2026-02-01 -- Completed 23-01-PLAN.md (Multi-Transport MCP Server)
+Last activity: 2026-02-01 -- Completed 23-02-PLAN.md (MCP Transport Unit Tests)
 
-Progress: [######################################------------------] 59/? (v1.6 plans TBD)
+Progress: [########################################----------------] 60/? (v1.6 plans TBD)
 
 ## Milestones Shipped
 
@@ -29,6 +29,7 @@ Progress: [######################################------------------] 59/? (v1.6 
 | v1.5 Configuration & Architecture Polish | 19-22 | 11 | 2026-02-01 |
 
 **Total shipped:** 22 phases, 58 plans across 6 milestones
+**v1.6 in progress:** Phase 23 complete (2 plans)
 
 ## Performance Metrics
 
@@ -57,6 +58,8 @@ See PROJECT.md Key Decisions table for full list (33 decisions).
 - Configure FastMCP via mcp.settings instead of constructor params for dynamic host/port
 - Use 0.0.0.0 as default host for container deployments
 - Default port 3000 for network transports
+- Patch cocosearch.mcp.run_server not cocosearch.cli.run_server (import inside function)
+- Mock mcp.settings for transport configuration tests
 
 ### Pending Todos
 
@@ -78,9 +81,9 @@ Key findings from research phase:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 23-01-PLAN.md
+Stopped at: Completed 23-02-PLAN.md
 Resume file: None
 Next action: Plan Phase 24 (Docker Compose All-in-One)
 
 ---
-*Updated: 2026-02-01 after Phase 23 Plan 01 completed*
+*Updated: 2026-02-01 after Phase 23 Plan 02 completed*
