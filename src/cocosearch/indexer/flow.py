@@ -136,7 +136,7 @@ def run_index(
     if config is None:
         config = IndexingConfig()
 
-    # Initialize CocoIndex (reads COCOINDEX_DATABASE_URL from environment)
+    # Initialize CocoIndex (database configured via COCOSEARCH_DATABASE_URL)
     cocoindex.init()
 
     # Build exclude patterns: defaults + .gitignore + user config
