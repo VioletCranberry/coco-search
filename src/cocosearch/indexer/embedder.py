@@ -61,7 +61,7 @@ def code_to_embedding(
     embeddings. This function should be used by both the indexing flow
     and search queries to ensure consistent embeddings.
 
-    Reads OLLAMA_HOST environment variable to determine Ollama server address.
+    Reads COCOSEARCH_OLLAMA_URL environment variable to determine Ollama server address.
     Defaults to None (which uses CocoIndex default: http://localhost:11434).
 
     Args:
@@ -70,14 +70,14 @@ def code_to_embedding(
     Returns:
         768-dimensional embedding vector.
     """
-    # Read Ollama address from environment
+    # Read Ollama URL from environment
     # If not set, EmbedText will use its default (localhost:11434)
-    ollama_host = os.environ.get("OLLAMA_HOST")
+    ollama_url = os.environ.get("COCOSEARCH_OLLAMA_URL")
 
     return text.transform(
         cocoindex.functions.EmbedText(
             api_type=cocoindex.LlmApiType.OLLAMA,
             model="nomic-embed-text",
-            address=ollama_host,
+            address=ollama_url,
         )
     )
