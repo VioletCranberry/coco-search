@@ -167,9 +167,12 @@ def get_custom_languages() -> list[cocoindex.functions.CustomLanguageSpec]:
     Returns:
         List of CustomLanguageSpec for all handlers that define one
     """
+    seen_handlers = set()
     specs = []
     for handler in _HANDLER_REGISTRY.values():
-        if handler.SEPARATOR_SPEC is not None:
+        handler_id = id(handler)
+        if handler_id not in seen_handlers and handler.SEPARATOR_SPEC is not None:
+            seen_handlers.add(handler_id)
             specs.append(handler.SEPARATOR_SPEC)
     return specs
 
