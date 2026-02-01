@@ -49,15 +49,16 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - ✓ CLI flag precedence over config file with environment variable support — v1.4
 - ✓ Developer setup script (dev-setup.sh) for Docker infrastructure and auto-indexing — v1.4
 - ✓ Self-indexing CocoSearch's own codebase as dogfooding validation — v1.4
+- ✓ Environment variable substitution in config values (`${VAR}` and `${VAR:-default}` syntax) — v1.5
+- ✓ Standardized all env vars to COCOSEARCH_* prefix (DATABASE_URL, OLLAMA_URL) — v1.5
+- ✓ CLI config check command for env var validation with source display — v1.5
+- ✓ Registry-based language handlers with autodiscovery (HCL, Dockerfile, Bash) — v1.5
+- ✓ README table of contents with emoji prefixes and back-to-top navigation — v1.5
+- ✓ CHANGELOG.md with migration guide for breaking env var changes — v1.5
 
 ### Active
 
-**v1.5 Configuration & Architecture Polish**
-
-- Environment variable substitution in config values (e.g., `${COCOSEARCH_DATABASE_URL}`)
-- Standardize all env vars to COCOSEARCH_* prefix across code, .env, docs
-- Pluggable language chunking with per-language modules and registry pattern
-- README table of contents for navigation
+None — project stable, ready for next milestone
 
 ### Out of Scope
 
@@ -72,14 +73,15 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ## Current State
 
-Shipped v1.4 with 3,801 LOC Python (src/).
+Shipped v1.5 with 4,574 LOC Python (src/).
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP.
 Primary use case: onboarding to unfamiliar codebases via semantic search.
-DevOps support: HCL (Terraform), Dockerfile, Bash with language-aware chunking and metadata.
-Test coverage: 327 unit tests + integration tests with real PostgreSQL and Ollama.
-Documentation: Comprehensive README with Quick Start, Installation, MCP config, CLI reference, dogfooding example.
-Configuration: YAML config file with init command, 4-level precedence (CLI > env > config > default).
+DevOps support: HCL (Terraform), Dockerfile, Bash with registry-based language handlers.
+Test coverage: 550+ unit tests + integration tests with real PostgreSQL and Ollama.
+Documentation: Comprehensive README with TOC navigation, CHANGELOG with migration guide.
+Configuration: YAML config with env var substitution, 4-level precedence, config check command.
 Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
+Environment: COCOSEARCH_DATABASE_URL (required), COCOSEARCH_OLLAMA_URL (optional).
 
 ## Constraints
 
@@ -125,6 +127,12 @@ Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
 | Docker-based Ollama for dev-setup | Consistency across developer environments | ✓ Good |
 | Plain text output in dev-setup.sh | CI-friendly, grep-able, works in all terminals | ✓ Good |
 | Minimal dogfooding config | Shows defaults work well, lowers barrier | ✓ Good |
+| Env var substitution after YAML parse | Resolves before Pydantic validation | ✓ Good |
+| COCOSEARCH_* env var prefix | Consistent naming, clear ownership | ✓ Good |
+| Registry-based language handlers | Autodiscovery, easy extension | ✓ Good |
+| Protocol-based handler interface | Duck typing, no inheritance required | ✓ Good |
+| TOC with emoji prefixes | Visual distinction, professional appearance | ✓ Good |
+| Keep a Changelog format | Industry standard for change documentation | ✓ Good |
 
 ---
-*Last updated: 2026-01-31 after v1.5 milestone started*
+*Last updated: 2026-02-01 after v1.5 milestone shipped*

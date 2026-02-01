@@ -1,5 +1,33 @@
 # Project Milestones: CocoSearch
 
+## v1.5 Configuration & Architecture Polish (Shipped: 2026-02-01)
+
+**Delivered:** Environment variable substitution in config files, standardized COCOSEARCH_* env var naming, registry-based language handler architecture, and professional README with comprehensive navigation — clean configuration patterns and extensible architecture.
+
+**Phases completed:** 19-22 (11 plans total)
+
+**Key accomplishments:**
+
+- Config env var substitution with `${VAR}` and `${VAR:-default}` syntax in cocosearch.yaml
+- Standardized all env vars to COCOSEARCH_* prefix (COCOSEARCH_DATABASE_URL, COCOSEARCH_OLLAMA_URL)
+- CLI config check command (`cocosearch config check`) validating env vars with source display
+- Registry-based language handlers with autodiscovery for HCL, Dockerfile, Bash
+- Comprehensive README with emoji TOC, user journey structure, and back-to-top navigation
+- CHANGELOG.md documenting breaking changes with migration guide
+
+**Stats:**
+
+- 69 files created/modified
+- +8,138 / -478 lines (4,574 Python LOC in src/)
+- 4 phases, 11 plans
+- 1 day (2026-02-01)
+
+**Git range:** `feat(19-01)` → `docs(22-01)`
+
+**What's next:** Project stable, ready for new feature milestone or maintenance
+
+---
+
 ## v1.4 Dogfooding Infrastructure (Shipped: 2026-01-31)
 
 **Delivered:** Configuration system with YAML config file, developer setup script for one-command bootstrap, and dogfooding validation with CocoSearch indexing itself — four-level precedence chain (CLI > env > config > default) with helpful error messages.
