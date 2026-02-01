@@ -879,6 +879,13 @@ def main() -> None:
         description="Display the path to the config file, or indicate if none is found.",
     )
 
+    # Config check subcommand
+    config_subparsers.add_parser(
+        "check",
+        help="Validate environment variables",
+        description="Validate required environment variables without connecting to services.",
+    )
+
     # Known subcommands for routing
     known_subcommands = ("index", "search", "list", "stats", "clear", "init", "mcp", "config", "-h", "--help")
 
@@ -913,6 +920,8 @@ def main() -> None:
             sys.exit(config_show_command(args))
         elif args.config_command == "path":
             sys.exit(config_path_command(args))
+        elif args.config_command == "check":
+            sys.exit(config_check_command(args))
         else:
             parser.print_help()
             sys.exit(1)
