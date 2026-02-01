@@ -631,6 +631,66 @@ def config_path_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def config_check_command(args: argparse.Namespace) -> int:
+    """Execute the config check command.
+
+    Validates environment variables without connecting to services.
+    Lightweight check for troubleshooting and CI/CD validation.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for valid, 1 for errors).
+    """
+    from rich.table import Table
+
+    from cocosearch.config import mask_password, validate_required_env_vars
+
+    console = Console()
+
+    # Validate required variables
+    errors = validate_required_env_vars()
+
+    if errors:
+        console.print("[bold red]Environment configuration errors:[/bold red]")
+        for error in errors:
+            console.print(f"  - {error.hint}")
+        console.print("\n[dim]See .env.example for configuration format.[/dim]")
+        return 1
+
+    # Show success + current values
+    console.print("[green]Environment configuration is valid[/green]\n")
+
+    # Display current environment variables
+    table = Table(title="Environment Variables")
+    table.add_column("Variable", style="cyan")
+    table.add_column("Value", style="white")
+    table.add_column("Source", style="dim")
+
+    # DATABASE_URL (required)
+    db_url = os.getenv("COCOSEARCH_DATABASE_URL")
+    table.add_row(
+        "COCOSEARCH_DATABASE_URL",
+        mask_password(db_url),
+        "environment"
+    )
+
+    # OLLAMA_URL (optional with default)
+    ollama_url = os.getenv("COCOSEARCH_OLLAMA_URL")
+    if ollama_url:
+        table.add_row("COCOSEARCH_OLLAMA_URL", ollama_url, "environment")
+    else:
+        table.add_row(
+            "COCOSEARCH_OLLAMA_URL",
+            "http://localhost:11434",
+            "default"
+        )
+
+    console.print(table)
+    return 0
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
