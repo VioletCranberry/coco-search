@@ -4,18 +4,18 @@
 
 See: .planning/PROJECT.md (updated 2026-02-01)
 
-**Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** Planning next milestone
+**Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
+**Current focus:** Phase 23 - MCP Transport Integration
 
 ## Current Position
 
 Milestone: v1.6 All-in-One Docker & Auto-Detect
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-01 — Milestone v1.6 started
+Phase: 23 of 26 (MCP Transport Integration)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-01 -- Roadmap created for v1.6
 
-Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0% (v1.6)
+Progress: [####################################--------------------] 58/? (v1.6 plans TBD)
 
 ## Milestones Shipped
 
@@ -61,18 +61,21 @@ None.
 
 None.
 
-### Quick Tasks Completed
+### Research Notes (v1.6)
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 001 | Update test_flow.py tests for handler architecture | 2026-02-01 | c99cd6d | [001-update-test-flow-tests-for-handler-archi](./quick/001-update-test-flow-tests-for-handler-archi/) |
+Key findings from research phase:
+- Use s6-overlay (not supervisord) for process supervision
+- SSE deprecated but needed for Claude Desktop compatibility
+- Streamable HTTP is MCP's future standard
+- PID 1 signal handling critical for PostgreSQL data integrity
+- Ollama cold start 30-120s, need warmup in entrypoint
 
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: v1.6 milestone initialization
+Stopped at: v1.6 roadmap created
 Resume file: None
-Next action: Define requirements and create roadmap
+Next action: Plan Phase 23 (MCP Transport Integration)
 
 ---
-*Updated: 2026-02-01 after v1.6 started*
+*Updated: 2026-02-01 after v1.6 roadmap created*

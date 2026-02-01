@@ -1,7 +1,7 @@
 # Requirements: CocoSearch v1.6
 
 **Defined:** 2026-02-01
-**Core Value:** Semantic code search that runs entirely locally — no data leaves your machine
+**Core Value:** Semantic code search that runs entirely locally -- no data leaves your machine
 
 ## v1.6 Requirements
 
@@ -19,7 +19,7 @@ Requirements for All-in-One Docker & Auto-Detect milestone.
 ### Service Orchestration
 
 - [ ] **ORCH-01**: Container exposes health check endpoint (`/health`) returning 200 when ready
-- [ ] **ORCH-02**: Services start in correct order (PostgreSQL → Ollama → MCP server)
+- [ ] **ORCH-02**: Services start in correct order (PostgreSQL -> Ollama -> MCP server)
 - [ ] **ORCH-03**: Container shuts down gracefully on SIGTERM (no data corruption)
 - [ ] **ORCH-04**: Process supervisor (s6-overlay) manages and restarts crashed services
 
@@ -83,37 +83,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DOCK-01 | TBD | Pending |
-| DOCK-02 | TBD | Pending |
-| DOCK-03 | TBD | Pending |
-| DOCK-04 | TBD | Pending |
-| DOCK-05 | TBD | Pending |
-| DOCK-06 | TBD | Pending |
-| ORCH-01 | TBD | Pending |
-| ORCH-02 | TBD | Pending |
-| ORCH-03 | TBD | Pending |
-| ORCH-04 | TBD | Pending |
-| TRNS-01 | TBD | Pending |
-| TRNS-02 | TBD | Pending |
-| TRNS-03 | TBD | Pending |
-| TRNS-04 | TBD | Pending |
-| AUTO-01 | TBD | Pending |
-| AUTO-02 | TBD | Pending |
-| AUTO-03 | TBD | Pending |
-| AUTO-04 | TBD | Pending |
-| AUTO-05 | TBD | Pending |
-| AUTO-06 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| DOCS-03 | TBD | Pending |
-| DOCS-04 | TBD | Pending |
-| DOCS-05 | TBD | Pending |
+| TRNS-01 | Phase 23 | Pending |
+| TRNS-02 | Phase 23 | Pending |
+| TRNS-03 | Phase 23 | Pending |
+| TRNS-04 | Phase 23 | Pending |
+| DOCK-01 | Phase 24 | Pending |
+| DOCK-02 | Phase 24 | Pending |
+| DOCK-03 | Phase 24 | Pending |
+| DOCK-04 | Phase 24 | Pending |
+| DOCK-05 | Phase 24 | Pending |
+| DOCK-06 | Phase 24 | Pending |
+| ORCH-01 | Phase 24 | Pending |
+| ORCH-02 | Phase 24 | Pending |
+| ORCH-03 | Phase 24 | Pending |
+| ORCH-04 | Phase 24 | Pending |
+| AUTO-01 | Phase 25 | Pending |
+| AUTO-02 | Phase 25 | Pending |
+| AUTO-03 | Phase 25 | Pending |
+| AUTO-04 | Phase 25 | Pending |
+| AUTO-05 | Phase 25 | Pending |
+| AUTO-06 | Phase 25 | Pending |
+| DOCS-01 | Phase 26 | Pending |
+| DOCS-02 | Phase 26 | Pending |
+| DOCS-03 | Phase 26 | Pending |
+| DOCS-04 | Phase 26 | Pending |
+| DOCS-05 | Phase 26 | Pending |
 
 **Coverage:**
 - v1.6 requirements: 25 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-01 after initial definition*
+*Last updated: 2026-02-01 after roadmap created*
