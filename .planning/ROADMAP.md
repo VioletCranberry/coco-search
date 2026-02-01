@@ -29,20 +29,16 @@ See project history for earlier milestones:
 
 **Milestone Goal:** Single `docker run` experience with all services bundled, plus auto-detect project from working directory.
 
-#### Phase 23: MCP Transport Integration
+#### Phase 23: MCP Transport Integration ✓
 **Goal**: MCP server supports multiple transport protocols selectable at runtime
 **Depends on**: Phase 22 (v1.5 complete)
 **Requirements**: TRNS-01, TRNS-02, TRNS-03, TRNS-04
-**Success Criteria** (what must be TRUE):
-  1. User can run MCP server with stdio transport (existing behavior preserved)
-  2. User can run MCP server with SSE transport via `--transport sse` flag
-  3. User can run MCP server with Streamable HTTP transport via `--transport http` flag
-  4. User can select transport via `MCP_TRANSPORT` environment variable
+**Status**: Complete (2026-02-01)
 **Plans**: 2 plans
 
 Plans:
-- [ ] 23-01-PLAN.md - Multi-transport support in server and CLI
-- [ ] 23-02-PLAN.md - Unit tests for transport selection
+- [x] 23-01-PLAN.md - Multi-transport support in server and CLI
+- [x] 23-02-PLAN.md - Unit tests for transport selection
 
 #### Phase 24: Container Foundation
 **Goal**: All-in-one Docker container with PostgreSQL, Ollama, and MCP server under process supervision
@@ -99,8 +95,8 @@ Plans:
 | v1.3 Integration Tests | 11-14 | 11 | Complete | 2026-01-30 |
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
-| v1.6 Docker & Auto-Detect | 23-26 | TBD | In progress | - |
+| v1.6 Docker & Auto-Detect | 23-26 | 2+ | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-01 after Phase 23 planning*
+*Last updated: 2026-02-01 after Phase 23 complete*
