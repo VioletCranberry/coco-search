@@ -71,10 +71,13 @@ Plans:
   3. Registry autodiscovers available language handlers without manual registration
   4. Existing chunking behavior unchanged (HCL, Dockerfile, Bash work as before)
   5. Each language module exports consistent separator and metadata extractor
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 21-01: TBD
+- [ ] 21-01-PLAN.md — Handlers package foundation (Protocol, registry, text fallback)
+- [ ] 21-02-PLAN.md — Language handler modules (HCL, Dockerfile, Bash)
+- [ ] 21-03-PLAN.md — Flow integration and backward-compatible re-exports
+- [ ] 21-04-PLAN.md — Handler tests and extension documentation
 
 ### Phase 22: Documentation Polish
 **Goal**: README has professional navigation via table of contents
@@ -96,7 +99,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 19. Config Env Var Substitution | v1.5 | 2/2 | Complete | 2026-02-01 |
 | 20. Env Var Standardization | v1.5 | 4/4 | Complete | 2026-02-01 |
-| 21. Language Chunking Refactor | v1.5 | 0/TBD | Not started | - |
+| 21. Language Chunking Refactor | v1.5 | 0/4 | Not started | - |
 | 22. Documentation Polish | v1.5 | 0/TBD | Not started | - |
 
 ---
