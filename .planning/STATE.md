@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-01-31)
 
 Milestone: v1.5 Configuration & Architecture Polish
 Phase: 20 of 22 (Env Var Standardization)
-Plan: 1 of 4 in current phase (In progress)
+Plan: 3 of 4 in current phase (In progress)
 Status: In progress
-Last activity: 2026-02-01 — Completed 20-01-PLAN.md
+Last activity: 2026-02-01 — Completed 20-03-PLAN.md
 
-Progress: [█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 26%
+Progress: [█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 27%
 
 ## Milestones Shipped
 
@@ -27,12 +27,12 @@ Progress: [█████████████░░░░░░░░░░
 | v1.3 Docker Integration Tests | 11-14 | 11 | 2026-01-30 |
 | v1.4 Dogfooding Infrastructure | 15-18 | 7 | 2026-01-31 |
 
-**Total shipped:** 19 phases, 47 plans (Phase 20: 1 of 4 plans complete)
+**Total shipped:** 19 phases, 47 plans (Phase 20: 3 of 4 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 50 (47 shipped + 2 from phase 19 + 1 from phase 20)
+- Total plans completed: 52 (47 shipped + 2 from phase 19 + 3 from phase 20)
 - Total execution time: ~7 days across 5 milestones
 
 **By Milestone:**
@@ -61,6 +61,8 @@ See PROJECT.md Key Decisions table.
 - COCOSEARCH_OLLAMA_URL is optional (defaults to localhost:11434)
 - COCOSEARCH_DATABASE_URL is required and validated
 - Added mask_password utility for safe URL display in logs/errors
+- config check validates without connecting to services (lightweight)
+- Show all missing variables together (not fail on first)
 
 ### Pending Todos
 
@@ -73,9 +75,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 20-01-PLAN.md
+Stopped at: Completed 20-03-PLAN.md
 Resume file: None
-Next action: `/gsd:execute-plan 20-02` or continue with remaining phase 20 plans
+Next action: `/gsd:execute-plan 20-04` to complete phase 20
 
 ---
-*Updated: 2026-02-01 after completing 20-01-PLAN.md*
+*Updated: 2026-02-01 after completing 20-03-PLAN.md*
