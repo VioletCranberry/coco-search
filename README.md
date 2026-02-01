@@ -262,7 +262,7 @@ uv run cocosearch --help
 **Set database URL** (if not using default Docker setup):
 
 ```bash
-export COCOINDEX_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
+export COCOSEARCH_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
 ```
 
 **Windows users:** Use WSL2 for best compatibility.
@@ -285,7 +285,7 @@ CocoSearch provides an MCP (Model Context Protocol) server for semantic code sea
 
 ```bash
 claude mcp add --transport stdio --scope user \
-  --env COCOINDEX_DATABASE_URL=postgresql://cocoindex:cocoindex@localhost:5432/cocoindex \
+  --env COCOSEARCH_DATABASE_URL=postgresql://cocoindex:cocoindex@localhost:5432/cocoindex \
   cocosearch -- uv run --directory /absolute/path/to/cocosearch cocosearch mcp
 ```
 
@@ -314,7 +314,7 @@ Add to `~/.claude.json`:
         "mcp"
       ],
       "env": {
-        "COCOINDEX_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
+        "COCOSEARCH_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
       }
     }
   }
@@ -352,7 +352,7 @@ Add to `~/.claude.json`:
         "mcp"
       ],
       "env": {
-        "COCOINDEX_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
+        "COCOSEARCH_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
       }
     }
   }
@@ -391,7 +391,7 @@ Add to `~/.claude.json`:
       ],
       "enabled": true,
       "environment": {
-        "COCOINDEX_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
+        "COCOSEARCH_DATABASE_URL": "postgresql://cocoindex:cocoindex@localhost:5432/cocoindex"
       }
     }
   }
@@ -579,5 +579,5 @@ indexing:
 
 | Variable                 | Description               | Default                                                     |
 | ------------------------ | ------------------------- | ----------------------------------------------------------- |
-| `COCOINDEX_DATABASE_URL` | PostgreSQL connection URL | `postgresql://cocoindex:cocoindex@localhost:5432/cocoindex` |
-| `OLLAMA_HOST`            | Ollama API host           | `http://localhost:11434`                                    |
+| `COCOSEARCH_DATABASE_URL` | PostgreSQL connection URL | `postgresql://cocoindex:cocoindex@localhost:5432/cocoindex` |
+| `COCOSEARCH_OLLAMA_URL`            | Ollama API URL            | `http://localhost:11434`                                    |
