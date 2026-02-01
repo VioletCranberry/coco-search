@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-01)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** Phase 24 - Container Foundation
+**Current focus:** Phase 24 - Container Foundation (COMPLETE)
 
 ## Current Position
 
 Milestone: v1.6 All-in-One Docker & Auto-Detect
 Phase: 24 of 26 (Container Foundation)
-Plan: 02 of 03 complete
-Status: In progress
-Last activity: 2026-02-01 -- Completed 24-02-PLAN.md (s6-rc service definitions)
+Plan: 03 of 03 complete
+Status: Phase complete
+Last activity: 2026-02-01 -- Completed 24-03-PLAN.md (health check infrastructure)
 
-Progress: [##########################################--------------] 62/? (v1.6 plans TBD)
+Progress: [##########################################--------------] 63/? (v1.6 plans TBD)
 
 ## Milestones Shipped
 
@@ -29,12 +29,12 @@ Progress: [##########################################--------------] 62/? (v1.6 
 | v1.5 Configuration & Architecture Polish | 19-22 | 11 | 2026-02-01 |
 
 **Total shipped:** 22 phases, 58 plans across 6 milestones
-**v1.6 in progress:** Phase 23 complete (2 plans), Phase 24 plans 01-02 complete
+**v1.6 in progress:** Phase 23 complete (2 plans), Phase 24 complete (3 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 60
+- Total plans completed: 63
 - Total execution time: ~8 days across 6 milestones
 
 **By Milestone:**
@@ -73,6 +73,11 @@ See PROJECT.md Key Decisions table for full list (33 decisions).
 - Warmup is non-blocking failure (model loads on first request if warmup fails)
 - PostgreSQL shutdown uses -m fast via finish script for clean shutdown
 
+**Phase 24-03 decisions:**
+- Use script-based HEALTHCHECK instead of inline commands for maintainability
+- STOPSIGNAL SIGTERM cascades through s6-overlay to services
+- init-ready depends on svc-mcp to ensure all services are ready
+
 ### Pending Todos
 
 None.
@@ -92,10 +97,10 @@ Key findings from research phase:
 
 ## Session Continuity
 
-Last session: 2026-02-01T19:43:30Z
-Stopped at: Completed 24-02-PLAN.md
+Last session: 2026-02-01T19:41:03Z
+Stopped at: Completed 24-03-PLAN.md (Phase 24 complete)
 Resume file: None
-Next action: Execute 24-03-PLAN.md (container testing)
+Next action: Begin Phase 25 (Auto-detect project)
 
 ---
-*Updated: 2026-02-01 after 24-02 complete*
+*Updated: 2026-02-01 after 24-03 complete*
