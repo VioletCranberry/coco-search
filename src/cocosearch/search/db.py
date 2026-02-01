@@ -16,20 +16,20 @@ def get_connection_pool() -> ConnectionPool:
     """Get or create the database connection pool.
 
     Creates a singleton connection pool with pgvector type registration.
-    The pool reads the database URL from COCOINDEX_DATABASE_URL environment
+    The pool reads the database URL from COCOSEARCH_DATABASE_URL environment
     variable.
 
     Returns:
         ConnectionPool configured with pgvector support.
 
     Raises:
-        ValueError: If COCOINDEX_DATABASE_URL is not set.
+        ValueError: If COCOSEARCH_DATABASE_URL is not set.
     """
     global _pool
     if _pool is None:
-        conninfo = os.getenv("COCOINDEX_DATABASE_URL")
+        conninfo = os.getenv("COCOSEARCH_DATABASE_URL")
         if not conninfo:
-            raise ValueError("COCOINDEX_DATABASE_URL environment variable is not set")
+            raise ValueError("Missing COCOSEARCH_DATABASE_URL. See .env.example for format.")
 
         def configure(conn):
             register_vector(conn)

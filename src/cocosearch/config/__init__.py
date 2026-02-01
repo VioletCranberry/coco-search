@@ -1,5 +1,6 @@
 """Configuration module for CocoSearch."""
 
+from .env_validation import check_env_or_exit, mask_password, validate_required_env_vars
 from .errors import format_validation_errors, suggest_field_name
 from .generator import CONFIG_TEMPLATE, generate_config
 from .loader import find_config_file, load_config
@@ -27,4 +28,7 @@ __all__ = [
     "ConfigResolver",
     "config_key_to_env_var",
     "parse_env_value",
+    "validate_required_env_vars",
+    "check_env_or_exit",
+    "mask_password",
 ]
