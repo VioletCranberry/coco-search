@@ -18,12 +18,14 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     stream=sys.stderr,
 )
+logger = logging.getLogger(__name__)
 
 from typing import Annotated
 
 import cocoindex
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
+from starlette.responses import JSONResponse
 
 from cocosearch.cli import derive_index_name
 from cocosearch.indexer import IndexingConfig, run_index
@@ -33,6 +35,13 @@ from cocosearch.search import byte_to_line, read_chunk_content, search
 
 # Create FastMCP server instance
 mcp = FastMCP("cocosearch")
+
+
+# Health endpoint for Docker/orchestration
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request):
+    """Health check endpoint for Docker HEALTHCHECK and load balancers."""
+    return JSONResponse({"status": "ok"})
 
 
 @mcp.tool()
@@ -196,6 +205,33 @@ def index_codebase(
         return {"success": False, "error": f"Failed to index codebase: {e}"}
 
 
-def run_server():
-    """Run the MCP server with stdio transport."""
-    mcp.run(transport="stdio")
+def run_server(
+    transport: str = "stdio",
+    host: str = "0.0.0.0",
+    port: int = 3000,
+):
+    """Run the MCP server with specified transport.
+
+    Args:
+        transport: Transport protocol - "stdio", "sse", or "http"
+        host: Host to bind to (ignored for stdio)
+        port: Port to bind to (ignored for stdio)
+    """
+    # Log startup info (always to stderr)
+    logger.info(f"Starting MCP server with transport: {transport}")
+
+    if transport == "stdio":
+        if port != 3000:  # Non-default port specified
+            logger.warning("--port is ignored with stdio transport")
+        mcp.run(transport="stdio")
+    elif transport == "sse":
+        logger.info(f"Connect at http://{host}:{port}/sse")
+        logger.info(f"Health check at http://{host}:{port}/health")
+        mcp.run(transport="sse", host=host, port=port)
+    elif transport == "http":
+        logger.info(f"Connect at http://{host}:{port}/mcp")
+        logger.info(f"Health check at http://{host}:{port}/health")
+        mcp.run(transport="streamable-http", host=host, port=port)
+    else:
+        # Should not reach here if CLI validates
+        raise ValueError(f"Invalid transport: {transport}")
