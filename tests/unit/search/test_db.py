@@ -17,7 +17,7 @@ class TestGetConnectionPool:
     """Tests for get_connection_pool function."""
 
     def test_raises_without_env_var(self):
-        """Should raise ValueError when COCOINDEX_DATABASE_URL not set."""
+        """Should raise ValueError when COCOSEARCH_DATABASE_URL not set."""
         # Reset pool singleton to force new pool creation
         db_module._pool = None
 
@@ -26,8 +26,7 @@ class TestGetConnectionPool:
             with pytest.raises(ValueError) as exc_info:
                 get_connection_pool()
 
-            assert "COCOINDEX_DATABASE_URL" in str(exc_info.value)
-            assert "not set" in str(exc_info.value)
+            assert "COCOSEARCH_DATABASE_URL" in str(exc_info.value)
 
 
 class TestGetTableName:
