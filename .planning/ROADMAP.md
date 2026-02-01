@@ -50,10 +50,13 @@ Plans:
   3. User can mount local codebase via `-v /path/to/code:/mnt/repos:ro` and index it
   4. User can persist data across container restarts via `-v cocosearch-data:/data`
   5. Container shuts down cleanly on `docker stop` without data corruption
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 24-01: TBD
+- [ ] 24-01-PLAN.md - Multi-stage Dockerfile with s6-overlay, PostgreSQL, Ollama, Python app
+- [ ] 24-02-PLAN.md - s6-overlay service definitions with dependency ordering
+- [ ] 24-03-PLAN.md - Health check and ready signal infrastructure
+- [ ] 24-04-PLAN.md - End-to-end verification and .dockerignore
 
 #### Phase 25: Auto-Detect Feature
 **Goal**: MCP automatically detects project context from working directory
@@ -95,8 +98,8 @@ Plans:
 | v1.3 Integration Tests | 11-14 | 11 | Complete | 2026-01-30 |
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
-| v1.6 Docker & Auto-Detect | 23-26 | 2+ | In progress | - |
+| v1.6 Docker & Auto-Detect | 23-26 | 6+ | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-01 after Phase 23 complete*
+*Last updated: 2026-02-01 after Phase 24 planned*
