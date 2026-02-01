@@ -312,3 +312,93 @@ class TestMCPToolRegistration:
         assert callable(index_stats)
         assert callable(clear_index)
         assert callable(index_codebase)
+
+
+class TestRunServer:
+    """Tests for run_server transport selection."""
+
+    def test_signature_has_transport_params(self):
+        """run_server accepts transport, host, port parameters."""
+        import inspect
+        from cocosearch.mcp.server import run_server
+        sig = inspect.signature(run_server)
+        assert "transport" in sig.parameters
+        assert "host" in sig.parameters
+        assert "port" in sig.parameters
+        # Check defaults
+        assert sig.parameters["transport"].default == "stdio"
+        assert sig.parameters["host"].default == "0.0.0.0"
+        assert sig.parameters["port"].default == 3000
+
+    def test_stdio_transport_calls_mcp_run_stdio(self):
+        """stdio transport calls mcp.run with transport='stdio'."""
+        with patch("cocosearch.mcp.server.mcp") as mock_mcp:
+            from cocosearch.mcp.server import run_server
+            run_server(transport="stdio")
+            mock_mcp.run.assert_called_once_with(transport="stdio")
+
+    def test_sse_transport_configures_settings_and_calls_mcp_run(self):
+        """sse transport sets mcp.settings and calls mcp.run."""
+        with patch("cocosearch.mcp.server.mcp") as mock_mcp:
+            # Create mock settings object
+            mock_settings = MagicMock()
+            mock_mcp.settings = mock_settings
+
+            from cocosearch.mcp.server import run_server
+            run_server(transport="sse", host="127.0.0.1", port=8080)
+
+            # Verify settings were configured
+            assert mock_settings.host == "127.0.0.1"
+            assert mock_settings.port == 8080
+            # Verify mcp.run called with sse transport
+            mock_mcp.run.assert_called_once_with(transport="sse")
+
+    def test_http_transport_configures_settings_and_calls_streamable_http(self):
+        """http transport sets mcp.settings and calls mcp.run with 'streamable-http'."""
+        with patch("cocosearch.mcp.server.mcp") as mock_mcp:
+            # Create mock settings object
+            mock_settings = MagicMock()
+            mock_mcp.settings = mock_settings
+
+            from cocosearch.mcp.server import run_server
+            run_server(transport="http", host="0.0.0.0", port=3000)
+
+            # Verify settings were configured
+            assert mock_settings.host == "0.0.0.0"
+            assert mock_settings.port == 3000
+            # Verify mcp.run called with streamable-http transport
+            mock_mcp.run.assert_called_once_with(transport="streamable-http")
+
+    def test_invalid_transport_raises_valueerror(self):
+        """Invalid transport raises ValueError."""
+        with patch("cocosearch.mcp.server.mcp"):
+            from cocosearch.mcp.server import run_server
+            with pytest.raises(ValueError, match="Invalid transport"):
+                run_server(transport="invalid")
+
+
+class TestHealthEndpoint:
+    """Tests for health check endpoint."""
+
+    def test_health_check_function_exists(self):
+        """health_check endpoint is defined."""
+        from cocosearch.mcp.server import health_check
+        assert callable(health_check)
+
+    def test_health_check_is_async(self):
+        """health_check is an async function."""
+        import asyncio
+        from cocosearch.mcp.server import health_check
+        assert asyncio.iscoroutinefunction(health_check)
+
+    @pytest.mark.asyncio
+    async def test_health_check_returns_ok_status(self):
+        """health_check returns JSONResponse with status ok."""
+        from cocosearch.mcp.server import health_check
+        request = MagicMock()
+        response = await health_check(request)
+        assert response.status_code == 200
+        # JSONResponse body is bytes, decode and check
+        import json
+        body = json.loads(response.body.decode())
+        assert body["status"] == "ok"
