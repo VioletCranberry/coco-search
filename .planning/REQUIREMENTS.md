@@ -9,9 +9,9 @@ Requirements for v1.5 Configuration & Architecture Polish. Each maps to roadmap 
 
 ### Configuration
 
-- [ ] **CONFIG-01**: Config values support `${VAR}` syntax for env var substitution
-- [ ] **CONFIG-02**: Missing env vars in substitution produce clear error messages
-- [ ] **CONFIG-03**: Env var substitution works in all config sections (indexing, search, embedding)
+- [x] **CONFIG-01**: Config values support `${VAR}` syntax for env var substitution
+- [x] **CONFIG-02**: Missing env vars in substitution produce clear error messages
+- [x] **CONFIG-03**: Env var substitution works in all config sections (indexing, search, embedding)
 
 ### Environment Variables
 
@@ -59,9 +59,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONFIG-01 | Phase 19 | Pending |
-| CONFIG-02 | Phase 19 | Pending |
-| CONFIG-03 | Phase 19 | Pending |
+| CONFIG-01 | Phase 19 | Complete |
+| CONFIG-02 | Phase 19 | Complete |
+| CONFIG-03 | Phase 19 | Complete |
 | ENV-01 | Phase 20 | Pending |
 | ENV-02 | Phase 20 | Pending |
 | ENV-03 | Phase 20 | Pending |
@@ -82,4 +82,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after roadmap creation*
+*Last updated: 2026-02-01 after Phase 19 completion*

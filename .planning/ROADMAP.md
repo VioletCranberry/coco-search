@@ -22,7 +22,7 @@ See project history. 19 phases, 47 plans completed across 5 milestones.
 
 **Milestone Goal:** Clean up configuration patterns, standardize environment variables, and refactor language chunking for extensibility.
 
-- [ ] **Phase 19: Config Env Var Substitution** - Support ${VAR} syntax in config files
+- [x] **Phase 19: Config Env Var Substitution** - Support ${VAR} syntax in config files
 - [ ] **Phase 20: Env Var Standardization** - Migrate to COCOSEARCH_* prefix everywhere
 - [ ] **Phase 21: Language Chunking Refactor** - Registry-based language handler architecture
 - [ ] **Phase 22: Documentation Polish** - README with clickable table of contents
@@ -41,7 +41,7 @@ See project history. 19 phases, 47 plans completed across 5 milestones.
 
 Plans:
 - [x] 19-01-PLAN.md — TDD: Environment variable substitution function
-- [ ] 19-02-PLAN.md — Integration into config loader
+- [x] 19-02-PLAN.md — Integration into config loader
 
 ### Phase 20: Env Var Standardization
 **Goal**: All CocoSearch environment variables use consistent COCOSEARCH_* naming
@@ -91,11 +91,11 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 19. Config Env Var Substitution | v1.5 | 1/2 | In progress | - |
+| 19. Config Env Var Substitution | v1.5 | 2/2 | Complete | 2026-02-01 |
 | 20. Env Var Standardization | v1.5 | 0/TBD | Not started | - |
 | 21. Language Chunking Refactor | v1.5 | 0/TBD | Not started | - |
 | 22. Documentation Polish | v1.5 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-31*
-*Last updated: 2026-01-31*
+*Last updated: 2026-02-01*
