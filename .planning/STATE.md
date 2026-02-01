@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-01-31)
 
 Milestone: v1.5 Configuration & Architecture Polish
 Phase: 19 of 22 (Config Env Var Substitution)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-31 — Completed 19-01-PLAN.md
+Plan: 2 of 2 in current phase (Phase Complete)
+Status: Phase complete
+Last activity: 2026-02-01 — Completed 19-02-PLAN.md
 
-Progress: [████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 12.5%
+Progress: [█████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 13.0%
 
 ## Milestones Shipped
 
@@ -32,7 +32,7 @@ Progress: [████████████░░░░░░░░░░░
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 47
+- Total plans completed: 49 (47 + 2 from phase 19)
 - Total execution time: ~7 days across 5 milestones
 
 **By Milestone:**
@@ -51,6 +51,11 @@ Progress: [████████████░░░░░░░░░░░
 
 See PROJECT.md Key Decisions table.
 
+**Phase 19 Decisions:**
+- Env var substitution after YAML parse, before Pydantic validation
+- ${VAR} and ${VAR:-default} syntax supported
+- Numeric fields require literal values (strict=True limitation documented)
+
 ### Pending Todos
 
 None.
@@ -61,10 +66,10 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-31
-Stopped at: Completed 19-01-PLAN.md
+Last session: 2026-02-01
+Stopped at: Completed 19-02-PLAN.md (Phase 19 complete)
 Resume file: None
-Next action: `/gsd:execute-phase 19` (for 19-02)
+Next action: Phase 20 or next milestone phase
 
 ---
-*Updated: 2026-01-31 after 19-01 execution*
+*Updated: 2026-02-01 after 19-02 execution*
