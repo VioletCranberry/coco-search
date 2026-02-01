@@ -6,6 +6,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
+from .env_substitution import substitute_env_vars
 from .errors import format_validation_errors
 from .schema import CocoSearchConfig, ConfigError
 
@@ -43,6 +44,10 @@ def find_config_file() -> Path | None:
 def load_config(path: Path | None = None) -> CocoSearchConfig:
     """Load configuration from YAML file.
 
+    Supports environment variable substitution in config values:
+    - ${VAR} - Required env var, raises ConfigError if not set
+    - ${VAR:-default} - Env var with default value if not set
+
     Args:
         path: Optional path to config file. If None, searches for cocosearch.yaml.
 
@@ -50,7 +55,7 @@ def load_config(path: Path | None = None) -> CocoSearchConfig:
         CocoSearchConfig instance with loaded or default values.
 
     Raises:
-        ConfigError: If YAML is invalid or validation fails.
+        ConfigError: If YAML is invalid, validation fails, or required env vars missing.
     """
     if path is None:
         path = find_config_file()
@@ -66,6 +71,14 @@ def load_config(path: Path | None = None) -> CocoSearchConfig:
         # Handle empty file
         if data is None:
             return CocoSearchConfig()
+
+        # Substitute environment variables
+        data, missing_vars = substitute_env_vars(data)
+        if missing_vars:
+            raise ConfigError(
+                f"Missing required environment variables in {path}: "
+                f"{', '.join(sorted(missing_vars))}"
+            )
 
         # Validate with Pydantic
         try:
