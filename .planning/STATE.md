@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 Milestone: v1.6 All-in-One Docker & Auto-Detect
 Phase: 24 of 26 (Container Foundation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-01 -- Completed Phase 23 (MCP Transport Integration)
+Plan: 01 of 03 complete
+Status: In progress
+Last activity: 2026-02-01 -- Completed 24-01-PLAN.md (Dockerfile with s6-overlay)
 
-Progress: [########################################----------------] 60/? (v1.6 plans TBD)
+Progress: [#########################################---------------] 61/? (v1.6 plans TBD)
 
 ## Milestones Shipped
 
@@ -29,7 +29,7 @@ Progress: [########################################----------------] 60/? (v1.6 
 | v1.5 Configuration & Architecture Polish | 19-22 | 11 | 2026-02-01 |
 
 **Total shipped:** 22 phases, 58 plans across 6 milestones
-**v1.6 in progress:** Phase 23 complete (2 plans), Phase 24 next
+**v1.6 in progress:** Phase 23 complete (2 plans), Phase 24 plan 01 complete
 
 ## Performance Metrics
 
@@ -61,6 +61,11 @@ See PROJECT.md Key Decisions table for full list (33 decisions).
 - Patch cocosearch.mcp.run_server not cocosearch.cli.run_server (import inside function)
 - Mock mcp.settings for transport configuration tests
 
+**Phase 24-01 decisions:**
+- Copy Ollama binary from model-downloader stage instead of downloading separately
+- Map TARGETARCH to s6-overlay naming (arm64->aarch64, amd64->x86_64)
+- Use official ollama/ollama image for multi-arch model baking (gerke74 is amd64-only)
+
 ### Pending Todos
 
 None.
@@ -80,10 +85,10 @@ Key findings from research phase:
 
 ## Session Continuity
 
-Last session: 2026-02-01
-Stopped at: Phase 23 verified complete
+Last session: 2026-02-01T19:34:37Z
+Stopped at: Completed 24-01-PLAN.md
 Resume file: None
-Next action: Plan Phase 24 (Container Foundation)
+Next action: Execute 24-02-PLAN.md (s6 service definitions)
 
 ---
-*Updated: 2026-02-01 after Phase 23 complete*
+*Updated: 2026-02-01 after 24-01 complete*
