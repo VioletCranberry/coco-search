@@ -99,9 +99,9 @@ def warmed_ollama(ollama_service):
     Yields:
         str: Ollama service URL (same as ollama_service, but warmed up)
     """
-    # Set OLLAMA_HOST environment variable for CocoIndex
-    original_host = os.environ.get("OLLAMA_HOST")
-    os.environ["OLLAMA_HOST"] = ollama_service
+    # Set COCOSEARCH_OLLAMA_URL environment variable
+    original_url = os.environ.get("COCOSEARCH_OLLAMA_URL")
+    os.environ["COCOSEARCH_OLLAMA_URL"] = ollama_service
 
     try:
         # Create warmup embedding flow
@@ -142,10 +142,10 @@ def warmed_ollama(ollama_service):
             f"Or ensure Docker is available for container fallback."
         )
     finally:
-        # Restore original OLLAMA_HOST
-        if original_host is not None:
-            os.environ["OLLAMA_HOST"] = original_host
-        elif "OLLAMA_HOST" in os.environ:
-            del os.environ["OLLAMA_HOST"]
+        # Restore original COCOSEARCH_OLLAMA_URL
+        if original_url is not None:
+            os.environ["COCOSEARCH_OLLAMA_URL"] = original_url
+        elif "COCOSEARCH_OLLAMA_URL" in os.environ:
+            del os.environ["COCOSEARCH_OLLAMA_URL"]
 
     yield ollama_service
