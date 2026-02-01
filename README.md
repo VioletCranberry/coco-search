@@ -39,33 +39,33 @@ flowchart LR
 
 ## Table of Contents
 
-- [📦 Installing](#-installing)
+- [📦 Installing](#installing)
   - [Installing Ollama](#installing-ollama)
   - [Starting PostgreSQL](#starting-postgresql)
   - [Installing CocoSearch](#installing-cocosearch)
-- [🚀 Getting Started](#-getting-started)
+- [🚀 Getting Started](#getting-started)
   - [Indexing Your Code](#indexing-your-code)
   - [Searching Semantically](#searching-semantically)
   - [Using with MCP](#using-with-mcp)
-- [🔍 Dogfooding](#-dogfooding)
+- [🔍 Dogfooding](#dogfooding)
   - [Prerequisites](#prerequisites)
   - [Indexing the Codebase](#indexing-the-codebase)
   - [Verifying Indexing](#verifying-indexing)
   - [Example Searches](#example-searches)
   - [Full Development Environment](#full-development-environment)
-- [⚙️ Configuring MCP](#️-configuring-mcp)
+- [⚙️ Configuring MCP](#configuring-mcp)
   - [Configuring Claude Code](#configuring-claude-code)
   - [Configuring Claude Desktop](#configuring-claude-desktop)
   - [Configuring OpenCode](#configuring-opencode)
-- [💻 CLI Reference](#-cli-reference)
+- [💻 CLI Reference](#cli-reference)
   - [Indexing Commands](#indexing-commands)
   - [Searching Commands](#searching-commands)
   - [Managing Indexes](#managing-indexes)
-- [🛠️ Configuration](#️-configuration)
+- [🛠️ Configuration](#configuration)
   - [Configuration File](#configuration-file)
   - [Environment Variables](#environment-variables)
 
-## 📦 Installing
+## Installing
 
 ### Installing Ollama
 
@@ -145,9 +145,9 @@ export COCOSEARCH_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/
 
 [↑ Back to top](#table-of-contents)
 
-## 🚀 Getting Started
+## Getting Started
 
-**Prerequisites:** Ollama, PostgreSQL with pgvector, and CocoSearch installed. See [Installing](#-installing) for setup.
+**Prerequisites:** Ollama, PostgreSQL with pgvector, and CocoSearch installed. See [Installing](#installing) for setup.
 
 ### Indexing Your Code
 
@@ -174,11 +174,11 @@ cocosearch search --interactive
 
 ### Using with MCP
 
-For AI assistant integration with Claude Code, Claude Desktop, or OpenCode, see [Configuring MCP](#️-configuring-mcp) below.
+For AI assistant integration with Claude Code, Claude Desktop, or OpenCode, see [Configuring MCP](#configuring-mcp) below.
 
 [↑ Back to top](#table-of-contents)
 
-## 🔍 Dogfooding
+## Dogfooding
 
 CocoSearch uses CocoSearch to index its own codebase. This demonstrates real-world usage and lets you explore the implementation.
 
@@ -292,7 +292,7 @@ Run `./dev-setup.sh` for automated setup including Docker services, database ini
 
 [↑ Back to top](#table-of-contents)
 
-## ⚙️ Configuring MCP
+## Configuring MCP
 
 CocoSearch provides an MCP (Model Context Protocol) server for semantic code search integration with LLM clients. When configured, your AI assistant can search your codebase using natural language.
 
@@ -442,7 +442,7 @@ Add to `~/.claude.json`:
 
 [↑ Back to top](#table-of-contents)
 
-## 💻 CLI Reference
+## CLI Reference
 
 CocoSearch provides a command-line interface for indexing and searching code. Output is JSON by default (for scripting/MCP); use `--pretty` for human-readable output.
 
@@ -582,7 +582,7 @@ cocosearch mcp  # Runs until killed, used by Claude/OpenCode
 
 [↑ Back to top](#table-of-contents)
 
-## 🛠️ Configuration
+## Configuration
 
 ### Configuration File
 
