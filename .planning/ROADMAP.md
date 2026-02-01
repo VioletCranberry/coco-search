@@ -23,7 +23,7 @@ See project history. 19 phases, 47 plans completed across 5 milestones.
 **Milestone Goal:** Clean up configuration patterns, standardize environment variables, and refactor language chunking for extensibility.
 
 - [x] **Phase 19: Config Env Var Substitution** - Support ${VAR} syntax in config files
-- [ ] **Phase 20: Env Var Standardization** - Migrate to COCOSEARCH_* prefix everywhere
+- [x] **Phase 20: Env Var Standardization** - Migrate to COCOSEARCH_* prefix everywhere
 - [ ] **Phase 21: Language Chunking Refactor** - Registry-based language handler architecture
 - [ ] **Phase 22: Documentation Polish** - README with clickable table of contents
 
@@ -56,10 +56,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — Core code env var migration + validation module
-- [ ] 20-02-PLAN.md — Integration test env var migration
-- [ ] 20-03-PLAN.md — CLI config check command
-- [ ] 20-04-PLAN.md — Documentation and CHANGELOG
+- [x] 20-01-PLAN.md — Core code env var migration + validation module
+- [x] 20-02-PLAN.md — Integration test env var migration
+- [x] 20-03-PLAN.md — CLI config check command
+- [x] 20-04-PLAN.md — Documentation and CHANGELOG
 
 ### Phase 21: Language Chunking Refactor
 **Goal**: Language handlers use registry pattern for clean extensibility
@@ -95,7 +95,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 19. Config Env Var Substitution | v1.5 | 2/2 | Complete | 2026-02-01 |
-| 20. Env Var Standardization | v1.5 | 0/4 | Not started | - |
+| 20. Env Var Standardization | v1.5 | 4/4 | Complete | 2026-02-01 |
 | 21. Language Chunking Refactor | v1.5 | 0/TBD | Not started | - |
 | 22. Documentation Polish | v1.5 | 0/TBD | Not started | - |
 

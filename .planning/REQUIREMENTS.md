@@ -15,11 +15,11 @@ Requirements for v1.5 Configuration & Architecture Polish. Each maps to roadmap 
 
 ### Environment Variables
 
-- [ ] **ENV-01**: All app env vars use COCOSEARCH_* prefix
-- [ ] **ENV-02**: Code reads COCOSEARCH_DATABASE_URL (replaces COCOINDEX_DATABASE_URL)
-- [ ] **ENV-03**: Code reads COCOSEARCH_OLLAMA_URL (replaces OLLAMA_HOST)
-- [ ] **ENV-04**: .env.example and docker-compose.yml use COCOSEARCH_* vars
-- [ ] **ENV-05**: Documentation reflects COCOSEARCH_* naming throughout
+- [x] **ENV-01**: All app env vars use COCOSEARCH_* prefix
+- [x] **ENV-02**: Code reads COCOSEARCH_DATABASE_URL (replaces COCOINDEX_DATABASE_URL)
+- [x] **ENV-03**: Code reads COCOSEARCH_OLLAMA_URL (replaces OLLAMA_HOST)
+- [x] **ENV-04**: .env.example and docker-compose.yml use COCOSEARCH_* vars
+- [x] **ENV-05**: Documentation reflects COCOSEARCH_* naming throughout
 
 ### Language Chunking
 
@@ -62,11 +62,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONFIG-01 | Phase 19 | Complete |
 | CONFIG-02 | Phase 19 | Complete |
 | CONFIG-03 | Phase 19 | Complete |
-| ENV-01 | Phase 20 | Pending |
-| ENV-02 | Phase 20 | Pending |
-| ENV-03 | Phase 20 | Pending |
-| ENV-04 | Phase 20 | Pending |
-| ENV-05 | Phase 20 | Pending |
+| ENV-01 | Phase 20 | Complete |
+| ENV-02 | Phase 20 | Complete |
+| ENV-03 | Phase 20 | Complete |
+| ENV-04 | Phase 20 | Complete |
+| ENV-05 | Phase 20 | Complete |
 | LANG-01 | Phase 21 | Pending |
 | LANG-02 | Phase 21 | Pending |
 | LANG-03 | Phase 21 | Pending |
@@ -82,4 +82,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-02-01 after Phase 19 completion*
+*Last updated: 2026-02-01 after Phase 20 completion*
