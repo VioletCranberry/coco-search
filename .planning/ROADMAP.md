@@ -53,23 +53,18 @@ Plans:
 - [x] 24-03-PLAN.md - Health check and ready signal infrastructure
 - [x] 24-04-PLAN.md - End-to-end verification and .dockerignore
 
-#### Phase 25: Auto-Detect Feature
+#### Phase 25: Auto-Detect Feature ✓
 **Goal**: MCP automatically detects project context from working directory
 **Depends on**: Phase 23 (transport layer, not container)
 **Requirements**: AUTO-01, AUTO-02, AUTO-03, AUTO-04, AUTO-05, AUTO-06
-**Success Criteria** (what must be TRUE):
-  1. User can use MCP tools without specifying index_name when cwd is in indexed project
-  2. System uses priority chain: cocosearch.yaml indexName > git repo name > directory name
-  3. User is warned when same index name maps to different paths (collision)
-  4. User is prompted to set explicit indexName in cocosearch.yaml on collision
-  5. User is prompted to run index command when auto-detected project has no index
+**Status**: Complete (2026-02-02)
 **Plans**: 4 plans
 
 Plans:
-- [ ] 25-01-PLAN.md - Context detection and metadata storage foundation
-- [ ] 25-02-PLAN.md - MCP auto-detect integration
-- [ ] 25-03-PLAN.md - CLI path registration and cleanup
-- [ ] 25-04-PLAN.md - Unit tests for auto-detect feature
+- [x] 25-01-PLAN.md - Context detection and metadata storage foundation
+- [x] 25-02-PLAN.md - MCP auto-detect integration
+- [x] 25-03-PLAN.md - CLI path registration and cleanup
+- [x] 25-04-PLAN.md - Unit tests for auto-detect feature
 
 #### Phase 26: Documentation & Polish
 **Goal**: Complete documentation for Docker deployment and MCP client configuration
@@ -100,4 +95,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-02 after Phase 25 planned*
+*Last updated: 2026-02-02 after Phase 25 complete*

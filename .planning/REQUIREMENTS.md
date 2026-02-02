@@ -97,12 +97,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ORCH-02 | Phase 24 | Complete |
 | ORCH-03 | Phase 24 | Complete |
 | ORCH-04 | Phase 24 | Complete |
-| AUTO-01 | Phase 25 | Pending |
-| AUTO-02 | Phase 25 | Pending |
-| AUTO-03 | Phase 25 | Pending |
-| AUTO-04 | Phase 25 | Pending |
-| AUTO-05 | Phase 25 | Pending |
-| AUTO-06 | Phase 25 | Pending |
+| AUTO-01 | Phase 25 | Complete |
+| AUTO-02 | Phase 25 | Complete |
+| AUTO-03 | Phase 25 | Complete |
+| AUTO-04 | Phase 25 | Complete |
+| AUTO-05 | Phase 25 | Complete |
+| AUTO-06 | Phase 25 | Complete |
 | DOCS-01 | Phase 26 | Pending |
 | DOCS-02 | Phase 26 | Pending |
 | DOCS-03 | Phase 26 | Pending |
@@ -116,4 +116,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-01*
-*Last updated: 2026-02-02 after Phase 24 complete*
+*Last updated: 2026-02-02 after Phase 25 complete*
