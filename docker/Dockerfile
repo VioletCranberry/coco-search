@@ -97,9 +97,11 @@ COPY --from=model-downloader /bin/ollama /usr/local/bin/ollama
 COPY --from=python-builder /app/.venv /app/.venv
 COPY --from=python-builder /build/src /app/src
 
-# Add Python to PATH
-ENV PATH="/app/.venv/bin:$PATH"
+# Add Python and PostgreSQL to PATH
+ENV PATH="/app/.venv/bin:/usr/lib/postgresql/16/bin:$PATH"
 ENV PYTHONPATH="/app/src"
+# Set HOME for Ollama (required by envconfig)
+ENV HOME="/root"
 
 # =============================================================================
 # Copy pre-baked Ollama model from downloader stage
@@ -118,7 +120,7 @@ ENV COCOSEARCH_MCP_PORT=3000 \
     COCOSEARCH_PG_PORT=5432 \
     COCOSEARCH_OLLAMA_PORT=11434 \
     COCOSEARCH_EMBED_MODEL=nomic-embed-text \
-    COCOSEARCH_MCP_TRANSPORT=streamable-http \
+    COCOSEARCH_MCP_TRANSPORT=http \
     COCOSEARCH_LOG_LEVEL=warn \
     # Ollama configuration
     OLLAMA_HOST=0.0.0.0:11434 \

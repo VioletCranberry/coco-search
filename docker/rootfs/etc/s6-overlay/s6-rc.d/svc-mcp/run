@@ -5,7 +5,8 @@ echo "Starting CocoSearch MCP server..."
 sleep 1
 
 # Resolve configuration from environment
-TRANSPORT="${COCOSEARCH_MCP_TRANSPORT:-streamable-http}"
+# COCOSEARCH_MCP_TRANSPORT is our env var, MCP_TRANSPORT is what the CLI reads
+TRANSPORT="${COCOSEARCH_MCP_TRANSPORT:-http}"
 PORT="${COCOSEARCH_MCP_PORT:-3000}"
 
 echo "Transport: $TRANSPORT, Port: $PORT"

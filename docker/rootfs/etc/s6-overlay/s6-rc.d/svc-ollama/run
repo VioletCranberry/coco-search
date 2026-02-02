@@ -1,4 +1,9 @@
 #!/bin/sh
+# Set environment variables for Ollama
+export HOME=/root
+export OLLAMA_MODELS=/data/ollama_models
+export OLLAMA_HOST=0.0.0.0:${COCOSEARCH_OLLAMA_PORT:-11434}
+
 echo "Starting Ollama..."
 
 # Ensure model directory exists and has correct permissions

@@ -2,6 +2,9 @@
 # Combined health check - returns 0 only when ALL services are ready
 # Used by Docker HEALTHCHECK
 
+# Add PostgreSQL binaries to PATH
+export PATH="/usr/lib/postgresql/16/bin:$PATH"
+
 # Check PostgreSQL
 if ! pg_isready -h localhost -U cocosearch -d cocosearch > /dev/null 2>&1; then
     echo "PostgreSQL not ready"
