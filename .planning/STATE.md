@@ -11,9 +11,9 @@ See: .planning/PROJECT.md (updated 2026-02-01)
 
 Milestone: v1.6 All-in-One Docker & Auto-Detect
 Phase: 25 of 26 (Auto-Detect Feature)
-Plan: 01 of ? in progress
+Plan: 03 of ? in progress
 Status: In progress
-Last activity: 2026-02-02 -- Completed 25-01-PLAN.md (auto-detect foundation)
+Last activity: 2026-02-02 -- Completed 25-03-PLAN.md (CLI integration)
 
 Progress: [#############################################-----------] 65/? (v1.6 plans TBD)
 
@@ -29,7 +29,7 @@ Progress: [#############################################-----------] 65/? (v1.6 
 | v1.5 Configuration & Architecture Polish | 19-22 | 11 | 2026-02-01 |
 
 **Total shipped:** 22 phases, 58 plans across 6 milestones
-**v1.6 in progress:** Phase 23 complete (2 plans), Phase 24 complete (4 plans), Phase 25-01 complete
+**v1.6 in progress:** Phase 23 complete (2 plans), Phase 24 complete (4 plans), Phase 25-01,25-03 complete
 
 ## Performance Metrics
 
@@ -90,6 +90,12 @@ See PROJECT.md Key Decisions table for full list (33 decisions).
 - Use lru_cache(maxsize=128) for path-to-index lookups
 - Cache invalidation: call cache_clear() after any database write
 
+**Phase 25-03 decisions:**
+- Path registration happens after indexing succeeds, not before
+- Collision errors shown as yellow warnings, not blocking errors
+- Metadata cleanup is non-critical - log warning but don't fail delete
+- Import clear_index_path inside function to avoid circular imports
+
 ### Pending Todos
 
 None.
@@ -109,10 +115,10 @@ Key findings from research phase:
 
 ## Session Continuity
 
-Last session: 2026-02-02T17:42:36Z
-Stopped at: Completed 25-01-PLAN.md (auto-detect foundation)
+Last session: 2026-02-02T18:02:00Z
+Stopped at: Completed 25-03-PLAN.md (CLI integration)
 Resume file: None
-Next action: Continue Phase 25 (25-02 MCP tool integration)
+Next action: Continue Phase 25 (remaining plans)
 
 ---
-*Updated: 2026-02-02 after 25-01 complete*
+*Updated: 2026-02-02 after 25-03 complete*
