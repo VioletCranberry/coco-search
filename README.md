@@ -43,6 +43,11 @@ flowchart LR
   - [Installing Ollama](#installing-ollama)
   - [Starting PostgreSQL](#starting-postgresql)
   - [Installing CocoSearch](#installing-cocosearch)
+- [🐳 Docker Quick Start](#docker-quick-start-all-in-one)
+  - [Quick Start for Claude Code (stdio)](#quick-start-for-claude-code-stdio)
+  - [Quick Start for Claude Desktop (HTTP via mcp-remote)](#quick-start-for-claude-desktop-http-via-mcp-remote)
+  - [Data Persistence](#data-persistence)
+  - [Building the Image](#building-the-image)
 - [🚀 Getting Started](#getting-started)
   - [Indexing Your Code](#indexing-your-code)
   - [Searching Semantically](#searching-semantically)
@@ -61,6 +66,12 @@ flowchart LR
   - [Indexing Commands](#indexing-commands)
   - [Searching Commands](#searching-commands)
   - [Managing Indexes](#managing-indexes)
+- [🔧 Troubleshooting Docker](#troubleshooting-docker)
+  - [Container Startup Issues](#container-startup-issues)
+  - [PostgreSQL Issues](#postgresql-issues)
+  - [Ollama Issues](#ollama-issues)
+  - [MCP Connection Issues](#mcp-connection-issues)
+  - [Useful Commands](#useful-commands)
 - [🛠️ Configuration](#configuration)
   - [Configuration File](#configuration-file)
   - [Environment Variables](#environment-variables)
@@ -142,6 +153,110 @@ export COCOSEARCH_DATABASE_URL="postgresql://cocoindex:cocoindex@localhost:5432/
 ```
 
 **Windows users:** Use WSL2 for best compatibility.
+
+[↑ Back to top](#table-of-contents)
+
+## Docker Quick Start (All-in-One)
+
+The all-in-one Docker image bundles PostgreSQL (with pgvector), Ollama (with pre-baked nomic-embed-text model), and the CocoSearch MCP server. No separate setup required.
+
+### Quick Start for Claude Code (stdio)
+
+Register CocoSearch as an MCP server using the Claude CLI:
+
+```bash
+claude mcp add --transport stdio --scope user cocosearch -- \
+  docker run -i --rm \
+  -v cocosearch-data:/data \
+  -v "$PWD":/mnt/repos:ro \
+  cocosearch cocosearch mcp --transport stdio
+```
+
+**Flags explained:**
+- `-i` - Keep stdin attached (required for stdio transport)
+- `--rm` - Remove container when stopped
+- `-v cocosearch-data:/data` - Persist database and models
+- `-v "$PWD":/mnt/repos:ro` - Mount current directory read-only for indexing
+
+**Alternative: JSON config** in `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "cocosearch": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "cocosearch-data:/data", "-v", "/absolute/path/to/repos:/mnt/repos:ro", "cocosearch", "cocosearch", "mcp", "--transport", "stdio"]
+    }
+  }
+}
+```
+
+Replace `/absolute/path/to/repos` with the actual path to your code repositories.
+
+### Quick Start for Claude Desktop (HTTP via mcp-remote)
+
+Claude Desktop requires stdio transport but our container uses HTTP. The `mcp-remote` package bridges this gap.
+
+**Step 1:** Start the container as a daemon:
+
+```bash
+docker run -d --name cocosearch \
+  -v cocosearch-data:/data \
+  -v "$PWD":/mnt/repos:ro \
+  -p 3000:3000 \
+  cocosearch
+```
+
+**Step 2:** Add to `claude_desktop_config.json`:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Linux:** `~/.config/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "cocosearch": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:3000/mcp"]
+    }
+  }
+}
+```
+
+> **Why mcp-remote?** Claude Desktop only supports stdio transport but our container exposes HTTP. The `mcp-remote` package acts as a bridge, converting HTTP/SSE to stdio.
+
+### Data Persistence
+
+The named volume `cocosearch-data:/data` persists all state across container restarts:
+
+- `/data/pg_data` - PostgreSQL database (your indexes)
+- `/data/ollama_models` - Ollama model files
+- `/data/cocosearch` - CocoSearch metadata
+
+**Alternative: Repo-local storage**
+
+For project-specific data, mount a local directory:
+
+```bash
+docker run -d --name cocosearch \
+  -v "$(pwd)/.cocosearch-data":/data \
+  -v "$PWD":/mnt/repos:ro \
+  -p 3000:3000 \
+  cocosearch
+```
+
+Add `.cocosearch-data/` to your project's `.gitignore`.
+
+### Building the Image
+
+Build from the repository root:
+
+```bash
+docker build -t cocosearch -f docker/Dockerfile .
+```
+
+The build takes 5-10 minutes (downloads and bakes the Ollama model).
 
 [↑ Back to top](#table-of-contents)
 
