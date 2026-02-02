@@ -1,0 +1,177 @@
+"""Metadata storage module for cocosearch.
+
+Provides functions to store and retrieve path-to-index mappings
+with collision detection. Used by auto-detect feature to track
+which projects are indexed under which names.
+"""
+
+from functools import lru_cache
+from pathlib import Path
+
+from cocosearch.management.context import get_canonical_path
+from cocosearch.search.db import get_connection_pool
+
+
+def ensure_metadata_table() -> None:
+    """Create the metadata table if it doesn't exist.
+
+    Creates cocosearch_index_metadata table with:
+    - index_name (TEXT PRIMARY KEY)
+    - canonical_path (TEXT NOT NULL)
+    - created_at, updated_at (TIMESTAMP)
+
+    Idempotent - safe to call multiple times.
+    """
+    pool = get_connection_pool()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS cocosearch_index_metadata (
+                    index_name TEXT PRIMARY KEY,
+                    canonical_path TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cocosearch_metadata_path
+                    ON cocosearch_index_metadata(canonical_path)
+            """)
+        conn.commit()
+
+
+def get_index_metadata(index_name: str) -> dict | None:
+    """Get metadata for an index by name.
+
+    Args:
+        index_name: The name of the index to look up.
+
+    Returns:
+        Dict with keys: index_name, canonical_path, created_at, updated_at
+        or None if not found.
+    """
+    pool = get_connection_pool()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT index_name, canonical_path, created_at, updated_at
+                FROM cocosearch_index_metadata
+                WHERE index_name = %s
+                """,
+                (index_name,)
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return {
+                "index_name": row[0],
+                "canonical_path": row[1],
+                "created_at": row[2],
+                "updated_at": row[3],
+            }
+
+
+@lru_cache(maxsize=128)
+def get_index_for_path(canonical_path: str) -> str | None:
+    """Get the index name for a canonical path.
+
+    Results are cached for performance since MCP tools call this frequently.
+
+    Args:
+        canonical_path: Absolute, symlink-resolved path as string
+
+    Returns:
+        Index name if mapping exists, None otherwise
+    """
+    pool = get_connection_pool()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT index_name
+                FROM cocosearch_index_metadata
+                WHERE canonical_path = %s
+                """,
+                (canonical_path,)
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return row[0]
+
+
+def register_index_path(index_name: str, project_path: str | Path) -> None:
+    """Register a path-to-index mapping with collision detection.
+
+    Args:
+        index_name: The name of the index
+        project_path: The project directory path (will be resolved to canonical form)
+
+    Raises:
+        ValueError: If index_name already maps to a different path (collision)
+    """
+    # Resolve to canonical path
+    canonical = str(get_canonical_path(project_path))
+
+    # Ensure table exists
+    ensure_metadata_table()
+
+    # Check for collision: same index_name, different path
+    existing = get_index_metadata(index_name)
+    if existing and existing["canonical_path"] != canonical:
+        raise ValueError(
+            f"Index name collision detected: '{index_name}'\n"
+            f"  Existing path: {existing['canonical_path']}\n"
+            f"  New path: {canonical}\n\n"
+            f"To resolve:\n"
+            f"  1. Set explicit indexName in cocosearch.yaml at {project_path}, or\n"
+            f"  2. Use --index-name flag: cocosearch index {project_path} --name <unique-name>"
+        )
+
+    # Upsert the mapping
+    pool = get_connection_pool()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO cocosearch_index_metadata (index_name, canonical_path, created_at, updated_at)
+                VALUES (%s, %s, NOW(), NOW())
+                ON CONFLICT (index_name) DO UPDATE SET
+                    canonical_path = EXCLUDED.canonical_path,
+                    updated_at = NOW()
+                """,
+                (index_name, canonical)
+            )
+        conn.commit()
+
+    # Clear cache since database changed
+    get_index_for_path.cache_clear()
+
+
+def clear_index_path(index_name: str) -> bool:
+    """Remove a path-to-index mapping.
+
+    Args:
+        index_name: The name of the index to remove
+
+    Returns:
+        True if a row was deleted, False if not found
+    """
+    pool = get_connection_pool()
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM cocosearch_index_metadata
+                WHERE index_name = %s
+                """,
+                (index_name,)
+            )
+            deleted = cur.rowcount > 0
+        conn.commit()
+
+    # Clear cache since database changed
+    get_index_for_path.cache_clear()
+
+    return deleted
