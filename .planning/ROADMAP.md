@@ -76,10 +76,10 @@ Plans:
   3. Claude Desktop configuration example exists showing SSE/HTTP transport setup
   4. Volume mount and data persistence documentation covers common scenarios
   5. Troubleshooting guide covers container startup failures and connectivity issues
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 26-01: TBD
+- [ ] 26-01-PLAN.md - Docker quick start, MCP client configuration, and troubleshooting documentation
 
 ## Progress
 
@@ -91,8 +91,8 @@ Plans:
 | v1.3 Integration Tests | 11-14 | 11 | Complete | 2026-01-30 |
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
-| v1.6 Docker & Auto-Detect | 23-26 | 10+ | In progress | - |
+| v1.6 Docker & Auto-Detect | 23-26 | 11 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-02 after Phase 25 complete*
+*Last updated: 2026-02-02 after Phase 26 planning*
