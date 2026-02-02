@@ -8,7 +8,7 @@
 - v1.3 Docker Integration Tests -- Phases 11-14 (shipped 2026-01-30)
 - v1.4 Dogfooding Infrastructure -- Phases 15-18 (shipped 2026-01-31)
 - v1.5 Configuration & Architecture Polish -- Phases 19-22 (shipped 2026-02-01)
-- v1.6 All-in-One Docker & Auto-Detect -- Phases 23-26 (in progress)
+- v1.6 All-in-One Docker & Auto-Detect -- Phases 23-26 (shipped 2026-02-02)
 
 ## Phases
 
@@ -66,20 +66,15 @@ Plans:
 - [x] 25-03-PLAN.md - CLI path registration and cleanup
 - [x] 25-04-PLAN.md - Unit tests for auto-detect feature
 
-#### Phase 26: Documentation & Polish
+#### Phase 26: Documentation & Polish ✓
 **Goal**: Complete documentation for Docker deployment and MCP client configuration
 **Depends on**: Phase 24, Phase 25
 **Requirements**: DOCS-01, DOCS-02, DOCS-03, DOCS-04, DOCS-05
-**Success Criteria** (what must be TRUE):
-  1. Docker quick start guide exists with copy-paste `docker run` examples
-  2. Claude Code configuration example exists showing stdio transport setup
-  3. Claude Desktop configuration example exists showing SSE/HTTP transport setup
-  4. Volume mount and data persistence documentation covers common scenarios
-  5. Troubleshooting guide covers container startup failures and connectivity issues
+**Status**: Complete (2026-02-02)
 **Plans**: 1 plan
 
 Plans:
-- [ ] 26-01-PLAN.md - Docker quick start, MCP client configuration, and troubleshooting documentation
+- [x] 26-01-PLAN.md - Docker quick start, MCP client configuration, and troubleshooting documentation
 
 ## Progress
 
@@ -91,8 +86,8 @@ Plans:
 | v1.3 Integration Tests | 11-14 | 11 | Complete | 2026-01-30 |
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
-| v1.6 Docker & Auto-Detect | 23-26 | 11 | In progress | - |
+| v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-02 after Phase 26 planning*
+*Last updated: 2026-02-02 after Phase 26 complete*
