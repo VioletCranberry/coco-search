@@ -31,6 +31,11 @@ from cocosearch.cli import derive_index_name
 from cocosearch.indexer import IndexingConfig, run_index
 from cocosearch.management import clear_index as mgmt_clear_index
 from cocosearch.management import get_stats, list_indexes as mgmt_list_indexes
+from cocosearch.management import (
+    find_project_root,
+    resolve_index_name,
+    get_index_metadata,
+)
 from cocosearch.search import byte_to_line, read_chunk_content, search
 
 # Create FastMCP server instance
@@ -47,7 +52,12 @@ async def health_check(request):
 @mcp.tool()
 def search_code(
     query: Annotated[str, Field(description="Natural language search query")],
-    index_name: Annotated[str, Field(description="Name of the index to search")],
+    index_name: Annotated[
+        str | None,
+        Field(
+            description="Name of the index to search. If not provided, auto-detects from current working directory."
+        ),
+    ] = None,
     limit: Annotated[int, Field(description="Maximum results to return")] = 10,
     language: Annotated[
         str | None,
@@ -60,7 +70,66 @@ def search_code(
     """Search indexed code using natural language.
 
     Returns code chunks matching the query, ranked by semantic similarity.
+    If index_name is not provided, auto-detects from current working directory.
     """
+    # Auto-detect index if not provided
+    if index_name is None:
+        root_path, detection_method = find_project_root()
+
+        if root_path is None:
+            # Not in a project directory
+            return [{
+                "error": "No project detected",
+                "message": (
+                    "Not in a git repository or directory with cocosearch.yaml. "
+                    "Either navigate to your project directory, or specify index_name parameter explicitly."
+                ),
+                "results": []
+            }]
+
+        # Resolve index name using priority chain
+        index_name = resolve_index_name(root_path, detection_method)
+        logger.info(f"Auto-detected index: {index_name} from {root_path}")
+
+        # Check if index exists
+        indexes = mgmt_list_indexes()
+        index_names = {idx["name"] for idx in indexes}
+
+        if index_name not in index_names:
+            # Project detected but not indexed
+            return [{
+                "error": "Index not found",
+                "message": (
+                    f"Project detected at {root_path} but not indexed. "
+                    f"Index this project first using:\n"
+                    f"  CLI: cocosearch index {root_path}\n"
+                    f"  MCP: index_codebase(path='{root_path}')"
+                ),
+                "detected_path": str(root_path),
+                "suggested_index_name": index_name,
+                "results": []
+            }]
+
+        # Check for collision (same index name, different path in metadata)
+        metadata = get_index_metadata(index_name)
+        if metadata is not None:
+            canonical_cwd = str(root_path.resolve())
+            stored_path = metadata.get("canonical_path", "")
+            if stored_path and stored_path != canonical_cwd:
+                # Collision detected
+                return [{
+                    "error": "Index name collision",
+                    "message": (
+                        f"Index '{index_name}' is already mapped to a different project:\n"
+                        f"  Stored: {stored_path}\n"
+                        f"  Current: {canonical_cwd}\n\n"
+                        f"To resolve:\n"
+                        f"  1. Set explicit indexName in cocosearch.yaml, or\n"
+                        f"  2. Specify index_name parameter explicitly"
+                    ),
+                    "results": []
+                }]
+
     # Initialize CocoIndex (required for embedding generation)
     cocoindex.init()
 
