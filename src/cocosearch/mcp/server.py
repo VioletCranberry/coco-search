@@ -35,6 +35,7 @@ from cocosearch.management import (
     find_project_root,
     resolve_index_name,
     get_index_metadata,
+    register_index_path,
 )
 from cocosearch.search import byte_to_line, read_chunk_content, search
 
@@ -215,6 +216,7 @@ def clear_index(
     The operation cannot be undone.
     """
     try:
+        # mgmt_clear_index also clears path metadata internally
         result = mgmt_clear_index(index_name)
         return result
     except ValueError as e:
@@ -250,6 +252,13 @@ def index_codebase(
             codebase_path=path,
             config=IndexingConfig(),
         )
+
+        # Register path-to-index mapping (enables collision detection)
+        try:
+            register_index_path(index_name, path)
+        except ValueError as collision_error:
+            # Collision during indexing - warn but continue (index was created)
+            logger.warning(f"Path registration warning: {collision_error}")
 
         # Extract stats from update_info
         stats = {
