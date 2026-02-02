@@ -697,6 +697,69 @@ cocosearch mcp  # Runs until killed, used by Claude/OpenCode
 
 [↑ Back to top](#table-of-contents)
 
+## Troubleshooting Docker
+
+First diagnostic step is always checking logs: `docker logs cocosearch`
+
+### Container Startup Issues
+
+- **Container exits immediately**: Check `docker logs cocosearch` for errors. Common cause: port 3000 already in use. Solution: use `-p 3001:3000` instead.
+
+- **Health check failing**: Container takes approximately 90 seconds to fully start (model loading). Wait and check status:
+  ```bash
+  docker inspect cocosearch --format='{{.State.Health.Status}}'
+  ```
+
+### PostgreSQL Issues
+
+- **"Connection refused" from MCP**: PostgreSQL may still be starting. Check logs for "database system is ready to accept connections".
+
+- **Data corruption after unclean shutdown**: Always use `docker stop` (not `docker kill`). The container uses SIGTERM for graceful PostgreSQL shutdown.
+
+### Ollama Issues
+
+- **"Model not found" errors**: The model is pre-baked in the image. If seeing this error, the image may be corrupted. Rebuild with:
+  ```bash
+  docker build --no-cache -t cocosearch -f docker/Dockerfile .
+  ```
+
+- **Slow first embedding**: First request warms up the model (5-10 seconds). Subsequent requests are fast.
+
+### MCP Connection Issues
+
+- **Claude Code "server disconnected"**: Ensure container is running with `-i` flag for stdio transport.
+
+- **Claude Desktop "connection refused"**:
+  1. Verify container is running: `docker ps`
+  2. Verify port mapping shows `0.0.0.0:3000->3000/tcp`
+  3. Verify mcp-remote is available: `npx mcp-remote --version`
+
+- **"Unknown transport" error**: Using wrong transport for client. Claude Code uses stdio, Claude Desktop uses HTTP.
+
+### Useful Commands
+
+```bash
+# Check container status
+docker ps -a | grep cocosearch
+
+# View logs (first diagnostic step)
+docker logs cocosearch
+
+# Follow logs in real-time
+docker logs -f cocosearch
+
+# Check health status
+docker inspect cocosearch --format='{{.State.Health.Status}}'
+
+# Interactive debug shell
+docker exec -it cocosearch sh
+
+# Restart container
+docker restart cocosearch
+```
+
+[↑ Back to top](#table-of-contents)
+
 ## Configuration
 
 ### Configuration File
