@@ -63,10 +63,13 @@ Plans:
   3. User is warned when same index name maps to different paths (collision)
   4. User is prompted to set explicit indexName in cocosearch.yaml on collision
   5. User is prompted to run index command when auto-detected project has no index
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 25-01: TBD
+- [ ] 25-01-PLAN.md - Context detection and metadata storage foundation
+- [ ] 25-02-PLAN.md - MCP auto-detect integration
+- [ ] 25-03-PLAN.md - CLI path registration and cleanup
+- [ ] 25-04-PLAN.md - Unit tests for auto-detect feature
 
 #### Phase 26: Documentation & Polish
 **Goal**: Complete documentation for Docker deployment and MCP client configuration
@@ -93,8 +96,8 @@ Plans:
 | v1.3 Integration Tests | 11-14 | 11 | Complete | 2026-01-30 |
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
-| v1.6 Docker & Auto-Detect | 23-26 | 6+ | In progress | - |
+| v1.6 Docker & Auto-Detect | 23-26 | 10+ | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-02 after Phase 24 complete*
+*Last updated: 2026-02-02 after Phase 25 planned*
