@@ -88,9 +88,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HYBR-02 | Phase 28 | Pending |
 | HYBR-03 | Phase 28 | Pending |
 | HYBR-04 | Phase 28 | Pending |
-| HYBR-05 | Phase 27 | Pending |
-| HYBR-06 | Phase 27 | Pending |
-| HYBR-07 | Phase 27 | Pending |
+| HYBR-05 | Phase 27 | Complete |
+| HYBR-06 | Phase 27 | Complete |
+| HYBR-07 | Phase 27 | Complete |
 | CTXT-01 | Phase 31 | Pending |
 | CTXT-02 | Phase 31 | Pending |
 | CTXT-03 | Phase 31 | Pending |
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after roadmap creation*
+*Last updated: 2026-02-03 after Phase 27 completion*

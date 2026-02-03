@@ -48,9 +48,9 @@ See project history for earlier milestones:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 27-01-PLAN.md — Add content_text field to indexing flow
-- [ ] 27-02-PLAN.md — Add graceful degradation for hybrid search columns
-- [ ] 27-03-PLAN.md — Add tsvector generation and GIN index support
+- [x] 27-01-PLAN.md — Add content_text field to indexing flow
+- [x] 27-02-PLAN.md — Add graceful degradation for hybrid search columns
+- [x] 27-03-PLAN.md — Add tsvector generation and GIN index support
 
 #### Phase 28: Hybrid Search Query
 
@@ -160,8 +160,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 3 | In progress | - |
+| v1.7 Search Enhancement | 27-32 | 6 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 with v1.7 milestone phases*
+*Last updated: 2026-02-03 after Phase 27 completion*
