@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 27 of 32 (Hybrid Search Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-03 — v1.7 roadmap created with 6 phases
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-03 — Completed 27-01-PLAN.md (content_text field)
 
-Progress: [████████████████████████████░░░░] 81% (69 of 85 estimated plans complete)
+Progress: [████████████████████████████░░░░] 82% (70 of 85 estimated plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 69
+- Total plans completed: 70
 - Milestones shipped: 6 (v1.0-v1.6)
 - Current milestone: v1.7 Search Enhancement
 
@@ -39,6 +39,7 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **27-01**: Store raw chunk text in content_text field (no transformation)
 - **v1.6**: All-in-one Docker image with SSE transport for Claude Desktop
 - **v1.6**: Auto-detect project from cwd with collision detection
 - **v1.5**: Registry-based language handlers with autodiscovery
@@ -62,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: v1.7 roadmap created, ready to plan Phase 27
+Stopped at: Completed 27-01-PLAN.md
 Resume file: None
