@@ -155,10 +155,12 @@ Plans:
   3. Documentation lists all supported languages with file extensions
   4. Hybrid search, symbol filtering, and context expansion are documented with examples
 
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD
+- [ ] 32-01-PLAN.md — Language registry expansion + languages CLI command
+- [ ] 32-02-PLAN.md — Per-language stats function + stats CLI update
+- [ ] 32-03-PLAN.md — README documentation for v1.7 features
 
 ## Progress
 
@@ -171,8 +173,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 18 | In progress (Phase 31 complete) | - |
+| v1.7 Search Enhancement | 27-32 | 21 | In progress (Phase 31 complete) | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 31 execution*
+*Last updated: 2026-02-03 after Phase 32 planning*
