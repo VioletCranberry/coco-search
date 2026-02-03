@@ -11,6 +11,35 @@ CocoSearch indexes your code and enables semantic search powered by local embedd
 - **Stay private** - everything runs locally, no external API calls
 - **Use with AI assistants** - integrate via Model Context Protocol (MCP)
 
+## Quick Start (5 minutes)
+
+**Prerequisites:** Docker installed.
+
+**1. Start services** (PostgreSQL + Ollama in one container):
+
+```bash
+docker run -d --name cocosearch \
+  -v cocosearch-data:/data \
+  -v "$PWD":/mnt/repos:ro \
+  -p 3000:3000 \
+  cocosearch
+```
+
+**2. Index your code:**
+
+```bash
+# Wait ~90 seconds for container startup, then:
+docker exec cocosearch cocosearch index /mnt/repos --name myproject
+```
+
+**3. Search:**
+
+```bash
+docker exec cocosearch cocosearch search "authentication logic" --index myproject --pretty
+```
+
+**That's it!** For local development setup without Docker, see [Installing](#installing).
+
 ## Architecture
 
 ```mermaid
@@ -39,6 +68,7 @@ flowchart LR
 
 ## Table of Contents
 
+- [⚡ Quick Start (5 minutes)](#quick-start-5-minutes)
 - [📦 Installing](#installing)
   - [Installing Ollama](#installing-ollama)
   - [Starting PostgreSQL](#starting-postgresql)
