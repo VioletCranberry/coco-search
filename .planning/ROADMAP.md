@@ -83,12 +83,12 @@ Plans:
   5. HTTP API serves stats at /api/stats endpoint
   6. Terminal dashboard shows live stats with Unicode graphs
   7. Web UI accessible via browser at /dashboard
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 35-01: Stats CLI enhancement (metrics, language, symbols)
-- [ ] 35-02: HTTP API + terminal dashboard
-- [ ] 35-03: Web UI dashboard
+- [ ] 35-01-PLAN.md -- Stats CLI enhancement (IndexStats dataclass, Unicode bars, warnings, -v/--json/--all flags)
+- [ ] 35-02-PLAN.md -- HTTP API + terminal dashboard (/api/stats endpoint, Rich Layout multi-pane dashboard)
+- [ ] 35-03-PLAN.md -- Web UI dashboard (Chart.js visualization, serve-dashboard command)
 
 #### Phase 36: Developer Skills
 **Goal**: Create skills for Claude Code and OpenCode with installation and routing guidance
@@ -130,8 +130,8 @@ Plans:
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
 | v1.7 Search Enhancement | 27-32 | 21 | Complete | 2026-02-03 |
-| v1.8 Polish & Observability | 33-37 | 11/13 | In progress | - |
+| v1.8 Polish & Observability | 33-37 | 10/13 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 34 complete*
+*Last updated: 2026-02-04 after Phase 35 planned*
