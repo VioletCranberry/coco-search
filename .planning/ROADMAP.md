@@ -136,10 +136,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 31-01-PLAN.md — Context expander module with tree-sitter boundaries
-- [ ] 31-02-PLAN.md — CLI context flags and formatter integration
-- [ ] 31-03-PLAN.md — MCP context parameters
-- [ ] 31-04-PLAN.md — Integration tests and module wiring
+- [x] 31-01-PLAN.md — Context expander module with tree-sitter boundaries
+- [x] 31-02-PLAN.md — CLI context flags and formatter integration
+- [x] 31-03-PLAN.md — MCP context parameters
+- [x] 31-04-PLAN.md — Integration tests and module wiring
 
 #### Phase 32: Full Language Coverage + Documentation
 
@@ -171,8 +171,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 18 | In progress (Phase 30 complete) | - |
+| v1.7 Search Enhancement | 27-32 | 18 | In progress (Phase 31 complete) | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 30 execution*
+*Last updated: 2026-02-03 after Phase 31 execution*

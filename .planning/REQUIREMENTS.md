@@ -19,12 +19,12 @@ Requirements for Search Enhancement milestone. Each maps to roadmap phases.
 
 ### Context Expansion
 
-- [ ] **CTXT-01**: CLI flags `-A/-B/-C` show N lines before/after/around matches
-- [ ] **CTXT-02**: MCP parameters `context_before`, `context_after` for context lines
-- [ ] **CTXT-03**: File reads batched by filename to prevent I/O thrashing
-- [ ] **CTXT-04**: Smart context boundaries expand to enclosing function/class via Tree-sitter
-- [ ] **CTXT-05**: LRU cache for frequently accessed files during search session
-- [ ] **CTXT-06**: Context included in both JSON and pretty output formats
+- [x] **CTXT-01**: CLI flags `-A/-B/-C` show N lines before/after/around matches
+- [x] **CTXT-02**: MCP parameters `context_before`, `context_after` for context lines
+- [x] **CTXT-03**: File reads batched by filename to prevent I/O thrashing
+- [x] **CTXT-04**: Smart context boundaries expand to enclosing function/class via Tree-sitter
+- [x] **CTXT-05**: LRU cache for frequently accessed files during search session
+- [x] **CTXT-06**: Context included in both JSON and pretty output formats
 
 ### Symbol-Aware Search
 
@@ -91,12 +91,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HYBR-05 | Phase 27 | Complete |
 | HYBR-06 | Phase 27 | Complete |
 | HYBR-07 | Phase 27 | Complete |
-| CTXT-01 | Phase 31 | Pending |
-| CTXT-02 | Phase 31 | Pending |
-| CTXT-03 | Phase 31 | Pending |
-| CTXT-04 | Phase 31 | Pending |
-| CTXT-05 | Phase 31 | Pending |
-| CTXT-06 | Phase 31 | Pending |
+| CTXT-01 | Phase 31 | Complete |
+| CTXT-02 | Phase 31 | Complete |
+| CTXT-03 | Phase 31 | Complete |
+| CTXT-04 | Phase 31 | Complete |
+| CTXT-05 | Phase 31 | Complete |
+| CTXT-06 | Phase 31 | Complete |
 | SYMB-01 | Phase 29 | Complete |
 | SYMB-02 | Phase 29 | Complete |
 | SYMB-03 | Phase 29 | Complete |
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 30 completion*
+*Last updated: 2026-02-03 after Phase 31 completion*
