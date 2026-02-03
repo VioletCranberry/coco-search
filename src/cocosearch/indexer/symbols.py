@@ -10,6 +10,9 @@ Supported languages:
 - TypeScript: functions, classes, methods, interfaces, type aliases
 - Go: functions, methods (with receiver), structs, interfaces
 - Rust: functions, methods (in impl blocks), structs, traits, enums
+- Java: classes, interfaces, enums, methods, constructors
+- C: functions, structs, enums, typedefs
+- C++: functions, classes, structs, namespaces, methods
 
 Features:
 - Query-based extraction using external .scm files
@@ -49,6 +52,18 @@ LANGUAGE_MAP = {
     # Python
     "py": "python",
     "python": "python",
+    # Java
+    "java": "java",
+    # C
+    "c": "c",
+    "h": "c",
+    # C++
+    "cpp": "cpp",
+    "cxx": "cpp",
+    "cc": "cpp",
+    "hpp": "cpp",
+    "hxx": "cpp",
+    "hh": "cpp",
 }
 
 # ============================================================================
@@ -220,6 +235,9 @@ def _build_qualified_name(node, name: str, chunk_text: str, language: str) -> st
         "typescript": ["class_declaration", "class_body"],
         "go": [],  # Go methods use receiver extraction above
         "rust": ["impl_item"],
+        "java": ["class_declaration", "interface_declaration", "enum_declaration"],
+        "c": ["struct_specifier"],
+        "cpp": ["class_specifier", "struct_specifier", "namespace_definition"],
     }
 
     parents = []
