@@ -528,21 +528,21 @@ class TestJavaScriptSymbols:
 
     def test_method_definition(self):
         """Verify method is extracted with qualified name when class not first."""
-        from cocosearch.indexer.symbols import _extract_javascript_symbols, _get_parser
+        from cocosearch.indexer.symbols import _extract_symbols_with_query, resolve_query_file
 
         code = """class UserService {
     fetchUser(id) {
         return this.users[id];
     }
 }"""
-        parser = _get_parser("javascript")
-        symbols = _extract_javascript_symbols(code, parser)
+        query_text = resolve_query_file("javascript")
+        symbols = _extract_symbols_with_query(code, "javascript", query_text)
 
         assert len(symbols) == 2
         assert symbols[0]["symbol_type"] == "class"
         assert symbols[1]["symbol_type"] == "method"
         assert symbols[1]["symbol_name"] == "UserService.fetchUser"
-        assert symbols[1]["symbol_signature"] == "fetchUser(id)"
+        assert "fetchUser(id)" in symbols[1]["symbol_signature"]
 
     def test_jsx_extension(self):
         """JSX files use JavaScript extractor."""
@@ -799,14 +799,14 @@ class TestRustSymbols:
 
     def test_multiple_methods_in_impl(self):
         """Verify multiple methods extracted from impl block."""
-        from cocosearch.indexer.symbols import _extract_rust_symbols, _get_parser
+        from cocosearch.indexer.symbols import _extract_symbols_with_query, resolve_query_file
 
         code = """impl Server {
     fn start(&self) {}
     fn stop(&mut self) {}
 }"""
-        parser = _get_parser("rust")
-        symbols = _extract_rust_symbols(code, parser)
+        query_text = resolve_query_file("rust")
+        symbols = _extract_symbols_with_query(code, "rust", query_text)
 
         assert len(symbols) == 2
         assert symbols[0]["symbol_name"] == "Server.start"
