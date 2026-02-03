@@ -67,10 +67,20 @@ def search_code(
             "Aliases: terraform=hcl, shell/sh=bash. Comma-separated for multiple."
         ),
     ] = None,
+    use_hybrid_search: Annotated[
+        bool | None,
+        Field(
+            description="Enable hybrid search (vector + keyword matching). "
+            "None=auto (enabled for identifier patterns like camelCase/snake_case), "
+            "True=always use hybrid, False=vector-only"
+        ),
+    ] = None,
 ) -> list[dict]:
     """Search indexed code using natural language.
 
     Returns code chunks matching the query, ranked by semantic similarity.
+    Supports hybrid search combining vector similarity and keyword matching
+    for better results when searching for code identifiers.
     If index_name is not provided, auto-detects from current working directory.
     """
     # Auto-detect index if not provided
@@ -140,6 +150,7 @@ def search_code(
         index_name=index_name,
         limit=limit,
         language_filter=language,
+        use_hybrid=use_hybrid_search,
     )
 
     # Convert results to dicts with line numbers and content
@@ -149,18 +160,26 @@ def search_code(
         end_line = byte_to_line(r.filename, r.end_byte)
         content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
 
-        output.append(
-            {
-                "file_path": r.filename,
-                "start_line": start_line,
-                "end_line": end_line,
-                "score": r.score,
-                "content": content,
-                "block_type": r.block_type,
-                "hierarchy": r.hierarchy,
-                "language_id": r.language_id,
-            }
-        )
+        result_dict = {
+            "file_path": r.filename,
+            "start_line": start_line,
+            "end_line": end_line,
+            "score": r.score,
+            "content": content,
+            "block_type": r.block_type,
+            "hierarchy": r.hierarchy,
+            "language_id": r.language_id,
+        }
+
+        # Include hybrid search fields when available
+        if r.match_type:
+            result_dict["match_type"] = r.match_type
+        if r.vector_score is not None:
+            result_dict["vector_score"] = r.vector_score
+        if r.keyword_score is not None:
+            result_dict["keyword_score"] = r.keyword_score
+
+        output.append(result_dict)
 
     return output
 
