@@ -9,6 +9,8 @@ from dataclasses import dataclass
 
 from cocosearch.indexer.embedder import code_to_embedding
 from cocosearch.search.db import check_column_exists, get_connection_pool, get_table_name
+from cocosearch.search.hybrid import hybrid_search as execute_hybrid_search
+from cocosearch.search.query_analyzer import has_identifier_pattern
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ class SearchResult:
         block_type: DevOps block type (e.g., "resource", "FROM", "function").
         hierarchy: DevOps hierarchy path (e.g., "resource.aws_s3_bucket.data").
         language_id: DevOps language identifier (e.g., "hcl", "dockerfile", "bash").
+        match_type: Source of match for hybrid search ("semantic", "keyword", "both", or "" for vector-only).
+        vector_score: Original vector similarity score (for hybrid search breakdown).
+        keyword_score: Keyword/ts_rank score (for hybrid search breakdown).
     """
 
     filename: str
@@ -34,6 +39,9 @@ class SearchResult:
     block_type: str = ""
     hierarchy: str = ""
     language_id: str = ""
+    match_type: str = ""  # "" for backward compat, "semantic"/"keyword"/"both" for hybrid
+    vector_score: float | None = None
+    keyword_score: float | None = None
 
 
 # Language to file extension mapping
@@ -135,11 +143,14 @@ def search(
     limit: int = 10,
     min_score: float = 0.0,
     language_filter: str | None = None,
+    use_hybrid: bool | None = None,
 ) -> list[SearchResult]:
     """Search for code similar to query.
 
     Embeds the query using the same model as indexing, then performs
     a cosine similarity search against the PostgreSQL database.
+    Optionally uses hybrid search (vector + keyword) for better results
+    when searching for code identifiers.
 
     Args:
         query: Natural language search query.
@@ -147,9 +158,14 @@ def search(
         limit: Maximum results to return (default 10).
         min_score: Minimum similarity score to include (0-1, default 0.0).
         language_filter: Optional language filter (e.g., "python", "hcl,bash").
+        use_hybrid: Hybrid search mode:
+            - None (default): Auto-detect from query (enabled for identifier patterns)
+            - True: Force hybrid search (falls back to vector-only if unavailable)
+            - False: Use vector-only search
 
     Returns:
         List of SearchResult ordered by similarity (highest first).
+        When hybrid search is used, results include match_type indicator.
 
     Raises:
         ValueError: If language_filter contains unrecognized language names,
@@ -171,14 +187,10 @@ def search(
                 "Run 'cocosearch index' to upgrade."
             )
 
-    # Embed query using same model as indexing
-    query_embedding = code_to_embedding.eval(query)
-
     pool = get_connection_pool()
     table_name = get_table_name(index_name)
 
     # Check for hybrid search capability (content_text column) on first call
-    # This prepares for Phase 28 hybrid search implementation
     if _has_content_text_column and not _hybrid_warning_emitted:
         if not check_column_exists(table_name, "content_text"):
             _has_content_text_column = False
@@ -187,6 +199,51 @@ def search(
                 "Run 'cocosearch index' to enable hybrid search."
             )
             _hybrid_warning_emitted = True
+
+    # Determine whether to use hybrid search
+    should_use_hybrid = False
+    if use_hybrid is True:
+        # Explicit request for hybrid search
+        if _has_content_text_column:
+            should_use_hybrid = True
+        else:
+            # Fall back to vector-only silently (already warned above)
+            logger.debug("Hybrid search requested but content_text column missing, using vector-only")
+    elif use_hybrid is None:
+        # Auto-detect: use hybrid if query has identifier patterns AND column exists
+        if _has_content_text_column and has_identifier_pattern(query):
+            should_use_hybrid = True
+            logger.debug(f"Auto-detected identifier pattern in query, using hybrid search")
+    # use_hybrid is False: always use vector-only (no action needed)
+
+    # Execute hybrid search if applicable
+    # Note: hybrid search doesn't support language filtering yet (future enhancement)
+    if should_use_hybrid and not language_filter:
+        hybrid_results = execute_hybrid_search(query, index_name, limit)
+
+        # Convert HybridSearchResult to SearchResult, applying min_score filter
+        results = []
+        for hr in hybrid_results:
+            if hr.combined_score >= min_score:
+                results.append(
+                    SearchResult(
+                        filename=hr.filename,
+                        start_byte=hr.start_byte,
+                        end_byte=hr.end_byte,
+                        score=hr.combined_score,
+                        block_type=hr.block_type,
+                        hierarchy=hr.hierarchy,
+                        language_id=hr.language_id,
+                        match_type=hr.match_type,
+                        vector_score=hr.vector_score,
+                        keyword_score=hr.keyword_score,
+                    )
+                )
+        return results
+
+    # Vector-only search (existing behavior)
+    # Embed query using same model as indexing
+    query_embedding = code_to_embedding.eval(query)
 
     # Determine whether to include metadata columns in SELECT
     include_metadata = _has_metadata_columns

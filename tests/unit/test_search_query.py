@@ -203,3 +203,253 @@ class TestHybridSearchGracefulDegradation:
         assert len(results) == 1
         assert results[0].filename == "/path/to/file.py"
         assert results[0].score == 0.95
+
+
+class TestHybridSearchModes:
+    """Tests for hybrid search mode selection (auto/explicit/disabled)."""
+
+    def test_search_auto_hybrid_triggered_by_camelcase(self, mock_db_pool):
+        """Test that camelCase queries auto-trigger hybrid search."""
+        import cocosearch.search.query as query_module
+
+        # Reset module state
+        query_module._has_content_text_column = True
+        query_module._hybrid_warning_emitted = False
+
+        # Mock hybrid search results
+        from cocosearch.search.hybrid import HybridSearchResult
+
+        mock_hybrid_results = [
+            HybridSearchResult(
+                filename="/path/to/file.py",
+                start_byte=0,
+                end_byte=100,
+                combined_score=0.9,
+                match_type="both",
+                vector_score=0.85,
+                keyword_score=0.75,
+                block_type="function",
+                hierarchy="main.getUserById",
+                language_id="python",
+            )
+        ]
+
+        with patch.object(query_module, "check_column_exists", return_value=True):
+            with patch.object(
+                query_module, "execute_hybrid_search", return_value=mock_hybrid_results
+            ) as mock_hybrid:
+                with patch.object(
+                    query_module, "get_connection_pool"
+                ):
+                    with patch.object(
+                        query_module, "get_table_name", return_value="test_table"
+                    ):
+                        # camelCase query should trigger hybrid search
+                        results = query_module.search("getUserById", "test_index")
+
+                # Hybrid search should have been called
+                mock_hybrid.assert_called_once_with("getUserById", "test_index", 10)
+
+        # Results should have match_type from hybrid search
+        assert len(results) == 1
+        assert results[0].match_type == "both"
+        assert results[0].vector_score == 0.85
+        assert results[0].keyword_score == 0.75
+
+    def test_search_auto_hybrid_triggered_by_snake_case(self, mock_db_pool):
+        """Test that snake_case queries auto-trigger hybrid search."""
+        import cocosearch.search.query as query_module
+
+        # Reset module state
+        query_module._has_content_text_column = True
+        query_module._hybrid_warning_emitted = False
+
+        from cocosearch.search.hybrid import HybridSearchResult
+
+        mock_hybrid_results = [
+            HybridSearchResult(
+                filename="/path/to/file.py",
+                start_byte=0,
+                end_byte=100,
+                combined_score=0.88,
+                match_type="keyword",
+                vector_score=None,
+                keyword_score=0.88,
+                block_type="function",
+                hierarchy="main.get_user_by_id",
+                language_id="python",
+            )
+        ]
+
+        with patch.object(query_module, "check_column_exists", return_value=True):
+            with patch.object(
+                query_module, "execute_hybrid_search", return_value=mock_hybrid_results
+            ) as mock_hybrid:
+                with patch.object(query_module, "get_connection_pool"):
+                    with patch.object(
+                        query_module, "get_table_name", return_value="test_table"
+                    ):
+                        # snake_case query should trigger hybrid search
+                        results = query_module.search("get_user_by_id", "test_index")
+
+                mock_hybrid.assert_called_once()
+
+        assert len(results) == 1
+        assert results[0].match_type == "keyword"
+
+    def test_search_explicit_hybrid_mode(self, mock_db_pool):
+        """Test that use_hybrid=True forces hybrid search even for plain queries."""
+        import cocosearch.search.query as query_module
+
+        # Reset module state
+        query_module._has_content_text_column = True
+        query_module._hybrid_warning_emitted = False
+
+        from cocosearch.search.hybrid import HybridSearchResult
+
+        mock_hybrid_results = [
+            HybridSearchResult(
+                filename="/path/to/file.py",
+                start_byte=0,
+                end_byte=100,
+                combined_score=0.75,
+                match_type="semantic",
+                vector_score=0.75,
+                keyword_score=None,
+            )
+        ]
+
+        with patch.object(query_module, "check_column_exists", return_value=True):
+            with patch.object(
+                query_module, "execute_hybrid_search", return_value=mock_hybrid_results
+            ) as mock_hybrid:
+                with patch.object(query_module, "get_connection_pool"):
+                    with patch.object(
+                        query_module, "get_table_name", return_value="test_table"
+                    ):
+                        # Plain query with use_hybrid=True should still use hybrid
+                        results = query_module.search(
+                            "database connection", "test_index", use_hybrid=True
+                        )
+
+                mock_hybrid.assert_called_once()
+
+        assert len(results) == 1
+        assert results[0].match_type == "semantic"
+
+    def test_search_vector_only_when_hybrid_false(self, mock_db_pool):
+        """Test that use_hybrid=False forces vector-only search even for identifiers."""
+        import cocosearch.search.query as query_module
+
+        # Reset module state
+        query_module._has_content_text_column = True
+        query_module._hybrid_warning_emitted = False
+
+        # Mock vector search results
+        vector_results = [
+            ("/path/to/file.py", 0, 100, 0.85, "function", "main", "python"),
+        ]
+
+        pool, cursor, conn = mock_db_pool(results=vector_results)
+
+        with patch.object(query_module, "check_column_exists", return_value=True):
+            with patch.object(
+                query_module, "execute_hybrid_search"
+            ) as mock_hybrid:
+                with patch.object(query_module, "code_to_embedding") as mock_embedding:
+                    mock_embedding.eval.return_value = [0.1] * 1024
+                    with patch.object(
+                        query_module, "get_connection_pool", return_value=pool
+                    ):
+                        with patch.object(
+                            query_module, "get_table_name", return_value="test_table"
+                        ):
+                            # camelCase query with use_hybrid=False should NOT use hybrid
+                            results = query_module.search(
+                                "getUserById", "test_index", use_hybrid=False
+                            )
+
+                # Hybrid search should NOT have been called
+                mock_hybrid.assert_not_called()
+
+        # Results should NOT have match_type (vector-only)
+        assert len(results) == 1
+        assert results[0].match_type == ""  # Empty for vector-only
+        assert results[0].vector_score is None
+        assert results[0].keyword_score is None
+
+    def test_search_fallback_when_no_hybrid_columns(self, mock_db_pool):
+        """Test that hybrid search falls back to vector-only when columns missing."""
+        import cocosearch.search.query as query_module
+
+        # Reset module state
+        query_module._has_content_text_column = True
+        query_module._hybrid_warning_emitted = False
+
+        # Vector search results
+        vector_results = [
+            ("/path/to/file.py", 0, 100, 0.85, "function", "main", "python"),
+        ]
+
+        pool, cursor, conn = mock_db_pool(results=vector_results)
+
+        with patch.object(query_module, "check_column_exists", return_value=False):
+            with patch.object(
+                query_module, "execute_hybrid_search"
+            ) as mock_hybrid:
+                with patch.object(query_module, "code_to_embedding") as mock_embedding:
+                    mock_embedding.eval.return_value = [0.1] * 1024
+                    with patch.object(
+                        query_module, "get_connection_pool", return_value=pool
+                    ):
+                        with patch.object(
+                            query_module, "get_table_name", return_value="test_table"
+                        ):
+                            # Request hybrid but column missing - should fallback
+                            results = query_module.search(
+                                "getUserById", "test_index", use_hybrid=True
+                            )
+
+                # Hybrid search should NOT be called (column missing)
+                mock_hybrid.assert_not_called()
+
+        # Should still return results (from vector-only)
+        assert len(results) == 1
+        assert results[0].score == 0.85
+
+    def test_search_auto_mode_uses_vector_for_plain_query(self, mock_db_pool):
+        """Test that plain English queries use vector-only search in auto mode."""
+        import cocosearch.search.query as query_module
+
+        # Reset module state
+        query_module._has_content_text_column = True
+        query_module._hybrid_warning_emitted = False
+
+        # Vector search results
+        vector_results = [
+            ("/path/to/file.py", 0, 100, 0.75, "function", "main", "python"),
+        ]
+
+        pool, cursor, conn = mock_db_pool(results=vector_results)
+
+        with patch.object(query_module, "check_column_exists", return_value=True):
+            with patch.object(
+                query_module, "execute_hybrid_search"
+            ) as mock_hybrid:
+                with patch.object(query_module, "code_to_embedding") as mock_embedding:
+                    mock_embedding.eval.return_value = [0.1] * 1024
+                    with patch.object(
+                        query_module, "get_connection_pool", return_value=pool
+                    ):
+                        with patch.object(
+                            query_module, "get_table_name", return_value="test_table"
+                        ):
+                            # Plain English query in auto mode should use vector-only
+                            results = query_module.search(
+                                "find database connection code", "test_index"
+                            )
+
+                # Hybrid search should NOT be called for plain query
+                mock_hybrid.assert_not_called()
+
+        assert len(results) == 1
