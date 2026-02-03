@@ -26,7 +26,7 @@ from cocosearch.config import (
 )
 from cocosearch.indexer import IndexingConfig, load_config, run_index
 from cocosearch.indexer.progress import IndexingProgress
-from cocosearch.management import clear_index, derive_index_from_git, get_stats, list_indexes
+from cocosearch.management import clear_index, derive_index_from_git, get_language_stats, get_stats, list_indexes
 from cocosearch.management import register_index_path
 from cocosearch.search import search
 from cocosearch.search.formatter import format_json, format_pretty
@@ -444,6 +444,7 @@ def stats_command(args: argparse.Namespace) -> int:
         try:
             stats = get_stats(args.index)
             stats["name"] = args.index
+            lang_stats = get_language_stats(args.index)
         except ValueError as e:
             if args.pretty:
                 console.print(f"[bold red]Error:[/bold red] {e}")
@@ -454,17 +455,51 @@ def stats_command(args: argparse.Namespace) -> int:
         if args.pretty:
             from rich.table import Table
 
-            table = Table(title=f"Index: {args.index}")
-            table.add_column("Metric", style="cyan")
-            table.add_column("Value", style="green")
+            # Summary stats first
+            console.print(f"\n[bold]Index:[/bold] {args.index}")
+            console.print(f"[dim]Files: {stats['file_count']} | Chunks: {stats['chunk_count']} | Size: {stats['storage_size_pretty']}[/dim]\n")
 
-            table.add_row("Files", str(stats["file_count"]))
-            table.add_row("Chunks", str(stats["chunk_count"]))
-            table.add_row("Size", stats["storage_size_pretty"])
+            # Per-language breakdown table
+            table = Table(title="Language Statistics")
+            table.add_column("Language", style="cyan", no_wrap=True)
+            table.add_column("Files", justify="right")
+            table.add_column("Chunks", justify="right")
+            table.add_column("Lines", justify="right")
+
+            total_files = 0
+            total_chunks = 0
+            total_lines = 0
+            has_line_counts = any(ls["line_count"] is not None for ls in lang_stats)
+
+            for ls in lang_stats:
+                line_str = f"{ls['line_count']:,}" if ls["line_count"] is not None else "N/A"
+                table.add_row(
+                    ls["language"],
+                    str(ls["file_count"]),
+                    str(ls["chunk_count"]),
+                    line_str,
+                )
+                total_files += ls["file_count"]
+                total_chunks += ls["chunk_count"]
+                if ls["line_count"] is not None:
+                    total_lines += ls["line_count"]
+
+            # Add totals row
+            table.add_section()
+            total_lines_str = f"{total_lines:,}" if has_line_counts else "N/A"
+            table.add_row("TOTAL", str(total_files), str(total_chunks), total_lines_str, style="bold")
 
             console.print(table)
+
+            if not has_line_counts:
+                console.print("\n[dim]Note: Line counts require v1.7+ index. Re-index to enable.[/dim]")
         else:
-            print(json.dumps(stats, indent=2))
+            # JSON output includes both summary and per-language stats
+            output = {
+                **stats,
+                "languages": lang_stats,
+            }
+            print(json.dumps(output, indent=2))
     else:
         # Stats for all indexes
         indexes = list_indexes()
