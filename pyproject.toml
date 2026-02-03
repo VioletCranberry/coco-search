@@ -15,6 +15,8 @@ dependencies = [
     "psycopg[binary,pool]>=3.3.2",
     "pyyaml>=6.0.2",
     "rich>=13.0.0",
+    "tree-sitter>=0.25.2",
+    "tree-sitter-languages>=1.10.2",
 ]
 
 [project.scripts]
