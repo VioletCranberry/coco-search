@@ -66,10 +66,13 @@ Plans:
   3. Identifier patterns (camelCase, snake_case) automatically trigger hybrid search
   4. Search results show relevance from both semantic meaning and literal keyword matches
 
-**Plans:** TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD
+- [ ] 28-01-PLAN.md — Core hybrid search algorithm and query analyzer
+- [ ] 28-02-PLAN.md — CLI and MCP integration for hybrid search
+- [ ] 28-03-PLAN.md — Output presentation with match type indicators
+- [ ] 28-04-PLAN.md — Integration tests and module wiring
 
 #### Phase 29: Symbol-Aware Indexing
 
