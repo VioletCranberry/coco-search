@@ -350,6 +350,9 @@ def search_command(args: argparse.Namespace) -> int:
     symbol_type = getattr(args, "symbol_type", None)  # list[str] or None from action="append"
     symbol_name = getattr(args, "symbol_name", None)  # str or None
 
+    # Get cache bypass flag
+    no_cache = getattr(args, "no_cache", False)
+
     # Execute search
     try:
         results = search(
@@ -361,6 +364,7 @@ def search_command(args: argparse.Namespace) -> int:
             use_hybrid=use_hybrid,
             symbol_type=symbol_type,
             symbol_name=symbol_name,
+            no_cache=no_cache,
         )
     except Exception as e:
         if args.pretty:
@@ -995,6 +999,11 @@ def main() -> None:
         "--symbol-name",
         help="Filter by symbol name pattern (glob). "
              "Examples: 'get*', 'User*Service', '*Handler'. Case-insensitive matching.",
+    )
+    search_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass query cache (force fresh search)",
     )
 
     # List subcommand

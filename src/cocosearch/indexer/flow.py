@@ -12,6 +12,8 @@ import os
 import cocoindex
 import psycopg
 
+import logging
+
 from cocosearch.indexer.config import IndexingConfig
 from cocosearch.indexer.embedder import code_to_embedding, extract_extension, extract_language
 from cocosearch.indexer.tsvector import text_to_tsvector_sql
@@ -19,6 +21,9 @@ from cocosearch.handlers import get_custom_languages, extract_devops_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
 from cocosearch.indexer.symbols import extract_symbol_metadata
 from cocosearch.indexer.schema_migration import ensure_symbol_columns
+from cocosearch.search.cache import invalidate_index_cache
+
+logger = logging.getLogger(__name__)
 
 
 def create_code_index_flow(
@@ -156,6 +161,15 @@ def run_index(
     # Use default config if not provided
     if config is None:
         config = IndexingConfig()
+
+    # Invalidate query cache for this index before reindexing
+    # This ensures stale results aren't served during/after reindex
+    try:
+        removed = invalidate_index_cache(index_name)
+        if removed > 0:
+            logger.info(f"Invalidated {removed} cached queries for index '{index_name}'")
+    except Exception as e:
+        logger.warning(f"Cache invalidation failed (non-fatal): {e}")
 
     # Initialize CocoIndex (database configured via COCOSEARCH_DATABASE_URL)
     cocoindex.init()
