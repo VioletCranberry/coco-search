@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 32 of 32 (Full Language Coverage + Documentation)
-Plan: 1 of 1 in phase 32
-Status: Phase 32 Plan 01 complete
-Last activity: 2026-02-03 — Completed 32-01-PLAN.md (Language Coverage Expansion)
+Plan: 2 of 4 in phase 32
+Status: Phase 32 in progress
+Last activity: 2026-02-03 — Completed 32-02-PLAN.md (Per-Language Statistics)
 
-Progress: [█████████████████████████████████] 100% (88 of 88 estimated plans complete)
+Progress: [█████████████████████████████████] 100% (89 of 88 estimated plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 88
+- Total plans completed: 89
 - Milestones shipped: 6 (v1.0-v1.6)
 - Current milestone: v1.7 Search Enhancement
 
@@ -31,7 +31,7 @@ Progress: [███████████████████████
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 | v1.4 Dogfooding | 15-18 | 7 | 2026-01-31 |
 
-*Updated: 2026-02-03 after Phase 32 Plan 01 completion*
+*Updated: 2026-02-03 after Phase 32 Plan 02 completion*
 
 ## Accumulated Context
 
@@ -39,6 +39,11 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **32-02**: SQL GROUP BY aggregation for per-language stats (database-level efficiency)
+- **32-02**: Stats CLI shows Language, Files, Chunks, Lines columns with TOTAL row
+- **32-02**: Check content_text column existence to detect v1.7+ indexes
+- **32-02**: JSON stats output includes languages array with per-language data
+- **32-02**: Display N/A for line counts on pre-v1.7 indexes (graceful degradation)
 - **32-01**: LANGUAGE_EXTENSIONS expanded to 28 standard languages (31 total with DevOps)
 - **32-01**: SYMBOL_AWARE_LANGUAGES constant tracks 5 symbol-extraction languages
 - **32-01**: languages CLI command shows Rich table with Language/Extensions/Symbols columns
@@ -128,5 +133,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 32-01-PLAN.md (Language Coverage Expansion)
+Stopped at: Completed 32-02-PLAN.md (Per-Language Statistics)
 Resume file: None
