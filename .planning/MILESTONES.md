@@ -1,5 +1,36 @@
 # Project Milestones: CocoSearch
 
+## v1.7 Search Enhancement (Shipped: 2026-02-03)
+
+**Delivered:** Hybrid search combining vector similarity and keyword matching via RRF fusion, context expansion with smart tree-sitter boundaries, symbol-aware indexing for 5 languages (Python, JS, TS, Go, Rust), and full language coverage (31 languages) — comprehensive search quality improvements for code understanding.
+
+**Phases completed:** 27-32 (21 plans total)
+
+**Key accomplishments:**
+
+- Hybrid search with RRF fusion combining semantic vector similarity and keyword matching
+- Query analyzer auto-detecting code identifiers (camelCase, snake_case) for automatic hybrid mode
+- Context expansion with -A/-B/-C flags and smart tree-sitter boundary detection
+- Symbol-aware indexing extracting functions, classes, and methods with tree-sitter
+- Symbol filtering with --symbol-type and --symbol-name CLI flags and MCP parameters
+- Definition boost (2x) ranking function/class definitions higher than references
+- Full language coverage: 31 languages (28 standard + 3 DevOps)
+- `cocosearch languages` command for language discovery with symbol support indicators
+- Per-language statistics in `cocosearch stats` showing files, chunks, and lines per language
+
+**Stats:**
+
+- 100 files created/modified
+- +21,906 lines (8,225 Python LOC in src/)
+- 6 phases, 21 plans
+- 1 day (2026-02-03)
+
+**Git range:** `docs(27)` → `docs(32)`
+
+**What's next:** v1.8 features (hybrid+symbol combination, nested symbol hierarchy, query caching)
+
+---
+
 ## v1.6 All-in-One Docker & Auto-Detect (Shipped: 2026-02-02)
 
 **Delivered:** All-in-one Docker container bundling PostgreSQL+pgvector, Ollama with pre-baked model, and MCP server under s6-overlay supervision — single `docker run` deployment with multi-transport support (stdio/SSE/HTTP) and auto-detect project from working directory.
