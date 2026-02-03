@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 34 of 37 (Symbol Extraction Expansion)
-Plan: 01 of 03 (Migration & Query Architecture)
-Status: In progress
-Last activity: 2026-02-03 — Completed 34-01: tree-sitter migration, query files
+Plan: 03 of 03 (C and C++ Symbol Extraction)
+Status: Phase complete
+Last activity: 2026-02-03 — Completed 34-03: C and C++ symbol extraction
 
-Progress: [=================================.........] 81% (33/37 phases, 94/103 plans)
+Progress: [==================================........] 84% (34/37 phases, 97/103 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 93
+- Total plans completed: 96
 - Milestones shipped: 7 (v1.0-v1.7)
 - Current milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
 
@@ -39,12 +39,16 @@ Progress: [=================================.........] 81% (33/37 phases, 94/103
 
 Full decision log in PROJECT.md Key Decisions table.
 
-Recent Phase 34-01 decisions:
+Recent Phase 34 decisions:
 - Use QueryCursor dict-based captures API (tree-sitter 0.25.x returns dict not list)
 - Remove field names from TypeScript/JavaScript queries (grammars use positional matching)
 - Preserve return types in signatures for richer search context
 - Extract receiver types for Go methods to build qualified names (Server.Start)
 - Prioritize method patterns in Rust queries to distinguish from top-level functions
+- Only extract C/C++ definitions with body (ignore forward declarations)
+- Map C++ namespaces to "class" symbol type (organizational containers)
+- Use "::" separator for C++ qualified names (MyClass::method)
+- .h files map to C by default (users can override via .cocosearch/queries/)
 
 Recent Phase 33 decisions:
 - Apply symbol/language filters BEFORE RRF fusion (not after)
@@ -70,6 +74,6 @@ None - tree-sitter deprecation warnings resolved in Phase 34-01.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: Completed 34-01-PLAN.md (tree-sitter migration, query architecture)
+Last session: 2026-02-03 19:44 UTC
+Stopped at: Completed Phase 34 (Symbol Extraction Expansion)
 Resume file: None
