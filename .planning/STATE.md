@@ -39,6 +39,11 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **30-01**: LANGUAGE_MAP with 12 extension mappings (js/jsx/mjs/cjs, ts/tsx/mts/cts, go, rs, py)
+- **30-01**: TypeScript type aliases map to "interface" symbol_type
+- **30-01**: Go structs and Rust structs/enums map to "class" symbol_type
+- **30-01**: Rust traits map to "interface" symbol_type
+- **30-01**: Methods use ClassName.methodName format in all languages
 - **30-02**: Escape SQL chars (%, _) BEFORE converting glob wildcards (*, ?) - order matters
 - **30-02**: Symbol filtering uses vector-only mode - hybrid + symbol filters is future enhancement
 - **30-02**: Include symbol columns in SELECT only when symbol filtering is active
