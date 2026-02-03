@@ -1,8 +1,15 @@
-"""Symbol extraction using tree-sitter for Python code.
+"""Symbol extraction using tree-sitter for multiple programming languages.
 
-Extracts function, class, and method definitions from Python source code
+Extracts function, class, method, and interface definitions from source code
 using tree-sitter query-based parsing. Provides metadata for symbol-aware
 indexing and search.
+
+Supported languages:
+- Python: functions, classes, methods (async supported)
+- JavaScript: functions, arrow functions, classes, methods
+- TypeScript: functions, classes, methods, interfaces, type aliases
+- Go: functions, methods (with receiver), structs, interfaces
+- Rust: functions, methods (in impl blocks), structs, traits, enums
 
 Features:
 - Extracts standalone functions, classes, and class methods
@@ -21,29 +28,68 @@ import cocoindex
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# Module-level parser initialization (lazy, one-time setup)
+# Language Mapping (file extension to tree-sitter language name)
 # ============================================================================
 
-_PY_LANGUAGE = None
-_PY_PARSER = None
+LANGUAGE_MAP = {
+    # JavaScript
+    "js": "javascript",
+    "jsx": "javascript",
+    "mjs": "javascript",
+    "cjs": "javascript",
+    # TypeScript
+    "ts": "typescript",
+    "tsx": "typescript",
+    "mts": "typescript",
+    "cts": "typescript",
+    # Go
+    "go": "go",
+    # Rust
+    "rs": "rust",
+    # Python
+    "py": "python",
+    "python": "python",
+}
+
+# ============================================================================
+# Module-level parser cache (lazy, one-time setup per language)
+# ============================================================================
+
+_PARSERS: dict[str, Parser] = {}
+
+
+def _get_parser(language: str) -> Parser:
+    """Get or initialize a tree-sitter parser for the given language.
+
+    Lazy initialization to avoid overhead if language not used.
+    Parsers are cached by tree-sitter language name (not file extension).
+
+    Args:
+        language: Tree-sitter language name (e.g., "python", "javascript").
+
+    Returns:
+        Parser configured for the specified language.
+    """
+    global _PARSERS
+
+    if language not in _PARSERS:
+        lang = get_language(language)
+        parser = Parser()
+        parser.set_language(lang)
+        _PARSERS[language] = parser
+
+    return _PARSERS[language]
 
 
 def _get_python_parser() -> Parser:
     """Get or initialize the Python tree-sitter parser.
 
-    Lazy initialization to avoid overhead if symbols not used.
+    Backward compatible wrapper for existing code.
 
     Returns:
         Parser configured for Python language.
     """
-    global _PY_LANGUAGE, _PY_PARSER
-
-    if _PY_PARSER is None:
-        _PY_LANGUAGE = get_language("python")
-        _PY_PARSER = Parser()
-        _PY_PARSER.set_language(_PY_LANGUAGE)
-
-    return _PY_PARSER
+    return _get_parser("python")
 
 
 # ============================================================================
@@ -113,8 +159,8 @@ def _is_nested_function(func_node) -> bool:
     return False
 
 
-def _extract_all_symbols(chunk_text: str, parser: Parser) -> list[dict]:
-    """Extract all symbols from chunk using a unified approach.
+def _extract_python_symbols(chunk_text: str, parser: Parser) -> list[dict]:
+    """Extract all symbols from Python code.
 
     This function walks the syntax tree and extracts:
     - Classes with their signatures
@@ -226,25 +272,29 @@ def extract_symbol_metadata(text: str, language: str) -> dict:
     """Extract symbol metadata from code chunk.
 
     This is a CocoIndex transform function that extracts symbol information
-    from code chunks during indexing. Supports Python only in Phase 29.
+    from code chunks during indexing. Supports Python, JavaScript, TypeScript,
+    Go, and Rust.
 
     Args:
         text: The chunk text content.
-        language: Language identifier (e.g., "py", "python").
+        language: Language identifier (e.g., "py", "python", "js", "ts", "go", "rs").
 
     Returns:
         Dict with three fields:
-        - symbol_type: "function", "class", "method", or None
+        - symbol_type: "function", "class", "method", "interface", or None
         - symbol_name: Symbol name (qualified for methods), or None
         - symbol_signature: Full signature as written, or None
 
         Returns NULL fields if:
         - Chunk contains no symbols
         - Parse error occurs
-        - Language not supported (non-Python)
+        - Language not supported
     """
-    # Only Python supported in Phase 29
-    if language not in ("py", "python"):
+    # Map extension to tree-sitter language name
+    ts_language = LANGUAGE_MAP.get(language)
+
+    # Return NULL fields for unsupported languages
+    if ts_language is None:
         return {
             "symbol_type": None,
             "symbol_name": None,
@@ -252,7 +302,7 @@ def extract_symbol_metadata(text: str, language: str) -> dict:
         }
 
     try:
-        parser = _get_python_parser()
+        parser = _get_parser(ts_language)
 
         # Parse the chunk
         tree = parser.parse(bytes(text, "utf8"))
@@ -261,8 +311,20 @@ def extract_symbol_metadata(text: str, language: str) -> dict:
         if tree.root_node.has_error:
             logger.debug("Parse errors in chunk (continuing with partial tree)")
 
-        # Extract all symbols
-        symbols = _extract_all_symbols(text, parser)
+        # Dispatch to language-specific extractor
+        if ts_language == "python":
+            symbols = _extract_python_symbols(text, parser)
+        elif ts_language == "javascript":
+            symbols = _extract_javascript_symbols(text, parser)
+        elif ts_language == "typescript":
+            symbols = _extract_typescript_symbols(text, parser)
+        elif ts_language == "go":
+            symbols = _extract_go_symbols(text, parser)
+        elif ts_language == "rust":
+            symbols = _extract_rust_symbols(text, parser)
+        else:
+            # Fallback (should not happen with LANGUAGE_MAP)
+            symbols = []
 
         # Return first symbol if any found
         if symbols:
@@ -285,4 +347,4 @@ def extract_symbol_metadata(text: str, language: str) -> dict:
         }
 
 
-__all__ = ["extract_symbol_metadata"]
+__all__ = ["extract_symbol_metadata", "LANGUAGE_MAP"]
