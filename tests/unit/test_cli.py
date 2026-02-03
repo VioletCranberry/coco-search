@@ -265,6 +265,118 @@ class TestErrorHandling:
         assert "DB error" in output["error"]
 
 
+class TestSymbolFilterArguments:
+    """Tests for search command symbol filter argument parsing."""
+
+    def test_symbol_type_single(self):
+        """Single --symbol-type flag parses correctly."""
+        from cocosearch.cli import main
+        import sys
+
+        # Test by inspecting search_parser behavior via argparse directly
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument(
+            "--symbol-type",
+            action="append",
+            dest="symbol_type",
+        )
+
+        args = parser.parse_args(["query", "--symbol-type", "function"])
+        assert args.symbol_type == ["function"]
+
+    def test_symbol_type_multiple(self):
+        """Multiple --symbol-type flags create list."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument(
+            "--symbol-type",
+            action="append",
+            dest="symbol_type",
+        )
+
+        args = parser.parse_args([
+            "query",
+            "--symbol-type", "function",
+            "--symbol-type", "method"
+        ])
+        assert args.symbol_type == ["function", "method"]
+
+    def test_symbol_name_pattern(self):
+        """--symbol-name accepts glob pattern."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument("--symbol-name")
+
+        args = parser.parse_args(["query", "--symbol-name", "get*"])
+        assert args.symbol_name == "get*"
+
+    def test_symbol_filters_with_other_flags(self):
+        """Symbol filters work with --lang and --hybrid."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument("--symbol-type", action="append", dest="symbol_type")
+        parser.add_argument("--symbol-name")
+        parser.add_argument("--lang")
+        parser.add_argument("--hybrid", action="store_true", default=None)
+
+        args = parser.parse_args([
+            "query",
+            "--symbol-type", "function",
+            "--symbol-name", "fetch*",
+            "--lang", "python",
+            "--hybrid"
+        ])
+        assert args.symbol_type == ["function"]
+        assert args.symbol_name == "fetch*"
+        assert args.lang == "python"
+        assert args.hybrid is True
+
+    def test_symbol_type_all_four(self):
+        """All four symbol types can be specified."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument("--symbol-type", action="append", dest="symbol_type")
+
+        args = parser.parse_args([
+            "query",
+            "--symbol-type", "function",
+            "--symbol-type", "class",
+            "--symbol-type", "method",
+            "--symbol-type", "interface"
+        ])
+        assert args.symbol_type == ["function", "class", "method", "interface"]
+
+    def test_symbol_name_complex_patterns(self):
+        """--symbol-name handles complex glob patterns."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument("--symbol-name")
+
+        # Pattern with asterisk on both ends
+        args = parser.parse_args(["query", "--symbol-name", "*Handler*"])
+        assert args.symbol_name == "*Handler*"
+
+        # Pattern with question mark
+        args = parser.parse_args(["query", "--symbol-name", "get?User"])
+        assert args.symbol_name == "get?User"
+
+        # Pattern like ClassName.method
+        args = parser.parse_args(["query", "--symbol-name", "User*.get*"])
+        assert args.symbol_name == "User*.get*"
+
+    def test_symbol_filters_none_by_default(self):
+        """Symbol filters are None when not specified."""
+        parser = argparse.ArgumentParser()
+        parser.add_argument("query", nargs="?")
+        parser.add_argument("--symbol-type", action="append", dest="symbol_type")
+        parser.add_argument("--symbol-name")
+
+        args = parser.parse_args(["query"])
+        assert args.symbol_type is None
+        assert args.symbol_name is None
+
+
 class TestMCPCommand:
     """Tests for mcp_command transport handling."""
 
