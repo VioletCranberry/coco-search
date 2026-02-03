@@ -305,6 +305,20 @@ def format_pretty(
             escaped = annotation.replace("[", "\\[")
             console.print(f"  [dim cyan]{escaped}[/dim cyan]")
 
+            # Show symbol info if present (after language annotation, before context)
+            if hasattr(r, "symbol_name") and r.symbol_name:
+                symbol_type = getattr(r, "symbol_type", "symbol") or "symbol"
+                # Escape brackets for Rich markup
+                symbol_display = f"[{symbol_type}] {r.symbol_name}"
+                symbol_escaped = symbol_display.replace("[", "\\[")
+                console.print(f"  [dim magenta]{symbol_escaped}[/dim magenta]")
+                # Show signature if available (truncated for display)
+                if hasattr(r, "symbol_signature") and r.symbol_signature:
+                    sig = r.symbol_signature
+                    if len(sig) > 60:
+                        sig = sig[:57] + "..."
+                    console.print(f"  [dim]{sig}[/dim]")
+
             # Get context lines if context expansion is enabled
             if should_expand_context and expander is not None:
                 before_lines, match_lines, after_lines, is_bof, is_eof = expander.get_context_lines(
