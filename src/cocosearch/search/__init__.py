@@ -8,6 +8,7 @@ improved results on code identifier queries.
 """
 
 from cocosearch.search.db import get_connection_pool, get_table_name
+from cocosearch.search.filters import build_symbol_where_clause, glob_to_sql_pattern
 from cocosearch.search.formatter import format_json, format_pretty
 from cocosearch.search.hybrid import (
     HybridSearchResult,
@@ -32,6 +33,9 @@ __all__ = [
     # Core search
     "search",
     "SearchResult",
+    # Symbol filters
+    "build_symbol_where_clause",
+    "glob_to_sql_pattern",
     # Hybrid search
     "hybrid_search",
     "rrf_fusion",
