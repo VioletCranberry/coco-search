@@ -1,16 +1,43 @@
-"""Unit tests for symbol extraction from Python code.
+"""Unit tests for symbol extraction from multiple programming languages.
 
 Tests symbol metadata extraction using tree-sitter for:
+
+Python:
 - Functions (simple, with parameters, with type hints, async)
 - Classes (simple, with bases, multiple bases)
 - Methods (instance, class, static, property)
 - Decorated functions
 - Nested functions (should be skipped)
-- Edge cases (no symbols, parse errors, multiple symbols)
+
+JavaScript:
+- Function declarations
+- Named arrow functions
+- Class declarations
+- Methods inside classes
+
+TypeScript:
+- All JavaScript patterns
+- Interface declarations
+- Type alias declarations (mapped to "interface")
+
+Go:
+- Functions
+- Methods with receivers
+- Structs (mapped to "class")
+- Interfaces
+
+Rust:
+- Functions
+- Methods in impl blocks
+- Structs (mapped to "class")
+- Traits (mapped to "interface")
+- Enums (mapped to "class")
+
+Edge cases (no symbols, parse errors, multiple symbols, unsupported languages)
 """
 
 import pytest
-from cocosearch.indexer.symbols import extract_symbol_metadata
+from cocosearch.indexer.symbols import extract_symbol_metadata, LANGUAGE_MAP
 
 
 @pytest.mark.unit
@@ -273,10 +300,10 @@ z = [1, 2, 3]
 
         assert result["symbol_type"] is None
 
-    def test_non_python_language(self):
-        """Non-Python language returns NULL fields."""
-        code = "function foo() { return 42; }"
-        result = extract_symbol_metadata(code, "javascript")
+    def test_unsupported_language(self):
+        """Unsupported language returns NULL fields."""
+        code = "def foo(): pass"
+        result = extract_symbol_metadata(code, "ruby")  # Ruby not supported
 
         assert result["symbol_type"] is None
         assert result["symbol_name"] is None
@@ -430,3 +457,454 @@ class TestReturnTypeFormats:
         result = extract_symbol_metadata(code, "py")
 
         assert "-> Callable[[int], str]" in result["symbol_signature"]
+
+
+# ============================================================================
+# JavaScript Symbol Extraction Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestJavaScriptSymbols:
+    """Test JavaScript symbol extraction."""
+
+    def test_simple_function(self):
+        """Extract simple function declaration."""
+        code = "function fetchUser() { return null; }"
+        result = extract_symbol_metadata(code, "js")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "fetchUser"
+        assert result["symbol_signature"] == "function fetchUser()"
+
+    def test_function_with_parameters(self):
+        """Extract function with parameters."""
+        code = "function add(a, b) { return a + b; }"
+        result = extract_symbol_metadata(code, "js")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "add"
+        assert result["symbol_signature"] == "function add(a, b)"
+
+    def test_arrow_function_with_parens(self):
+        """Extract named arrow function with parentheses."""
+        code = "const fetchData = (url) => { return fetch(url); }"
+        result = extract_symbol_metadata(code, "js")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "fetchData"
+        assert "const fetchData =" in result["symbol_signature"]
+        assert "=> ..." in result["symbol_signature"]
+
+    def test_arrow_function_multiple_params(self):
+        """Extract arrow function with multiple parameters."""
+        code = "const multiply = (x, y) => x * y;"
+        result = extract_symbol_metadata(code, "js")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "multiply"
+
+    def test_class_declaration(self):
+        """Extract class declaration."""
+        code = "class UserService { }"
+        result = extract_symbol_metadata(code, "js")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "UserService"
+        assert result["symbol_signature"] == "class UserService"
+
+    def test_class_with_method(self):
+        """Extract class with method (class is first symbol)."""
+        code = """class UserService {
+    fetchUser(id) {
+        return this.users[id];
+    }
+}"""
+        result = extract_symbol_metadata(code, "js")
+
+        # First symbol is the class
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "UserService"
+
+    def test_method_definition(self):
+        """Verify method is extracted with qualified name when class not first."""
+        from cocosearch.indexer.symbols import _extract_javascript_symbols, _get_parser
+
+        code = """class UserService {
+    fetchUser(id) {
+        return this.users[id];
+    }
+}"""
+        parser = _get_parser("javascript")
+        symbols = _extract_javascript_symbols(code, parser)
+
+        assert len(symbols) == 2
+        assert symbols[0]["symbol_type"] == "class"
+        assert symbols[1]["symbol_type"] == "method"
+        assert symbols[1]["symbol_name"] == "UserService.fetchUser"
+        assert symbols[1]["symbol_signature"] == "fetchUser(id)"
+
+    def test_jsx_extension(self):
+        """JSX files use JavaScript extractor."""
+        code = "function Button() { return <button />; }"
+        result = extract_symbol_metadata(code, "jsx")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "Button"
+
+    def test_empty_input(self):
+        """Empty JavaScript returns NULL fields."""
+        result = extract_symbol_metadata("", "js")
+
+        assert result["symbol_type"] is None
+        assert result["symbol_name"] is None
+        assert result["symbol_signature"] is None
+
+    def test_no_symbols(self):
+        """JavaScript with no symbols returns NULL fields."""
+        code = "const x = 42; console.log(x);"
+        result = extract_symbol_metadata(code, "js")
+
+        assert result["symbol_type"] is None
+
+
+# ============================================================================
+# TypeScript Symbol Extraction Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestTypeScriptSymbols:
+    """Test TypeScript symbol extraction."""
+
+    def test_function_declaration(self):
+        """Extract TypeScript function declaration."""
+        code = "function fetchUser(id: number): User { return null; }"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "fetchUser"
+        assert "function fetchUser" in result["symbol_signature"]
+
+    def test_arrow_function_typed(self):
+        """Extract typed arrow function."""
+        code = "const fetchData = (url: string): Promise<Data> => fetch(url);"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "fetchData"
+
+    def test_interface_declaration(self):
+        """Extract interface declaration."""
+        code = "interface User { name: string; age: number; }"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "User"
+        assert result["symbol_signature"] == "interface User"
+
+    def test_interface_extends(self):
+        """Extract interface that extends another."""
+        code = "interface Admin extends User { role: string; }"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "Admin"
+
+    def test_type_alias_simple(self):
+        """Extract simple type alias (mapped to interface)."""
+        code = "type UserID = string;"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "UserID"
+        assert result["symbol_signature"] == "type UserID"
+
+    def test_type_alias_union(self):
+        """Extract union type alias."""
+        code = "type Status = 'active' | 'inactive' | 'pending';"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "Status"
+
+    def test_type_alias_object(self):
+        """Extract object type alias."""
+        code = "type UserConfig = { theme: string; language: string; };"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "UserConfig"
+
+    def test_class_declaration(self):
+        """Extract TypeScript class."""
+        code = "class UserService { private users: User[] = []; }"
+        result = extract_symbol_metadata(code, "ts")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "UserService"
+
+    def test_tsx_extension(self):
+        """TSX files use TypeScript extractor."""
+        code = "interface Props { title: string; }"
+        result = extract_symbol_metadata(code, "tsx")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "Props"
+
+    def test_empty_input(self):
+        """Empty TypeScript returns NULL fields."""
+        result = extract_symbol_metadata("", "ts")
+
+        assert result["symbol_type"] is None
+
+
+# ============================================================================
+# Go Symbol Extraction Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestGoSymbols:
+    """Test Go symbol extraction."""
+
+    def test_simple_function(self):
+        """Extract simple Go function."""
+        code = "func Process() error { return nil }"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "Process"
+        assert result["symbol_signature"] == "func Process()"
+
+    def test_function_with_parameters(self):
+        """Extract function with parameters."""
+        code = "func Add(a, b int) int { return a + b }"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "Add"
+        assert "func Add(" in result["symbol_signature"]
+
+    def test_method_with_pointer_receiver(self):
+        """Extract method with pointer receiver."""
+        code = "func (s *Server) Start() error { return nil }"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "method"
+        assert result["symbol_name"] == "Server.Start"
+        assert result["symbol_signature"] == "func Start()"
+
+    def test_method_with_value_receiver(self):
+        """Extract method with value receiver."""
+        code = "func (c Config) GetPort() int { return c.Port }"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "method"
+        assert result["symbol_name"] == "Config.GetPort"
+
+    def test_struct_declaration(self):
+        """Extract struct declaration (mapped to class)."""
+        code = "type Server struct { port int; host string }"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Server"
+        assert result["symbol_signature"] == "type Server struct"
+
+    def test_interface_declaration(self):
+        """Extract interface declaration."""
+        code = "type Handler interface { Handle(ctx Context) error }"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "Handler"
+        assert result["symbol_signature"] == "type Handler interface"
+
+    def test_empty_interface(self):
+        """Extract empty interface (any)."""
+        code = "type Any interface{}"
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "Any"
+
+    def test_multiple_receiver_forms(self):
+        """Test various receiver syntax forms."""
+        code1 = "func (srv *HTTPServer) Listen() {}"
+        result1 = extract_symbol_metadata(code1, "go")
+        assert result1["symbol_name"] == "HTTPServer.Listen"
+
+    def test_empty_input(self):
+        """Empty Go returns NULL fields."""
+        result = extract_symbol_metadata("", "go")
+
+        assert result["symbol_type"] is None
+
+    def test_no_symbols(self):
+        """Go with no symbols returns NULL fields."""
+        code = "package main\n\nimport \"fmt\""
+        result = extract_symbol_metadata(code, "go")
+
+        assert result["symbol_type"] is None
+
+
+# ============================================================================
+# Rust Symbol Extraction Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestRustSymbols:
+    """Test Rust symbol extraction."""
+
+    def test_simple_function(self):
+        """Extract simple Rust function."""
+        code = "fn process() -> Result<(), Error> { Ok(()) }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "process"
+        assert result["symbol_signature"] == "fn process()"
+
+    def test_function_with_parameters(self):
+        """Extract function with parameters."""
+        code = "fn add(a: i32, b: i32) -> i32 { a + b }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "add"
+        assert "fn add(" in result["symbol_signature"]
+
+    def test_public_function(self):
+        """Extract public function."""
+        code = "pub fn new() -> Self { Self {} }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "new"
+
+    def test_method_in_impl_block(self):
+        """Extract method from impl block."""
+        code = """impl Server {
+    fn start(&self) -> Result<(), Error> {
+        Ok(())
+    }
+}"""
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "method"
+        assert result["symbol_name"] == "Server.start"
+        assert result["symbol_signature"] == "fn start(&self)"
+
+    def test_multiple_methods_in_impl(self):
+        """Verify multiple methods extracted from impl block."""
+        from cocosearch.indexer.symbols import _extract_rust_symbols, _get_parser
+
+        code = """impl Server {
+    fn start(&self) {}
+    fn stop(&mut self) {}
+}"""
+        parser = _get_parser("rust")
+        symbols = _extract_rust_symbols(code, parser)
+
+        assert len(symbols) == 2
+        assert symbols[0]["symbol_name"] == "Server.start"
+        assert symbols[1]["symbol_name"] == "Server.stop"
+
+    def test_struct_declaration(self):
+        """Extract struct declaration (mapped to class)."""
+        code = "struct Server { port: u16, host: String }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Server"
+        assert result["symbol_signature"] == "struct Server"
+
+    def test_tuple_struct(self):
+        """Extract tuple struct."""
+        code = "struct Point(i32, i32);"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Point"
+
+    def test_trait_declaration(self):
+        """Extract trait declaration (mapped to interface)."""
+        code = "trait Handler { fn handle(&self) -> Result<(), Error>; }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "Handler"
+        assert result["symbol_signature"] == "trait Handler"
+
+    def test_enum_declaration(self):
+        """Extract enum declaration (mapped to class)."""
+        code = "enum Status { Active, Inactive, Pending }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Status"
+        assert result["symbol_signature"] == "enum Status"
+
+    def test_enum_with_data(self):
+        """Extract enum with associated data."""
+        code = "enum Message { Quit, Move { x: i32, y: i32 }, Write(String) }"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Message"
+
+    def test_empty_input(self):
+        """Empty Rust returns NULL fields."""
+        result = extract_symbol_metadata("", "rs")
+
+        assert result["symbol_type"] is None
+
+    def test_no_symbols(self):
+        """Rust with no symbols returns NULL fields."""
+        code = "use std::io::Result;\nmod tests;"
+        result = extract_symbol_metadata(code, "rs")
+
+        assert result["symbol_type"] is None
+
+
+# ============================================================================
+# Language Map Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestLanguageMap:
+    """Test language extension mapping."""
+
+    def test_language_map_count(self):
+        """LANGUAGE_MAP contains all 12 extension mappings."""
+        assert len(LANGUAGE_MAP) == 12
+
+    def test_javascript_extensions(self):
+        """JavaScript extensions map correctly."""
+        assert LANGUAGE_MAP["js"] == "javascript"
+        assert LANGUAGE_MAP["jsx"] == "javascript"
+        assert LANGUAGE_MAP["mjs"] == "javascript"
+        assert LANGUAGE_MAP["cjs"] == "javascript"
+
+    def test_typescript_extensions(self):
+        """TypeScript extensions map correctly."""
+        assert LANGUAGE_MAP["ts"] == "typescript"
+        assert LANGUAGE_MAP["tsx"] == "typescript"
+        assert LANGUAGE_MAP["mts"] == "typescript"
+        assert LANGUAGE_MAP["cts"] == "typescript"
+
+    def test_other_extensions(self):
+        """Other language extensions map correctly."""
+        assert LANGUAGE_MAP["go"] == "go"
+        assert LANGUAGE_MAP["rs"] == "rust"
+        assert LANGUAGE_MAP["py"] == "python"
+        assert LANGUAGE_MAP["python"] == "python"
+
+    def test_unsupported_extension(self):
+        """Unsupported extension returns None."""
+        assert LANGUAGE_MAP.get("rb") is None
+        assert LANGUAGE_MAP.get("java") is None
+        assert LANGUAGE_MAP.get("cpp") is None

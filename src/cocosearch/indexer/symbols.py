@@ -506,6 +506,229 @@ def _extract_typescript_symbols(chunk_text: str, parser: Parser) -> list[dict]:
     return symbols
 
 
+# ============================================================================
+# Go Symbol Extraction
+# ============================================================================
+
+
+def _extract_go_symbols(chunk_text: str, parser: Parser) -> list[dict]:
+    """Extract symbols from Go code.
+
+    Extracts:
+    - Functions: func Process() error
+    - Methods: func (s *Server) Start() error -> Server.Start
+    - Structs: type Server struct {} (mapped to "class" symbol_type)
+    - Interfaces: type Handler interface {}
+
+    Args:
+        chunk_text: Source code text to parse.
+        parser: Tree-sitter parser instance.
+
+    Returns:
+        List of symbol dicts with symbol_type, symbol_name, symbol_signature.
+    """
+    tree = parser.parse(bytes(chunk_text, "utf8"))
+    symbols = []
+
+    for node in tree.root_node.children:
+        # Function declarations (including methods with receivers)
+        if node.type == "function_declaration":
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+
+            if name_node:
+                func_name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node) if params_node else "()"
+
+                # Check for receiver (method)
+                receiver = None
+                for child in node.children:
+                    if child.type == "parameter_list" and child.start_byte < name_node.start_byte:
+                        # This is the receiver, extract type name
+                        receiver_text = _get_node_text(chunk_text, child)
+                        # Parse receiver: (s *Server) -> Server, (s Server) -> Server
+                        inner = receiver_text.strip("()")
+                        parts = inner.split()
+                        if len(parts) >= 2:
+                            type_part = parts[-1].lstrip("*")
+                            receiver = type_part
+                        elif len(parts) == 1:
+                            receiver = parts[0].lstrip("*")
+                        break
+
+                if receiver:
+                    symbols.append({
+                        "symbol_type": "method",
+                        "symbol_name": f"{receiver}.{func_name}",
+                        "symbol_signature": f"func {func_name}{params}",
+                    })
+                else:
+                    symbols.append({
+                        "symbol_type": "function",
+                        "symbol_name": func_name,
+                        "symbol_signature": f"func {func_name}{params}",
+                    })
+
+        # Method declarations (alternative syntax)
+        elif node.type == "method_declaration":
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+            receiver_node = node.child_by_field_name("receiver")
+
+            if name_node:
+                method_name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node) if params_node else "()"
+
+                receiver = None
+                if receiver_node:
+                    receiver_text = _get_node_text(chunk_text, receiver_node)
+                    inner = receiver_text.strip("()")
+                    parts = inner.split()
+                    if len(parts) >= 2:
+                        receiver = parts[-1].lstrip("*")
+                    elif len(parts) == 1:
+                        receiver = parts[0].lstrip("*")
+
+                if receiver:
+                    symbols.append({
+                        "symbol_type": "method",
+                        "symbol_name": f"{receiver}.{method_name}",
+                        "symbol_signature": f"func {method_name}{params}",
+                    })
+                else:
+                    symbols.append({
+                        "symbol_type": "function",
+                        "symbol_name": method_name,
+                        "symbol_signature": f"func {method_name}{params}",
+                    })
+
+        # Type declarations (structs, interfaces)
+        elif node.type == "type_declaration":
+            for spec in node.children:
+                if spec.type == "type_spec":
+                    name_node = spec.child_by_field_name("name")
+                    type_node = spec.child_by_field_name("type")
+
+                    if name_node and type_node:
+                        type_name = _get_node_text(chunk_text, name_node)
+
+                        if type_node.type == "struct_type":
+                            symbols.append({
+                                "symbol_type": "class",
+                                "symbol_name": type_name,
+                                "symbol_signature": f"type {type_name} struct",
+                            })
+                        elif type_node.type == "interface_type":
+                            symbols.append({
+                                "symbol_type": "interface",
+                                "symbol_name": type_name,
+                                "symbol_signature": f"type {type_name} interface",
+                            })
+
+    return symbols
+
+
+# ============================================================================
+# Rust Symbol Extraction
+# ============================================================================
+
+
+def _extract_rust_symbols(chunk_text: str, parser: Parser) -> list[dict]:
+    """Extract symbols from Rust code.
+
+    Extracts:
+    - Functions: fn process() -> Result<(), Error>
+    - Methods: impl Server { fn start() } -> Server.start
+    - Structs: struct Server {} (mapped to "class" symbol_type)
+    - Traits: trait Handler {} (mapped to "interface" symbol_type)
+    - Enums: enum Status {} (mapped to "class" symbol_type)
+
+    Args:
+        chunk_text: Source code text to parse.
+        parser: Tree-sitter parser instance.
+
+    Returns:
+        List of symbol dicts with symbol_type, symbol_name, symbol_signature.
+    """
+    tree = parser.parse(bytes(chunk_text, "utf8"))
+    symbols = []
+
+    for node in tree.root_node.children:
+        # Function definitions (top-level)
+        if node.type == "function_item":
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+
+            if name_node:
+                func_name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node) if params_node else "()"
+
+                symbols.append({
+                    "symbol_type": "function",
+                    "symbol_name": func_name,
+                    "symbol_signature": f"fn {func_name}{params}",
+                })
+
+        # Impl blocks (methods)
+        elif node.type == "impl_item":
+            type_node = node.child_by_field_name("type")
+            type_name = None
+            if type_node:
+                type_name = _get_node_text(chunk_text, type_node)
+
+            body_node = node.child_by_field_name("body")
+            if body_node and type_name:
+                for child in body_node.children:
+                    if child.type == "function_item":
+                        name_node = child.child_by_field_name("name")
+                        params_node = child.child_by_field_name("parameters")
+
+                        if name_node:
+                            method_name = _get_node_text(chunk_text, name_node)
+                            params = _get_node_text(chunk_text, params_node) if params_node else "()"
+
+                            symbols.append({
+                                "symbol_type": "method",
+                                "symbol_name": f"{type_name}.{method_name}",
+                                "symbol_signature": f"fn {method_name}{params}",
+                            })
+
+        # Struct definitions
+        elif node.type == "struct_item":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                struct_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "class",
+                    "symbol_name": struct_name,
+                    "symbol_signature": f"struct {struct_name}",
+                })
+
+        # Trait definitions
+        elif node.type == "trait_item":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                trait_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "interface",
+                    "symbol_name": trait_name,
+                    "symbol_signature": f"trait {trait_name}",
+                })
+
+        # Enum definitions
+        elif node.type == "enum_item":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                enum_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "class",
+                    "symbol_name": enum_name,
+                    "symbol_signature": f"enum {enum_name}",
+                })
+
+    return symbols
+
+
 @cocoindex.op.function()
 def extract_symbol_metadata(text: str, language: str) -> dict:
     """Extract symbol metadata from code chunk.
