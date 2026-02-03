@@ -7,6 +7,7 @@ Also provides hybrid search combining vector and keyword matching for
 improved results on code identifier queries.
 """
 
+from cocosearch.search.context_expander import ContextExpander
 from cocosearch.search.db import get_connection_pool, get_table_name
 from cocosearch.search.filters import build_symbol_where_clause, glob_to_sql_pattern
 from cocosearch.search.formatter import format_json, format_pretty
@@ -48,6 +49,8 @@ __all__ = [
     "byte_to_line",
     "read_chunk_content",
     "get_context_lines",
+    # Context expansion
+    "ContextExpander",
     # Formatters
     "format_json",
     "format_pretty",
