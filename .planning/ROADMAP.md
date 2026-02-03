@@ -88,10 +88,12 @@ Plans:
   3. Existing indexes (pre-v1.7) continue to work without symbol filtering capability
   4. Symbol extraction handles parse errors gracefully without corrupting index
 
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD
+- [ ] 29-01-PLAN.md — Symbol extraction module with tree-sitter
+- [ ] 29-02-PLAN.md — Integrate symbol extraction into indexing flow
+- [ ] 29-03-PLAN.md — Graceful degradation for pre-v1.7 indexes
 
 #### Phase 30: Symbol Search Filters + Language Expansion
 
@@ -163,8 +165,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 10 | In progress | - |
+| v1.7 Search Enhancement | 27-32 | 13 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 28 completion*
+*Last updated: 2026-02-03 after Phase 29 planning*
