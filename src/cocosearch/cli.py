@@ -310,12 +310,22 @@ def search_command(args: argparse.Namespace) -> int:
         import sys as _sys
         print(f"Using index: {index_name}", file=_sys.stderr)
 
+    # Determine context parameters
+    context_before = args.before_context
+    context_after = args.after_context
+    if args.context is not None:
+        context_before = context_before if context_before is not None else args.context
+        context_after = context_after if context_after is not None else args.context
+    smart_context = not args.no_smart
+
     # Handle interactive mode
     if args.interactive:
+        # For interactive mode, use context value for backward compatibility
+        interactive_context = args.context if args.context is not None else 5
         run_repl(
             index_name=index_name,
             limit=limit,
-            context_lines=args.context,
+            context_lines=interactive_context,
             min_score=min_score,
         )
         return 0
@@ -360,9 +370,20 @@ def search_command(args: argparse.Namespace) -> int:
 
     # Output results
     if args.pretty:
-        format_pretty(results, context_lines=args.context, console=console)
+        format_pretty(
+            results,
+            context_before=context_before,
+            context_after=context_after,
+            smart_context=smart_context,
+            console=console,
+        )
     else:
-        print(format_json(results, context_lines=args.context))
+        print(format_json(
+            results,
+            context_before=context_before,
+            context_after=context_after,
+            smart_context=smart_context,
+        ))
 
     return 0
 
@@ -827,10 +848,30 @@ def main() -> None:
         default=0.3,
     )
     search_parser.add_argument(
-        "-c", "--context",
+        "-A", "--after-context",
         type=int,
-        default=5,
-        help="Context lines to include (default: 5)",
+        default=None,
+        metavar="NUM",
+        help="Show NUM lines after each match (overrides smart expansion)",
+    )
+    search_parser.add_argument(
+        "-B", "--before-context",
+        type=int,
+        default=None,
+        metavar="NUM",
+        help="Show NUM lines before each match (overrides smart expansion)",
+    )
+    search_parser.add_argument(
+        "-C", "--context",
+        type=int,
+        default=None,
+        metavar="NUM",
+        help="Show NUM lines before and after each match (overrides smart expansion)",
+    )
+    search_parser.add_argument(
+        "--no-smart",
+        action="store_true",
+        help="Disable smart context expansion (use exact line counts instead of function boundaries)",
     )
     search_parser.add_argument(
         "--pretty",
