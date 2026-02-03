@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 
 from cocosearch.indexer.embedder import code_to_embedding
+from cocosearch.search.cache import get_query_cache
 from cocosearch.search.db import (
     check_column_exists,
     check_symbol_columns_exist,
@@ -174,6 +175,7 @@ def search(
     use_hybrid: bool | None = None,
     symbol_type: str | list[str] | None = None,
     symbol_name: str | None = None,
+    no_cache: bool = False,
 ) -> list[SearchResult]:
     """Search for code similar to query.
 
@@ -195,6 +197,7 @@ def search(
         symbol_type: Filter by symbol type ("function", "class", "method", "interface").
             Can be a single string or list of types.
         symbol_name: Filter by symbol name using glob pattern (supports * and ?).
+        no_cache: If True, bypass query cache (default False).
 
     Returns:
         List of SearchResult ordered by similarity (highest first).
@@ -210,6 +213,24 @@ def search(
     """
     global _has_metadata_columns, _metadata_warning_emitted
     global _has_content_text_column, _hybrid_warning_emitted
+
+    # Check cache first (exact match only at this point, semantic check after embedding)
+    if not no_cache:
+        cache = get_query_cache()
+        cached_results, hit_type = cache.get(
+            query=query,
+            index_name=index_name,
+            limit=limit,
+            min_score=min_score,
+            language_filter=language_filter,
+            use_hybrid=use_hybrid,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            query_embedding=None,  # No embedding yet for semantic check
+        )
+        if cached_results is not None:
+            logger.debug(f"Cache hit ({hit_type})")
+            return cached_results
 
     # Validate and resolve language filter
     validated_languages = None
@@ -296,6 +317,23 @@ def search(
                         symbol_signature=hr.symbol_signature,
                     )
                 )
+
+        # Cache results for future queries (hybrid search doesn't have embedding)
+        if not no_cache:
+            cache = get_query_cache()
+            cache.put(
+                query=query,
+                index_name=index_name,
+                limit=limit,
+                min_score=min_score,
+                language_filter=language_filter,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                results=results,
+                query_embedding=None,  # Hybrid search doesn't expose query embedding
+            )
+
         return results
 
     # Vector-only search (existing behavior)
@@ -464,5 +502,21 @@ def search(
                         score=score,
                     )
                 )
+
+    # Cache results for future queries (vector search includes embedding for semantic matching)
+    if not no_cache:
+        cache = get_query_cache()
+        cache.put(
+            query=query,
+            index_name=index_name,
+            limit=limit,
+            min_score=min_score,
+            language_filter=language_filter,
+            use_hybrid=use_hybrid,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            results=results,
+            query_embedding=query_embedding,
+        )
 
     return results
