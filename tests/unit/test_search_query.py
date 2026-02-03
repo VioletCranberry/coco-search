@@ -247,8 +247,15 @@ class TestHybridSearchModes:
                         # camelCase query should trigger hybrid search
                         results = query_module.search("getUserById", "test_index")
 
-                # Hybrid search should have been called
-                mock_hybrid.assert_called_once_with("getUserById", "test_index", 10)
+                # Hybrid search should have been called (with filter params)
+                mock_hybrid.assert_called_once_with(
+                    "getUserById",
+                    "test_index",
+                    10,
+                    symbol_type=None,
+                    symbol_name=None,
+                    language_filter=None,
+                )
 
         # Results should have match_type from hybrid search
         assert len(results) == 1
