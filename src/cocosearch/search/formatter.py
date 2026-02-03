@@ -1,6 +1,8 @@
 """Result formatters for search output.
 
 Provides JSON and pretty (Rich) output formatters for search results.
+Supports both smart context expansion (tree-sitter boundaries) and
+explicit line counts via -A/-B/-C flags.
 """
 
 import json
@@ -9,25 +11,45 @@ import os
 from rich.console import Console
 from rich.syntax import Syntax
 
+from cocosearch.search.context_expander import ContextExpander
 from cocosearch.search.query import SearchResult
 from cocosearch.search.utils import byte_to_line, get_context_lines, read_chunk_content
 
 
 def format_json(
     results: list[SearchResult],
-    context_lines: int = 5,
+    context_lines: int | None = None,
+    context_before: int | None = None,
+    context_after: int | None = None,
+    smart_context: bool = True,
     include_content: bool = True,
 ) -> str:
     """Format results as JSON.
 
     Args:
         results: List of SearchResult objects.
-        context_lines: Number of surrounding lines to include.
+        context_lines: Legacy parameter for backward compatibility.
+        context_before: Lines to include before match (overrides smart).
+        context_after: Lines to include after match (overrides smart).
+        smart_context: Whether to use smart boundary expansion.
         include_content: Whether to include chunk content.
 
     Returns:
         JSON string.
     """
+    # Handle backward compatibility for context_lines parameter
+    if context_lines is not None:
+        context_before = context_before if context_before is not None else context_lines
+        context_after = context_after if context_after is not None else context_lines
+
+    # Determine if context expansion should be done
+    should_expand_context = (
+        context_before is not None or context_after is not None or smart_context
+    )
+
+    # Create expander instance for session caching
+    expander = ContextExpander() if should_expand_context else None
+
     output = []
     for r in results:
         start_line = byte_to_line(r.filename, r.start_byte)
@@ -54,14 +76,26 @@ def format_json(
         if include_content:
             item["content"] = read_chunk_content(r.filename, r.start_byte, r.end_byte)
 
-            if context_lines > 0:
-                before, after = get_context_lines(
-                    r.filename, start_line, end_line, context_lines
+            if should_expand_context and expander is not None:
+                # Use ContextExpander for smart or explicit context
+                before_lines, _, after_lines, _, _ = expander.get_context_lines(
+                    r.filename,
+                    start_line,
+                    end_line,
+                    context_before=context_before or 0,
+                    context_after=context_after or 0,
+                    smart=smart_context and context_before is None and context_after is None,
+                    language=_get_tree_sitter_language(r.filename),
                 )
-                item["context_before"] = before
-                item["context_after"] = after
+                # Format as newline-separated strings
+                item["context_before"] = "\n".join(line for _, line in before_lines)
+                item["context_after"] = "\n".join(line for _, line in after_lines)
 
         output.append(item)
+
+    # Clear cache after processing
+    if expander is not None:
+        expander.clear_cache()
 
     return json.dumps(output, indent=2)
 
@@ -115,6 +149,36 @@ _PYGMENTS_LEXER_MAP = {
     "dockerfile": "docker",
 }
 
+# Mapping from extension to tree-sitter language names for context expansion
+_TREE_SITTER_LANG_MAP = {
+    "py": "python",
+    "pyw": "python",
+    "pyi": "python",
+    "js": "javascript",
+    "jsx": "javascript",
+    "mjs": "javascript",
+    "cjs": "javascript",
+    "ts": "typescript",
+    "tsx": "typescript",
+    "mts": "typescript",
+    "cts": "typescript",
+    "go": "go",
+    "rs": "rust",
+}
+
+
+def _get_tree_sitter_language(filepath: str) -> str | None:
+    """Get tree-sitter language name from file extension.
+
+    Args:
+        filepath: Path to the source file.
+
+    Returns:
+        Tree-sitter language name, or None if not supported.
+    """
+    ext = os.path.splitext(filepath)[1].lstrip(".")
+    return _TREE_SITTER_LANG_MAP.get(ext)
+
 
 def _get_display_language(result: SearchResult, filepath: str) -> str:
     """Determine the display language for a search result.
@@ -155,14 +219,20 @@ def _get_annotation(result: SearchResult, display_lang: str) -> str:
 
 def format_pretty(
     results: list[SearchResult],
-    context_lines: int = 5,
+    context_lines: int | None = None,
+    context_before: int | None = None,
+    context_after: int | None = None,
+    smart_context: bool = True,
     console: Console | None = None,
 ) -> None:
-    """Print results in human-readable format.
+    """Print results in human-readable format with grep-style context.
 
     Args:
         results: List of SearchResult objects.
-        context_lines: Number of surrounding lines to include.
+        context_lines: Legacy parameter for backward compatibility.
+        context_before: Lines to include before match (overrides smart).
+        context_after: Lines to include after match (overrides smart).
+        smart_context: Whether to use smart boundary expansion.
         console: Rich Console instance (creates new if None).
     """
     if console is None:
@@ -171,6 +241,19 @@ def format_pretty(
     if not results:
         console.print("[dim]No results found.[/dim]")
         return
+
+    # Handle backward compatibility for context_lines parameter
+    if context_lines is not None:
+        context_before = context_before if context_before is not None else context_lines
+        context_after = context_after if context_after is not None else context_lines
+
+    # Determine if context expansion should be done
+    should_expand_context = (
+        context_before is not None or context_after is not None or smart_context
+    )
+
+    # Create expander instance for session caching
+    expander = ContextExpander() if should_expand_context else None
 
     console.print(f"[bold]Found {len(results)} results:[/bold]\n")
 
@@ -214,23 +297,56 @@ def format_pretty(
             escaped = annotation.replace("[", "\\[")
             console.print(f"  [dim cyan]{escaped}[/dim cyan]")
 
-            # Show content with syntax highlighting
-            content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
-            if content:
-                # Use language_id-aware language for syntax highlighting
-                lexer = _PYGMENTS_LEXER_MAP.get(display_lang, display_lang)
+            # Get context lines if context expansion is enabled
+            if should_expand_context and expander is not None:
+                before_lines, match_lines, after_lines, is_bof, is_eof = expander.get_context_lines(
+                    r.filename,
+                    start_line,
+                    end_line,
+                    context_before=context_before or 0,
+                    context_after=context_after or 0,
+                    smart=smart_context and context_before is None and context_after is None,
+                    language=_get_tree_sitter_language(r.filename),
+                )
 
-                try:
-                    syntax = Syntax(
-                        content,
-                        lexer,
-                        line_numbers=True,
-                        start_line=start_line,
-                        theme="monokai",
-                    )
-                    console.print(syntax)
-                except Exception:
-                    # Fallback to plain text if syntax highlighting fails
-                    console.print(content)
+                # Show BOF marker if at file start
+                if is_bof and before_lines:
+                    console.print("[dim]  [Beginning of file][/dim]")
+
+                # Show context before with grep-style markers (: for context)
+                for line_num, line_text in before_lines:
+                    console.print(f"  [dim]{line_num}: {line_text}[/dim]")
+
+                # Show matched lines with grep-style markers (> for match)
+                for line_num, line_text in match_lines:
+                    console.print(f"  [bold]{line_num}> {line_text}[/bold]")
+
+                # Show context after with grep-style markers (: for context)
+                for line_num, line_text in after_lines:
+                    console.print(f"  [dim]{line_num}: {line_text}[/dim]")
+
+                # Show EOF marker if at file end
+                if is_eof and after_lines:
+                    console.print("[dim]  [End of file][/dim]")
+            else:
+                # No context expansion - show content with syntax highlighting (legacy mode)
+                content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+                if content:
+                    lexer = _PYGMENTS_LEXER_MAP.get(display_lang, display_lang)
+                    try:
+                        syntax = Syntax(
+                            content,
+                            lexer,
+                            line_numbers=True,
+                            start_line=start_line,
+                            theme="monokai",
+                        )
+                        console.print(syntax)
+                    except Exception:
+                        console.print(content)
 
         console.print()  # Blank line between files
+
+    # Clear cache after processing
+    if expander is not None:
+        expander.clear_cache()
