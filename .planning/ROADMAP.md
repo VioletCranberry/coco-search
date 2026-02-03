@@ -62,13 +62,13 @@ Plans:
   4. Ruby files indexed with functions, classes, modules as symbols
   5. PHP files indexed with functions, classes, interfaces, traits as symbols
   6. Symbol extraction uses external .scm query files (not hardcoded Python)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 34-01: Query file architecture + tree-sitter-language-pack migration
-- [ ] 34-02: Java + Ruby symbol extraction
-- [ ] 34-03: C + C++ symbol extraction
-- [ ] 34-04: PHP + additional types
+- [ ] 34-01-PLAN.md -- tree-sitter-language-pack migration + query file architecture
+- [ ] 34-02-PLAN.md -- Java + Ruby symbol extraction
+- [ ] 34-03-PLAN.md -- C + C++ symbol extraction
+- [ ] 34-04-PLAN.md -- PHP symbol extraction + 10-language verification
 
 #### Phase 35: Stats Dashboard
 **Goal**: Provide index observability via CLI, terminal dashboard, and web UI
@@ -129,8 +129,8 @@ Plans:
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
 | v1.7 Search Enhancement | 27-32 | 21 | Complete | 2026-02-03 |
-| v1.8 Polish & Observability | 33-37 | 3/13 | In progress | - |
+| v1.8 Polish & Observability | 33-37 | 7/13 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 33 complete*
+*Last updated: 2026-02-03 after Phase 34 planning*
