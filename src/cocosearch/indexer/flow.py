@@ -11,6 +11,7 @@ import cocoindex
 
 from cocosearch.indexer.config import IndexingConfig
 from cocosearch.indexer.embedder import code_to_embedding, extract_extension, extract_language
+from cocosearch.indexer.tsvector import text_to_tsvector_sql
 from cocosearch.handlers import get_custom_languages, extract_devops_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
 
@@ -82,13 +83,18 @@ def create_code_index_flow(
                     language=file["extension"],
                 )
 
-                # Collect with metadata (now includes content_text for hybrid search)
-                # content_text stores raw chunk text for keyword/BM25-style search (v1.7)
+                # v1.7 Hybrid Search: Store chunk text and tsvector for keyword search
+                # content_text: Raw text for storage and potential future use
+                # content_tsv_input: Preprocessed text for PostgreSQL to_tsvector()
+                chunk["content_tsv_input"] = chunk["text"].transform(text_to_tsvector_sql)
+
+                # Collect with metadata (includes hybrid search columns)
                 code_embeddings.collect(
                     filename=file["filename"],
                     location=chunk["location"],
                     embedding=chunk["embedding"],
-                    content_text=chunk["text"],  # Store text for keyword indexing
+                    content_text=chunk["text"],  # Raw text for hybrid search
+                    content_tsv_input=chunk["content_tsv_input"],  # Preprocessed for tsvector
                     block_type=chunk["metadata"]["block_type"],
                     hierarchy=chunk["metadata"]["hierarchy"],
                     language_id=chunk["metadata"]["language_id"],
