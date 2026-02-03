@@ -870,6 +870,211 @@ class TestRustSymbols:
 
 
 # ============================================================================
+# C Symbol Extraction Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestCSymbols:
+    """Test C symbol extraction."""
+
+    def test_simple_function(self):
+        """Extract simple C function."""
+        code = "int process() { return 0; }"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "process"
+        assert result["symbol_signature"] == "int process()"
+
+    def test_function_with_parameters(self):
+        """Extract function with parameters."""
+        code = "int add(int a, int b) { return a + b; }"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "add"
+        assert "int add(" in result["symbol_signature"]
+
+    def test_pointer_function(self):
+        """Extract function returning pointer."""
+        code = "void *allocate(size_t size) { return malloc(size); }"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "allocate"
+
+    def test_struct_with_body(self):
+        """Extract struct with body (mapped to class)."""
+        code = "struct User { char *name; int age; };"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "User"
+        assert result["symbol_signature"] == "struct User"
+
+    def test_struct_forward_declaration_ignored(self):
+        """Forward declaration without body should be ignored."""
+        code = "struct User;"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] is None
+        assert result["symbol_name"] is None
+
+    def test_enum_declaration(self):
+        """Extract enum declaration (mapped to class)."""
+        code = "enum Status { ACTIVE, INACTIVE, PENDING };"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Status"
+        assert result["symbol_signature"] == "enum Status"
+
+    def test_typedef_declaration(self):
+        """Extract typedef (mapped to interface)."""
+        code = "typedef struct User User;"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] == "interface"
+        assert result["symbol_name"] == "User"
+        assert result["symbol_signature"] == "typedef struct User User;"
+
+    def test_function_declaration_ignored(self):
+        """Function declaration without body should be ignored."""
+        code = "int process();"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] is None
+
+    def test_header_extension(self):
+        """C header files (.h) use C extractor."""
+        code = "int process() { return 0; }"
+        result = extract_symbol_metadata(code, "h")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "process"
+
+    def test_empty_input(self):
+        """Empty C returns NULL fields."""
+        result = extract_symbol_metadata("", "c")
+
+        assert result["symbol_type"] is None
+
+    def test_no_symbols(self):
+        """C with no symbols returns NULL fields."""
+        code = "#include <stdio.h>\n#define MAX 100"
+        result = extract_symbol_metadata(code, "c")
+
+        assert result["symbol_type"] is None
+
+
+# ============================================================================
+# C++ Symbol Extraction Tests
+# ============================================================================
+
+
+@pytest.mark.unit
+class TestCppSymbols:
+    """Test C++ symbol extraction."""
+
+    def test_simple_function(self):
+        """Extract simple C++ function."""
+        code = "int process() { return 0; }"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "process"
+        assert result["symbol_signature"] == "int process()"
+
+    def test_class_declaration(self):
+        """Extract class declaration."""
+        code = "class Server { int port; };"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Server"
+        assert result["symbol_signature"] == "class Server"
+
+    def test_struct_declaration(self):
+        """Extract struct declaration."""
+        code = "struct Point { int x; int y; };"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Point"
+        assert result["symbol_signature"] == "struct Point"
+
+    def test_namespace_declaration(self):
+        """Extract namespace declaration (mapped to class)."""
+        code = "namespace MyLib { }"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "MyLib"
+        assert result["symbol_signature"] == "namespace MyLib"
+
+    def test_method_with_qualified_name(self):
+        """Extract method with qualified name (ClassName::method)."""
+        code = "void MyClass::myMethod() { }"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "method"
+        assert result["symbol_name"] == "myMethod"
+        assert "MyClass::myMethod" in result["symbol_signature"]
+
+    def test_pointer_function(self):
+        """Extract function returning pointer."""
+        code = "void *allocate(size_t size) { return new char[size]; }"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "allocate"
+
+    def test_template_class(self):
+        """Extract template class."""
+        code = "template<typename T> class Container { };"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "class"
+        assert result["symbol_name"] == "Container"
+
+    def test_template_function(self):
+        """Extract template function."""
+        code = "template<typename T> T max(T a, T b) { return a > b ? a : b; }"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] == "function"
+        assert result["symbol_name"] == "max"
+
+    def test_multiple_extensions(self):
+        """Test various C++ extensions."""
+        code = "class Foo {};"
+
+        result_cpp = extract_symbol_metadata(code, "cpp")
+        result_cxx = extract_symbol_metadata(code, "cxx")
+        result_cc = extract_symbol_metadata(code, "cc")
+        result_hpp = extract_symbol_metadata(code, "hpp")
+
+        assert result_cpp["symbol_type"] == "class"
+        assert result_cxx["symbol_type"] == "class"
+        assert result_cc["symbol_type"] == "class"
+        assert result_hpp["symbol_type"] == "class"
+
+    def test_empty_input(self):
+        """Empty C++ returns NULL fields."""
+        result = extract_symbol_metadata("", "cpp")
+
+        assert result["symbol_type"] is None
+
+    def test_no_symbols(self):
+        """C++ with no symbols returns NULL fields."""
+        code = "#include <iostream>\nusing namespace std;"
+        result = extract_symbol_metadata(code, "cpp")
+
+        assert result["symbol_type"] is None
+
+
+# ============================================================================
 # Language Map Tests
 # ============================================================================
 
@@ -879,8 +1084,8 @@ class TestLanguageMap:
     """Test language extension mapping."""
 
     def test_language_map_count(self):
-        """LANGUAGE_MAP contains all 12 extension mappings."""
-        assert len(LANGUAGE_MAP) == 12
+        """LANGUAGE_MAP contains all 23 extension mappings."""
+        assert len(LANGUAGE_MAP) == 23
 
     def test_javascript_extensions(self):
         """JavaScript extensions map correctly."""
@@ -902,9 +1107,23 @@ class TestLanguageMap:
         assert LANGUAGE_MAP["rs"] == "rust"
         assert LANGUAGE_MAP["py"] == "python"
         assert LANGUAGE_MAP["python"] == "python"
+        assert LANGUAGE_MAP["java"] == "java"
+
+    def test_c_extensions(self):
+        """C extensions map correctly."""
+        assert LANGUAGE_MAP["c"] == "c"
+        assert LANGUAGE_MAP["h"] == "c"
+
+    def test_cpp_extensions(self):
+        """C++ extensions map correctly."""
+        assert LANGUAGE_MAP["cpp"] == "cpp"
+        assert LANGUAGE_MAP["cxx"] == "cpp"
+        assert LANGUAGE_MAP["cc"] == "cpp"
+        assert LANGUAGE_MAP["hpp"] == "cpp"
+        assert LANGUAGE_MAP["hxx"] == "cpp"
+        assert LANGUAGE_MAP["hh"] == "cpp"
 
     def test_unsupported_extension(self):
         """Unsupported extension returns None."""
-        assert LANGUAGE_MAP.get("rb") is None
-        assert LANGUAGE_MAP.get("java") is None
-        assert LANGUAGE_MAP.get("cpp") is None
+        assert LANGUAGE_MAP.get("swift") is None
+        assert LANGUAGE_MAP.get("kt") is None
