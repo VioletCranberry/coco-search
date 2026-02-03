@@ -85,7 +85,21 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ### Active
 
-(No active milestone — ready for v1.8 planning)
+**Current Milestone: v1.8 Polish & Observability**
+
+**Goal:** Complete deferred search features, expand symbol coverage, add stats dashboard, create developer skills, and overhaul documentation to reflect CocoSearch's full capabilities.
+
+**Target features:**
+- Hybrid + symbol filter combination (fix fallback to vector-only)
+- Nested symbol hierarchy (fully qualified Class.method names)
+- Query caching/history
+- Symbol extraction for 10 languages (add Java, C, C++, Ruby, PHP)
+- Stats dashboard (HTTP API + terminal + web UI)
+- Claude Code skill (installation + code exploration routing)
+- OpenCode skill (installation + code exploration routing)
+- README rebrand (not just "semantic search" anymore)
+- Retrieval logic documentation
+- MCP tools reference documentation
 
 ### Out of Scope
 
@@ -176,4 +190,4 @@ Environment: COCOSEARCH_DATABASE_URL (required), COCOSEARCH_OLLAMA_URL (optional
 | Definition boost after RRF | 2x multiplier applied post-fusion | ✓ Good |
 
 ---
-*Last updated: 2026-02-03 after v1.7 milestone complete*
+*Last updated: 2026-02-03 after v1.8 milestone started*

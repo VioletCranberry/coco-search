@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** Planning next milestone
+**Current focus:** v1.8 Polish & Observability
 
 ## Current Position
 
-Phase: 32 of 32 complete (all v1.7 phases shipped)
-Plan: N/A — milestone complete
-Status: Ready to plan v1.8
-Last activity: 2026-02-03 — v1.7 milestone archived
+Phase: Not started (researching)
+Plan: —
+Status: Researching v1.8 features
+Last activity: 2026-02-03 — Milestone v1.8 started
 
-Progress: [█████████████████████████████████] 100% (90 plans complete)
+Progress: Defining requirements
 
 ## Performance Metrics
 
@@ -63,5 +63,5 @@ None — v1.7 shipped successfully.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: v1.7 milestone archived — ready for /gsd:new-milestone
+Stopped at: v1.8 milestone started — researching
 Resume file: None
