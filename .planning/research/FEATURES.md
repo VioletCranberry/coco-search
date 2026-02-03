@@ -1,378 +1,580 @@
-# Feature Landscape: DevOps Language Support (v1.2)
+# Feature Landscape: Search Enhancements (v1.7)
 
-**Domain:** DevOps language-aware code search -- HCL (Terraform), Dockerfile, Bash/Shell
-**Researched:** 2026-01-27
-**Confidence:** HIGH (verified against CocoIndex API, Tree-sitter grammars, official Terraform/Docker/Bash documentation)
+**Domain:** Semantic code search enhancements — hybrid search, context expansion, symbol-aware indexing
+**Researched:** 2026-02-03
+**Confidence:** HIGH (verified against Context7, official documentation, current research papers)
+
+## Executive Summary
+
+This research covers four enhancement areas for CocoSearch v1.7:
+
+1. **Hybrid Search** — Combine vector similarity with keyword matching (BM25) for better recall
+2. **Context Expansion** — Show surrounding lines at query time without re-indexing
+3. **Symbol-Aware Search** — Index functions/classes as first-class entities with metadata
+4. **Full Language Coverage** — Expand from 15+ to 30+ languages via CocoIndex built-in support
+
+**Key finding:** These features are table stakes for production code search tools in 2026. Missing them makes CocoSearch feel incomplete compared to Sourcegraph, Cursor, and other modern tools.
 
 ## Table Stakes
 
-Features users expect when a code search tool claims "DevOps language support." Missing any of these makes the feature feel incomplete or broken.
+Features users expect when a code search tool claims "production-ready search." Missing these makes the feature feel incomplete or broken.
 
-### Chunking Features
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **HCL block-level chunking** | Terraform users think in blocks (resource, module, variable). Splitting mid-block destroys the semantic unit. | MEDIUM | Use `CustomLanguageSpec` with regex separators at block boundaries (`resource`, `data`, `module`, `variable`, `output`, `locals`, `provider`, `terraform`). HCL is NOT in CocoIndex's built-in Tree-sitter list -- custom_languages is required. |
-| **Dockerfile instruction-level chunking** | Dockerfiles are sequential instruction lists. A chunk that starts mid-RUN command is useless. FROM boundaries are critical for multi-stage builds. | MEDIUM | Use `CustomLanguageSpec` with FROM as Level 1 separator (stage boundary), then major instructions (RUN, COPY, ENV, etc.) as Level 2. Dockerfile is NOT in CocoIndex's built-in Tree-sitter list. |
-| **Bash function-level chunking** | Shell scripts organize logic into functions. Users search for "the deployment function" or "the cleanup script." | LOW-MEDIUM | Bash IS in CocoIndex's built-in Tree-sitter list, so the existing chunking already understands function boundaries. Custom regex is only needed if Tree-sitter's bash chunking proves inadequate at separating logical script sections. Test first. |
-| **File pattern recognition** | Indexing must actually pick up DevOps files. Users expect `*.tf`, `Dockerfile`, `*.sh` to be indexed without manual configuration. | LOW | Add patterns to `IndexingConfig.include_patterns`. Must handle: `*.tf`, `*.hcl`, `*.tfvars`, `Dockerfile`, `Dockerfile.*`, `Containerfile`, `*.sh`, `*.bash`. |
-| **Correct language routing** | When a `.tf` file is chunked, it must use HCL separators, not plain text fallback. When a `.sh` file is chunked, it should use Bash rules. | LOW | CocoIndex's `language` parameter receives the file extension. Custom language `aliases` must include all relevant extensions. Special case: Dockerfile has no extension -- need filename-based routing. |
-| **Non-DevOps files unaffected** | Adding DevOps support must not break existing Python/JS/Rust chunking. The 30+ Tree-sitter languages must continue working identically. | LOW | `custom_languages` only activates for extensions/names that match custom specs. Built-in Tree-sitter languages take priority (verified from CocoIndex docs). Risk: Bash name collision between custom and built-in. |
-
-### Metadata Features
+### Hybrid Search (Vector + Keyword)
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **HCL block type identification** | A search result showing `resource "aws_s3_bucket" "data"` should indicate this is a "resource" block. Without this, DevOps search results are no better than grep. | LOW | Regex extraction from chunk text: match `^(resource\|data\|variable\|...)` at chunk start. 12 known top-level block types in Terraform. |
-| **Dockerfile instruction type** | Users need to know whether a search result is a FROM, RUN, COPY, or ENV instruction. Critical for understanding build flow. | LOW | First keyword of each instruction is the type. Regex: `^(FROM\|RUN\|COPY\|...)`. |
-| **Bash function name** | When searching for "database backup," the result should show it found `function backup_database()`. | LOW | Regex match for `function_name()` or `function func_name` patterns. |
-| **File path and line numbers** | Already a v1.0 feature. DevOps files must work identically to programming language files for navigation. | NONE | Already implemented. No changes needed. |
-| **Relevance scores** | Already a v1.0 feature. Cosine similarity scores must work with DevOps file embeddings. | NONE | Already implemented. Embedding model is language-agnostic. |
+| **BM25 keyword scoring** | Pure vector search misses exact identifier matches. Searching "AuthService" should rank exact matches higher than semantic similarity. Users expect both semantic understanding AND literal matching. | HIGH | Requires PostgreSQL extension (pg_textsearch or VectorChord-BM25) or tsvector/tsquery with custom BM25 implementation. PostgreSQL's built-in ts_rank is NOT BM25 — it lacks inverse document frequency. |
+| **Reciprocal Rank Fusion (RRF)** | Industry-standard method for combining ranked lists. Formula: `score = sum(1/(k + rank))` where k=60. Works well without tuning, which is why Elasticsearch, OpenSearch, and LanceDB all use it by default. | LOW-MEDIUM | Simple algorithm, no dependencies. Given two ranked lists (vector results, keyword results), merge them with RRF scoring. 50 lines of Python. |
+| **Configurable weighting** | Different queries favor different strategies. "Find database migrations" (keyword-heavy) vs "Find where we handle authentication" (semantic-heavy). Users expect a balance parameter. | LOW | Weighted RRF: multiply each retriever's contribution by a weight. Default 0.5/0.5 (equal weight), configurable via CLI flag `--hybrid-weight` (0.0 = pure keyword, 1.0 = pure vector). |
+| **Query analysis** | Automatically detect when to use hybrid vs pure vector. Short queries with camelCase/snake_case identifiers (e.g., "UserAuth", "get_token") should trigger keyword emphasis. Natural language queries ("where do we authenticate users") should favor vector. | MEDIUM | Heuristic-based: If query contains [A-Z][a-z] or _, boost keyword weight. If query > 5 words, boost vector weight. Simple rules, 90% accuracy. |
+| **Backward compatibility** | Existing pure vector search must continue working. Users who don't need hybrid search shouldn't pay the indexing cost (tsvector columns). | LOW | Hybrid search is opt-in via CLI flag `--hybrid`. Default behavior (vector-only) unchanged. |
 
-### Search Features
+### Context Expansion (Surrounding Code Display)
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Language filter for DevOps files** | `--language terraform` or `--language dockerfile` should narrow results to those file types only. | LOW | Extend `LANGUAGE_EXTENSIONS` mapping in `query.py` with `"terraform": [".tf", ".hcl", ".tfvars"]`, `"dockerfile": ["Dockerfile"]`, `"bash": [".sh", ".bash"]`. Dockerfile is special -- match on basename, not extension. |
-| **Mixed codebase search** | A repo with both Python and Terraform should return results from both. DevOps files should not require a separate index. | LOW | Single flow with `custom_languages` handles this. All files go through the same pipeline. Already confirmed in architecture research. |
-| **Search results include content** | DevOps file chunks must be readable in search output, with proper syntax highlighting for HCL, Dockerfile, and Bash. | LOW | Add to `EXTENSION_LANG_MAP` in `formatter.py`: `"tf": "hcl"`, `"hcl": "hcl"`, `"Dockerfile": "dockerfile"` (Rich library supports these). Verify Rich supports `hcl` and `dockerfile` syntax themes. |
+| **Configurable context lines** | Users expect `-A/-B/-C` flags like grep/ripgrep. Showing 2-5 lines before/after each match is standard in all code search tools (grep, ag, rg, Sourcegraph, GitHub Code Search). | LOW | Read file from disk at query time. Use start_byte/end_byte to locate chunk, then count N lines before/after. No indexing changes required. |
+| **Line number adjustment** | When showing context, line numbers must be accurate. If chunk starts at line 50 and we show 3 lines before, display should start at line 47. | LOW | Calculate line offset from start_byte. PostgreSQL location range gives bytes, not lines. Count newlines in file from 0 to start_byte to get starting line number. |
+| **Smart context boundaries** | Don't show partial lines or break mid-statement. If showing context, include complete lines. If a line is continuation (`\` in Python/Bash), include the full statement. | MEDIUM | Use Tree-sitter to find enclosing scope boundaries (function start/end) and prefer those as context limits. Fallback to line boundaries if Tree-sitter not available for language. |
+| **File reading fallback** | If file has been deleted/moved since indexing, gracefully degrade. Show chunk content only (already in index in v1.0 reference-only approach — wait, CocoSearch uses reference-only storage, so chunk text is NOT in DB). | MEDIUM | Chunk text is NOT stored in PostgreSQL (verified from PROJECT.md: "Reference-only storage"). Context expansion requires file on disk. If file missing, show error: "File modified/deleted since indexing." Cannot show context or chunk text without re-indexing. |
+| **Context separator** | When showing multiple results, separate them clearly like ripgrep does with `--` separator between non-contiguous matches. | LOW | Insert `--` between results in pretty output. Already have this concept from v1.0 pretty formatter. |
+| **Performance for large files** | Reading a 50MB file to show 5 lines of context is wasteful. Need efficient partial file reading using byte ranges. | MEDIUM | Use `seek()` to jump to start_byte - N bytes, read small buffer (~4KB), extract lines. Don't read entire file into memory. |
 
+### Symbol-Aware Indexing (Functions/Classes/Methods)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Function-level chunking granularity** | Users think in terms of functions and classes, not arbitrary 512-token chunks. "Find the authentication function" should return the complete function definition, not a mid-function chunk. | LOW-MEDIUM | CocoIndex already uses Tree-sitter for built-in languages. Verify that default chunking respects function boundaries. If not, add custom separators for each language (e.g., Python: `^def `, `^class `, `^async def `). |
+| **Symbol metadata extraction** | Search results should show "function: authenticate_user" or "class: AuthService" alongside file/line info. This is what VSCode's symbol search does — users expect it. | MEDIUM | Use Tree-sitter queries to extract symbol names. For each chunk, if it starts with a function/class definition, extract the name. Store in `symbol_name` and `symbol_type` columns (extends v1.2 metadata approach). |
+| **Symbol type classification** | Distinguish between functions, classes, methods, interfaces, structs, enums, constants. Different query patterns target different symbol types ("find the User class" vs "find getUserById function"). | MEDIUM | Tree-sitter node types map to symbol types. Python: `function_definition` → function, `class_definition` → class. Each language has different node type names but similar concepts. Need language-specific mapping tables. |
+| **Nested symbol hierarchy** | A method inside a class should show as "AuthService.validate_token" not just "validate_token". Otherwise, searching for "token validation" returns 50 unqualified names. | HIGH | Requires walking up Tree-sitter AST to find parent class/module. Multi-pass parsing: first pass identifies all symbols, second pass builds hierarchy map. Significantly more complex than flat extraction. |
+| **Symbol search filter** | `--symbol-type function` or `--symbol-type class` to narrow search to specific symbol kinds. Complements existing `--language` filter. | LOW | SQL WHERE clause on `symbol_type` column. Trivial once metadata is stored. |
+| **Symbol name search** | `--symbol-name UserAuth` for exact symbol name match, case-insensitive. Useful when you know the symbol name but not which file it's in. | LOW | SQL WHERE with ILIKE on `symbol_name` column. Exact match first, then substring match. |
+
+### Full Language Coverage (30+ Languages)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **All CocoIndex built-in languages** | CocoIndex bundles 30+ Tree-sitter grammars. Users expect a semantic code search tool to support all common languages out of the box. Supporting only 15 languages feels arbitrary and incomplete in 2026. | LOW | Enable all built-in CocoIndex languages. No custom language definitions needed — Tree-sitter grammars already bundled. Just remove the implicit limitation. |
+| **YAML/JSON/Markdown support** | DevOps repos contain tons of YAML (Kubernetes, GitHub Actions, Ansible), JSON (package.json, tsconfig.json, API schemas), and Markdown (docs, README files). Searching only code files misses critical configuration and documentation. | LOW | Already supported by CocoIndex built-ins. Add to LANGUAGE_EXTENSIONS mapping in query.py. |
+| **Language auto-detection** | File extension should be sufficient. `*.yaml` → YAML, `*.md` → Markdown, `*.json` → JSON. No magic number detection needed — code repos are well-organized by convention. | LOW | Already implemented in v1.0 via extension-based routing. Just expand the extension mapping tables. |
+| **Language-specific chunking** | Different languages have different structural units. JSON: top-level keys. YAML: document separators (`---`). Markdown: heading boundaries (`#`, `##`). Tree-sitter handles this automatically. | NONE | Tree-sitter grammars already know language structure. CocoIndex's SplitRecursively respects language semantics. Zero work needed. |
+| **Updated documentation** | README and docs should list all supported languages. Users need to know what's supported before trying it. | LOW | Update `LANGUAGE_EXTENSIONS` mapping and regenerate CLI help text. Add supported languages section to README. |
 
 ## Differentiators
 
-Features that make CocoSearch meaningfully better than grep/ripgrep for DevOps file search. These are not expected but highly valued.
+Features that set CocoSearch apart from competitors. Not expected, but highly valued when present.
 
-### Metadata Enrichment (Primary Differentiator)
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **HCL resource hierarchy** | Show `resource.aws_s3_bucket.data` or `module.vpc > resource.aws_subnet.public` in results. Grep shows raw text; CocoSearch shows structural context. | MEDIUM | Extract from block labels. Two-label blocks (resource, data) produce `type.resource_type.name`. Single-label blocks (variable, output) produce `type.name`. Nested hierarchy (module composition) requires parent tracking -- defer nested modules to future. |
-| **Dockerfile build stage context** | Show `stage:builder` or `stage:production` alongside instruction results. A RUN chunk in a multi-stage Dockerfile is meaningless without knowing which stage it belongs to. | MEDIUM | Parse FROM...AS name to identify stages. Track "current stage" context for subsequent instructions. Requires looking at preceding FROM in the file, not just the chunk. This is the hardest metadata to extract from a chunk alone -- may need file-level pre-processing. |
-| **Terraform provider context** | Show which provider/cloud a resource belongs to (e.g., AWS, GCP, Azure). Useful in multi-cloud repos where "find the load balancer" could match AWS ALB or GCP LB. | LOW | Infer from resource type prefix: `aws_` = AWS, `azurerm_` = Azure, `google_` = GCP, `kubernetes_` = Kubernetes. Heuristic but reliable for 95%+ of Terraform code. |
-| **Bash script purpose annotation** | Annotate chunks with contextual purpose: "CI/CD script" (from path like `ci/`, `.github/`), "deployment function" (from function name), "entrypoint" (from common patterns like `main()` or `"$@"`). | MEDIUM | Path-based heuristics plus content-based keyword matching. Less precise than HCL/Dockerfile structure, but still adds value over raw grep. |
-| **Block type search filter** | `--block-type resource` to search only Terraform resources, or `--block-type function` to search only Bash functions. No existing tool offers this granularity for DevOps files. | LOW | SQL WHERE clause on `block_type` column. Requires metadata extraction to populate the column. Trivial once metadata is stored. |
-| **Hierarchy search filter** | `--hierarchy "aws_s3"` to find all S3-related resources, or `--hierarchy "stage:build"` to find all build stage instructions. Enables precise infrastructure navigation. | LOW | SQL WHERE with LIKE/ILIKE on `hierarchy` column. Trivial once metadata is stored. |
-
-### Chunking Quality (Secondary Differentiator)
+### Hybrid Search Intelligence
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **HCL nested block preservation** | Keep `lifecycle`, `ingress`, `egress`, `provisioner` blocks intact within their parent resource block. Splitting a `lifecycle` block from its `aws_instance` resource loses critical context. | MEDIUM | Regex separator hierarchy: Level 1 = top-level blocks, Level 2 = nested blocks. CocoIndex's `SplitRecursively` tries higher-level separators first, falling to lower levels only if chunks exceed `chunk_size`. Large resource blocks may still split at nested block boundaries, which is the correct behavior. |
-| **Dockerfile RUN command grouping** | Multi-line RUN commands (with `\` continuation) should be kept as one chunk. A 15-line `RUN apt-get install && pip install ...` command is a single semantic unit. | LOW | Regex separator pattern should NOT split on continuation lines. The instruction-level separator `\n(?=RUN\s)` only matches the start of a new instruction, preserving multi-line commands. |
-| **Bash heredoc preservation** | Heredocs (`<<EOF ... EOF`) are common in deployment scripts. Splitting mid-heredoc produces nonsensical chunks. | LOW | Tree-sitter's built-in bash parser understands heredocs as `heredoc_redirect` nodes. If using custom regex, heredoc boundaries are harder to capture. This favors keeping Tree-sitter's built-in bash support over custom regex. |
-| **Comment block association** | Comments preceding a Terraform resource or Bash function should be included in the same chunk. They provide the "why" that makes the code searchable. | LOW | SplitRecursively's natural behavior: comments immediately before a block will be included in the chunk below (since the separator triggers at block start). No special handling needed. |
+| **Automatic hybrid mode** | No manual `--hybrid` flag needed. Query analyzer automatically enables hybrid for identifier-heavy queries ("AuthService", "get_user_by_id") and pure vector for natural language ("where do we handle errors"). Best of both worlds without user intervention. | MEDIUM | Heuristics: If query contains camelCase/snake_case/kebab-case identifiers, enable hybrid. If query is >5 words with no code-like patterns, use pure vector. Log decision for transparency. |
+| **Explain mode** | `--explain` flag shows how the query was interpreted: "Detected identifier pattern 'AuthService', using hybrid search with 0.7 keyword weight." Helps users understand ranking and tune their queries. | LOW | Wrapper around existing search logic. Log query analysis decisions and scoring breakdown per result. |
+| **Negative keywords** | `NOT:test` or `-test` to exclude results. "Find authentication logic NOT:test" excludes test files. Keyword-based exclusion is faster than post-processing vector results. | LOW | Translate to PostgreSQL tsquery: `authentication & !test`. Requires tsvector column (already needed for hybrid search). |
+| **Phrase matching** | `"exact phrase"` in quotes forces keyword phrase match. Useful for error messages, specific comments, or API names. Vector search alone can't enforce exact phrase matching. | LOW | PostgreSQL tsquery `<->` operator: `authentication <-> token`. Requires tsvector column. |
 
+### Context Expansion Intelligence
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Semantic context boundaries** | Instead of fixed line counts, show the enclosing function/class. Searching for "user validation" inside a 200-line function should show the function signature, not just ±5 lines that cut off mid-logic. | HIGH | Use Tree-sitter to find enclosing `function_definition` or `class_definition` node. Extract entire node content. May be very large (200+ lines) — need max size limit to avoid flooding output. |
+| **Collapsible context** | In JSON output for MCP clients, return `chunk` (matching text), `context_before`, `context_after` as separate fields. Calling LLM decides how much context to include based on its own context window budget. | LOW | Already separating concerns: CocoSearch returns chunks, caller synthesizes. Just add context fields to SearchResult dataclass and MCP response schema. |
+| **Syntax-highlighted context** | Context lines in pretty output should be syntax-highlighted too, not just the matching chunk. Makes output readable in terminal. Already doing this for chunk text in v1.0 pretty formatter. | LOW | Extend existing Rich syntax highlighting to include context lines. Already have `EXTENSION_LANG_MAP` mapping. |
+| **Adaptive context size** | Small chunks (5-10 lines) get less context (±2 lines). Large chunks (50+ lines) get more context (±10 lines) because they're already part of complex code. Prevents tiny snippets from being drowned in context. | LOW | Heuristic: `context_lines = min(requested_context, chunk_size_lines // 3)`. Simple ratio, good defaults. |
+
+### Symbol-Aware Intelligence
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Symbol ranking boost** | When query contains a symbol-like term ("UserAuth", "validateToken"), boost chunks that contain symbol definitions (function/class) over chunks that just mention the symbol. Definitions are more useful than call sites 80% of the time. | MEDIUM | RRF with symbol-aware weights: If chunk has `symbol_type != ""`, multiply RRF score by 1.5. Simple heuristic, big impact. |
+| **Related symbols** | "Find related symbols" query: Given a function name, find all functions that call it or are called by it. Useful for impact analysis ("if I change this function, what breaks?"). | VERY HIGH | Requires call graph analysis: parse all files, build AST, extract function calls, build graph, query graph. This is Language Server Protocol (LSP) territory. Probably out of scope for CocoSearch v1.7 — defer to v2.0 or never. |
+| **Symbol cross-references** | Show "X uses this symbol" count alongside search results. "function: authenticate_user (used 47 times)" gives context about importance. | HIGH | Two-pass indexing: (1) extract all symbol definitions, (2) scan all files for references to each symbol, (3) count. Expensive, but high value. Defer to v1.8 or validate demand first. |
+| **Jump to definition** | MCP tool: `jump_to_symbol(symbol_name)` returns file path + line number for symbol definition. Complements search with direct navigation. | LOW | SQL query: `SELECT filename, start_byte WHERE symbol_name = ? AND symbol_type IN ('function', 'class')`. Convert byte offset to line number. Already have all the pieces. |
+
+### Full Language Coverage Value-Adds
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Language statistics** | `cocosearch stats <index>` shows language breakdown: "15k lines Python, 8k lines TypeScript, 2k lines YAML, 500 lines Markdown." Helps users understand codebase composition. | LOW | Extend existing stats command to count chunks by `language_id`. Already stored in v1.2 metadata schema. |
+| **Multi-language projects** | Mixed-language codebases (Python backend + TypeScript frontend + YAML configs) work seamlessly. One index, all languages searchable. Competitors often segment by language. | NONE | Already implemented in v1.2 via unified flow architecture. Just document it explicitly. |
+| **Language-aware snippets** | JSON output for MCP includes language hint: `{"language": "python", "chunk": "..."}` so calling LLM can syntax-highlight or lint the returned code. | LOW | Already capturing language_id in v1.2 metadata. Add to MCP response schema. |
 
 ## Anti-Features
 
-Features that seem useful but should be deliberately NOT built. Building these would add complexity without proportionate value, or would violate CocoSearch's architecture.
+Features that seem useful but should be deliberately NOT built. Building these would add complexity without proportionate value.
 
 | Anti-Feature | Why It Seems Useful | Why Problematic | What to Do Instead |
 |--------------|--------------------|-----------------|--------------------|
-| **Terraform plan/state integration** | "Show what resources actually exist in the cloud alongside the code" | Requires cloud credentials, API calls, state file access. Completely out of scope for a local code search tool. Violates local-first principle. | Search code only. Let users correlate with their own `terraform state list` output. |
-| **Dockerfile build graph analysis** | "Show the dependency graph between build stages" | Requires parsing COPY --from= references, resolving stage names, building a graph. This is a build tool feature, not a search feature. | Extract stage names as metadata. Let the calling LLM (Claude) reason about stage dependencies from the chunks returned. |
-| **Bash script execution analysis** | "Track variable values through script execution" | Bash is dynamically scoped and uses eval, source, etc. Static analysis is brittle. ShellCheck exists for this. | Extract function boundaries and names. Let semantic search handle "what does this script do?" queries via embedding similarity. |
-| **HCL module resolution** | "Resolve `source = "./modules/vpc"` and inline the module contents" | Requires filesystem traversal, registry downloads, variable substitution. This is `terraform init` territory. | Index each .tf file independently. The module path appears in the file and is searchable. Users can follow module references manually. |
-| **Custom Tree-sitter grammars** | "Ship tree-sitter-hcl and tree-sitter-dockerfile for native AST parsing" | CocoIndex's SplitRecursively uses its own bundled Tree-sitter. Adding custom grammars would require either (a) forking CocoIndex or (b) a separate parsing step. Massive complexity increase for marginal improvement over regex separators. | Use CocoIndex's `custom_languages` with regex separators. For HCL and Dockerfile, the structure is regular enough that regex works well. Block-level chunking does not require full AST parsing. |
-| **Secrets detection in DevOps files** | "Flag potential secrets in .tf files or shell scripts" | Adds security scanning scope. Tools like `tfsec`, `checkov`, `gitleaks` exist for this. Not a search feature. | Out of scope. Users should run dedicated security tools. |
-| **Terraform version-specific parsing** | "Handle HCL1 vs HCL2 syntax differences" | HCL1 is deprecated since Terraform 0.12 (2019). No one writes new HCL1 code. Supporting it doubles parsing complexity for near-zero users. | Support HCL2 only. HCL1 files will still be indexed as plain text if encountered. |
-| **YAML/JSON Terraform support** | "Some Terraform configs use JSON format instead of HCL" | JSON Terraform files are extremely rare in practice. YAML is already supported via built-in Tree-sitter. Adding JSON-Terraform-specific metadata extraction for a tiny edge case is not worth it. | JSON files are already indexed as JSON. YAML files already indexed as YAML. They just lack Terraform-specific metadata, which is acceptable. |
-| **Dockerfile linting integration** | "Highlight Dockerfile best practice violations in search results" | Not a search feature. `hadolint` exists for this purpose. Mixing linting with search muddles both. | Return raw chunks. Let the calling LLM identify best practice issues if asked. |
-| **Shell dialect detection** | "Distinguish bash from zsh from sh from fish" | File extension already provides this signal. The structural differences between bash/zsh/sh are minimal for chunking purposes. Fish has a different syntax but is rarely used in DevOps. | Treat all `*.sh`, `*.bash`, `*.zsh` identically for chunking. Use extension for language_id metadata. |
-
+| **Full-text index everything** | "Index every token for perfect keyword recall" | tsvector columns add significant storage cost (30-50% increase). Most queries are semantic, not keyword. Indexing common words ("the", "a", "if") is wasteful. | Index only identifiers and important terms. Use PostgreSQL's `english` text search config to filter stop words. Store tsvector separately, not inline with vector embeddings. |
+| **Re-rank with LLM** | "Use Claude/GPT to re-rank results for perfect relevance" | API cost per query, latency spike (500ms+ per query), violates local-first principle. Semantic code search should be fast (sub-100ms) and free (no API calls). | RRF + heuristic boosts (symbol-aware, identifier-pattern detection) achieve 90% of LLM re-ranking quality with zero cost and latency. |
+| **Result clustering** | "Group results by file, by module, by feature" | Users already have IDE file trees and `git ls-files` for clustering. Search results should be flat and ranked. Clustering hides rank order and complicates navigation. | Return flat ranked list. Calling LLM can group results if needed (e.g., "summarize these results by component"). |
+| **Query suggestions** | "Did you mean X?" autocorrect for queries" | Code search queries are often intentionally misspelled (variable names with typos, abbreviations like "auth" for "authentication"). Autocorrect breaks more queries than it fixes. | No autocorrect. Let semantic search handle fuzzy matching via embeddings. If zero results, suggest relaxing filters (e.g., remove `--language` filter) instead of correcting query text. |
+| **Result deduplication** | "Collapse identical chunks from different files" | Identical code in different files often has different meanings (vendored dependencies vs application code). Collapsing loses context. User needs to see all occurrences. | Show all results. Rank by relevance, not uniqueness. If identical chunks appear, that's information ("this code is duplicated 5 times"). |
+| **Search history** | "Remember past queries for quick repeat" | CocoSearch is designed to be called by MCP clients (Claude Code, Cursor) which have their own chat history. CLI users have shell history (Ctrl+R). Duplicating history in the tool adds complexity with no value. | Rely on shell history for CLI. MCP clients handle their own history. |
+| **Saved searches** | "Save common queries with a name" | Code search queries are one-off explorations, not recurring reports. If a query is repeated often, it should be codified as a test or documented pattern, not saved in a search tool. | No saved searches. If users want to repeat a query, they can copy/paste from shell history or chat history. |
+| **Multi-index search** | "Search across multiple codebases simultaneously" | Different codebases have different contexts. Results from two unrelated projects mixed together are confusing. Users should search one codebase at a time. | One search = one index. If users need multi-repo search, they can run multiple searches sequentially (via bash loop or MCP tool chaining). |
+| **Search within results** | "Filter results from previous search" | Encourages inefficient workflows ("search broadly, then narrow"). Better to refine the original query. MCP clients can do this client-side if needed. | No server-side result filtering. Encourage users to refine queries using `--language`, `--symbol-type`, etc. |
+| **Export results to CSV/Excel** | "Export results for reporting" | Code search is for navigation and understanding, not reporting. If users need to report on code patterns, they should use static analysis tools (SonarQube, CodeQL) designed for that purpose. | JSON output is already machine-readable. If users want CSV, they can pipe: `cocosearch search ... --json | jq -r '.[] | [.filename, .score] | @csv'`. |
 
 ## Feature Dependencies
 
 ```
-[DevOps Chunking Layer]
-CustomLanguageSpec definitions (HCL, Dockerfile, Bash)
+[Hybrid Search Layer]
+PostgreSQL tsvector column
     |
-    +--> SplitRecursively integration (pass custom_languages)
+    +--> BM25-compatible ranking (pg_textsearch OR custom ts_rank)
     |       |
-    |       +--> File pattern recognition (*.tf, Dockerfile, *.sh added to config)
+    |       +--> Reciprocal Rank Fusion (RRF) scoring
+    |       |       |
+    |       |       +--> Weighted RRF (configurable vector/keyword balance)
+    |       |
+    |       +--> Query analyzer (identifier detection, auto-hybrid)
     |
-    +--> Language routing verification (extension -> correct language spec)
+    +--> Backward compatibility (hybrid is opt-in via --hybrid flag)
+    |
+    +--> Schema migration (add tsvector column, GIN index)
 
-[Metadata Layer] (depends on chunking)
-Metadata extraction function (extract_devops_metadata)
+[Context Expansion Layer]
+File on disk (reference-only storage requires original files)
     |
-    +--> HCL block type + hierarchy extraction (regex on chunk text)
+    +--> Byte-to-line conversion (count newlines from 0 to start_byte)
+    |       |
+    |       +--> Efficient partial file reading (seek + small buffer)
     |
-    +--> Dockerfile instruction type + stage extraction (regex on chunk text)
+    +--> Smart boundaries (Tree-sitter scope detection OR line boundaries)
+    |       |
+    |       +--> Configurable context size (-A/-B/-C flags like grep)
     |
-    +--> Bash function name extraction (regex on chunk text)
+    +--> MCP schema extension (context_before, context_after fields)
     |
-    +--> Flow integration (metadata fields added to collector)
-         |
-         +--> Schema extension (3 new TEXT columns in PostgreSQL)
+    +--> Pretty formatter extension (syntax-highlighted context)
 
-[Search Layer] (depends on metadata)
-SearchResult field extension (block_type, hierarchy, language_id)
+[Symbol-Aware Layer]
+Tree-sitter AST parsing (already used by CocoIndex)
     |
-    +--> SQL query update (SELECT new columns)
+    +--> Symbol extraction (function/class/method names)
+    |       |
+    |       +--> Symbol type classification (language-specific node types)
+    |       |
+    |       +--> Metadata storage (symbol_name, symbol_type columns)
     |
-    +--> Language filter extension (terraform, dockerfile, bash)
+    +--> Symbol hierarchy (OPTIONAL, nested symbols like Class.method)
+    |       |
+    |       +--> AST traversal (parent node lookup)
+    |       |
+    |       +--> Fully qualified names (package.module.Class.method)
     |
-    +--> Formatter update (show metadata in JSON and pretty output)
+    +--> Symbol filters (--symbol-type, --symbol-name CLI flags)
+    |       |
+    |       +--> SQL WHERE clauses on symbol_* columns
     |
-    +--> MCP server update (include metadata in search_code response)
-    |
-    +--> Graceful degradation (fall back for pre-v1.2 indexes)
+    +--> Symbol ranking boost (in RRF scoring, definitions > references)
 
-[Enhancement Layer] (depends on search, optional)
-Block type filter (--block-type resource)
+[Language Coverage Layer]
+CocoIndex built-in languages (already available, just enable)
     |
-    +--> Hierarchy filter (--hierarchy "aws_s3")
+    +--> LANGUAGE_EXTENSIONS mapping (query.py update)
     |
-    +--> Provider inference (aws_, azurerm_, google_ prefix heuristic)
+    +--> Documentation update (README, CLI help)
+    |
+    +--> Language statistics (extend stats command)
 ```
 
 ### Dependency Notes
 
-- **Chunking must come first.** Without correct chunk boundaries, metadata extraction produces garbage (a chunk that starts mid-resource-block cannot identify its block type).
-- **Metadata extraction depends on chunking quality.** The regex patterns match the START of a chunk. If SplitRecursively produces chunks that start at block boundaries (as designed), regex works. If chunks start mid-block, regex fails silently (returns empty metadata).
-- **Search changes are backward-compatible.** New columns use COALESCE with empty string defaults. Pre-v1.2 indexes degrade gracefully (no metadata, but search still works).
-- **Block type and hierarchy filters are optional enhancements.** Basic search works without them. They add precision filtering for power users.
+- **Hybrid search depends on tsvector column:** Can't do keyword search without full-text index. This is a schema change (additive, backward-compatible).
+- **Context expansion depends on files on disk:** CocoSearch uses reference-only storage (no chunk text in DB). Context requires reading original files. If file deleted, no context available.
+- **Symbol extraction depends on Tree-sitter:** Already using Tree-sitter for chunking. Extend to extract symbol names from AST nodes.
+- **Nested symbol hierarchy is optional:** Flat symbol names (function: "authenticate_user") are sufficient for v1.7 MVP. Fully qualified names (module.Class.method) can be deferred to v1.8.
+- **Language coverage is essentially free:** CocoIndex bundles 30+ Tree-sitter grammars. Just enable them, no code changes to indexing pipeline.
 
-
-## Per-Language Metadata Specification
-
-### HCL (Terraform)
-
-**Chunk boundaries:** Top-level block start (`resource`, `data`, `variable`, `output`, `locals`, `module`, `provider`, `terraform`, `import`, `moved`, `removed`, `check`).
-
-**Metadata extracted per chunk:**
-
-| Field | Example Value | Extraction Method |
-|-------|--------------|-------------------|
-| `block_type` | `"resource"` | First keyword in block declaration |
-| `hierarchy` | `"resource.aws_s3_bucket.data"` | `block_type.label1.label2` from block declaration |
-| `language_id` | `"hcl"` | File extension (`.tf`, `.hcl`, `.tfvars`) |
-
-**HCL block label patterns:**
-
-| Block Type | Labels | Hierarchy Format | Example |
-|------------|--------|-----------------|---------|
-| `resource` | 2 (type, name) | `resource.TYPE.NAME` | `resource.aws_s3_bucket.data` |
-| `data` | 2 (type, name) | `data.TYPE.NAME` | `data.aws_ami.ubuntu` |
-| `module` | 1 (name) | `module.NAME` | `module.vpc` |
-| `variable` | 1 (name) | `variable.NAME` | `variable.region` |
-| `output` | 1 (name) | `output.NAME` | `output.bucket_arn` |
-| `provider` | 1 (name) | `provider.NAME` | `provider.aws` |
-| `locals` | 0 | `locals` | `locals` |
-| `terraform` | 0 | `terraform` | `terraform` |
-| `import` | 0 | `import` | `import` |
-| `moved` | 0 | `moved` | `moved` |
-| `removed` | 0 | `removed` | `removed` |
-| `check` | 1 (name) | `check.NAME` | `check.health` |
-
-**Provider inference (optional enrichment):**
-
-| Resource Prefix | Provider | Cloud |
-|----------------|----------|-------|
-| `aws_` | AWS | Amazon Web Services |
-| `azurerm_` | Azure | Microsoft Azure |
-| `google_` | GCP | Google Cloud Platform |
-| `kubernetes_` | Kubernetes | Container orchestration |
-| `helm_` | Helm | Kubernetes package manager |
-| `github_` | GitHub | Version control |
-| `docker_` | Docker | Container runtime |
-| `null_` | Null | Utility provider |
-| `random_` | Random | Utility provider |
-| `local_` | Local | Utility provider |
-| `tls_` | TLS | Certificate management |
-
-### Dockerfile
-
-**Chunk boundaries:** FROM instruction (build stage boundary), then individual instructions.
-
-**Metadata extracted per chunk:**
-
-| Field | Example Value | Extraction Method |
-|-------|--------------|-------------------|
-| `block_type` | `"FROM"`, `"RUN"`, `"COPY"` | First keyword of the instruction |
-| `hierarchy` | `"stage:builder"`, `"stage:production"` | FROM...AS name; instructions inherit stage |
-| `language_id` | `"dockerfile"` | Filename-based (`Dockerfile*`, `Containerfile`) |
-
-**Dockerfile instruction types (all 19):**
-
-| Instruction | Frequency | Metadata Value | Notes |
-|------------|-----------|----------------|-------|
-| `FROM` | Every file | Stage boundary | Always has base image; optionally `AS name` |
-| `RUN` | Very common | Build command | Often multi-line with `\` continuation or heredoc |
-| `COPY` | Very common | File transfer | May have `--from=stage` for multi-stage |
-| `ENV` | Common | Environment setup | Key=value pairs |
-| `WORKDIR` | Common | Directory context | Sets working directory |
-| `EXPOSE` | Common | Port declaration | Metadata only, does not publish |
-| `CMD` | Once per file | Runtime command | Final command |
-| `ENTRYPOINT` | Once per file | Runtime entrypoint | Often combined with CMD |
-| `ARG` | Common | Build argument | Available only during build |
-| `ADD` | Less common | File transfer with extras | Like COPY but can extract archives and fetch URLs |
-| `LABEL` | Less common | Image metadata | Key=value metadata pairs |
-| `VOLUME` | Less common | Mount point | Declares volumes |
-| `USER` | Less common | User context | Sets runtime user |
-| `HEALTHCHECK` | Less common | Health monitoring | Container health check config |
-| `SHELL` | Rare | Shell override | Changes default shell |
-| `ONBUILD` | Rare | Trigger | Deferred instruction |
-| `STOPSIGNAL` | Rare | Signal config | Container stop signal |
-| `MAINTAINER` | Deprecated | Author info | Use LABEL instead |
-| `CROSS_BUILD` | Rare | Cross-compilation | Platform-specific |
-
-**Stage tracking challenge:** A Dockerfile chunk containing a RUN instruction should ideally know which build stage it belongs to (e.g., `stage:builder`). However, chunks are processed independently. Solution: the metadata extractor must be file-aware, not just chunk-aware. Two approaches:
-1. **Simple (recommended):** Extract stage from chunk text only. FROM chunks get stage names. Other instructions get empty hierarchy unless the FROM is in the same chunk.
-2. **Complex (deferred):** Pre-process the file to build a stage map, then annotate each chunk with its parent stage. This requires two-pass processing.
-
-Recommend the simple approach for v1.2. Stage context for non-FROM chunks is a v1.3 enhancement.
-
-### Bash/Shell
-
-**Chunk boundaries:** Function definitions, major control flow (if/for/while/case), blank lines between logical sections.
-
-**Metadata extracted per chunk:**
-
-| Field | Example Value | Extraction Method |
-|-------|--------------|-------------------|
-| `block_type` | `"function"`, `"script"` | Function definition pattern match |
-| `hierarchy` | `"function:deploy_app"`, `"function:cleanup"` | Function name extraction |
-| `language_id` | `"bash"` | File extension (`.sh`, `.bash`, `.zsh`) |
-
-**Bash structural elements:**
-
-| Element | Frequency | Metadata Value | Notes |
-|---------|-----------|----------------|-------|
-| `function name() { }` | Common | `function:name` | Standard function definition |
-| `function name { }` | Common | `function:name` | Alternative syntax (no parens) |
-| `if/elif/else/fi` | Common | `"script"` (no hierarchy) | Control flow, not a named unit |
-| `for/while/until` | Common | `"script"` (no hierarchy) | Loop, not a named unit |
-| `case/esac` | Common | `"script"` (no hierarchy) | Pattern matching |
-| Top-level commands | Always | `"script"` (no hierarchy) | Sequential commands outside functions |
-| Shebang (`#!/bin/bash`) | Usually first line | Part of first chunk | Identifies interpreter |
-
-**Special consideration:** Many DevOps bash scripts are "flat" -- no functions, just a sequence of commands with comments as section separators. For these scripts, the most meaningful metadata is the filename/path itself (e.g., `scripts/deploy.sh`) rather than internal structure. The `block_type="script"` with empty hierarchy is the correct representation.
-
-
-## Search Filter Specification
-
-### Existing Filters (v1.0, unchanged)
-
-| Filter | Parameter | Values | Example |
-|--------|-----------|--------|---------|
-| Language | `--language` / `language` | python, javascript, typescript, etc. | `--language python` |
-| Result limit | `--limit` / `limit` | integer | `--limit 5` |
-| Min score | `--min-score` | 0.0-1.0 | `--min-score 0.5` |
-
-### New Language Filter Values (v1.2)
-
-| Value | Matches Files | Extension Patterns |
-|-------|--------------|-------------------|
-| `terraform` or `hcl` | `*.tf`, `*.hcl`, `*.tfvars` | `%.tf`, `%.hcl`, `%.tfvars` |
-| `dockerfile` | `Dockerfile`, `Dockerfile.*`, `Containerfile` | Special: basename LIKE pattern |
-| `bash` or `shell` | `*.sh`, `*.bash`, `*.zsh` | `%.sh`, `%.bash`, `%.zsh` |
-
-**Dockerfile filter challenge:** Dockerfiles often have no extension (just `Dockerfile`) or variant names (`Dockerfile.production`, `Dockerfile.dev`). The existing language filter uses `filename LIKE %s` patterns with extensions. Dockerfile filtering needs `filename LIKE '%/Dockerfile%'` or `basename(filename) LIKE 'Dockerfile%'`. This requires SQL changes -- PostgreSQL does not have a native basename function, but `filename LIKE '%Dockerfile%' OR filename LIKE '%Containerfile%'` works for practical cases.
-
-### New Metadata Filters (v1.2, optional enhancement)
-
-| Filter | Parameter | Values | Example |
-|--------|-----------|--------|---------|
-| Block type | `--block-type` | resource, data, module, variable, output, FROM, RUN, function, script | `--block-type resource` |
-| Hierarchy | `--hierarchy` | partial match on hierarchy string | `--hierarchy aws_s3` |
-
-These filters are additive (AND) with the existing language filter. Combining `--language terraform --block-type resource --hierarchy aws_s3` narrows results to only S3 resource blocks in Terraform files.
-
-
-## MVP Recommendation for v1.2
+## MVP Recommendation for v1.7
 
 ### Must Ship (Core Deliverable)
 
-1. **Custom language definitions** for HCL, Dockerfile, Bash -- without these, DevOps files are indexed as plain text (broken)
-2. **File pattern additions** to IndexingConfig -- without these, DevOps files are not picked up at all
-3. **Block type metadata extraction** -- the minimum viable "DevOps awareness"
-4. **Language filter additions** for terraform, dockerfile, bash -- users need to narrow search scope
-5. **Search result metadata in output** -- surface block_type, hierarchy, language_id in JSON and pretty formats
-6. **MCP server metadata** -- calling LLMs need structured metadata for better synthesis
+1. **Hybrid search with RRF** — Combines vector + keyword, essential for identifier search quality
+2. **Configurable context expansion** — `-A/-B/-C` flags, show surrounding lines, table stakes feature
+3. **Symbol metadata extraction** — Extract function/class names and types, store in DB
+4. **Full language coverage** — Enable all 30+ CocoIndex built-in languages (YAML, JSON, Markdown, etc.)
+5. **Symbol search filters** — `--symbol-type function` to narrow to specific symbol kinds
+6. **Updated MCP schema** — Include symbol metadata and context fields in search responses
 
 ### Should Ship (Significant Value Add)
 
-7. **HCL hierarchy extraction** (resource.aws_s3_bucket.data) -- transforms search from "here's some HCL" to "here's the S3 bucket resource named data"
-8. **Bash function name extraction** -- names are the most searchable unit in shell scripts
-9. **Graceful degradation** for pre-v1.2 indexes -- users should not be forced to re-index everything
-10. **Syntax highlighting** for DevOps files in pretty output -- visual quality matters
+7. **Automatic hybrid mode** — Query analyzer detects identifier patterns, enables hybrid automatically
+8. **Symbol ranking boost** — Boost symbol definitions over references in RRF scoring
+9. **Smart context boundaries** — Use Tree-sitter to prefer function/class boundaries over arbitrary line counts
+10. **Language statistics** — Show language breakdown in `cocosearch stats` command
 
-### Defer to v1.3 (Post-Validation)
+### Defer to v1.8 (Post-Validation)
 
-11. **Dockerfile stage tracking** for non-FROM instructions -- requires two-pass or file-level context
-12. **Block type search filter** (`--block-type`) -- useful but not critical for initial release
-13. **Hierarchy search filter** (`--hierarchy`) -- power user feature, validate demand first
-14. **Provider inference** for Terraform resources -- nice annotation but not essential
-15. **Bash script purpose annotation** -- heuristic-based, may not be reliable enough
+11. **Nested symbol hierarchy** — Fully qualified names (Class.method), requires AST traversal
+12. **Explain mode** — `--explain` flag showing query analysis and scoring decisions
+13. **Phrase matching** — `"exact phrase"` keyword search with tsquery `<->` operator
+14. **Negative keywords** — `NOT:test` exclusion via tsquery negation
+15. **Symbol cross-references** — Count how many times each symbol is used
 
+## Competitive Positioning (2026)
 
-## Competitive Positioning
+| Capability | grep/ripgrep | GitHub Code Search | Sourcegraph | Cursor/Claude Context | CocoSearch v1.7 |
+|-----------|-------------|-------------------|-------------|----------------------|----------------|
+| Vector semantic search | No | Limited | Yes (Deep Search) | Yes | **Yes** |
+| Keyword search | Yes | Yes | Yes | Limited | **Yes (hybrid)** |
+| Hybrid search (combined) | No | Yes | Yes | No | **Yes (RRF)** |
+| Context expansion (±N lines) | Yes (-A/-B/-C) | Yes | Yes | No (full file) | **Yes** |
+| Symbol-aware search | No | Limited | Yes (LSP) | No | **Yes (metadata)** |
+| Function/class filtering | No | No | Yes (code intel) | No | **Yes (--symbol-type)** |
+| 30+ language support | Yes | Yes | Yes | Yes | **Yes** |
+| Fully local / private | Yes | No (cloud) | No (cloud/enterprise) | No (cloud API) | **Yes** |
+| MCP integration | No | No | Limited | Yes | **Yes** |
+| Sub-second search | Yes | Yes | Yes | Depends | **Yes (local)** |
 
-| Capability | grep/ripgrep | Sourcegraph | GitHub Code Search | CocoSearch v1.2 |
-|-----------|-------------|-------------|-------------------|----------------|
-| Find DevOps files | Yes (patterns) | Yes | Yes | Yes |
-| Semantic search ("find the S3 bucket config") | No | Yes (Deep Search) | Limited | Yes |
-| Block type identification | No | No (generic AST) | No | **Yes** |
-| Resource hierarchy in results | No | No | No | **Yes** |
-| Build stage context | No | No | No | **Yes** (FROM only in v1.2) |
-| Fully local / private | Yes | Enterprise only | No (cloud) | **Yes** |
-| Filter by block type | No | No | No | **Planned v1.3** |
-| Mixed codebase search | Yes | Yes | Yes | Yes |
-| Incremental indexing | N/A | Yes | Yes | Yes (CocoIndex) |
-| MCP integration | No | Yes (MCP server) | No | **Yes** |
-
-**Key differentiator:** CocoSearch v1.2 is the only tool that combines semantic search with DevOps-specific metadata (block types, resource hierarchy) in a fully local, privacy-preserving package. grep finds text but lacks semantics. Sourcegraph has semantics but lacks DevOps-specific structural awareness and requires cloud/enterprise infrastructure. CocoSearch v1.2 fills the gap.
-
+**Key differentiator:** CocoSearch v1.7 is the only tool that combines hybrid search, symbol awareness, and semantic understanding in a fully local, privacy-preserving package with MCP integration. GitHub Code Search and Sourcegraph require cloud/enterprise infrastructure. Cursor/Claude Context uses cloud APIs (not local-first). ripgrep/grep lack semantic search. CocoSearch v1.7 fills the gap.
 
 ## User Query Examples (What People Actually Search For)
 
-These queries illustrate why DevOps-specific metadata matters:
+These queries illustrate why each enhancement matters:
 
-| Natural Language Query | Without Metadata | With v1.2 Metadata |
-|-----------------------|-----------------|-------------------|
-| "S3 bucket configuration" | Returns chunks from .tf files with matching text | Returns chunks annotated with `block_type=resource`, `hierarchy=resource.aws_s3_bucket.*` |
-| "Docker build stage for production" | Returns FROM lines in Dockerfiles | Returns FROM chunk with `hierarchy=stage:production` |
-| "deployment function in shell scripts" | Returns text-similar chunks from .sh files | Returns chunk with `block_type=function`, `hierarchy=function:deploy` |
-| "VPC module" | Returns chunks mentioning VPC | Returns chunk with `block_type=module`, `hierarchy=module.vpc` |
-| "environment variables in Docker" | Returns ENV instructions and text mentioning env | Returns ENV instructions with `block_type=ENV`, `language_id=dockerfile` |
-| "database connection settings" | Returns various chunks across all files | Metadata helps the calling LLM distinguish Terraform data source vs. application config vs. Docker ENV |
+| Query | Without Enhancements | With v1.7 Enhancements | Why It Matters |
+|-------|---------------------|------------------------|----------------|
+| **"AuthService"** | Finds chunks semantically similar to "authentication service" but misses exact class name matches buried in boilerplate | Hybrid search ranks exact identifier match first, semantic matches second | Identifiers should match exactly when they appear literally |
+| **"where do we validate tokens"** | Returns chunks with "validate", "token" nearby, but no context — could be inside a 200-line function | Returns chunk with ±10 lines of context showing the function signature and setup logic | Context prevents "grep in the dark" problem |
+| **"find the User class"** | Returns any chunk mentioning "User" — could be imports, comments, docstrings | Symbol-aware search filters to `symbol_type=class`, returns only class definitions | Users think in symbols (functions, classes), not arbitrary chunks |
+| **"deployment scripts"** | Only searches Python/JS/Rust code (15 languages), misses deploy.yaml and deploy.sh | Full language coverage includes YAML, Bash, Markdown — finds all deployment-related files | Modern repos are 40% config/docs, not just code |
+| **"error handling in API"** | Returns 50 snippets, no way to see if they're inside error handling functions or just comments mentioning errors | Symbol metadata shows which results are inside `handle_error()` functions vs. incidental mentions | Symbol context disambiguates results |
+| **"database connection NOT:test"** | Returns test files mixed with application code, user manually filters | Hybrid search with negative keywords excludes test files immediately | Keyword exclusion is faster than semantic filtering |
 
+## Per-Feature User Experience Specification
+
+### Hybrid Search UX
+
+**CLI:**
+```bash
+# Explicit hybrid mode
+cocosearch search "AuthService" --hybrid
+
+# Automatic hybrid (query analyzer detects identifier)
+cocosearch search "AuthService"  # auto-enables hybrid
+
+# Weight tuning (0.0 = keyword only, 1.0 = vector only, default 0.5)
+cocosearch search "authentication logic" --hybrid-weight 0.7  # favor vector
+```
+
+**MCP:**
+```json
+{
+  "query": "AuthService",
+  "hybrid": true,
+  "hybrid_weight": 0.5
+}
+```
+
+**Expected behavior:**
+- Identifier-heavy queries ("getUserById", "AuthService") automatically enable hybrid with 0.7 keyword weight
+- Natural language queries ("where do we handle errors") use 0.3 keyword weight
+- Pure keyword queries (--hybrid-weight 0.0) behave like grep but with BM25 ranking
+- Pure vector queries (--hybrid-weight 1.0) behave like v1.0 (current behavior)
+
+### Context Expansion UX
+
+**CLI:**
+```bash
+# Show 3 lines before and after each match (like grep -C 3)
+cocosearch search "validate token" -C 3
+
+# Asymmetric context (5 before, 2 after)
+cocosearch search "validate token" -B 5 -A 2
+
+# Smart boundaries (show enclosing function)
+cocosearch search "validate token" --context-smart
+```
+
+**MCP:**
+```json
+{
+  "query": "validate token",
+  "context_before": 3,
+  "context_after": 3,
+  "context_smart": false
+}
+```
+
+**Result format (JSON):**
+```json
+{
+  "filename": "auth.py",
+  "start_line": 42,
+  "end_line": 45,
+  "score": 0.89,
+  "context_before": ["def validate_token(token: str):", "    if not token:", "        return False"],
+  "chunk": ["    payload = decode_jwt(token)", "    if payload.exp < now():", "        return False", "    return True"],
+  "context_after": ["", "def refresh_token(user_id: int):"]
+}
+```
+
+**Pretty output:**
+```
+auth.py:42-45 (score: 0.89)
+39: def validate_token(token: str):
+40:     if not token:
+41:         return False
+42:     payload = decode_jwt(token)
+43:     if payload.exp < now():
+44:         return False
+45:     return True
+46:
+47: def refresh_token(user_id: int):
+--
+```
+
+### Symbol-Aware Search UX
+
+**CLI:**
+```bash
+# Filter by symbol type
+cocosearch search "authentication" --symbol-type function
+
+# Search by exact symbol name
+cocosearch search --symbol-name "AuthService"
+
+# Combine filters
+cocosearch search "user management" --language python --symbol-type class
+```
+
+**MCP:**
+```json
+{
+  "query": "authentication",
+  "symbol_type": "function",
+  "symbol_name": null
+}
+```
+
+**Result format (JSON):**
+```json
+{
+  "filename": "auth.py",
+  "start_line": 42,
+  "end_line": 45,
+  "score": 0.89,
+  "symbol_name": "authenticate_user",
+  "symbol_type": "function",
+  "language_id": "python"
+}
+```
+
+**Pretty output:**
+```
+auth.py:42-45 (score: 0.89)
+function: authenticate_user (python)
+    def authenticate_user(username: str, password: str) -> User:
+        ...
+--
+```
+
+### Full Language Coverage UX
+
+**CLI:**
+```bash
+# Search YAML files
+cocosearch search "kubernetes deployment" --language yaml
+
+# Search Markdown docs
+cocosearch search "installation guide" --language markdown
+
+# Multi-language search
+cocosearch search "database config" --language python,yaml,json
+```
+
+**Language statistics:**
+```bash
+cocosearch stats myproject
+
+Index: myproject
+Files indexed: 1,247
+Total chunks: 8,932
+
+Language breakdown:
+  Python: 4,521 chunks (50.6%)
+  TypeScript: 2,340 chunks (26.2%)
+  YAML: 1,203 chunks (13.5%)
+  JSON: 543 chunks (6.1%)
+  Markdown: 325 chunks (3.6%)
+```
+
+## Implementation Complexity Assessment
+
+| Feature | Complexity | LOC Estimate | Dependencies | Risk Level |
+|---------|-----------|--------------|--------------|------------|
+| **Hybrid search (RRF)** | MEDIUM | 150 | tsvector column, GIN index | LOW (well-documented) |
+| **BM25 ranking** | HIGH | 200 | pg_textsearch OR custom | MEDIUM (extension dependency) |
+| **Context expansion** | LOW | 100 | None (file I/O) | LOW |
+| **Smart context boundaries** | MEDIUM | 150 | Tree-sitter queries | MEDIUM (language-specific) |
+| **Symbol extraction** | MEDIUM | 200 | Tree-sitter queries | MEDIUM (per-language mapping) |
+| **Symbol hierarchy** | HIGH | 300 | AST traversal | HIGH (complex logic) |
+| **Language coverage** | LOW | 50 | None (already in CocoIndex) | NONE |
+| **Query analyzer** | LOW | 100 | Regex patterns | LOW |
+
+**Total v1.7 MVP estimate:** ~950 LOC (hybrid search + context expansion + symbol extraction + language coverage)
+
+**Deferred features (v1.8):** ~450 LOC (symbol hierarchy + explain mode + advanced query syntax)
+
+## Query Pattern Taxonomy
+
+Based on research, code search queries fall into 5 categories:
+
+| Pattern | Example | Best Approach | Why |
+|---------|---------|--------------|-----|
+| **Identifier lookup** | "AuthService", "getUserById" | Hybrid with keyword boost | Exact match matters |
+| **Natural language concept** | "where do we handle authentication" | Pure vector | Semantic understanding needed |
+| **Error message** | "Token expired" | Hybrid with phrase match | Exact phrase + semantic context |
+| **Symbol search** | "User class definition" | Symbol-aware filter | User thinking in code structure |
+| **File type + concept** | "YAML kubernetes deployment" | Language filter + vector | Scope + semantics |
+
+**Query analyzer heuristics:**
+
+1. Contains camelCase/snake_case → Enable hybrid, boost keyword 0.7
+2. Contains quoted phrase → Enable phrase matching
+3. Mentions "class" or "function" → Enable symbol filters
+4. Mentions file type/language → Enable language filter
+5. >5 words, no code patterns → Pure vector search
+
+## Schema Changes Required
+
+### New Columns (Hybrid Search)
+
+```sql
+-- Add tsvector column for full-text search
+ALTER TABLE codeindex_{index_name}__{index_name}_chunks
+ADD COLUMN chunk_text_tsvector tsvector;
+
+-- Populate tsvector from chunk text (requires reading files to extract text)
+-- NOTE: chunk text not stored in DB (reference-only), need to read from disk
+
+-- Create GIN index for fast keyword search
+CREATE INDEX idx_{index_name}_chunks_tsvector
+ON codeindex_{index_name}__{index_name}_chunks
+USING GIN (chunk_text_tsvector);
+```
+
+**CRITICAL ISSUE:** Reference-only storage means chunk text is NOT in database. To populate tsvector, must:
+1. Read each file from disk
+2. Extract chunk text using start_byte/end_byte
+3. Convert to tsvector
+4. Update row
+
+This is essentially a full re-index. **Hybrid search cannot be retrofitted to existing indexes without re-indexing.**
+
+### New Columns (Symbol-Aware)
+
+```sql
+-- Add symbol metadata columns
+ALTER TABLE codeindex_{index_name}__{index_name}_chunks
+ADD COLUMN symbol_name TEXT DEFAULT '',
+ADD COLUMN symbol_type TEXT DEFAULT '',
+ADD COLUMN symbol_hierarchy TEXT DEFAULT '';
+
+-- Create indexes for symbol filters
+CREATE INDEX idx_{index_name}_chunks_symbol_type
+ON codeindex_{index_name}__{index_name}_chunks (symbol_type);
+
+CREATE INDEX idx_{index_name}_chunks_symbol_name
+ON codeindex_{index_name}__{index_name}_chunks (symbol_name);
+```
+
+**Note:** Unlike tsvector, symbol metadata CAN be extracted during initial indexing from CocoIndex chunk text (before storage). This is additive and backward-compatible.
+
+## Performance Considerations
+
+### Hybrid Search Performance
+
+| Operation | Vector-Only | Hybrid (RRF) | Notes |
+|-----------|-------------|--------------|-------|
+| Query latency | 20-50ms | 40-80ms | Two queries + RRF merge |
+| Index size | 100% | 130-150% | +30-50% for tsvector + GIN |
+| Indexing time | 100% | 120-140% | +20-40% for text extraction + tsvector |
+
+**Mitigation:** Hybrid is opt-in. Default vector-only search unchanged.
+
+### Context Expansion Performance
+
+| File Size | Context Retrieval Time | Notes |
+|-----------|----------------------|-------|
+| <10KB | <1ms | Negligible |
+| 100KB | 2-5ms | Seek + read small buffer |
+| 1MB | 5-10ms | Still fast with byte-range seek |
+| 10MB+ | 20-50ms | Large files become bottleneck |
+
+**Mitigation:** Use `seek()` + small buffer (4KB) read. Don't load full file into memory.
+
+### Symbol Extraction Performance
+
+| Language | Parse Time (per file) | Notes |
+|----------|----------------------|-------|
+| Python | 10-30ms | Tree-sitter built-in |
+| TypeScript | 20-50ms | Complex grammar |
+| YAML | 5-10ms | Simple structure |
+
+**Mitigation:** Symbol extraction happens during indexing (one-time cost). Query time unaffected.
+
+## Open Questions
+
+1. **BM25 implementation:** Use pg_textsearch extension (requires installation) or custom ts_rank implementation (pure SQL but lower quality)?
+   - **Recommendation:** Start with custom ts_rank, document pg_textsearch as optional upgrade for production deployments.
+
+2. **Chunk text storage:** Should we store chunk text in DB to avoid file I/O for context expansion and hybrid search?
+   - **Recommendation:** No. Reference-only is a core principle. File I/O is fast enough (<5ms per chunk with seek).
+
+3. **Symbol hierarchy depth:** How many levels? `Class.method` or `package.module.Class.method`?
+   - **Recommendation:** Start with 2 levels (`Class.method`). Validate demand for full namespacing.
+
+4. **Hybrid search default:** Should hybrid be default (with auto-weight) or opt-in?
+   - **Recommendation:** Opt-in for v1.7 (backward compatibility). Consider default in v2.0 after validation.
+
+5. **Context expansion default lines:** What's the default for `-C`? grep defaults to 2, ripgrep defaults to 0.
+   - **Recommendation:** Default 0 (no context unless requested). Explicit is better than implicit for MCP responses.
 
 ## Sources
 
-**CocoIndex (Verified - HIGH confidence):**
-- [CocoIndex Functions Documentation](https://cocoindex.io/docs/ops/functions) -- SplitRecursively API, CustomLanguageSpec structure, supported languages list
-- [CocoIndex Academic Papers Example](https://cocoindex.io/docs/examples/academic_papers_index) -- CustomLanguageSpec usage pattern
-- CocoIndex Python API (`cocoindex.functions.SplitRecursively`, `cocoindex.functions.CustomLanguageSpec`) -- Verified via `help()` in local venv
+**Hybrid Search:**
+- [Hybrid Search: Combining BM25 and Vector Search | Medium (Jan 2026)](https://medium.com/codex/96-hybrid-search-combining-bm25-and-vector-search-7a93adfd3f4e)
+- [OpenSearch Semantic and Hybrid Search Tutorial (2026)](https://docs.opensearch.org/latest/tutorials/vector-search/neural-search-tutorial/)
+- [Reciprocal Rank Fusion Explained | GitHub Gist](https://gist.github.com/srcecde/eec6c5dda268f9a58473e1c14735c7bb)
+- [Implementing RRF in Python | Safjan](https://safjan.com/implementing-rank-fusion-in-python/)
+- [Redis Hybrid Search Explained (2026)](https://redis.io/blog/hybrid-search-explained/)
 
-**Tree-sitter Grammars (Verified - HIGH confidence):**
-- [tree-sitter-grammars/tree-sitter-hcl](https://github.com/tree-sitter-grammars/tree-sitter-hcl) -- HCL grammar exists but is NOT bundled in CocoIndex
-- [camdencheek/tree-sitter-dockerfile](https://github.com/camdencheek/tree-sitter-dockerfile) -- Dockerfile grammar exists but is NOT bundled in CocoIndex
-- [tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash) -- Bash grammar IS bundled in CocoIndex (built-in language)
-- [Tree-sitter parser list](https://github.com/tree-sitter/tree-sitter/wiki/List-of-parsers) -- Comprehensive grammar catalog
+**BM25 in PostgreSQL:**
+- [PostgreSQL BM25 Full-Text Search | VectorChord Blog](https://blog.vectorchord.ai/postgresql-full-text-search-fast-when-done-right-debunking-the-slow-myth)
+- [Implementing BM25 in PostgreSQL | ParadeDB](https://www.paradedb.com/learn/search-in-postgresql/bm25)
+- [pg_textsearch (Timescale) | GitHub](https://github.com/timescale/pg_textsearch)
+- [VectorChord-BM25 | GitHub](https://github.com/tensorchord/VectorChord-bm25)
 
-**Terraform / HCL (Verified - HIGH confidence):**
-- [Terraform Syntax Configuration](https://developer.hashicorp.com/terraform/language/syntax/configuration) -- HCL block types, label patterns
-- [Terraform Block Reference](https://developer.hashicorp.com/terraform/language/block/terraform) -- terraform block structure
-- [Terraform Import Block](https://developer.hashicorp.com/terraform/language/import) -- import block documentation
-- [HCL Block Types Overview](https://spacelift.io/blog/hcl-hashicorp-configuration-language) -- Community guide to all block types
+**Context Expansion:**
+- [Sourcegraph Code Navigation Features (2026)](https://sourcegraph.com/docs/code-search/code-navigation/features)
+- [GitLab Exact Code Search (2026)](https://about.gitlab.com/blog/exact-code-search-find-code-faster-across-repositories/)
+- [How to display context lines in grep | LabEx](https://labex.io/tutorials/linux-how-to-display-context-lines-in-grep-437961)
+- [Ripgrep Context Matching | Learn by Example](https://learnbyexample.github.io/learn_gnugrep_ripgrep/context-matching.html)
 
-**Dockerfile (Verified - HIGH confidence):**
-- [Dockerfile Reference](https://docs.docker.com/reference/dockerfile/) -- All 19 instruction types
-- [Docker Multi-Stage Builds](https://docs.docker.com/build/building/multi-stage/) -- FROM...AS syntax, stage naming
-- [BuildKit Parser (Go)](https://pkg.go.dev/github.com/moby/buildkit/frontend/dockerfile/parser) -- Official Dockerfile AST structure
+**Symbol-Aware Search:**
+- [Semantic Code Indexing with AST and Tree-sitter | Medium (2025)](https://medium.com/@email2dineshkuppan/semantic-code-indexing-with-ast-and-tree-sitter-for-ai-agents-part-1-of-3-eb5237ba687a)
+- [Tree-sitter: Revolutionizing Parsing | Deus in Machina](https://www.deusinmachina.net/p/tree-sitter-revolutionizing-parsing)
+- [Structural Code Search using Natural Language | arXiv (July 2025)](https://arxiv.org/html/2507.02107v1)
 
-**Bash (Verified - HIGH confidence):**
-- [tree-sitter-bash grammar](https://github.com/tree-sitter/tree-sitter-bash) -- AST node types (function_definition, compound_statement, etc.)
-- [ShellCheck](https://www.shellcheck.net/) -- Shell script static analysis (context for what analysis IS in scope for existing tools)
+**Code Search Best Practices:**
+- [Improving agent with semantic search | Cursor Blog (2025)](https://cursor.com/blog/semsearch)
+- [Semantic Search on Stack Overflow | Stack Overflow Blog](https://stackoverflow.blog/2023/07/31/ask-like-a-human-implementing-semantic-search-on-stack-overflow/)
+- [Semantic Code Search | Moderne.ai Blog](https://www.moderne.ai/blog/semantic-code-search-benefits)
 
-**Code Search Landscape (MEDIUM confidence):**
-- [Sourcegraph Code Search](https://sourcegraph.com/docs/code-search/features) -- Feature comparison
-- [Qdrant Code Search Tutorial](https://qdrant.tech/documentation/advanced-tutorials/code-search/) -- Semantic code search patterns
-- [Pinecone Chunking Strategies](https://www.pinecone.io/learn/chunking-strategies/) -- General chunking best practices
+**Language Coverage:**
+- [tree-sitter-languages | PyPI (2026)](https://pypi.org/project/tree-sitter-languages/)
+- [tree-sitter-language-pack (165+ languages) | GitHub](https://github.com/Goldziher/tree-sitter-language-pack)
+- [Tree-sitter releases (v0.26.4, Feb 2026) | GitHub](https://github.com/tree-sitter/tree-sitter/releases)
+
+**Anti-Patterns:**
+- [Anti-patterns You Should Avoid in Your Code | freeCodeCamp](https://www.freecodecamp.org/news/antipatterns-to-avoid-in-code/)
+- [6 Types of Anti Patterns | GeeksforGeeks](https://www.geeksforgeeks.org/blogs/types-of-anti-patterns-to-avoid-in-software-development/)
 
 ---
-*Feature research for: CocoSearch v1.2 DevOps Language Support*
-*Researched: 2026-01-27*
+*Feature research for: CocoSearch v1.7 Search Enhancements*
+*Researched: 2026-02-03*
