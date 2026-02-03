@@ -267,6 +267,245 @@ def _extract_python_symbols(chunk_text: str, parser: Parser) -> list[dict]:
     return symbols
 
 
+# ============================================================================
+# JavaScript Symbol Extraction
+# ============================================================================
+
+
+def _extract_javascript_symbols(chunk_text: str, parser: Parser) -> list[dict]:
+    """Extract symbols from JavaScript/JSX code.
+
+    Extracts:
+    - Function declarations: function fetchUser() {}
+    - Arrow functions: const fetchUser = () => {} (named only)
+    - Class declarations: class UserService {}
+    - Methods: methods inside class bodies
+
+    Args:
+        chunk_text: Source code text to parse.
+        parser: Tree-sitter parser instance.
+
+    Returns:
+        List of symbol dicts with symbol_type, symbol_name, symbol_signature.
+    """
+    tree = parser.parse(bytes(chunk_text, "utf8"))
+    symbols = []
+
+    def walk_node(node, current_class=None):
+        """Recursively walk tree and extract symbols."""
+
+        # Function declarations
+        if node.type == "function_declaration":
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+            if name_node and params_node:
+                name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node)
+
+                symbol_type = "method" if current_class else "function"
+                symbol_name = f"{current_class}.{name}" if current_class else name
+
+                symbols.append({
+                    "symbol_type": symbol_type,
+                    "symbol_name": symbol_name,
+                    "symbol_signature": f"function {name}{params}",
+                })
+
+        # Arrow functions (named only: const name = () => {})
+        elif node.type == "lexical_declaration":
+            # Look for pattern: const/let name = arrow_function
+            for child in node.children:
+                if child.type == "variable_declarator":
+                    name_node = child.child_by_field_name("name")
+                    value_node = child.child_by_field_name("value")
+                    if name_node and value_node and value_node.type == "arrow_function":
+                        name = _get_node_text(chunk_text, name_node)
+                        params_node = value_node.child_by_field_name("parameters")
+                        if params_node:
+                            params = _get_node_text(chunk_text, params_node)
+                        else:
+                            # Single parameter without parens: x => x
+                            param_node = value_node.child_by_field_name("parameter")
+                            params = f"({_get_node_text(chunk_text, param_node)})" if param_node else "()"
+
+                        symbols.append({
+                            "symbol_type": "function",
+                            "symbol_name": name,
+                            "symbol_signature": f"const {name} = {params} => ...",
+                        })
+
+        # Class declarations
+        elif node.type == "class_declaration":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                class_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "class",
+                    "symbol_name": class_name,
+                    "symbol_signature": f"class {class_name}",
+                })
+
+                # Walk class body for methods
+                body_node = node.child_by_field_name("body")
+                if body_node:
+                    for child in body_node.children:
+                        walk_node(child, current_class=class_name)
+
+        # Method definitions (inside classes)
+        elif node.type == "method_definition" and current_class:
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+            if name_node and params_node:
+                method_name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node)
+
+                symbols.append({
+                    "symbol_type": "method",
+                    "symbol_name": f"{current_class}.{method_name}",
+                    "symbol_signature": f"{method_name}{params}",
+                })
+
+        else:
+            # Recurse for module-level nodes
+            if current_class is None and node.type in ("program", "statement_block"):
+                for child in node.children:
+                    walk_node(child, current_class=None)
+            elif current_class and node.type == "class_body":
+                for child in node.children:
+                    walk_node(child, current_class=current_class)
+
+    walk_node(tree.root_node)
+    return symbols
+
+
+# ============================================================================
+# TypeScript Symbol Extraction
+# ============================================================================
+
+
+def _extract_typescript_symbols(chunk_text: str, parser: Parser) -> list[dict]:
+    """Extract symbols from TypeScript/TSX code.
+
+    Extends JavaScript extraction with:
+    - Interfaces: interface User {}
+    - Type aliases: type UserID = string (mapped to "interface" symbol_type)
+
+    Args:
+        chunk_text: Source code text to parse.
+        parser: Tree-sitter parser instance.
+
+    Returns:
+        List of symbol dicts with symbol_type, symbol_name, symbol_signature.
+    """
+    tree = parser.parse(bytes(chunk_text, "utf8"))
+    symbols = []
+
+    def walk_node(node, current_class=None):
+        """Recursively walk tree and extract symbols."""
+
+        # Function declarations
+        if node.type == "function_declaration":
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+            if name_node and params_node:
+                name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node)
+
+                symbol_type = "method" if current_class else "function"
+                symbol_name = f"{current_class}.{name}" if current_class else name
+
+                symbols.append({
+                    "symbol_type": symbol_type,
+                    "symbol_name": symbol_name,
+                    "symbol_signature": f"function {name}{params}",
+                })
+
+        # Arrow functions (named only: const name = () => {})
+        elif node.type == "lexical_declaration":
+            for child in node.children:
+                if child.type == "variable_declarator":
+                    name_node = child.child_by_field_name("name")
+                    value_node = child.child_by_field_name("value")
+                    if name_node and value_node and value_node.type == "arrow_function":
+                        name = _get_node_text(chunk_text, name_node)
+                        params_node = value_node.child_by_field_name("parameters")
+                        if params_node:
+                            params = _get_node_text(chunk_text, params_node)
+                        else:
+                            param_node = value_node.child_by_field_name("parameter")
+                            params = f"({_get_node_text(chunk_text, param_node)})" if param_node else "()"
+
+                        symbols.append({
+                            "symbol_type": "function",
+                            "symbol_name": name,
+                            "symbol_signature": f"const {name} = {params} => ...",
+                        })
+
+        # Class declarations
+        elif node.type == "class_declaration":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                class_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "class",
+                    "symbol_name": class_name,
+                    "symbol_signature": f"class {class_name}",
+                })
+
+                body_node = node.child_by_field_name("body")
+                if body_node:
+                    for child in body_node.children:
+                        walk_node(child, current_class=class_name)
+
+        # Method definitions (inside classes)
+        elif node.type == "method_definition" and current_class:
+            name_node = node.child_by_field_name("name")
+            params_node = node.child_by_field_name("parameters")
+            if name_node and params_node:
+                method_name = _get_node_text(chunk_text, name_node)
+                params = _get_node_text(chunk_text, params_node)
+
+                symbols.append({
+                    "symbol_type": "method",
+                    "symbol_name": f"{current_class}.{method_name}",
+                    "symbol_signature": f"{method_name}{params}",
+                })
+
+        # TypeScript-specific: Interface declarations
+        elif node.type == "interface_declaration":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                interface_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "interface",
+                    "symbol_name": interface_name,
+                    "symbol_signature": f"interface {interface_name}",
+                })
+
+        # TypeScript-specific: Type alias declarations (mapped to "interface")
+        elif node.type == "type_alias_declaration":
+            name_node = node.child_by_field_name("name")
+            if name_node:
+                type_name = _get_node_text(chunk_text, name_node)
+                symbols.append({
+                    "symbol_type": "interface",  # Map type alias to interface per CONTEXT.md
+                    "symbol_name": type_name,
+                    "symbol_signature": f"type {type_name}",
+                })
+
+        else:
+            # Recurse for module-level nodes
+            if current_class is None and node.type in ("program", "statement_block"):
+                for child in node.children:
+                    walk_node(child, current_class=None)
+            elif current_class and node.type == "class_body":
+                for child in node.children:
+                    walk_node(child, current_class=current_class)
+
+    walk_node(tree.root_node)
+    return symbols
+
+
 @cocoindex.op.function()
 def extract_symbol_metadata(text: str, language: str) -> dict:
     """Extract symbol metadata from code chunk.
