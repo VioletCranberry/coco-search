@@ -70,7 +70,15 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ### Active
 
-No active requirements. Project stable at v1.6.
+**Current Milestone: v1.7 Search Enhancement**
+
+**Goal:** Improve search quality with hybrid search, context expansion, and full language coverage.
+
+**Target features:**
+- Full CocoIndex language coverage (30+ languages including YAML, JSON, Markdown)
+- Hybrid search combining vector similarity + keyword matching (BM25)
+- Context expansion showing surrounding code at query time
+- Symbol-aware indexing tracking functions/classes as first-class entities
 
 ### Out of Scope
 

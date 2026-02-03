@@ -9,13 +9,13 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Milestone: v1.6 complete
-Phase: All 26 phases complete
-Plan: All 69 plans complete
-Status: Ready for next milestone
-Last activity: 2026-02-02 -- v1.6 milestone archived
+Milestone: v1.7 Search Enhancement
+Phase: Not started (researching)
+Plan: —
+Status: Researching domain ecosystem
+Last activity: 2026-02-03 — Milestone v1.7 started
 
-Progress: [##########################################################] 69/69 (all complete)
+Progress: Defining requirements
 
 ## Milestones Shipped
 
@@ -65,10 +65,10 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-02
-Stopped at: v1.6 milestone complete
+Last session: 2026-02-03
+Stopped at: Research phase for v1.7
 Resume file: None
-Next action: `/gsd:new-milestone` for v1.7 or future work
+Next action: Complete research → requirements → roadmap
 
 ---
-*Updated: 2026-02-02 after v1.6 milestone complete*
+*Updated: 2026-02-03 after v1.7 milestone started*
