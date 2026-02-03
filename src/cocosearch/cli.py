@@ -30,6 +30,7 @@ from cocosearch.management import clear_index, derive_index_from_git, get_stats,
 from cocosearch.management import register_index_path
 from cocosearch.search import search
 from cocosearch.search.formatter import format_json, format_pretty
+from cocosearch.search.query import DEVOPS_LANGUAGES, LANGUAGE_EXTENSIONS, SYMBOL_AWARE_LANGUAGES
 from cocosearch.search.repl import run_repl
 
 
@@ -563,6 +564,70 @@ def clear_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def languages_command(args: argparse.Namespace) -> int:
+    """Execute the languages command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    console = Console()
+
+    # Build language data from LANGUAGE_EXTENSIONS and DEVOPS_LANGUAGES
+    # Combine all sources into unified list
+    languages = []
+
+    # Standard languages from LANGUAGE_EXTENSIONS
+    for lang, exts in sorted(LANGUAGE_EXTENSIONS.items()):
+        # Format display name
+        if lang in ("sql", "xml", "css", "html", "json", "yaml", "toml", "dtd"):
+            display_name = lang.upper()
+        elif lang == "cpp":
+            display_name = "C++"
+        elif lang == "csharp":
+            display_name = "C#"
+        else:
+            display_name = lang.title()
+
+        languages.append({
+            "name": display_name,
+            "extensions": ", ".join(exts),
+            "symbols": lang in SYMBOL_AWARE_LANGUAGES,
+        })
+
+    # DevOps languages
+    devops_display = {"hcl": "HCL", "dockerfile": "Dockerfile", "bash": "Bash"}
+    for lang in sorted(DEVOPS_LANGUAGES.keys()):
+        ext_display = f".{lang}" if lang != "dockerfile" else "Dockerfile"
+        languages.append({
+            "name": devops_display.get(lang, lang.title()),
+            "extensions": ext_display,
+            "symbols": False,
+        })
+
+    if args.json:
+        import json as json_module
+        print(json_module.dumps(languages, indent=2))
+    else:
+        from rich.table import Table
+
+        table = Table(title="Supported Languages")
+        table.add_column("Language", style="cyan", no_wrap=True)
+        table.add_column("Extensions", style="dim")
+        table.add_column("Symbols", justify="center")
+
+        for lang in languages:
+            symbol_mark = "[green]✓[/green]" if lang["symbols"] else "[dim]✗[/dim]"
+            table.add_row(lang["name"], lang["extensions"], symbol_mark)
+
+        console.print(table)
+        console.print("\n[dim]Symbol-aware languages support --symbol-type and --symbol-name filtering.[/dim]")
+
+    return 0
+
+
 def init_command(args: argparse.Namespace) -> int:
     """Execute the init command.
 
@@ -927,6 +992,18 @@ def main() -> None:
         help="Human-readable output (default: JSON)",
     )
 
+    # Languages subcommand
+    languages_parser = subparsers.add_parser(
+        "languages",
+        help="List supported languages",
+        description="Show all languages CocoSearch can index with file extensions and symbol support.",
+    )
+    languages_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON (default: table)",
+    )
+
     # Clear subcommand
     clear_parser = subparsers.add_parser(
         "clear",
@@ -1004,7 +1081,7 @@ def main() -> None:
     )
 
     # Known subcommands for routing
-    known_subcommands = ("index", "search", "list", "stats", "clear", "init", "mcp", "config", "-h", "--help")
+    known_subcommands = ("index", "search", "list", "stats", "languages", "clear", "init", "mcp", "config", "-h", "--help")
 
     # Handle default action (query without subcommand)
     # Check before parsing if first argument is not a known subcommand
@@ -1026,6 +1103,8 @@ def main() -> None:
         sys.exit(list_command(args))
     elif args.command == "stats":
         sys.exit(stats_command(args))
+    elif args.command == "languages":
+        sys.exit(languages_command(args))
     elif args.command == "clear":
         sys.exit(clear_command(args))
     elif args.command == "init":
