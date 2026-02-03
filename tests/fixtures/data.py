@@ -24,6 +24,9 @@ def make_search_result():
         block_type: str = "",
         hierarchy: str = "",
         language_id: str = "",
+        match_type: str = "",
+        vector_score: float | None = None,
+        keyword_score: float | None = None,
     ) -> SearchResult:
         return SearchResult(
             filename=filename,
@@ -33,6 +36,9 @@ def make_search_result():
             block_type=block_type,
             hierarchy=hierarchy,
             language_id=language_id,
+            match_type=match_type,
+            vector_score=vector_score,
+            keyword_score=keyword_score,
         )
 
     return _make

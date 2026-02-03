@@ -404,3 +404,83 @@ class TestExtensionLangMapDevOps:
         assert EXTENSION_LANG_MAP["tf"] == "hcl"
         assert EXTENSION_LANG_MAP["hcl"] == "hcl"
         assert EXTENSION_LANG_MAP["tfvars"] == "hcl"
+
+
+class TestFormatPrettyHybridMatchType:
+    """Tests for hybrid search match type indicators in format_pretty."""
+
+    def _make_console(self) -> tuple[Console, io.StringIO]:
+        """Create a Rich Console that captures plain text (no ANSI codes)."""
+        output = io.StringIO()
+        console = Console(file=output, no_color=True, width=100)
+        return console, output
+
+    def test_format_pretty_semantic_match_type(self, make_search_result):
+        """Pretty output should show [semantic] indicator in cyan for vector-only matches."""
+        results = [make_search_result(
+            filename="/test/file.py",
+            score=0.85,
+            match_type="semantic",
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        # Should contain [semantic] indicator (Rich escapes brackets)
+        assert "[semantic]" in captured
+
+    def test_format_pretty_keyword_match_type(self, make_search_result):
+        """Pretty output should show [keyword] indicator in green for keyword-only matches."""
+        results = [make_search_result(
+            filename="/test/file.py",
+            score=0.85,
+            match_type="keyword",
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        # Should contain [keyword] indicator
+        assert "[keyword]" in captured
+
+    def test_format_pretty_both_match_type(self, make_search_result):
+        """Pretty output should show [both] indicator in yellow for double matches."""
+        results = [make_search_result(
+            filename="/test/file.py",
+            score=0.90,
+            match_type="both",
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        # Should contain [both] indicator
+        assert "[both]" in captured
+
+    def test_format_pretty_no_match_type_backward_compat(self, make_search_result):
+        """Pretty output should not show match indicator for non-hybrid results."""
+        # Default match_type is empty string (backward compat)
+        results = [make_search_result(
+            filename="/test/file.py",
+            score=0.85,
+        )]
+        console, output = self._make_console()
+
+        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                format_pretty(results, console=console)
+
+        captured = output.getvalue()
+        # Should NOT contain any match type indicators
+        assert "[semantic]" not in captured
+        assert "[keyword]" not in captured
+        assert "[both]" not in captured

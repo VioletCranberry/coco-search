@@ -182,10 +182,21 @@ def format_pretty(
             start_line = byte_to_line(r.filename, r.start_byte)
             end_line = byte_to_line(r.filename, r.end_byte)
 
+            # Build match type indicator for hybrid search results
+            match_indicator = ""
+            if hasattr(r, "match_type") and r.match_type:
+                if r.match_type == "semantic":
+                    match_indicator = " [cyan]\\[semantic][/cyan]"
+                elif r.match_type == "keyword":
+                    match_indicator = " [green]\\[keyword][/green]"
+                elif r.match_type == "both":
+                    match_indicator = " [yellow]\\[both][/yellow]"
+
             # Score and line info
             score_color = "green" if r.score > 0.7 else "yellow" if r.score > 0.5 else "red"
             console.print(
-                f"  [{score_color}]{r.score:.2f}[/{score_color}] Lines {start_line}-{end_line}"
+                f"  [{score_color}]{r.score:.2f}[/{score_color}] "
+                f"Lines {start_line}-{end_line}{match_indicator}"
             )
 
             # Language annotation (escape brackets for Rich markup)
