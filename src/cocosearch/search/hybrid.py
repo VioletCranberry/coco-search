@@ -19,6 +19,46 @@ from cocosearch.search.query_analyzer import normalize_query_for_keyword
 logger = logging.getLogger(__name__)
 
 
+def _is_definition_chunk(content: str) -> bool:
+    """Check if chunk content starts with a definition keyword.
+
+    Heuristic: definition chunks start with keywords like:
+    - def, class, async def (Python)
+    - function, const, let, var (JavaScript/TypeScript)
+    - func, type (Go)
+    - fn, struct, trait, enum, impl (Rust)
+
+    Args:
+        content: Chunk text content.
+
+    Returns:
+        True if chunk appears to be a definition.
+    """
+    stripped = content.lstrip()
+    definition_keywords = [
+        # Python
+        "def ",
+        "class ",
+        "async def ",
+        # JavaScript/TypeScript
+        "function ",
+        "const ",
+        "let ",
+        "var ",
+        "interface ",
+        "type ",
+        # Go
+        "func ",
+        # Rust
+        "fn ",
+        "struct ",
+        "trait ",
+        "enum ",
+        "impl ",
+    ]
+    return any(stripped.startswith(kw) for kw in definition_keywords)
+
+
 @dataclass
 class KeywordResult:
     """A single keyword search result.
