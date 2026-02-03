@@ -10,6 +10,7 @@ Provides Model Context Protocol server with tools for:
 
 # CRITICAL: Configure logging to stderr immediately before any other imports
 # This prevents stdout corruption of the JSON-RPC protocol
+import os
 import sys
 import logging
 
@@ -38,6 +39,7 @@ from cocosearch.management import (
     register_index_path,
 )
 from cocosearch.search import byte_to_line, read_chunk_content, search
+from cocosearch.search.context_expander import ContextExpander
 
 # Create FastMCP server instance
 mcp = FastMCP("cocosearch")
@@ -48,6 +50,24 @@ mcp = FastMCP("cocosearch")
 async def health_check(request):
     """Health check endpoint for Docker HEALTHCHECK and load balancers."""
     return JSONResponse({"status": "ok"})
+
+
+def _get_treesitter_language(ext: str) -> str | None:
+    """Map file extension to tree-sitter language name."""
+    mapping = {
+        "py": "python",
+        "js": "javascript",
+        "jsx": "javascript",
+        "mjs": "javascript",
+        "cjs": "javascript",
+        "ts": "typescript",
+        "tsx": "typescript",
+        "mts": "typescript",
+        "cts": "typescript",
+        "go": "go",
+        "rs": "rust",
+    }
+    return mapping.get(ext)
 
 
 @mcp.tool()
@@ -91,10 +111,35 @@ def search_code(
             "Case-insensitive matching."
         ),
     ] = None,
+    context_before: Annotated[
+        int | None,
+        Field(
+            description="Number of lines to show before each match. "
+            "Overrides smart context expansion when specified."
+        ),
+    ] = None,
+    context_after: Annotated[
+        int | None,
+        Field(
+            description="Number of lines to show after each match. "
+            "Overrides smart context expansion when specified."
+        ),
+    ] = None,
+    smart_context: Annotated[
+        bool,
+        Field(
+            description="Expand context to enclosing function/class boundaries. "
+            "Enabled by default. Set to False for exact line counts only."
+        ),
+    ] = True,
 ) -> list[dict]:
     """Search indexed code using natural language.
 
     Returns code chunks matching the query, ranked by semantic similarity.
+    By default, context expands to enclosing function/class boundaries.
+    Use context_before/context_after to specify exact line counts.
+    Set smart_context=False to disable automatic boundary expansion.
+
     Supports hybrid search combining vector similarity and keyword matching
     for better results when searching for code identifiers.
     If index_name is not provided, auto-detects from current working directory.
@@ -179,13 +224,40 @@ def search_code(
             "results": []
         }]
 
-    # Convert results to dicts with line numbers and content
+    # Create context expander for file caching
+    expander = ContextExpander()
+
+    # Convert results to dicts with line numbers, content, and context
     output = []
     for r in results:
         start_line = byte_to_line(r.filename, r.start_byte)
         end_line = byte_to_line(r.filename, r.end_byte)
         content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
 
+        # Get context if requested or smart context enabled
+        context_before_text = ""
+        context_after_text = ""
+
+        if context_before is not None or context_after is not None or smart_context:
+            # Determine language for smart expansion
+            ext = os.path.splitext(r.filename)[1].lstrip(".")
+            language_name = _get_treesitter_language(ext)
+
+            before_lines, _match_lines, after_lines, _is_bof, _is_eof = expander.get_context_lines(
+                r.filename,
+                start_line,
+                end_line,
+                context_before=context_before or 0,
+                context_after=context_after or 0,
+                smart=smart_context and (context_before is None and context_after is None),
+                language=language_name,
+            )
+
+            # Format context as strings (newline-separated)
+            context_before_text = "\n".join(line for _, line in before_lines)
+            context_after_text = "\n".join(line for _, line in after_lines)
+
+        # Build result dict
         result_dict = {
             "file_path": r.filename,
             "start_line": start_line,
@@ -201,6 +273,11 @@ def search_code(
             "symbol_signature": r.symbol_signature,
         }
 
+        # Include context fields when context was requested
+        if context_before_text or context_after_text:
+            result_dict["context_before"] = context_before_text
+            result_dict["context_after"] = context_after_text
+
         # Include hybrid search fields when available
         if r.match_type:
             result_dict["match_type"] = r.match_type
@@ -210,6 +287,9 @@ def search_code(
             result_dict["keyword_score"] = r.keyword_score
 
         output.append(result_dict)
+
+    # Clear cache after processing
+    expander.clear_cache()
 
     return output
 
