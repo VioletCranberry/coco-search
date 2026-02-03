@@ -9,7 +9,7 @@
 - v1.4 Dogfooding Infrastructure -- Phases 15-18 (shipped 2026-01-31)
 - v1.5 Configuration & Architecture Polish -- Phases 19-22 (shipped 2026-02-01)
 - v1.6 All-in-One Docker & Auto-Detect -- Phases 23-26 (shipped 2026-02-02)
-- v1.7 Search Enhancement -- Phases 27-32 (in progress)
+- v1.7 Search Enhancement -- Phases 27-32 (shipped 2026-02-03)
 
 ## Phases
 
@@ -27,7 +27,7 @@ See project history for earlier milestones:
 
 </details>
 
-### v1.7 Search Enhancement (In Progress)
+### v1.7 Search Enhancement (Complete)
 
 **Milestone Goal:** Improve search quality with hybrid search (vector + keyword), context expansion, symbol-aware indexing, and full language coverage (30+ languages).
 
@@ -158,9 +158,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 32-01-PLAN.md — Language registry expansion + languages CLI command
-- [ ] 32-02-PLAN.md — Per-language stats function + stats CLI update
-- [ ] 32-03-PLAN.md — README documentation for v1.7 features
+- [x] 32-01-PLAN.md — Language registry expansion + languages CLI command
+- [x] 32-02-PLAN.md — Per-language stats function + stats CLI update
+- [x] 32-03-PLAN.md — README documentation for v1.7 features
 
 ## Progress
 
@@ -173,8 +173,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 21 | In progress (Phase 31 complete) | - |
+| v1.7 Search Enhancement | 27-32 | 21 | Complete | 2026-02-03 |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 32 planning*
+*Last updated: 2026-02-03 after Phase 32 complete — v1.7 milestone shipped*

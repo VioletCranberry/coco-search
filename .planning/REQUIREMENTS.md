@@ -13,9 +13,9 @@ Requirements for Search Enhancement milestone. Each maps to roadmap phases.
 - [x] **HYBR-02**: CLI flag `--hybrid` enables hybrid search mode
 - [x] **HYBR-03**: MCP parameter `use_hybrid_search` enables hybrid search
 - [x] **HYBR-04**: Query analyzer detects identifier patterns (camelCase, snake_case) for auto-hybrid
-- [ ] **HYBR-05**: Schema adds `content_text` and `content_tsv` columns for keyword search
-- [ ] **HYBR-06**: GIN index on `content_tsv` for keyword search performance
-- [ ] **HYBR-07**: Existing indexes gracefully degrade (hybrid unavailable, vector-only works)
+- [x] **HYBR-05**: Schema adds `content_text` and `content_tsv` columns for keyword search
+- [x] **HYBR-06**: GIN index on `content_tsv` for keyword search performance
+- [x] **HYBR-07**: Existing indexes gracefully degrade (hybrid unavailable, vector-only works)
 
 ### Context Expansion
 
@@ -41,10 +41,10 @@ Requirements for Search Enhancement milestone. Each maps to roadmap phases.
 
 ### Language Coverage
 
-- [ ] **LANG-01**: Enable all 30+ CocoIndex built-in languages (YAML, JSON, Markdown, etc.)
-- [ ] **LANG-02**: Update LANGUAGE_EXTENSIONS mapping with all supported extensions
-- [ ] **LANG-03**: Language statistics in `cocosearch stats` command (lines per language)
-- [ ] **LANG-04**: Documentation lists all supported languages with file extensions
+- [x] **LANG-01**: Enable all 30+ CocoIndex built-in languages (YAML, JSON, Markdown, etc.)
+- [x] **LANG-02**: Update LANGUAGE_EXTENSIONS mapping with all supported extensions
+- [x] **LANG-03**: Language statistics in `cocosearch stats` command (lines per language)
+- [x] **LANG-04**: Documentation lists all supported languages with file extensions
 
 ## v1.8+ Requirements
 
@@ -107,10 +107,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYMB-08 | Phase 30 | Complete |
 | SYMB-09 | Phase 30 | Complete |
 | SYMB-10 | Phase 29 | Complete |
-| LANG-01 | Phase 32 | Pending |
-| LANG-02 | Phase 32 | Pending |
-| LANG-03 | Phase 32 | Pending |
-| LANG-04 | Phase 32 | Pending |
+| LANG-01 | Phase 32 | Complete |
+| LANG-02 | Phase 32 | Complete |
+| LANG-03 | Phase 32 | Complete |
+| LANG-04 | Phase 32 | Complete |
 
 **Coverage:**
 - v1.7 requirements: 27 total
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 31 completion*
+*Last updated: 2026-02-03 after Phase 32 complete — all v1.7 requirements satisfied*
