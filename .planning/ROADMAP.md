@@ -69,7 +69,7 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 28-01-PLAN.md — Core hybrid search algorithm and query analyzer
+- [x] 28-01-PLAN.md — Core hybrid search algorithm and query analyzer
 - [ ] 28-02-PLAN.md — CLI and MCP integration for hybrid search
 - [ ] 28-03-PLAN.md — Output presentation with match type indicators
 - [ ] 28-04-PLAN.md — Integration tests and module wiring
@@ -167,4 +167,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 27 completion*
+*Last updated: 2026-02-03 after Plan 28-01 completion*

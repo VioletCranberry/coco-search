@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 27 of 32 complete (Hybrid Search Foundation)
-Plan: 3 of 3 in phase 27 (verified)
-Status: Phase 27 verified, ready for Phase 28
-Last activity: 2026-02-03 — Phase 27 executed and verified
+Phase: 28 of 32 (Hybrid Search Query)
+Plan: 1 of 4 in phase 28
+Status: In progress
+Last activity: 2026-02-03 — Completed 28-01-PLAN.md
 
-Progress: [████████████████████████████░░░░] 85% (72 of 85 estimated plans complete)
+Progress: [█████████████████████████████░░░] 86% (73 of 85 estimated plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 72
+- Total plans completed: 73
 - Milestones shipped: 6 (v1.0-v1.6)
 - Current milestone: v1.7 Search Enhancement
 
@@ -31,7 +31,7 @@ Progress: [███████████████████████
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 | v1.4 Dogfooding | 15-18 | 7 | 2026-01-31 |
 
-*Updated: 2026-02-03 after Plan 27-03 completion*
+*Updated: 2026-02-03 after Plan 28-01 completion*
 
 ## Accumulated Context
 
@@ -39,6 +39,9 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **28-01**: RRF k=60 (standard value) for rank fusion constant
+- **28-01**: Keyword matches favored on tie-break
+- **28-01**: Silent fallback to vector-only when keyword search unavailable
 - **27-03**: Use PostgreSQL 'simple' text config (no stemming for code identifiers)
 - **27-03**: Two-phase tsvector: Python preprocessing + PostgreSQL generated column
 - **27-03**: Preserve original identifiers while splitting camelCase/snake_case
@@ -67,6 +70,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: Phase 27 verified, ready for Phase 28 planning
+Last session: 2026-02-03T09:00:13Z
+Stopped at: Completed 28-01-PLAN.md
 Resume file: None
