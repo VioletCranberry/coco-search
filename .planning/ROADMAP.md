@@ -72,7 +72,7 @@ Plans:
 - [x] 28-01-PLAN.md — Core hybrid search algorithm and query analyzer
 - [x] 28-02-PLAN.md — CLI and MCP integration for hybrid search
 - [x] 28-03-PLAN.md — Output presentation with match type indicators
-- [ ] 28-04-PLAN.md — Integration tests and module wiring
+- [x] 28-04-PLAN.md — Integration tests and module wiring
 
 #### Phase 29: Symbol-Aware Indexing
 
@@ -163,8 +163,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 6 | In progress | - |
+| v1.7 Search Enhancement | 27-32 | 10 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Plan 28-03 completion*
+*Last updated: 2026-02-03 after Phase 28 completion*

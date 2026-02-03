@@ -9,10 +9,10 @@ Requirements for Search Enhancement milestone. Each maps to roadmap phases.
 
 ### Hybrid Search
 
-- [ ] **HYBR-01**: Search combines vector similarity and keyword matching via RRF fusion
-- [ ] **HYBR-02**: CLI flag `--hybrid` enables hybrid search mode
-- [ ] **HYBR-03**: MCP parameter `use_hybrid_search` enables hybrid search
-- [ ] **HYBR-04**: Query analyzer detects identifier patterns (camelCase, snake_case) for auto-hybrid
+- [x] **HYBR-01**: Search combines vector similarity and keyword matching via RRF fusion
+- [x] **HYBR-02**: CLI flag `--hybrid` enables hybrid search mode
+- [x] **HYBR-03**: MCP parameter `use_hybrid_search` enables hybrid search
+- [x] **HYBR-04**: Query analyzer detects identifier patterns (camelCase, snake_case) for auto-hybrid
 - [ ] **HYBR-05**: Schema adds `content_text` and `content_tsv` columns for keyword search
 - [ ] **HYBR-06**: GIN index on `content_tsv` for keyword search performance
 - [ ] **HYBR-07**: Existing indexes gracefully degrade (hybrid unavailable, vector-only works)
@@ -84,10 +84,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HYBR-01 | Phase 28 | Pending |
-| HYBR-02 | Phase 28 | Pending |
-| HYBR-03 | Phase 28 | Pending |
-| HYBR-04 | Phase 28 | Pending |
+| HYBR-01 | Phase 28 | Complete |
+| HYBR-02 | Phase 28 | Complete |
+| HYBR-03 | Phase 28 | Complete |
+| HYBR-04 | Phase 28 | Complete |
 | HYBR-05 | Phase 27 | Complete |
 | HYBR-06 | Phase 27 | Complete |
 | HYBR-07 | Phase 27 | Complete |
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 27 completion*
+*Last updated: 2026-02-03 after Phase 28 completion*
