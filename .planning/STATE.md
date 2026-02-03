@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 30 of 32 complete (Symbol Search Filters)
-Plan: 4 of 4 in phase 30 (verified)
-Status: Phase 30 verified, ready for Phase 31 planning
-Last activity: 2026-02-03 — Phase 30 executed and verified
+Phase: 31 of 32 in progress (Context Expansion Enhancement)
+Plan: 1 of 4 in phase 31 (complete)
+Status: In progress
+Last activity: 2026-02-03 — Completed 31-01-PLAN.md
 
-Progress: [████████████████████████████████░] 97% (83 of 85 estimated plans complete)
+Progress: [████████████████████████████████░] 98% (84 of 86 estimated plans complete)
 
 ## Performance Metrics
 
@@ -39,6 +39,10 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **31-01**: Instance-level LRU cache (not module-level) for search session isolation
+- **31-01**: 5 language support: Python, JavaScript, TypeScript, Go, Rust
+- **31-01**: Return original range when no enclosing scope found (graceful fallback)
+- **31-01**: 50-line centering: cap applied centered on original match
 - **30-04**: Definition keywords detected via prefix match (fast heuristic, false positives acceptable)
 - **30-04**: Apply 2x boost after RRF fusion, before limit
 - **30-04**: Skip boost silently for pre-v1.7 indexes (DEBUG log level)
@@ -109,5 +113,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Phase 30 verified, ready for Phase 31 planning
+Stopped at: Completed 31-01-PLAN.md
 Resume file: None
