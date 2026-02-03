@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 34 of 37 (Symbol Extraction Expansion)
-Plan: — (phase not yet planned)
-Status: Ready to plan
-Last activity: 2026-02-03 — Phase 33 complete, verified
+Plan: 01 of 03 (Migration & Query Architecture)
+Status: In progress
+Last activity: 2026-02-03 — Completed 34-01: tree-sitter migration, query files
 
-Progress: [=================================.........] 80% (33/37 phases, 93/103 plans)
+Progress: [=================================.........] 81% (33/37 phases, 94/103 plans)
 
 ## Performance Metrics
 
@@ -39,22 +39,19 @@ Progress: [=================================.........] 80% (33/37 phases, 93/103
 
 Full decision log in PROJECT.md Key Decisions table.
 
+Recent Phase 34-01 decisions:
+- Use QueryCursor dict-based captures API (tree-sitter 0.25.x returns dict not list)
+- Remove field names from TypeScript/JavaScript queries (grammars use positional matching)
+- Preserve return types in signatures for richer search context
+- Extract receiver types for Go methods to build qualified names (Server.Start)
+- Prioritize method patterns in Rust queries to distinguish from top-level functions
+
 Recent Phase 33 decisions:
 - Apply symbol/language filters BEFORE RRF fusion (not after)
 - Add symbol fields to VectorResult and HybridSearchResult dataclasses
 - Pass include_symbol_columns flag to execute_vector_search for conditional SELECT
-- Omit symbol fields when None for clean JSON output
-- Display [symbol_type] symbol_name format in pretty output
-- Truncate signatures >60 chars with ellipsis
 - In-memory session-scoped cache (simpler than diskcache)
 - 0.95 cosine similarity threshold for semantic cache hits
-- 24-hour default TTL for cache entries
-
-Recent v1.7 decisions:
-- RRF k=60 for hybrid search (standard value)
-- PostgreSQL 'simple' text config for code identifiers
-- Tree-sitter 0.21.x for API compatibility
-- Definition boost (2x) after RRF fusion
 
 ### Pending Todos
 
@@ -63,15 +60,16 @@ None — starting Phase 34.
 ### Blockers/Concerns
 
 **Known technical debt:**
-- Tree-sitter deprecation warning in tree-sitter-languages 1.10.2 — addressed in Phase 34 migration
+None - tree-sitter deprecation warnings resolved in Phase 34-01.
 
 **Research flags from SUMMARY.md:**
-- Phase 34: Test C/C++ extraction on real codebases, verify failure rates
+- Phase 34-01: Test C/C++ extraction on real codebases with heavy macros, verify failure rates
+- Phase 34: Consider parse failure tracking in stats output (per-language counts)
 - Phase 35: Benchmark stats collection overhead, evaluate terminal UI options
 - Phase 36: Test skill routing with ambiguous queries
 
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Phase 33 complete, ready to plan Phase 34
+Stopped at: Completed 34-01-PLAN.md (tree-sitter migration, query architecture)
 Resume file: None
