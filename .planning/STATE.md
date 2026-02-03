@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 31 of 32 in progress (Context Expansion Enhancement)
-Plan: 1 of 4 in phase 31 (complete)
+Plan: 2 of 4 in phase 31 (complete)
 Status: In progress
-Last activity: 2026-02-03 — Completed 31-01-PLAN.md
+Last activity: 2026-02-03 — Completed 31-02-PLAN.md
 
-Progress: [████████████████████████████████░] 98% (84 of 86 estimated plans complete)
+Progress: [████████████████████████████████░] 98% (85 of 86 estimated plans complete)
 
 ## Performance Metrics
 
@@ -39,6 +39,10 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **31-02**: Smart context expansion enabled by default (no flags needed)
+- **31-02**: Explicit -A/-B/-C flags override smart expansion
+- **31-02**: Context output as newline-separated strings (not lists)
+- **31-02**: Grep-style markers: colon for context, angle bracket for match
 - **31-01**: Instance-level LRU cache (not module-level) for search session isolation
 - **31-01**: 5 language support: Python, JavaScript, TypeScript, Go, Rust
 - **31-01**: Return original range when no enclosing scope found (graceful fallback)
@@ -113,5 +117,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 31-01-PLAN.md
+Stopped at: Completed 31-02-PLAN.md
 Resume file: None
