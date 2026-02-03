@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 31 of 32 complete (Context Expansion Enhancement)
-Plan: 4 of 4 in phase 31 (verified)
-Status: Phase 31 verified, ready for Phase 32 planning
-Last activity: 2026-02-03 — Phase 31 executed and verified
+Phase: 32 of 32 (Full Language Coverage + Documentation)
+Plan: 1 of 1 in phase 32
+Status: Phase 32 Plan 01 complete
+Last activity: 2026-02-03 — Completed 32-01-PLAN.md (Language Coverage Expansion)
 
-Progress: [█████████████████████████████████] 99% (87 of 88 estimated plans complete)
+Progress: [█████████████████████████████████] 100% (88 of 88 estimated plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 87
+- Total plans completed: 88
 - Milestones shipped: 6 (v1.0-v1.6)
 - Current milestone: v1.7 Search Enhancement
 
@@ -31,7 +31,7 @@ Progress: [███████████████████████
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 | v1.4 Dogfooding | 15-18 | 7 | 2026-01-31 |
 
-*Updated: 2026-02-03 after Phase 31 verification*
+*Updated: 2026-02-03 after Phase 32 Plan 01 completion*
 
 ## Accumulated Context
 
@@ -39,6 +39,10 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **32-01**: LANGUAGE_EXTENSIONS expanded to 28 standard languages (31 total with DevOps)
+- **32-01**: SYMBOL_AWARE_LANGUAGES constant tracks 5 symbol-extraction languages
+- **32-01**: languages CLI command shows Rich table with Language/Extensions/Symbols columns
+- **32-01**: JSON output via --json flag for scripting integration
 - **31-04**: CLI tests use subprocess for true E2E verification
 - **31-04**: Smart boundary tests don't require Docker (direct ContextExpander calls)
 - **31-04**: Cache verification via cache_info() inspection
@@ -124,5 +128,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Phase 31 verified, ready for Phase 32 planning
+Stopped at: Completed 32-01-PLAN.md (Language Coverage Expansion)
 Resume file: None
