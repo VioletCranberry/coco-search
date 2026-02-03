@@ -58,22 +58,38 @@ class SearchResult:
 
 # Language to file extension mapping
 LANGUAGE_EXTENSIONS = {
-    "python": [".py", ".pyw", ".pyi"],
-    "javascript": [".js", ".mjs", ".cjs"],
-    "typescript": [".ts", ".tsx", ".mts", ".cts"],
-    "rust": [".rs"],
-    "go": [".go"],
-    "java": [".java"],
-    "ruby": [".rb"],
-    "php": [".php"],
     "c": [".c", ".h"],
     "cpp": [".cpp", ".cc", ".cxx", ".hpp", ".hxx"],
     "csharp": [".cs"],
-    "swift": [".swift"],
+    "css": [".css", ".scss"],
+    "dtd": [".dtd"],
+    "fortran": [".f", ".f90", ".f95", ".f03"],
+    "go": [".go"],
+    "html": [".html", ".htm"],
+    "java": [".java"],
+    "javascript": [".js", ".mjs", ".cjs", ".jsx"],
+    "json": [".json"],
     "kotlin": [".kt", ".kts"],
+    "markdown": [".md", ".mdx"],
+    "pascal": [".pas", ".dpr"],
+    "php": [".php"],
+    "python": [".py", ".pyw", ".pyi"],
+    "r": [".r", ".R"],
+    "ruby": [".rb"],
+    "rust": [".rs"],
     "scala": [".scala"],
     "shell": [".sh", ".bash", ".zsh"],
+    "solidity": [".sol"],
+    "sql": [".sql"],
+    "swift": [".swift"],
+    "toml": [".toml"],
+    "typescript": [".ts", ".tsx", ".mts", ".cts"],
+    "xml": [".xml"],
+    "yaml": [".yaml", ".yml"],
 }
+
+# Symbol-aware languages (support symbol extraction via tree-sitter)
+SYMBOL_AWARE_LANGUAGES = {"python", "javascript", "typescript", "go", "rust"}
 
 # DevOps language canonical names mapped to language_id values in the database
 DEVOPS_LANGUAGES = {
