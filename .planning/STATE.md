@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 33 of 37 (Deferred v1.7 Foundation)
-Plan: 02 of 03
+Plan: 01 of 03 (complete)
 Status: In progress
-Last activity: 2026-02-03 — Completed 33-02-PLAN.md (Symbol Display)
+Last activity: 2026-02-03 — Completed 33-01-PLAN.md (Hybrid Symbol Filter)
 
-Progress: [================================..........] 79% (32/37 phases, 92/103 plans)
+Progress: [================================..........] 79% (32/37 phases, 91/103 plans)
 
 ## Performance Metrics
 
@@ -40,6 +40,9 @@ Progress: [================================..........] 79% (32/37 phases, 92/103
 Full decision log in PROJECT.md Key Decisions table.
 
 Recent Phase 33 decisions:
+- Apply symbol/language filters BEFORE RRF fusion (not after)
+- Add symbol fields to VectorResult and HybridSearchResult dataclasses
+- Pass include_symbol_columns flag to execute_vector_search for conditional SELECT
 - Omit symbol fields when None for clean JSON output
 - Display [symbol_type] symbol_name format in pretty output
 - Truncate signatures >60 chars with ellipsis
@@ -57,7 +60,7 @@ None — starting fresh milestone.
 ### Blockers/Concerns
 
 **Known technical debt:**
-- TODO: Add symbol filter support to hybrid search (query.py:268) — addressed in Phase 33-03
+- TODO: Add symbol filter support to hybrid search (query.py:268) — RESOLVED in Phase 33-01
 - Tree-sitter deprecation warning in tree-sitter-languages 1.10.2 — addressed in Phase 34 migration
 
 **Research flags from SUMMARY.md:**
@@ -68,5 +71,5 @@ None — starting fresh milestone.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 33-02-PLAN.md
+Stopped at: Completed 33-01-PLAN.md (Hybrid Symbol Filter)
 Resume file: None
