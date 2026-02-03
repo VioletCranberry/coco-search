@@ -113,10 +113,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 30-01-PLAN.md — Multi-language symbol extraction (JS/TS/Go/Rust)
-- [ ] 30-02-PLAN.md — Symbol filter SQL builder and search integration
-- [ ] 30-03-PLAN.md — CLI and MCP symbol filter integration
-- [ ] 30-04-PLAN.md — Definition boost in hybrid search
+- [x] 30-01-PLAN.md — Multi-language symbol extraction (JS/TS/Go/Rust)
+- [x] 30-02-PLAN.md — Symbol filter SQL builder and search integration
+- [x] 30-03-PLAN.md — CLI and MCP symbol filter integration
+- [x] 30-04-PLAN.md — Definition boost in hybrid search
 
 #### Phase 31: Context Expansion Enhancement
 
@@ -168,8 +168,8 @@ Plans:
 | v1.4 Dogfooding | 15-18 | 7 | Complete | 2026-01-31 |
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
-| v1.7 Search Enhancement | 27-32 | 17 | In progress (Phase 29 complete) | - |
+| v1.7 Search Enhancement | 27-32 | 17 | In progress (Phase 30 complete) | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after Phase 30 planning*
+*Last updated: 2026-02-03 after Phase 30 execution*
