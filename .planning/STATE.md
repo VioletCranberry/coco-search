@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 29 of 32 complete (Symbol-Aware Indexing)
-Plan: 3 of 3 in phase 29 (verified)
-Status: Phase 29 verified, ready for Phase 30
-Last activity: 2026-02-03 — Phase 29 executed and verified
+Phase: 30 of 32 in progress (Symbol Search Filters)
+Plan: 2 of 3 in phase 30 (complete)
+Status: Plan 30-02 complete, ready for Plan 30-03
+Last activity: 2026-02-03 — Completed 30-02-PLAN.md (symbol filter SQL builder)
 
-Progress: [███████████████████████████████░] 93% (79 of 85 estimated plans complete)
+Progress: [████████████████████████████████░] 95% (81 of 85 estimated plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 79
+- Total plans completed: 81
 - Milestones shipped: 6 (v1.0-v1.6)
 - Current milestone: v1.7 Search Enhancement
 
@@ -31,7 +31,7 @@ Progress: [███████████████████████
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 | v1.4 Dogfooding | 15-18 | 7 | 2026-01-31 |
 
-*Updated: 2026-02-03 after Phase 29 verification*
+*Updated: 2026-02-03 after Plan 30-02 completion*
 
 ## Accumulated Context
 
@@ -39,6 +39,10 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **30-02**: Escape SQL chars (%, _) BEFORE converting glob wildcards (*, ?) - order matters
+- **30-02**: Symbol filtering uses vector-only mode - hybrid + symbol filters is future enhancement
+- **30-02**: Include symbol columns in SELECT only when symbol filtering is active
+- **30-02**: Symbol filters combine with language filters via AND logic
 - **29-03**: Module-level cache for symbol column availability (prevent repeated queries)
 - **29-03**: All-or-nothing check (require all 3 symbol columns for True)
 - **29-03**: INFO-level logging for pre-v1.7 detection (not WARNING)
@@ -92,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Phase 29 verified, ready for Phase 30 planning
+Stopped at: Completed 30-02-PLAN.md, ready for 30-03 CLI integration
 Resume file: None
