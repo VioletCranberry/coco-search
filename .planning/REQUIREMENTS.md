@@ -84,39 +84,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HYBR-01 | TBD | Pending |
-| HYBR-02 | TBD | Pending |
-| HYBR-03 | TBD | Pending |
-| HYBR-04 | TBD | Pending |
-| HYBR-05 | TBD | Pending |
-| HYBR-06 | TBD | Pending |
-| HYBR-07 | TBD | Pending |
-| CTXT-01 | TBD | Pending |
-| CTXT-02 | TBD | Pending |
-| CTXT-03 | TBD | Pending |
-| CTXT-04 | TBD | Pending |
-| CTXT-05 | TBD | Pending |
-| CTXT-06 | TBD | Pending |
-| SYMB-01 | TBD | Pending |
-| SYMB-02 | TBD | Pending |
-| SYMB-03 | TBD | Pending |
-| SYMB-04 | TBD | Pending |
-| SYMB-05 | TBD | Pending |
-| SYMB-06 | TBD | Pending |
-| SYMB-07 | TBD | Pending |
-| SYMB-08 | TBD | Pending |
-| SYMB-09 | TBD | Pending |
-| SYMB-10 | TBD | Pending |
-| LANG-01 | TBD | Pending |
-| LANG-02 | TBD | Pending |
-| LANG-03 | TBD | Pending |
-| LANG-04 | TBD | Pending |
+| HYBR-01 | Phase 28 | Pending |
+| HYBR-02 | Phase 28 | Pending |
+| HYBR-03 | Phase 28 | Pending |
+| HYBR-04 | Phase 28 | Pending |
+| HYBR-05 | Phase 27 | Pending |
+| HYBR-06 | Phase 27 | Pending |
+| HYBR-07 | Phase 27 | Pending |
+| CTXT-01 | Phase 31 | Pending |
+| CTXT-02 | Phase 31 | Pending |
+| CTXT-03 | Phase 31 | Pending |
+| CTXT-04 | Phase 31 | Pending |
+| CTXT-05 | Phase 31 | Pending |
+| CTXT-06 | Phase 31 | Pending |
+| SYMB-01 | Phase 29 | Pending |
+| SYMB-02 | Phase 29 | Pending |
+| SYMB-03 | Phase 29 | Pending |
+| SYMB-04 | Phase 30 | Pending |
+| SYMB-05 | Phase 30 | Pending |
+| SYMB-06 | Phase 30 | Pending |
+| SYMB-07 | Phase 30 | Pending |
+| SYMB-08 | Phase 30 | Pending |
+| SYMB-09 | Phase 30 | Pending |
+| SYMB-10 | Phase 29 | Pending |
+| LANG-01 | Phase 32 | Pending |
+| LANG-02 | Phase 32 | Pending |
+| LANG-03 | Phase 32 | Pending |
+| LANG-04 | Phase 32 | Pending |
 
 **Coverage:**
 - v1.7 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 (pending roadmap)
+- Mapped to phases: 27
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after initial definition*
+*Last updated: 2026-02-03 after roadmap creation*
