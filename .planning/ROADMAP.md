@@ -33,22 +33,23 @@ See project history for earlier milestones:
 
 **Milestone Goal:** Complete deferred v1.7 features, expand symbol coverage to 10 languages, add observability dashboard with CLI/terminal/web interfaces, create developer skills for Claude Code and OpenCode, and rebrand documentation.
 
-#### Phase 33: Deferred v1.7 Foundation
+#### Phase 33: Deferred v1.7 Foundation ✓
 **Goal**: Complete search features deferred from v1.7 -- hybrid+symbol combination, nested symbols, query caching
 **Depends on**: Phase 32 (v1.7 complete)
 **Requirements**: REQ-001, REQ-002, REQ-003, REQ-004
 **Success Criteria** (what must be TRUE):
-  1. User can combine hybrid search with symbol filters (--hybrid --symbol-type function works)
-  2. Symbol names display with parent context (ClassName.method_name format)
-  3. Repeated identical queries return cached results (sub-10ms response)
-  4. Semantic cache hits similar queries (cosine >0.95 reuses embeddings)
-  5. Cache invalidates automatically on reindex (--no-cache bypasses)
-**Plans**: 3 plans
+  1. ✓ User can combine hybrid search with symbol filters (--hybrid --symbol-type function works)
+  2. ✓ Symbol names display with parent context (ClassName.method_name format)
+  3. ✓ Repeated identical queries return cached results (sub-10ms response)
+  4. ✓ Semantic cache hits similar queries (cosine >0.95 reuses embeddings)
+  5. ✓ Cache invalidates automatically on reindex (--no-cache bypasses)
+**Plans**: 3 plans (complete)
+**Completed**: 2026-02-03
 
 Plans:
-- [ ] 33-01-PLAN.md -- Hybrid + symbol filter combination (pass WHERE to both vector/keyword before RRF)
-- [ ] 33-02-PLAN.md -- Nested symbol display (add symbol_name/type/signature to JSON and pretty output)
-- [ ] 33-03-PLAN.md -- Query caching (exact hash + semantic similarity, invalidate on reindex, --no-cache flag)
+- [x] 33-01-PLAN.md -- Hybrid + symbol filter combination (pass WHERE to both vector/keyword before RRF)
+- [x] 33-02-PLAN.md -- Nested symbol display (add symbol_name/type/signature to JSON and pretty output)
+- [x] 33-03-PLAN.md -- Query caching (exact hash + semantic similarity, invalidate on reindex, --no-cache flag)
 
 #### Phase 34: Symbol Extraction Expansion
 **Goal**: Extend symbol extraction from 5 to 10 languages with external query files
@@ -128,8 +129,8 @@ Plans:
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
 | v1.7 Search Enhancement | 27-32 | 21 | Complete | 2026-02-03 |
-| v1.8 Polish & Observability | 33-37 | 0/13 | In progress | - |
+| v1.8 Polish & Observability | 33-37 | 3/13 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-03 after v1.8 roadmap created*
+*Last updated: 2026-02-03 after Phase 33 complete*
