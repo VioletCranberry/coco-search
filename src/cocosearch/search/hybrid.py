@@ -384,6 +384,83 @@ def rrf_fusion(
     return fused_results
 
 
+def apply_definition_boost(
+    results: list[HybridSearchResult],
+    index_name: str,
+    boost_multiplier: float = 2.0,
+) -> list[HybridSearchResult]:
+    """Apply score boost to definition symbols.
+
+    Definitions are identified by checking if chunk content starts with
+    definition keywords (def/class/func/fn/etc.). Boost is applied after
+    RRF fusion to preserve rank-based algorithm semantics.
+
+    Args:
+        results: Fused hybrid search results.
+        index_name: Name of the index (for symbol column check).
+        boost_multiplier: Multiplier for definition scores (default 2.0).
+
+    Returns:
+        Results with boosted scores, re-sorted by new scores.
+    """
+    if not results:
+        return results
+
+    # Check if symbol columns exist (v1.7+ index)
+    # If not, skip boost - can't reliably identify definitions
+    from cocosearch.search.db import check_symbol_columns_exist
+
+    table_name = get_table_name(index_name)
+    if not check_symbol_columns_exist(table_name):
+        logger.debug("Skipping definition boost - symbol columns not available")
+        return results
+
+    # Import chunk content reader
+    from cocosearch.search.utils import read_chunk_content
+
+    boosted_results = []
+    for result in results:
+        # Read chunk content to check if definition
+        try:
+            content = read_chunk_content(
+                result.filename,
+                result.start_byte,
+                result.end_byte,
+            )
+            is_definition = _is_definition_chunk(content)
+        except Exception:
+            # If we can't read content, don't boost
+            is_definition = False
+
+        if is_definition:
+            # Create new result with boosted score
+            boosted_results.append(
+                HybridSearchResult(
+                    filename=result.filename,
+                    start_byte=result.start_byte,
+                    end_byte=result.end_byte,
+                    combined_score=result.combined_score * boost_multiplier,
+                    match_type=result.match_type,
+                    vector_score=result.vector_score,
+                    keyword_score=result.keyword_score,
+                    block_type=result.block_type,
+                    hierarchy=result.hierarchy,
+                    language_id=result.language_id,
+                )
+            )
+        else:
+            boosted_results.append(result)
+
+    # Re-sort by boosted scores (descending)
+    # Maintain keyword tiebreaker from rrf_fusion
+    boosted_results.sort(
+        key=lambda r: (r.combined_score, 1 if r.keyword_score is not None else 0),
+        reverse=True,
+    )
+
+    return boosted_results
+
+
 def hybrid_search(
     query: str,
     index_name: str,
