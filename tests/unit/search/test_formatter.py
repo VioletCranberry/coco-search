@@ -78,31 +78,49 @@ class TestFormatJson:
         assert "content" not in parsed[0]
 
     def test_includes_context_lines(self, make_search_result):
-        """JSON should contain context_before and context_after."""
-        results = [make_search_result()]
-        before = ["# Line before 1", "# Line before 2"]
-        after = ["# Line after 1"]
+        """JSON should contain context_before and context_after as strings."""
+        from unittest.mock import MagicMock
 
-        with patch("cocosearch.search.formatter.byte_to_line", return_value=5):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=(before, after)):
+        results = [make_search_result()]
+
+        mock_expander = MagicMock()
+        mock_expander.get_context_lines.return_value = (
+            [(3, "# Line before 1"), (4, "# Line before 2")],  # before
+            [(5, "code")],  # match
+            [(6, "# Line after 1")],  # after
+            False, False
+        )
+
+        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+            with patch("cocosearch.search.formatter.byte_to_line", return_value=5):
+                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
                     output = format_json(results, context_lines=2)
 
         parsed = json.loads(output)
-        assert parsed[0]["context_before"] == before
-        assert parsed[0]["context_after"] == after
+        # Context is now newline-separated string, not list
+        assert "# Line before 1" in parsed[0]["context_before"]
+        assert "# Line before 2" in parsed[0]["context_before"]
+        assert "# Line after 1" in parsed[0]["context_after"]
 
-    def test_no_context_when_zero(self, make_search_result):
-        """JSON should not contain context when context_lines is 0."""
+    def test_no_context_when_disabled(self, make_search_result):
+        """JSON should have empty context when smart_context=False and no lines requested."""
+        from unittest.mock import MagicMock
+
         results = [make_search_result()]
 
-        with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                output = format_json(results, context_lines=0)
+        mock_expander = MagicMock()
+        mock_expander.get_context_lines.return_value = ([], [], [], False, False)
+
+        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+            with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
+                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                    # With smart_context=False and context=0, minimal context
+                    output = format_json(results, context_lines=0, smart_context=False)
 
         parsed = json.loads(output)
-        assert "context_before" not in parsed[0]
-        assert "context_after" not in parsed[0]
+        # Context fields are present but empty
+        assert parsed[0]["context_before"] == ""
+        assert parsed[0]["context_after"] == ""
 
     def test_multiple_results(self, sample_search_results):
         """Should handle multiple results."""
