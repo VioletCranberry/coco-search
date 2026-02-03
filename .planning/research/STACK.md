@@ -1,462 +1,491 @@
-# Technology Stack: Search Enhancements
+# Technology Stack: v1.8 Feature Additions
 
-**Project:** CocoSearch v1.7 Search Enhancement
+**Project:** CocoSearch
 **Researched:** 2026-02-03
-**Confidence:** HIGH
+**Scope:** Stack additions for stats dashboard, skills, symbol extraction, and query caching
 
 ## Executive Summary
 
-This research evaluates stack additions for hybrid search (vector + BM25), context expansion, and symbol-aware indexing. The recommendation is **PostgreSQL-native approach** using built-in full-text search extensions rather than external libraries, keeping with CocoSearch's local-first, minimal-dependency philosophy.
-
-**Key decision:** Use PostgreSQL's built-in `tsvector`/`tsquery` with custom ranking over external BM25 extensions because:
-1. Zero new dependencies (already using PostgreSQL 17)
-2. Mature, stable, well-documented
-3. Sufficient for code search use case (BM25 advantage is marginal for short code chunks)
-4. Avoids pre-release extensions (pg_textsearch v0.5.0 still pre-GA)
-
-**Tree-sitter for symbols:** Use existing CocoIndex Tree-sitter integration with query-based symbol extraction - adds one small dependency (`tree-sitter-languages`) for 50+ language support.
-
-## Recommended Stack Additions
-
-### 1. Hybrid Search (Vector + Keyword)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| PostgreSQL `tsvector`/`tsquery` | Built-in (PG17) | Keyword/lexical search | Zero dependencies, mature, sufficient for code chunks |
-| PostgreSQL `pg_trgm` | Built-in contrib | Trigram similarity (fallback) | Optional enhancement for fuzzy matching |
-| None (RRF in Python) | N/A | Reciprocal Rank Fusion | Simple formula, implement in application layer |
-
-**Rationale:**
-
-PostgreSQL 17 includes production-ready full-text search with `tsvector` (document representation) and `tsquery` (query representation). While not "true BM25", it provides:
-- TF-IDF-like ranking via `ts_rank()` and `ts_rank_cd()` functions
-- Configurable weights for different text positions
-- Stop word filtering and stemming
-- GIN indexes for performance
-
-**Why NOT external BM25 extensions:**
-
-| Extension | Status | Why Skip |
-|-----------|--------|----------|
-| pg_textsearch (Timescale) | v0.5.0 pre-release, GA Feb 2026 | Too new, pre-release risk |
-| pg_search (ParadeDB) | Requires Rust/Tantivy build | Adds complexity, non-standard packaging |
-| VectorChord-BM25 | Newer, less mature | Limited adoption, unproven |
-
-For code search, the BM25 advantage is marginal:
-- Code chunks are short (1000 bytes avg) - length normalization less critical
-- Term frequency saturation less relevant in structured code
-- Keyword precision matters more than scoring nuance
-
-**Implementation approach:**
-
-1. Add `content_text` column to chunk table (stores actual chunk text, ~5-20KB per chunk)
-2. Add `content_tsv` column with `tsvector` (indexed with GIN)
-3. Generate `content_tsv` during indexing: `to_tsvector('english', chunk_text)`
-4. Keyword search: `SELECT ... WHERE content_tsv @@ plainto_tsquery('english', query)`
-5. Rank with `ts_rank(content_tsv, query)` for lexical score
-6. RRF fusion in Python application layer (simple formula)
-
-**Storage cost:** ~10-20% increase (chunk text + tsvector index)
-
-### 2. Context Expansion (Surrounding Code)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Python file I/O | stdlib | Read surrounding lines at query time | Zero dependencies, simple, fast |
-| PostgreSQL byte offsets | Existing | Locate chunk position | Already stored (`location` column) |
-
-**Rationale:**
-
-Context expansion is a **query-time operation**, not indexing-time. Current architecture stores:
-- `filename`: Full path to source file
-- `location`: Byte range as PostgreSQL `int4range` (e.g., `[0, 1000)`)
-
-**Implementation approach:**
-
-```python
-def expand_context(filename: str, start_byte: int, end_byte: int,
-                   context_lines: int = 5) -> tuple[str, int, int]:
-    """Expand chunk to include N lines before/after."""
-    with open(filename, 'rb') as f:
-        content = f.read().decode('utf-8', errors='replace')
-
-    # Find line boundaries
-    lines = content.splitlines(keepends=True)
-    # ... calculate expanded start/end based on context_lines
-
-    return expanded_text, new_start, new_end
-```
-
-**Performance:** File reads are fast (local SSD, ~1ms per file). Caching not needed for MVP (10 results = 10 file reads = 10ms overhead).
-
-**Alternative considered:** Store full chunk text in PostgreSQL. **Rejected because:**
-- Violates current reference-only design (filename + byte range)
-- Increases storage 10-20x (768-dim embeddings = 3KB, full text = 1KB avg)
-- Makes context expansion less flexible (fixed at indexing time)
-
-**When to upgrade:** If profiling shows file I/O is a bottleneck (unlikely), add chunk text column later.
-
-### 3. Symbol-Aware Indexing (Functions/Classes)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `tree-sitter-languages` | 1.10.2+ | Pre-built Tree-sitter grammars for 50+ languages | Zero-config language support |
-| Tree-sitter queries | Via `tree-sitter-languages` | Extract symbols (functions, classes, methods) | Precise, AST-based extraction |
-
-**Rationale:**
-
-CocoSearch already uses Tree-sitter via CocoIndex for chunking. Extend to **symbol extraction** by querying the AST during indexing.
-
-**Current Tree-sitter usage:**
-- CocoIndex uses `SplitRecursively` with Tree-sitter for semantic chunking
-- Custom language handlers for HCL, Dockerfile, Bash (via `custom_languages`)
-
-**Symbol extraction approach:**
-
-Tree-sitter provides a **query language** for pattern matching on ASTs. Example for Python:
-
-```python
-# Query pattern (S-expression format)
-PYTHON_SYMBOL_QUERY = """
-(function_definition
-  name: (identifier) @function.name) @function.def
-
-(class_definition
-  name: (identifier) @class.name) @class.def
-"""
-
-# Usage
-from tree_sitter_languages import get_language, get_parser
-
-parser = get_parser('python')
-tree = parser.parse(bytes(code, 'utf8'))
-
-language = get_language('python')
-query = language.query(PYTHON_SYMBOL_QUERY)
-
-for match, capture_name in query.captures(tree.root_node):
-    if capture_name == 'function.name':
-        # Extract function name, line number, byte range
-        pass
-```
-
-**Schema addition:**
-
-Add `symbol_type` and `symbol_name` columns to chunk table:
-
-```sql
-ALTER TABLE codeindex_{index}__{index}_chunks
-ADD COLUMN symbol_type TEXT,  -- 'function', 'class', 'method', etc.
-ADD COLUMN symbol_name TEXT;  -- 'parse_config', 'SearchResult', etc.
-```
-
-**Language coverage:**
-
-`tree-sitter-languages` v1.10.2 includes 50+ languages:
-- **Core:** Python, JavaScript, TypeScript, Java, C, C++, Go, Rust, Ruby, PHP
-- **Web:** HTML, CSS, JSON, YAML, Markdown
-- **Systems:** C#, Swift, Kotlin, Scala, Erlang, Elixir
-- **Config:** TOML, INI, SQL
-
-**Integration with CocoIndex:**
-
-CocoIndex already parses files with Tree-sitter. Add symbol extraction as a **parallel operation** during chunking:
-
-1. CocoIndex chunks file into semantic units (existing)
-2. For each chunk, query Tree-sitter AST for symbols (new)
-3. Store symbol metadata alongside chunk (new columns)
-
-**Why NOT regex-based extraction:**
-- Fragile (breaks on edge cases, nested definitions)
-- Language-specific (need 50+ regex patterns)
-- Already have Tree-sitter in pipeline
-
-### 4. Full Language Coverage
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| CocoIndex built-in languages | Via `tree-sitter-languages` | Enable all 50+ languages | Already supported, just need to enable |
-
-**Current state:** CocoSearch uses CocoIndex's `SplitRecursively` which already supports 50+ languages via Tree-sitter. No code changes needed.
-
-**Validation needed:** Test that current CocoIndex version (0.3.28+) works with YAML, JSON, Markdown, and other non-code languages.
-
-**Schema changes:** None. Language detection already handled by CocoIndex via file extensions.
-
-## Updated Dependency List
-
-### New Dependencies
-
-```toml
-[project.dependencies]
-# Existing (no changes)
-cocoindex[embeddings] = ">=0.3.28"
-mcp[cli] = ">=1.26.0"
-pathspec = ">=1.0.3"
-pgvector = ">=0.4.2"
-psycopg[binary,pool] = ">=3.3.2"
-pyyaml = ">=6.0.2"
-rich = ">=13.0.0"
-
-# NEW for symbol extraction
-tree-sitter-languages = ">=1.10.2"
-```
-
-**Size impact:** `tree-sitter-languages` is ~50MB (pre-compiled binaries for all languages). Acceptable for desktop tool.
-
-### PostgreSQL Extensions
-
-Enable during database setup:
-
-```sql
--- Already using
-CREATE EXTENSION IF NOT EXISTS vector;
-
--- NEW for hybrid search
-CREATE EXTENSION IF NOT EXISTS pg_trgm;  -- Built-in contrib, optional
-```
-
-**Note:** `tsvector`/`tsquery` are core PostgreSQL types, no extension needed.
-
-## Schema Changes
-
-### Chunk Table Additions
-
-```sql
--- For hybrid search (keyword matching)
-ALTER TABLE codeindex_{index}__{index}_chunks
-ADD COLUMN content_text TEXT,        -- Full chunk text (1KB avg)
-ADD COLUMN content_tsv tsvector;     -- Full-text search vector
-
--- For symbol-aware indexing
-ALTER TABLE codeindex_{index}__{index}_chunks
-ADD COLUMN symbol_type TEXT,         -- 'function', 'class', 'method', etc.
-ADD COLUMN symbol_name TEXT;         -- 'parse_config', 'SearchResult', etc.
-
--- Indexes for performance
-CREATE INDEX idx_{index}_content_gin ON codeindex_{index}__{index}_chunks USING GIN(content_tsv);
-CREATE INDEX idx_{index}_symbols ON codeindex_{index}__{index}_chunks(symbol_type, symbol_name);
-```
-
-**Storage estimate (per 10K chunks):**
-- `content_text`: ~10MB (1KB avg per chunk)
-- `content_tsv` (GIN index): ~2-3MB (compressed tsvector)
-- `symbol_type` + `symbol_name`: ~500KB (short strings)
-- **Total new storage:** ~13MB per 10K chunks (~20% increase from baseline)
-
-**Baseline for comparison:** Current 10K chunks with embeddings = ~65MB (768-dim float32 vectors)
-
-## Implementation Sequence
-
-### Phase 1: Storage & Indexing
-1. Add schema columns (content_text, content_tsv, symbol_type, symbol_name)
-2. Update CocoIndex flow to store chunk text
-3. Generate tsvector during indexing: `to_tsvector('english', chunk_text)`
-4. Add Tree-sitter symbol extraction to indexing pipeline
-5. Populate new columns during indexing
-
-### Phase 2: Hybrid Search
-1. Implement keyword search query (PostgreSQL `@@` operator)
-2. Implement RRF fusion in Python (combine vector + keyword scores)
-3. Add hybrid search to MCP search tool
-4. Add CLI flag: `--hybrid` or `--search-mode={vector,keyword,hybrid}`
-
-### Phase 3: Context Expansion
-1. Add query-time file reading function
-2. Add context expansion to MCP search results
-3. Add CLI flag: `--context-lines=N` (default 0)
-
-### Phase 4: Symbol Search
-1. Add symbol filtering to search query
-2. Add MCP tool: `search_symbols(query, symbol_type='function')`
-3. Add CLI command: `cocosearch symbols --index=NAME --type=function`
-
-## Alternatives Considered
-
-### Alternative 1: External BM25 Libraries
-
-**Option A: pg_textsearch (Timescale)**
-- **Pro:** True BM25, modern architecture
-- **Con:** Pre-release (v0.5.0), GA expected Feb 2026, PostgreSQL 17+ only
-- **Verdict:** Too new, wait for v1.0 before adopting
-
-**Option B: pg_search (ParadeDB)**
-- **Pro:** True BM25, built on Tantivy (Rust)
-- **Con:** Requires Rust toolchain for build, complex packaging, non-standard
-- **Verdict:** Adds too much complexity for marginal benefit
-
-**Option C: Python BM25 library (rank-bm25)**
-- **Pro:** Pure Python, no PostgreSQL changes
-- **Con:** Requires loading all documents into memory, doesn't scale
-- **Verdict:** Not suitable for 100K+ chunks
-
-### Alternative 2: Store Full Chunk Text in PostgreSQL
-
-**Approach:** Add `content_text` column, query-time context expansion from DB.
-
-**Pro:**
-- Faster query time (no file I/O)
-- Simpler query logic
-
-**Con:**
-- Violates reference-only design principle
-- 10-20x storage increase (significant for large codebases)
-- Less flexible (context size fixed at indexing time)
-- Makes re-indexing slower (more data to insert)
-
-**Verdict:** Start with file I/O approach (Phase 3), measure performance, upgrade if needed.
-
-### Alternative 3: Regex-Based Symbol Extraction
-
-**Approach:** Use regex patterns instead of Tree-sitter queries.
-
-**Pro:**
-- Simpler (no new dependencies)
-- Faster for simple cases
-
-**Con:**
-- Fragile (breaks on nested definitions, complex syntax)
-- Requires 50+ language-specific patterns
-- Already have Tree-sitter in pipeline
-
-**Verdict:** Use Tree-sitter queries (more robust, leverages existing infrastructure).
-
-## Performance Considerations
-
-### Hybrid Search Query Time
-
-**Baseline (vector-only):**
-- Query embedding: ~50ms (Ollama)
-- Vector similarity search: ~10ms (pgvector with HNSW index)
-- **Total:** ~60ms
-
-**Hybrid (vector + keyword):**
-- Query embedding: ~50ms (same)
-- Vector similarity search: ~10ms (same)
-- Keyword search: ~5ms (GIN index on tsvector)
-- RRF fusion: ~1ms (in-memory ranking)
-- **Total:** ~66ms (+10% overhead)
-
-**Verdict:** Negligible overhead, acceptable.
-
-### Context Expansion Overhead
-
-**File I/O per result:**
-- Open file: ~0.5ms
-- Read and decode: ~0.5ms
-- Parse lines: ~0.1ms
-- **Total:** ~1ms per result
-
-**For 10 results:** ~10ms total
-
-**Verdict:** Acceptable. Add caching later if profiling shows bottleneck.
-
-### Symbol Extraction During Indexing
-
-**Overhead per file:**
-- Parse with Tree-sitter: Already done by CocoIndex (~5ms per file)
-- Query for symbols: ~1-2ms per file (one query per language)
-- **Additional overhead:** ~1-2ms per file
-
-**For 1000 files:** ~1-2 seconds additional indexing time
-
-**Verdict:** Minimal impact on indexing performance.
-
-## Migration Path
-
-### Backward Compatibility
-
-New columns are **additive only** (no breaking changes):
-- Existing indexes work without re-indexing (columns default to empty)
-- New features gracefully degrade if columns missing (like v1.2 metadata)
-- Full functionality requires re-indexing
-
-### Migration Strategy
-
-```python
-# Check if new columns exist
-try:
-    cursor.execute("SELECT content_text FROM {table} LIMIT 1")
-    has_content_text = True
-except UndefinedColumn:
-    has_content_text = False
-
-# Graceful degradation
-if not has_content_text:
-    logger.warning("Hybrid search requires re-indexing. Run: cocosearch index")
-    # Fall back to vector-only search
-```
-
-### User Communication
-
-```
-$ cocosearch search --hybrid "authentication logic" --index=myproject
-
-Warning: Hybrid search requires v1.7 index schema.
-Run: cocosearch index --index=myproject
-Falling back to vector-only search...
-```
-
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| `tsvector` ranking not good enough | Medium | Medium | Can upgrade to pg_textsearch later (schema compatible) |
-| File I/O too slow for context | Low | Low | Add chunk text column if profiling shows issue |
-| Tree-sitter query syntax complex | Low | Medium | Use pre-built queries from community examples |
-| Storage increase unacceptable | Low | Medium | Make chunk text optional (CLI flag: --store-content) |
-
-## Validation Checklist
-
-Before finalizing implementation:
-
-- [ ] Verify CocoIndex 0.3.28+ supports all 50+ languages (check docs/tests)
-- [ ] Test `tsvector` ranking on sample code chunks (compare to BM25 baseline)
-- [ ] Benchmark file I/O for context expansion (measure 10, 100, 1000 results)
-- [ ] Validate Tree-sitter query syntax for Python, JavaScript, Go, Rust
-- [ ] Estimate storage impact on large codebases (100K+ chunks)
-
-## Sources
-
-**PostgreSQL BM25 & Hybrid Search:**
-- [PostgreSQL BM25 Full-Text Search](https://blog.vectorchord.ai/postgresql-full-text-search-fast-when-done-right-debunking-the-slow-myth)
-- [True BM25 Ranking in Postgres](https://www.tigerdata.com/blog/introducing-pg_textsearch-true-bm25-ranking-hybrid-retrieval-postgres)
-- [pg_textsearch GitHub](https://github.com/timescale/pg_textsearch) (v0.5.0 pre-release)
-- [Hybrid Search in PostgreSQL: The Missing Manual](https://www.paradedb.com/blog/hybrid-search-in-postgresql-the-missing-manual)
-- [ParadeDB: BM25 in PostgreSQL](https://www.paradedb.com/learn/search-in-postgresql/bm25)
-
-**Reciprocal Rank Fusion:**
-- [RAG Series: Hybrid Search with Re-ranking](https://www.dbi-services.com/blog/rag-series-hybrid-search-with-re-ranking/)
-- [Better RAG with RRF and Hybrid Search](https://www.assembled.com/blog/better-rag-results-with-reciprocal-rank-fusion-and-hybrid-search)
-- [Hybrid Search Using RRF in SQL](https://www.singlestore.com/blog/hybrid-search-using-reciprocal-rank-fusion-in-sql/)
-- [What is Reciprocal Rank Fusion?](https://www.paradedb.com/learn/search-concepts/reciprocal-rank-fusion)
-
-**Tree-sitter & Symbol Extraction:**
-- [py-tree-sitter Documentation](https://tree-sitter.github.io/py-tree-sitter/)
-- [py-tree-sitter GitHub](https://github.com/tree-sitter/py-tree-sitter) (v0.25.2)
-- [tree-sitter-languages PyPI](https://pypi.org/project/tree-sitter-languages/) (v1.10.2)
-- [Diving into Tree-Sitter with Python](https://dev.to/shrsv/diving-into-tree-sitter-parsing-code-with-python-like-a-pro-17h8)
-- [Using Tree-Sitter for Call Graph Extraction](https://volito.digital/using-the-tree-sitter-library-in-python-to-build-a-custom-tool-for-parsing-source-code-and-extracting-call-graphs/)
-
-**PostgreSQL Full-Text Search:**
-- [PostgreSQL 17: Chapter 12. Full Text Search](https://www.postgresql.org/docs/current/textsearch.html)
-- [PostgreSQL pg_trgm Extension](https://www.postgresql.org/docs/current/pgtrgm.html)
-- [Neon: pg_trgm Extension Guide](https://neon.com/docs/extensions/pg_trgm)
-
-**CocoIndex & Tree-sitter Integration:**
-- [Large Codebase Context with CocoIndex](https://cocoindexio.substack.com/p/index-codebase-with-tree-sitter-and)
-- [Build Real-Time Codebase Indexing with CocoIndex](https://cocoindex.io/blogs/index-code-base-for-rag)
-- [CocoIndex Functions Documentation](https://cocoindex.io/docs/ops/functions)
-
-**Context Window & Code Search:**
-- [Semantic Code Search](https://wangxj03.github.io/posts/2024-09-24-code-search/)
-- [Building Open-Source Cursor Alternative](https://milvus.io/blog/build-open-source-alternative-to-cursor-with-code-context.md)
-- [AI Code Review Tools: Context & Scale 2026](https://www.qodo.ai/blog/best-ai-code-review-tools-2026/)
+v1.8 requires **minimal new dependencies** aligned with CocoSearch's local-first philosophy. The key additions are:
+
+1. **FastAPI + Uvicorn** for HTTP stats API (optional feature)
+2. **Rich** for terminal dashboard (already a dependency)
+3. **tree-sitter-language-pack** migration for 5+ language support
+4. **PostgreSQL JSONB** for query caching (no new dependencies)
+5. **Skill files** are static markdown (no runtime dependencies)
+
+**Philosophy:** Prefer built-in PostgreSQL features over external caching layers. Avoid JavaScript build tooling for web UI.
 
 ---
 
-**Research confidence:** HIGH
-- PostgreSQL built-in features verified via official docs
-- Tree-sitter libraries verified via PyPI and GitHub (current versions)
-- BM25 extensions evaluated via official repos and blog posts
-- RRF algorithm verified via multiple sources with SQL examples
+## 1. Stats Dashboard Stack
+
+### HTTP API Layer
+
+| Technology | Version | Purpose | Rationale |
+|------------|---------|---------|-----------|
+| **FastAPI** | 0.128.0+ | HTTP API framework | De-facto standard for Python HTTP APIs. Automatic OpenAPI docs, Pydantic validation, async-native. Integrates with existing async codebase. |
+| **Uvicorn** | 0.40.0+ | ASGI server | Lightweight, production-ready ASGI server. No heavyweight deployment needed. |
+
+**Why FastAPI over alternatives:**
+- Flask: Not async-native, would block event loop
+- aiohttp: More verbose, no automatic validation/docs
+- Starlette: FastAPI is built on Starlette with better DX
+
+**Installation:**
+```bash
+uv add "fastapi>=0.128.0"
+uv add "uvicorn[standard]>=0.40.0"  # [standard] includes uvloop for performance
+```
+
+**Integration points:**
+- FastAPI runs as separate process or embedded in Docker container
+- Shares PostgreSQL connection pool with existing MCP server
+- Optional dependency: Only installed if stats dashboard feature enabled
+
+**Configuration:**
+- Add `COCO_STATS_API_ENABLED` environment variable
+- Default to disabled (CLI/MCP only mode)
+- When enabled, expose `/stats` endpoint on configurable port (default 8765)
+
+### Terminal Dashboard
+
+| Technology | Version | Purpose | Rationale |
+|------------|---------|---------|-----------|
+| **Rich** | 14.3.2+ | Terminal UI library | **Already a dependency** (used for CLI output). No new installation needed. Supports tables, live updates, layouts. |
+
+**Why Rich over alternatives:**
+- Textual: Too heavyweight for simple stats dashboard. Textual is for complex TUI apps with widgets/events.
+- Dashing: Unmaintained, last release 2019
+- Curses: Low-level, requires significant boilerplate
+
+**Implementation approach:**
+- Use `rich.table.Table` for stats tables
+- Use `rich.live.Live` for auto-refreshing dashboard
+- Use `rich.layout.Layout` for multi-panel views (indexed files, queries, repo stats)
+
+**No new dependencies required.**
+
+### Web Dashboard UI
+
+**Recommendation: Static HTML + Vanilla JS**
+
+| Component | Technology | Rationale |
+|-----------|-----------|-----------|
+| HTML/CSS | Tailwind CSS via CDN | Zero build tooling. Copy-paste from open-source templates. |
+| JavaScript | Vanilla JS (ES6+) | No framework overhead. Fetch API for stats endpoint. |
+| Charts | Chart.js via CDN | Lightweight charting library. No build step. |
+
+**Why NOT to use:**
+- React/Vue/Svelte: Requires build tooling (webpack/vite), npm dependencies, breaks local-first philosophy
+- Server-side rendering: FastAPI Jinja2 templates add dependency and complexity
+- Electron/Tauri: Massive overhead for simple stats dashboard
+
+**Implementation:**
+- Single `dashboard.html` file served from FastAPI static directory
+- Fetch JSON from `/api/stats` endpoint every 5 seconds
+- Self-contained file: All CSS/JS inline or from CDN
+- Works offline after first load (cache CDN resources)
+
+**Template starting point:** TailAdmin or Tabler free templates (MIT licensed)
+
+---
+
+## 2. Claude Code / OpenCode Skills Stack
+
+### Skill File Format
+
+**No runtime dependencies required.**
+
+Skills are static markdown files following the [Agent Skills](https://agentskills.io) open standard.
+
+**File structure:**
+```
+.claude/skills/coco-explore/
+├── SKILL.md          # Main skill (YAML frontmatter + markdown)
+├── examples.md       # Optional: Usage examples
+└── scripts/          # Optional: Helper scripts
+    └── index_repo.sh
+```
+
+**Format:**
+```yaml
+---
+name: coco-explore
+description: Search codebase semantically with CocoSearch
+disable-model-invocation: false
+allowed-tools: Bash(cocosearch *)
+---
+
+When exploring a codebase, use `cocosearch query "semantic query"` to find relevant code.
+```
+
+**Integration with CocoSearch:**
+- Skills invoke `cocosearch` CLI via Bash tool
+- No MCP integration needed (skills use CLI, not MCP server directly)
+- Skills can run `cocosearch stats` for context before querying
+
+**Skill file locations:**
+1. **Personal skills:** `~/.claude/skills/coco-*/SKILL.md` (global)
+2. **Project skills:** `.claude/skills/coco-*/SKILL.md` (per-repo)
+3. **Plugin skills:** Distribute via CocoSearch plugin (future)
+
+**Distribution strategy:**
+- Ship example skills in `examples/claude-skills/` directory
+- Installation: User copies to `~/.claude/skills/` manually
+- No automated installation (respects Claude Code's security model)
+
+**Files to create:**
+- `coco-explore.md`: Search codebase semantically
+- `coco-index.md`: Index current repository
+- `coco-stats.md`: Show indexing statistics
+- `coco-context.md`: Extract context around code blocks
+
+---
+
+## 3. Symbol Extraction: Language Support Expansion
+
+### Current State (v1.7)
+
+```toml
+# pyproject.toml
+dependencies = [
+    "tree-sitter>=0.21.0,<0.22.0",
+    "tree-sitter-languages>=1.10.0,<1.11.0",  # 5 languages: Python, JS, TS, Go, Rust
+]
+```
+
+**Supported languages (v1.7):** Python, JavaScript, TypeScript, Go, Rust
+
+### Migration Required: tree-sitter-language-pack
+
+| Package | Status | Action |
+|---------|--------|--------|
+| `tree-sitter-languages` | **Unmaintained** (last update 2024-02-04) | Replace |
+| `tree-sitter-language-pack` | **Actively maintained** (165+ languages, updated 2026) | Migrate to |
+
+**Why migrate:**
+1. `tree-sitter-languages` is unmaintained (explicitly recommends `tree-sitter-language-pack`)
+2. `tree-sitter-language-pack` includes all 5 languages needed (Java, C, C++, Ruby, PHP) plus existing ones
+3. Pre-built wheels, zero compilation required
+4. Full typing support (better IDE experience)
+5. Aligns with tree-sitter 0.25.x (latest)
+
+**Compatibility:**
+- API is nearly identical: `get_language()`, `get_parser()`
+- Requires Python 3.10+ (CocoSearch already requires 3.11)
+- Tree-sitter 0.25.x drops Python 3.9 (not a concern)
+
+**Migration:**
+```toml
+# pyproject.toml - UPDATE
+dependencies = [
+    "tree-sitter>=0.25.0,<0.26.0",  # Updated from 0.21.x
+    "tree-sitter-language-pack>=0.2.0",  # Replaces tree-sitter-languages
+]
+```
+
+**Code changes required:**
+```python
+# Before (v1.7)
+from tree_sitter_languages import get_language, get_parser
+
+# After (v1.8)
+from tree_sitter_language_pack import get_language, get_parser
+# Same API, zero refactoring needed
+```
+
+### New Language Support
+
+All 5 new languages are included in `tree-sitter-language-pack`:
+
+| Language | Grammar Status | Symbol Types |
+|----------|---------------|--------------|
+| **Java** | Official tree-sitter grammar, updated Jan 2026 | class, interface, method, field, enum |
+| **C** | Official tree-sitter grammar, updated Feb 2026 | function, struct, typedef, enum |
+| **C++** | Official tree-sitter grammar, updated Feb 2026 | class, function, method, namespace, template |
+| **Ruby** | Official tree-sitter grammar, updated Jan 2026 | class, module, method, singleton_method |
+| **PHP** | Official tree-sitter grammar, updated Feb 2026 | class, interface, trait, function, method |
+
+**Implementation:**
+- Add language handlers to `src/cocosearch/handlers/` (e.g., `java.py`, `c.py`, etc.)
+- Update symbol extraction logic to recognize node types for each language
+- Follow existing pattern from `python.py`, `javascript.py`, etc.
+
+**No breaking changes:** Existing 5-language support remains unchanged.
+
+---
+
+## 4. Query Caching / History Stack
+
+### Storage Strategy: PostgreSQL JSONB
+
+**No new dependencies required.**
+
+Use existing PostgreSQL with JSONB columns for query caching and history.
+
+| Feature | Technology | Rationale |
+|---------|-----------|-----------|
+| **Cache storage** | PostgreSQL JSONB column | Already have PostgreSQL. JSONB supports fast lookups, partial indexes, JSON queries. |
+| **Cache key** | MD5 hash of (query + filters + top_k) | Deterministic cache key for exact match lookups. |
+| **Expiration** | PostgreSQL TTL + cleanup job | Native timestamp-based expiration. No external cache layer. |
+
+**Why NOT external caching:**
+- Redis: Adds deployment complexity, requires Docker container, breaks local-first philosophy
+- Memcached: Same issues as Redis
+- SQLite: Already have PostgreSQL, no need for second database
+- In-memory: Doesn't persist across MCP server restarts
+
+**Schema:**
+```sql
+CREATE TABLE query_cache (
+    id SERIAL PRIMARY KEY,
+    cache_key TEXT UNIQUE NOT NULL,
+    query TEXT NOT NULL,
+    filters JSONB,
+    results JSONB NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    accessed_at TIMESTAMP DEFAULT NOW(),
+    access_count INTEGER DEFAULT 1
+);
+
+CREATE INDEX idx_cache_key ON query_cache(cache_key);
+CREATE INDEX idx_created_at ON query_cache(created_at);
+```
+
+**Query history:**
+```sql
+CREATE TABLE query_history (
+    id SERIAL PRIMARY KEY,
+    query TEXT NOT NULL,
+    filters JSONB,
+    result_count INTEGER,
+    execution_time_ms INTEGER,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_history_created_at ON query_history(created_at);
+```
+
+**Cache invalidation strategies:**
+1. **Time-based TTL:** Delete entries older than 24 hours (configurable)
+2. **LRU eviction:** Keep top 1000 most-accessed queries
+3. **Manual clear:** `cocosearch clear --cache` command
+
+**Performance:**
+- JSONB indexing: Use GIN index for filter queries (if needed)
+- Partial index: Only index recent entries (last 7 days)
+- Vacuum: PostgreSQL auto-vacuum handles cleanup
+
+**Configuration:**
+```yaml
+# .cocosearch.yml
+cache:
+  enabled: true
+  ttl_hours: 24
+  max_entries: 1000
+```
+
+---
+
+## What NOT to Add
+
+### Explicitly Rejected Dependencies
+
+| Technology | Why NOT |
+|-----------|---------|
+| **Redis** | Adds deployment complexity. PostgreSQL JSONB handles caching. Local-first philosophy: don't require external services. |
+| **React/Vue/Svelte** | Requires build tooling (npm, webpack, vite). Breaks local-first philosophy. Static HTML + vanilla JS is sufficient. |
+| **Electron/Tauri** | Massive overhead (100+ MB). Web dashboard via FastAPI is lighter and simpler. |
+| **GraphQL** | Overkill for simple stats API. REST endpoints are sufficient. |
+| **WebSockets** | Not needed. HTTP polling every 5 seconds is sufficient for stats dashboard. |
+| **Celery** | No background job queue needed. Stats are computed on-demand. |
+| **Message brokers (RabbitMQ, Kafka)** | No distributed architecture. Single-node deployment only. |
+
+---
+
+## Installation Summary
+
+### Required for v1.8 Features
+
+```bash
+# Stats Dashboard (optional feature)
+uv add "fastapi>=0.128.0"
+uv add "uvicorn[standard]>=0.40.0"
+
+# Symbol Extraction (MIGRATION REQUIRED)
+uv remove tree-sitter-languages
+uv add "tree-sitter>=0.25.0,<0.26.0"
+uv add "tree-sitter-language-pack>=0.2.0"
+
+# Query Caching
+# No new dependencies - uses existing PostgreSQL
+
+# Skills
+# No new dependencies - static markdown files
+```
+
+### Updated pyproject.toml
+
+```toml
+[project]
+dependencies = [
+    "cocoindex[embeddings]>=0.3.28",
+    "mcp[cli]>=1.26.0",
+    "pathspec>=1.0.3",
+    "pgvector>=0.4.2",
+    "psycopg[binary,pool]>=3.3.2",
+    "pyyaml>=6.0.2",
+    "rich>=13.0.0",
+    "tree-sitter>=0.25.0,<0.26.0",           # UPDATED
+    "tree-sitter-language-pack>=0.2.0",      # REPLACED tree-sitter-languages
+]
+
+[project.optional-dependencies]
+stats = [
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.40.0",
+]
+```
+
+**Installation:**
+```bash
+# Full install with stats dashboard
+uv sync --extra stats
+
+# Minimal install (CLI/MCP only)
+uv sync
+```
+
+---
+
+## Docker Integration
+
+### Updated docker-compose.yml
+
+```yaml
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    # ... existing config ...
+
+  ollama:
+    image: ollama/ollama:latest
+    # ... existing config ...
+
+  # NEW: Stats API (optional)
+  stats-api:
+    build: .
+    container_name: cocosearch-stats
+    ports:
+      - "8765:8765"
+    environment:
+      COCO_STATS_API_ENABLED: "true"
+      POSTGRES_HOST: db
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    profiles:
+      - stats  # Only start if --profile stats is used
+```
+
+**Usage:**
+```bash
+# Start with stats dashboard
+docker-compose --profile stats up
+
+# Start without stats dashboard (CLI/MCP only)
+docker-compose up
+```
+
+---
+
+## Feature Flags
+
+Control which v1.8 features are enabled via environment variables:
+
+| Feature | Env Var | Default | Impact |
+|---------|---------|---------|--------|
+| Stats API | `COCO_STATS_API_ENABLED` | `false` | Requires FastAPI/Uvicorn |
+| Query Cache | `COCO_CACHE_ENABLED` | `true` | No new dependencies |
+| Query History | `COCO_HISTORY_ENABLED` | `true` | No new dependencies |
+
+**Rationale:** Users who only want CLI/MCP don't pay the cost of FastAPI/Uvicorn.
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|------------|-------|
+| **FastAPI/Uvicorn** | HIGH | De-facto standard for Python HTTP APIs. Current versions verified. |
+| **Rich** | HIGH | Already a dependency. No migration risk. |
+| **tree-sitter-language-pack** | HIGH | Actively maintained, API-compatible, all 5 languages included. Official grammars verified. |
+| **PostgreSQL JSONB caching** | HIGH | Standard pattern. No new dependencies. Well-documented. |
+| **Static HTML dashboard** | HIGH | No build tooling required. Proven approach. |
+| **Skills integration** | HIGH | Standard Claude Code skill format. No runtime dependencies. |
+
+**Overall confidence:** HIGH
+
+All recommendations based on:
+- Official documentation (FastAPI, Rich, tree-sitter)
+- PyPI package status (verified unmaintained status of tree-sitter-languages)
+- Current version numbers (verified via PyPI and GitHub releases)
+- Integration with existing stack (PostgreSQL, Docker, Python 3.11+)
+
+---
+
+## Migration Checklist
+
+Before implementing v1.8:
+
+- [ ] Migrate tree-sitter-languages to tree-sitter-language-pack
+- [ ] Update tree-sitter from 0.21.x to 0.25.x
+- [ ] Test existing 5-language symbol extraction still works
+- [ ] Add FastAPI/Uvicorn as optional dependencies
+- [ ] Create PostgreSQL schema for query cache and history
+- [ ] Create example skill files in `examples/claude-skills/`
+- [ ] Create static HTML dashboard template
+- [ ] Update Docker Compose with optional stats-api service
+- [ ] Document feature flags in README
+
+---
+
+## Sources
+
+**FastAPI and Uvicorn:**
+- [FastAPI PyPI](https://pypi.org/project/fastapi/)
+- [FastAPI Official Documentation](https://fastapi.tiangolo.com/)
+- [Uvicorn Release Notes](https://uvicorn.dev/release-notes/)
+- [FastAPI GitHub Releases](https://github.com/fastapi/fastapi/releases)
+
+**Rich Terminal Library:**
+- [Rich PyPI](https://pypi.org/project/rich/)
+- [Rich GitHub Repository](https://github.com/Textualize/rich)
+- [Building Rich Terminal Dashboards](https://www.willmcgugan.com/blog/tech/post/building-rich-terminal-dashboards/)
+- [Real Python: Rich Package Tutorial](https://realpython.com/python-rich-package/)
+
+**Tree-sitter Language Support:**
+- [tree-sitter-language-pack PyPI](https://pypi.org/project/tree-sitter-language-pack/)
+- [tree-sitter-language-pack GitHub](https://github.com/Goldziher/tree-sitter-language-pack)
+- [tree-sitter-languages PyPI (unmaintained)](https://pypi.org/project/tree-sitter-languages/)
+- [Tree-sitter Official Site](https://tree-sitter.github.io/tree-sitter/)
+- [Tree-sitter Grammars Organization](https://github.com/tree-sitter-grammars)
+
+**Claude Code Skills:**
+- [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills)
+- [Agent Skills Open Standard](https://agentskills.io)
+- [Anthropic Skills Repository](https://github.com/anthropics/skills)
+
+**PostgreSQL Caching:**
+- [PostgreSQL JSON Optimization 2025](https://markaicode.com/postgres-json-optimization-techniques-2025/)
+- [PostgreSQL as Cache Service](https://martinheinz.dev/blog/105)
+- [AWS: PostgreSQL as JSON Database](https://aws.amazon.com/blogs/database/postgresql-as-a-json-database-advanced-patterns-and-best-practices/)
+
+**Web Dashboard Templates:**
+- [TailAdmin Free Templates](https://tailadmin.com)
+- [Tabler Admin Template](https://tabler.io/)
+- [Free HTML5 Admin Templates 2026](https://colorlib.com/wp/free-html5-admin-dashboard-templates/)

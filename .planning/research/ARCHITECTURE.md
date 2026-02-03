@@ -1,699 +1,930 @@
-# Architecture Research: Docker Integration Testing
+# Architecture Integration: v1.8 Features
 
-**Project:** CocoSearch
-**Focus:** Integration test architecture alongside existing unit tests
-**Researched:** 2026-01-30
-**Overall Confidence:** HIGH
+**Project:** CocoSearch v1.8
+**Researched:** 2026-02-03
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Docker integration tests should live in `tests/integration/` alongside existing `tests/unit/`, using pytest markers for selective execution and session-scoped fixtures for container lifecycle management. Docker Compose profiles enable a single compose file for dev, testing, and CI with different service combinations. This architecture preserves existing unit test isolation while adding real-environment validation.
+This document analyzes how four v1.8 features integrate with CocoSearch's existing architecture:
 
-**Key Recommendation:** Use pytest-docker plugin + Docker Compose profiles + pytest markers for clean separation without duplicating configuration.
+1. **Stats Dashboard** - Web UI for index visualization
+2. **Developer Skills** - Reusable prompt files for LLM workflows
+3. **Expanded Symbol Extraction** - Per-language tree-sitter query files
+4. **Query Caching** - In-memory cache for repeated semantic searches
 
-## Recommended Test Organization
+All four features integrate cleanly with minimal architectural changes. The existing module structure supports natural extension points.
 
-### Directory Structure
+## Current Architecture Overview
 
 ```
-tests/
-├── conftest.py                    # Root-level shared fixtures (existing)
-├── fixtures/                      # Shared fixture modules (existing)
-│   ├── __init__.py
-│   ├── db.py                      # Mock DB fixtures (existing)
-│   ├── ollama.py                  # Mock Ollama fixtures (existing)
-│   └── data.py                    # Test data (existing)
-├── mocks/                         # Mock implementations (existing)
-│   ├── db.py
-│   └── ollama.py
-├── unit/                          # NEW: Unit tests with mocks (move existing)
-│   ├── conftest.py                # Unit-specific fixtures
-│   ├── indexer/
-│   ├── search/
-│   ├── management/
-│   ├── mcp/
-│   └── test_*.py
-└── integration/                   # NEW: Integration tests with Docker
-    ├── conftest.py                # Docker fixtures (pytest-docker integration)
-    ├── docker-compose.yml         # Test-specific compose config
-    ├── test_postgres_integration.py
-    ├── test_ollama_integration.py
-    └── test_full_flow_integration.py
+src/cocosearch/
+├── cli.py              # Click-based CLI (argparse implementation)
+├── mcp/
+│   └── server.py       # FastMCP server (stdio/SSE/HTTP transports)
+├── indexer/
+│   ├── symbols.py      # Tree-sitter symbol extraction
+│   └── flow.py         # CocoIndex integration
+├── search/
+│   ├── query.py        # Search execution
+│   ├── hybrid.py       # Vector + keyword search
+│   └── db.py           # PostgreSQL connection pool
+├── management/
+│   ├── stats.py        # Index statistics
+│   └── context.py      # Auto-detection
+└── config/
+    ├── schema.py       # Pydantic config model
+    └── loader.py       # YAML config loading
+
+docker/
+├── Dockerfile          # All-in-one container
+└── rootfs/             # s6-overlay service definitions
 ```
 
-**Rationale:**
-- Clear separation enables running fast unit tests without Docker overhead
-- Hierarchical conftest.py files allow shared and specialized fixtures
-- Existing fixtures remain available throughout (pytest discovers parent conftest.py)
-- Integration tests can import/reuse test data from `tests/fixtures/data.py`
+**Key characteristics:**
+- Modular package structure with clear boundaries
+- PostgreSQL storage with pgvector for embeddings
+- CocoIndex for indexing pipeline
+- FastMCP server supports multiple transports
+- s6-overlay for multi-process Docker supervision
 
-**Sources:**
-- [Pytest Good Integration Practices](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html) - Directory structure recommendations
-- [5 Best Practices for Organizing Tests](https://pytest-with-eric.com/pytest-best-practices/pytest-organize-tests/) - Separation patterns
-- [How to Keep Unit and Integration Tests Separate](https://www.pythontutorials.net/blog/how-to-keep-unit-tests-and-integrations-tests-separate-in-pytest/) - Marker and directory strategies
+## Feature 1: Stats Dashboard
 
-### Pytest Markers Configuration
+### Integration Point
 
-Add to `pyproject.toml`:
+**Option A: Extend MCP Server (RECOMMENDED)**
+- Add new HTTP routes to existing FastMCP server
+- Leverage existing `/health` endpoint pattern
+- Reuse `management/stats.py` functions
+- No new process needed in Docker container
 
-```toml
-[tool.pytest.ini_options]
-markers = [
-    "unit: Fast unit tests with mocked dependencies (default)",
-    "integration: Slower integration tests with Docker containers",
-    "postgres: Integration tests requiring PostgreSQL",
-    "ollama: Integration tests requiring Ollama embeddings",
-    "slow: Tests that take >10 seconds (skip in pre-commit)",
-]
-```
+**Option B: Standalone Server**
+- Separate HTTP server process
+- Requires new s6-overlay service definition
+- Additional port exposure (e.g., 8080)
+- More complex but cleaner separation
 
-**Usage patterns:**
-```bash
-# Fast feedback during development (unit tests only)
-pytest -m unit                      # ~2-5 seconds
+**Option C: CLI-Only**
+- `cocosearch stats --web` to spawn temporary server
+- Similar to `python -m http.server`
+- Good for development, poor for production
 
-# Full validation before commit (unit + integration)
-pytest                              # All tests, ~30-60 seconds
-
-# Skip slow integration tests in pre-commit hooks
-pytest -m "not slow"                # Unit + fast integration
-
-# CI runs everything
-pytest --verbose                    # Full suite with detailed output
-
-# Specific integration test category
-pytest -m postgres                  # Only PostgreSQL integration tests
-```
-
-**Rationale:**
-- Markers provide flexibility beyond directory structure
-- Can combine markers: `@pytest.mark.integration @pytest.mark.postgres @pytest.mark.slow`
-- CI can run all, developers can skip slow tests during iteration
-- Registration in pyproject.toml prevents warnings
-
-**Sources:**
-- [Ultimate Guide to Pytest Markers](https://pytest-with-eric.com/pytest-best-practices/pytest-markers/) - Marker patterns
-- [Pytest Markers Documentation](https://docs.pytest.org/en/stable/how-to/skipping.html) - Skip and selection
-- [pytest-skip-slow plugin](https://github.com/okken/pytest-skip-slow) - Skipping slow tests pattern
-
-## Docker Compose Strategy
-
-### Single File with Profiles (Recommended)
-
-**Location:** Root `docker-compose.yml` (enhance existing)
-
-```yaml
-services:
-  # Core service - always runs (dev + test + CI)
-  db:
-    image: pgvector/pgvector:pg17
-    container_name: cocosearch-db
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: cocoindex
-      POSTGRES_PASSWORD: cocoindex
-      POSTGRES_DB: cocoindex
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cocoindex -d cocoindex"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # Optional: Dockerized Ollama (test profile only)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: cocosearch-ollama
-    profiles: [test, ollama-docker]  # Only start when profile active
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
-  ollama_data:
-```
-
-**Activation examples:**
-```bash
-# Development: PostgreSQL only (existing workflow)
-docker compose up -d
-
-# Integration tests: PostgreSQL + Ollama (if not using native)
-docker compose --profile test up -d
-
-# Explicit Ollama Docker usage
-docker compose --profile ollama-docker up -d
-
-# CI: Start containers, let pytest-docker manage lifecycle
-# (CI just ensures Docker is available; pytest-docker handles up/down)
-```
-
-**Rationale:**
-- Single source of truth prevents config drift
-- Profiles avoid "separate file proliferation" (docker-compose.test.yml, docker-compose.dev.yml, etc.)
-- Core services (db) always available for development
-- Optional services (dockerized Ollama) only when needed
-- Healthchecks ensure containers are ready before tests run
-- pytest-docker respects existing compose files
-
-**Alternative Approach (Not Recommended):**
-Separate `tests/integration/docker-compose.yml` could be used if integration test containers differ significantly from dev environment. However, this creates duplication and configuration drift risk.
-
-**Sources:**
-- [Docker Compose Profiles Official Docs](https://docs.docker.com/compose/how-tos/profiles/) - Profile activation patterns
-- [Leveraging Compose Profiles for Environments](https://collabnix.com/leveraging-compose-profiles-for-dev-prod-test-and-staging-environments/) - Multi-environment patterns
-- [Managing Environment Configs with Profiles](https://oneuptime.com/blog/post/2025-11-27-manage-docker-compose-profiles/view) - Best practices
-
-## Fixture Architecture
-
-### Session-Scoped Docker Fixtures
-
-**Pattern:** Use pytest-docker plugin for automatic lifecycle management
-
-**Add to `tests/integration/conftest.py`:**
+### Recommended Architecture: Extended MCP Server
 
 ```python
-"""Integration test fixtures for Docker containers."""
+# src/cocosearch/mcp/server.py additions
 
-import pytest
-from pathlib import Path
+@mcp.custom_route("/dashboard", methods=["GET"])
+async def dashboard_ui(request):
+    """Serve stats dashboard HTML."""
+    return HTMLResponse(dashboard_html_template)
 
-# pytest-docker configuration fixtures
-@pytest.fixture(scope="session")
-def docker_compose_file(pytestconfig):
-    """Point to root docker-compose.yml."""
-    return Path(pytestconfig.rootdir) / "docker-compose.yml"
+@mcp.custom_route("/api/stats", methods=["GET"])
+async def stats_api(request):
+    """JSON API for dashboard data."""
+    indexes = mgmt_list_indexes()
+    stats = [get_stats(idx["name"]) for idx in indexes]
+    lang_stats = [get_language_stats(idx["name"]) for idx in indexes]
+    return JSONResponse({
+        "indexes": stats,
+        "languages": lang_stats,
+    })
+```
 
-@pytest.fixture(scope="session")
-def docker_compose_project_name():
-    """Use fixed name for easier debugging."""
-    return "cocosearch-integration-tests"
+**Rationale:**
+- FastMCP already serves HTTP on port 3000
+- Custom routes documented in FastMCP
+- Reuses existing stats.py functions
+- No new Docker service needed
+- Dashboard accessible at `http://localhost:3000/dashboard`
 
-@pytest.fixture(scope="session")
-def docker_setup():
-    """Start containers with --wait for healthchecks."""
-    return ["up --build --wait"]
+### Component Changes
 
-@pytest.fixture(scope="session")
-def docker_cleanup():
-    """Clean up containers and volumes after tests."""
-    return ["down -v"]
+| Component | Change Type | Description |
+|-----------|-------------|-------------|
+| `mcp/server.py` | Modified | Add `/dashboard` and `/api/stats` routes |
+| `mcp/templates.py` | New | HTML templates for dashboard UI |
+| `management/stats.py` | Extended | Add aggregation functions for multi-index views |
+| Docker Dockerfile | Unchanged | No new services required |
 
-# Service readiness fixtures
-@pytest.fixture(scope="session")
-def postgres_service(docker_ip, docker_services):
-    """Ensure PostgreSQL is ready and return connection details."""
-    port = docker_services.port_for("db", 5432)
+### Data Flow
 
-    # Wait until PostgreSQL accepts connections
-    docker_services.wait_until_responsive(
-        timeout=30.0,
-        pause=0.5,
-        check=lambda: is_postgres_responsive(docker_ip, port),
+```
+Browser → HTTP GET /dashboard → FastMCP → HTMLResponse (static dashboard)
+Browser → HTTP GET /api/stats → FastMCP → stats.py → PostgreSQL → JSON
+Dashboard JS → Fetch /api/stats → Render charts/tables
+```
+
+### UI Technology Stack
+
+Based on 2026 web dashboard trends, recommend:
+
+**Minimal Dependencies (Recommended):**
+- Vanilla JS + Fetch API for data loading
+- Chart.js for visualizations (CDN)
+- Tailwind CSS via CDN for styling
+- Single HTML file with embedded CSS/JS
+
+**Why minimal:**
+- No build step required
+- No npm dependencies in Docker image
+- Faster development iteration
+- Easier to maintain
+- Fits "local-first" philosophy
+
+**Modern Alternative:**
+- HTMX + Alpine.js for reactive UI
+- Still no build step
+- Progressive enhancement pattern
+
+### Build Order
+
+1. **Phase 1: API endpoints** - Add JSON endpoints to MCP server
+2. **Phase 2: Static dashboard** - Create HTML template with Chart.js
+3. **Phase 3: Real-time updates** - Add WebSocket support for live stats
+4. **Phase 4: CLI integration** - `cocosearch stats --web` alias
+
+## Feature 2: Developer Skills
+
+### Integration Point
+
+Skills are prompt templates for LLM workflows. Similar to Claude Code's SKILL.md format.
+
+**Storage location:** User's home directory
+- `~/.cocosearch/skills/` - Default skill library
+- Project-level: `.cocosearch/skills/` - Project-specific skills
+
+**File format:** Markdown with YAML frontmatter
+
+```markdown
+---
+name: code-review
+description: Perform comprehensive code review
+version: 1.0.0
+tags: [review, quality, security]
+---
+
+# Code Review Skill
+
+Review the following code for:
+- Technical correctness
+- Security issues
+- Performance concerns
+- Code style
+
+{CODE_CONTEXT}
+```
+
+### Architecture Pattern
+
+**Discovery mechanism:**
+1. Check `.cocosearch/skills/` (project-level, highest priority)
+2. Check `~/.cocosearch/skills/` (user-level)
+3. Built-in skills bundled with installation
+
+**Implementation:**
+
+```python
+# src/cocosearch/skills/
+├── __init__.py         # Skill discovery and loading
+├── loader.py           # Parse markdown + YAML frontmatter
+├── registry.py         # Skill registry with caching
+└── builtin/            # Bundled skills
+    ├── code-review.md
+    ├── explain.md
+    └── refactor.md
+```
+
+### Component Changes
+
+| Component | Change Type | Description |
+|-----------|-------------|-------------|
+| `skills/` module | New | Complete skills system |
+| `cli.py` | Extended | `cocosearch skills list/show/install` commands |
+| `mcp/server.py` | Extended | Optional MCP tool for skill execution |
+| `config/schema.py` | Extended | Add `skills.path` config option |
+
+### Skills CLI Commands
+
+```bash
+# List available skills
+cocosearch skills list
+
+# Show skill details
+cocosearch skills show code-review
+
+# Install skill from URL or file
+cocosearch skills install https://example.com/skill.md
+cocosearch skills install ./custom-skill.md
+
+# Create new skill from template
+cocosearch skills new my-skill
+```
+
+### Installation Flow
+
+```
+User runs: cocosearch skills install <url>
+    ↓
+Download skill file
+    ↓
+Validate YAML frontmatter + markdown
+    ↓
+Copy to ~/.cocosearch/skills/<name>.md
+    ↓
+Update registry cache
+```
+
+### MCP Integration (Optional)
+
+```python
+@mcp.tool()
+def apply_skill(
+    skill_name: str,
+    code_context: str,
+    index_name: str | None = None,
+) -> dict:
+    """Apply a developer skill to code context."""
+    skill = load_skill(skill_name)
+    if index_name:
+        # Augment context with search results
+        relevant_code = search(code_context, index_name)
+        context = format_code_context(relevant_code)
+    else:
+        context = code_context
+
+    prompt = skill.render(CODE_CONTEXT=context)
+    return {"prompt": prompt, "skill": skill_name}
+```
+
+### Build Order
+
+1. **Phase 1: Skill loader** - Parse markdown + YAML, validation
+2. **Phase 2: Discovery system** - Search paths, registry
+3. **Phase 3: CLI commands** - list, show, install
+4. **Phase 4: Built-in skills** - Bundle 3-5 common skills
+5. **Phase 5: MCP integration** - Optional tool for skill execution
+
+## Feature 3: Expanded Symbol Extraction
+
+### Current State
+
+Symbol extraction in `indexer/symbols.py`:
+- Hardcoded tree-sitter queries in Python
+- Supports Python, JS, TS, Go, Rust
+- Query logic embedded in `_extract_*_symbols()` functions
+
+### Target Architecture: Query Files
+
+Move tree-sitter queries to external `.scm` files per language:
+
+```
+src/cocosearch/queries/
+├── python.scm
+├── javascript.scm
+├── typescript.scm
+├── go.scm
+├── rust.scm
+└── README.md           # Query file format documentation
+```
+
+**Example: `queries/python.scm`**
+
+```scheme
+; Function definitions
+(function_definition
+  name: (identifier) @function.name
+  parameters: (parameters) @function.params
+  return_type: (type)? @function.return
+) @function
+
+; Class definitions
+(class_definition
+  name: (identifier) @class.name
+  superclasses: (argument_list)? @class.bases
+) @class
+
+; Methods (functions inside classes)
+(class_definition
+  body: (block
+    (function_definition
+      name: (identifier) @method.name
+      parameters: (parameters) @method.params
+    ) @method
+  )
+)
+```
+
+### Integration Point
+
+**Loader mechanism:**
+
+```python
+# src/cocosearch/indexer/symbols.py
+
+import importlib.resources
+from tree_sitter import Query
+
+_QUERY_CACHE: dict[str, Query] = {}
+
+def _load_query(language: str) -> Query:
+    """Load tree-sitter query from .scm file."""
+    if language in _QUERY_CACHE:
+        return _QUERY_CACHE[language]
+
+    # Load from package data
+    query_text = importlib.resources.read_text(
+        "cocosearch.queries",
+        f"{language}.scm"
     )
 
-    return {
-        "host": docker_ip,
-        "port": port,
-        "user": "cocoindex",
-        "password": "cocoindex",
-        "database": "cocoindex",
-    }
+    lang_obj = get_language(language)
+    query = Query(lang_obj, query_text)
+    _QUERY_CACHE[language] = query
+    return query
 
-@pytest.fixture(scope="session")
-def ollama_service(docker_ip, docker_services):
-    """Ensure Ollama is ready if using Docker profile."""
-    # This fixture only runs for tests marked with @pytest.mark.ollama
-    # If native Ollama is running, tests won't use this fixture
-    port = docker_services.port_for("ollama", 11434)
+def _extract_symbols_generic(chunk_text: str, language: str) -> list[dict]:
+    """Generic symbol extraction using query files."""
+    parser = _get_parser(language)
+    tree = parser.parse(bytes(chunk_text, "utf8"))
+    query = _load_query(language)
 
-    docker_services.wait_until_responsive(
-        timeout=60.0,  # Ollama takes longer to start
-        pause=1.0,
-        check=lambda: is_ollama_responsive(docker_ip, port),
-    )
+    captures = query.captures(tree.root_node)
+    symbols = []
 
-    return {
-        "host": docker_ip,
-        "port": port,
-        "base_url": f"http://{docker_ip}:{port}",
-    }
+    for node, capture_name in captures:
+        if capture_name.endswith(".name"):
+            symbol_type = capture_name.split(".")[0]
+            symbol_name = _get_node_text(chunk_text, node)
+            # Find signature from parent node
+            signature = _extract_signature(tree, node, symbol_type)
+            symbols.append({
+                "symbol_type": symbol_type,
+                "symbol_name": symbol_name,
+                "symbol_signature": signature,
+            })
 
-def is_postgres_responsive(host, port):
-    """Check if PostgreSQL accepts connections."""
-    import psycopg
-    try:
-        conn = psycopg.connect(
-            host=host, port=port,
-            user="cocoindex", password="cocoindex",
-            dbname="cocoindex",
-            connect_timeout=3
+    return symbols
+```
+
+### Component Changes
+
+| Component | Change Type | Description |
+|-----------|-------------|-------------|
+| `queries/` package | New | Tree-sitter query files (.scm) |
+| `indexer/symbols.py` | Refactored | Remove hardcoded queries, add query loader |
+| `pyproject.toml` | Modified | Add `queries/*.scm` to package_data |
+
+### Benefits
+
+1. **Extensibility** - Users can add new languages without Python code
+2. **Maintainability** - Query syntax is declarative, easier to read
+3. **Community contribution** - Non-Python developers can add language support
+4. **Testability** - Test queries independently of Python code
+
+### Custom Query Override
+
+Allow users to override built-in queries:
+
+```yaml
+# cocosearch.yaml
+indexing:
+  customQueries:
+    python: ./.cocosearch/queries/python.scm
+    rust: ./.cocosearch/queries/rust.scm
+```
+
+**Loader priority:**
+1. Custom queries from config (project-specific)
+2. Built-in queries from package (defaults)
+
+### Build Order
+
+1. **Phase 1: Extract existing queries** - Convert Python functions to .scm files
+2. **Phase 2: Query loader** - Add loader with caching
+3. **Phase 3: Generic extraction** - Refactor to use query files
+4. **Phase 4: Custom query support** - Add config option for overrides
+5. **Phase 5: Documentation** - Query file format guide
+
+## Feature 4: Query Caching
+
+### Problem Statement
+
+Repeated semantic searches generate duplicate embeddings and database queries:
+- Same query string → Generate embedding (Ollama call) → Vector search (PostgreSQL)
+- Embedding generation is expensive (network + compute)
+- Vector similarity search is fast but still a DB round-trip
+
+### Caching Strategy: Hybrid Approach
+
+**Layer 1: Embedding Cache (In-Memory)**
+- Cache query text → embedding vector mapping
+- Avoids redundant Ollama calls
+- LRU eviction policy
+- TTL: 1 hour (embeddings don't change for same text)
+
+**Layer 2: Result Cache (Optional, PostgreSQL-backed)**
+- Cache (embedding, filters) → search results
+- Semantic similarity threshold (0.98+) for cache hits
+- TTL: 5 minutes (results may change as index updates)
+- Invalidation on index updates
+
+### Architecture: In-Memory First
+
+```python
+# src/cocosearch/search/cache.py
+
+from functools import lru_cache
+from dataclasses import dataclass
+from typing import Any
+import hashlib
+import time
+
+@dataclass
+class CacheEntry:
+    """Cache entry with TTL."""
+    value: Any
+    expires_at: float
+
+class EmbeddingCache:
+    """LRU cache for query embeddings with TTL."""
+
+    def __init__(self, max_size: int = 1000, ttl_seconds: int = 3600):
+        self.max_size = max_size
+        self.ttl_seconds = ttl_seconds
+        self._cache: dict[str, CacheEntry] = {}
+
+    def get(self, query: str) -> list[float] | None:
+        """Get cached embedding if exists and not expired."""
+        if query not in self._cache:
+            return None
+
+        entry = self._cache[query]
+        if time.time() > entry.expires_at:
+            del self._cache[query]
+            return None
+
+        return entry.value
+
+    def set(self, query: str, embedding: list[float]) -> None:
+        """Cache embedding with TTL."""
+        if len(self._cache) >= self.max_size:
+            self._evict_oldest()
+
+        self._cache[query] = CacheEntry(
+            value=embedding,
+            expires_at=time.time() + self.ttl_seconds
         )
-        conn.close()
-        return True
-    except Exception:
-        return False
 
-def is_ollama_responsive(host, port):
-    """Check if Ollama API responds."""
-    import httpx
-    try:
-        response = httpx.get(f"http://{host}:{port}/api/tags", timeout=3.0)
-        return response.status_code == 200
-    except Exception:
-        return False
+    def clear(self) -> None:
+        """Clear all cached embeddings."""
+        self._cache.clear()
+
+    def _evict_oldest(self) -> None:
+        """Evict oldest entry (simple FIFO for now)."""
+        if self._cache:
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+
+# Global cache instance
+_embedding_cache = EmbeddingCache()
 ```
 
-**Rationale:**
-- Session scope minimizes container startup overhead (once per test run)
-- pytest-docker handles lifecycle automatically (up before tests, down after)
-- `wait_until_responsive` prevents test failures from race conditions
-- `is_*_responsive` functions use actual connections, not just port checks
-- Fixtures return connection details, not containers themselves
-- Tests import these fixtures to ensure containers are ready
-
-**Function-Scoped Cleanup Fixtures:**
-
-For tests that modify database state:
+### Integration with Search Flow
 
 ```python
-@pytest.fixture
-def clean_postgres_db(postgres_service):
-    """Clean database before each test."""
-    # Setup: clear all data
-    conn = psycopg.connect(**postgres_service)
-    cursor = conn.cursor()
-    cursor.execute("DROP SCHEMA IF EXISTS public CASCADE")
-    cursor.execute("CREATE SCHEMA public")
-    cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    conn.commit()
-    conn.close()
+# src/cocosearch/search/query.py (modified)
 
-    yield postgres_service
+def search(
+    query: str,
+    index_name: str,
+    limit: int = 10,
+    use_cache: bool = True,
+    **kwargs
+) -> list[SearchResult]:
+    """Execute semantic search with optional caching."""
 
-    # Teardown: could clean again if needed, but usually not necessary
+    # Check embedding cache
+    if use_cache:
+        embedding = _embedding_cache.get(query)
+        if embedding is None:
+            # Cache miss - generate and cache
+            embedding = generate_embedding(query)
+            _embedding_cache.set(query, embedding)
+    else:
+        # Cache disabled
+        embedding = generate_embedding(query)
+
+    # Execute vector search
+    results = vector_search(embedding, index_name, limit, **kwargs)
+    return results
 ```
 
-**Sources:**
-- [pytest-docker GitHub](https://github.com/avast/pytest-docker) - Plugin usage and fixture examples
-- [Pytest Fixture Scopes Official Docs](https://docs.pytest.org/en/stable/how-to/fixtures.html) - Session vs function scope
-- [Managing Containers with Pytest Fixtures](https://blog.oddbit.com/post/2023-07-15-pytest-and-containers/) - Lifecycle patterns
+### Cache Invalidation
 
-## Integration Points
+**Trigger: Index update**
 
-### With Existing Unit Tests
+```python
+# src/cocosearch/indexer/flow.py (modified)
 
-**Preserved Isolation:**
-- Unit tests continue using mocks (no Docker dependency)
-- Unit tests remain fast (<5 seconds for full suite)
-- Existing conftest.py fixtures remain available to all tests
+def run_index(index_name: str, codebase_path: str, config: IndexingConfig):
+    """Run indexing with cache invalidation."""
 
-**Shared Resources:**
-- Test data fixtures in `tests/fixtures/data.py` used by both
-- Utility functions can be shared
-- Mocks still useful for integration test edge cases
+    # ... existing indexing logic ...
 
-**Migration Path:**
-1. Move existing tests to `tests/unit/` directory (Phase 1)
-2. Add pytest markers to existing tests: `@pytest.mark.unit` (Phase 1)
-3. Create `tests/integration/` structure (Phase 2)
-4. Add pytest-docker fixtures (Phase 2)
-5. Write integration tests incrementally (Phase 3)
+    update_info = cocoindex.update(...)
 
-**No Breaking Changes:**
-- `pytest` still runs all tests
-- Existing test commands work unchanged
-- CI can adopt integration tests gradually
+    # Invalidate query cache for this index
+    if update_info.stats.get("files", {}).get("num_updates", 0) > 0:
+        # Content changed - clear embedding cache
+        from cocosearch.search.cache import _embedding_cache
+        _embedding_cache.clear()
 
-### With CI/CD
+    return update_info
+```
 
-**GitHub Actions Example:**
+### Component Changes
+
+| Component | Change Type | Description |
+|-----------|-------------|-------------|
+| `search/cache.py` | New | Embedding cache implementation |
+| `search/query.py` | Modified | Add cache lookup before embedding generation |
+| `indexer/flow.py` | Modified | Clear cache on index updates |
+| `config/schema.py` | Extended | Add `cache.enabled`, `cache.maxSize`, `cache.ttl` |
+| `cli.py` | Extended | `cocosearch cache clear/stats` commands |
+
+### Configuration
 
 ```yaml
-name: Tests
-
-on: [push, pull_request]
-
-jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - name: Run unit tests
-        run: |
-          uv sync --all-groups
-          uv run pytest -m unit --verbose
-
-  integration-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - name: Start Docker containers
-        run: docker compose up -d --wait
-      - name: Run integration tests
-        run: |
-          uv sync --all-groups
-          uv run pytest -m integration --verbose
-      - name: Cleanup containers
-        if: always()
-        run: docker compose down -v
+# cocosearch.yaml
+cache:
+  enabled: true
+  maxSize: 1000          # Max cached embeddings
+  ttl: 3600              # Seconds (1 hour)
 ```
 
-**Rationale:**
-- Separate jobs allow parallel execution (faster CI)
-- Unit tests run without Docker overhead
-- Integration tests use Docker Compose (not pytest-docker in CI)
-- `--wait` flag respects healthchecks (containers ready before pytest)
-- `if: always()` ensures cleanup even if tests fail
-- Can add test result caching, coverage reports later
+### Advanced: Redis-backed Cache (Optional)
 
-**Alternative (Single Job):**
+For multi-process deployments (Docker with multiple MCP instances):
+
+```python
+# src/cocosearch/search/cache.py (extended)
+
+class RedisEmbeddingCache(EmbeddingCache):
+    """Redis-backed embedding cache for multi-process deployments."""
+
+    def __init__(self, redis_url: str, **kwargs):
+        super().__init__(**kwargs)
+        import redis
+        self.redis = redis.from_url(redis_url)
+
+    def get(self, query: str) -> list[float] | None:
+        """Get from Redis."""
+        key = f"embed:{hashlib.sha256(query.encode()).hexdigest()}"
+        data = self.redis.get(key)
+        if data is None:
+            return None
+        import json
+        return json.loads(data)
+
+    def set(self, query: str, embedding: list[float]) -> None:
+        """Set in Redis with TTL."""
+        key = f"embed:{hashlib.sha256(query.encode()).hexdigest()}"
+        import json
+        self.redis.setex(key, self.ttl_seconds, json.dumps(embedding))
+```
+
+**Note:** Redis support is optional. Start with in-memory, add Redis only if needed.
+
+### Build Order
+
+1. **Phase 1: In-memory cache** - EmbeddingCache class with LRU + TTL
+2. **Phase 2: Search integration** - Modify search() to use cache
+3. **Phase 3: Invalidation** - Clear cache on index updates
+4. **Phase 4: Configuration** - Add cache config section
+5. **Phase 5: CLI commands** - `cocosearch cache` subcommands
+6. **Phase 6: Redis support** (optional) - For multi-process deployments
+
+## Recommended Build Order Across Features
+
+### Phase Structure
+
+**Phase 1: Query Caching (Highest ROI)**
+- Immediate performance improvement
+- Simple to implement (in-memory)
+- No UI dependencies
+- Foundation for other features
+
+**Phase 2: Expanded Symbol Extraction**
+- Natural extension of existing symbols.py
+- Enables community contributions
+- Unblocks language expansion
+- Clear migration path from current code
+
+**Phase 3: Developer Skills**
+- Independent of other features
+- CLI-first approach
+- User-facing value
+- Foundation for MCP enhancements
+
+**Phase 4: Stats Dashboard**
+- Builds on stable search/stats APIs
+- Requires UI development skills
+- Lower priority for CLI-first users
+- High value for Docker deployments
+
+### Dependency Graph
+
+```
+Query Caching (independent)
+    └─> Stats Dashboard (shows cache hit rates)
+
+Symbol Extraction (independent)
+    └─> Skills (skills can reference symbol types)
+
+Developer Skills (independent)
+    └─> MCP Integration (skills as tools)
+
+Stats Dashboard (independent)
+    └─> MCP Server (reuses HTTP transport)
+```
+
+## Integration Testing Strategy
+
+### Query Caching Tests
+
+```python
+def test_embedding_cache_hit():
+    """Verify cache returns same embedding without Ollama call."""
+    cache = EmbeddingCache()
+    query = "find authentication logic"
+
+    # First call - cache miss
+    embed1 = cache.get(query)
+    assert embed1 is None
+
+    embedding = [0.1, 0.2, 0.3]
+    cache.set(query, embedding)
+
+    # Second call - cache hit
+    embed2 = cache.get(query)
+    assert embed2 == embedding
+
+def test_cache_invalidation_on_update():
+    """Verify cache clears when index updates."""
+    cache = _embedding_cache
+    cache.set("test query", [0.1, 0.2])
+
+    # Simulate index update
+    run_index("test_index", "/path", config)
+
+    # Cache should be cleared
+    assert cache.get("test query") is None
+```
+
+### Symbol Query File Tests
+
+```python
+def test_query_file_loading():
+    """Verify query files load correctly."""
+    query = _load_query("python")
+    assert query is not None
+    assert isinstance(query, Query)
+
+def test_custom_query_override():
+    """Verify custom queries override built-in."""
+    config = CocoSearchConfig(
+        indexing=IndexingSection(
+            customQueries={"python": "./custom-python.scm"}
+        )
+    )
+    # Query loader should prefer custom over built-in
+```
+
+### Skills Discovery Tests
+
+```python
+def test_skill_discovery_priority():
+    """Verify project skills override user skills."""
+    # Create project skill: .cocosearch/skills/test.md
+    # Create user skill: ~/.cocosearch/skills/test.md
+    skill = load_skill("test")
+    # Should load from project directory
+    assert skill.path.startswith(".cocosearch")
+
+def test_skill_validation():
+    """Verify invalid skills are rejected."""
+    with pytest.raises(SkillValidationError):
+        install_skill("invalid-skill.md")
+```
+
+### Stats Dashboard Tests
+
+```python
+def test_dashboard_api_response():
+    """Verify /api/stats returns correct format."""
+    response = client.get("/api/stats")
+    assert response.status_code == 200
+    data = response.json()
+    assert "indexes" in data
+    assert "languages" in data
+
+def test_dashboard_html_render():
+    """Verify dashboard HTML renders."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    assert b"<html>" in response.content
+```
+
+## Architectural Principles Applied
+
+1. **Modularity** - Each feature is a self-contained module
+2. **Minimal coupling** - Features don't depend on each other
+3. **Extend, don't modify** - Existing modules extended, not rewritten
+4. **Configuration-driven** - Behavior controlled via cocosearch.yaml
+5. **Progressive enhancement** - Basic features work without advanced dependencies
+6. **Local-first** - All features work offline except dashboard (optional)
+
+## Docker Integration
+
+### No New Services Required
+
+All features integrate with existing Docker services:
+
+| Feature | Docker Impact |
+|---------|---------------|
+| Query Caching | In-memory cache in MCP process, no new service |
+| Symbol Extraction | Query files bundled in image, no runtime changes |
+| Developer Skills | Skills directory mounted as volume |
+| Stats Dashboard | Served by existing MCP HTTP transport |
+
+### Volume Mounts
+
 ```yaml
-integration-tests:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v5
-    - name: Install pytest-docker
-      run: uv add --dev pytest-docker
-    - name: Run all tests
-      run: uv run pytest --verbose  # pytest-docker manages containers
+# docker-compose.yml (extended)
+services:
+  cocosearch:
+    image: cocosearch:v1.8
+    volumes:
+      - ./codebase:/mnt/repos:ro
+      - ~/.cocosearch/skills:/root/.cocosearch/skills:ro
+      - cocosearch-data:/data
+    ports:
+      - "3000:3000"        # MCP + Dashboard
+      - "5432:5432"        # PostgreSQL (optional)
+      - "11434:11434"      # Ollama (optional)
 ```
 
-Simpler but slower (containers start/stop per test run).
+## Performance Considerations
 
-**Sources:**
-- [Pytest GitHub Actions Integration](https://pytest-with-eric.com/integrations/pytest-github-actions/) - CI patterns (edited 2026-01-22)
-- [Setup Docker for Integration Testing in GitHub Actions](https://dev.to/sahanonp/setup-docker-for-integration-testing-in-github-action-39fn) - Workflow examples
-- [pytest-docker-compose Actions](https://github.com/pytest-docker-compose/pytest-docker-compose/actions) - Real-world CI configs
+### Query Caching Impact
 
-## Comparison: pytest-docker vs testcontainers
+**Before caching:**
+- Query latency: ~200-500ms (embedding generation + vector search)
+- Ollama embedding: 150-300ms per query
+- PostgreSQL vector search: 50-200ms
 
-### pytest-docker (Recommended for CocoSearch)
+**After caching (cache hit):**
+- Query latency: ~50-200ms (vector search only)
+- 60-75% latency reduction for repeated queries
+- 3-5x throughput improvement
 
-**Pros:**
-- Leverages existing docker-compose.yml (no duplication)
-- Simple pytest integration (just fixtures)
-- Works with existing healthchecks
-- Session scope minimizes overhead
-- Team already familiar with Docker Compose
+### Symbol Extraction Performance
 
-**Cons:**
-- Less dynamic (can't easily create containers per test)
-- Tied to Docker Compose (not just Docker API)
+**Query files vs. hardcoded:**
+- Minimal performance difference
+- Query compilation cached in memory
+- File I/O only on first load
+- Tree-sitter query engine highly optimized
 
-**Best for:** Projects with stable infrastructure needs where docker-compose already exists for development.
+### Dashboard Overhead
 
-### testcontainers-python (Alternative)
+**Static dashboard:**
+- No polling - dashboard fetches on page load
+- Minimal server load (1-2 API calls per page view)
+- No persistent connections
 
-**Pros:**
-- Full control from Python code
-- Can create containers dynamically per test
-- Built-in wait strategies for many services
-- Language-agnostic (Java, Python, Go, etc.)
+**With live updates (future):**
+- WebSocket for real-time stats
+- Server-sent events (SSE) alternative
+- 1 connection per browser tab
 
-**Cons:**
-- Requires code changes beyond tests
-- Longer test execution (containers per test or test class)
-- Duplicates infrastructure config (not DRY)
-- Another abstraction layer to learn
+## Migration Path
 
-**Best for:** Projects needing dynamic test infrastructure or testing multiple DB versions.
+### Backward Compatibility
 
-### Decision for CocoSearch
+All v1.8 features are additive:
 
-**Use pytest-docker** because:
-1. docker-compose.yml already exists and maintained
-2. Infrastructure needs are stable (PostgreSQL + optional Ollama)
-3. Session scope sufficient (don't need per-test isolation)
-4. Team familiarity with Compose
-5. Simpler mental model (compose file = all infrastructure)
+1. **Query Caching** - Opt-in via config, defaults to disabled
+2. **Symbol Extraction** - Falls back to existing hardcoded queries
+3. **Skills** - Optional feature, no impact if unused
+4. **Dashboard** - Optional HTTP route, CLI unchanged
 
-**Sources:**
-- [Python Integration Tests: docker-compose vs testcontainers](https://medium.com/codex/python-integration-tests-docker-compose-vs-testcontainers-94986d7547ce) - Detailed comparison
-- [Testcontainers Python GitHub](https://github.com/testcontainers/testcontainers-python) - API and patterns
+### Upgrade Steps
 
-## Build Order
+```bash
+# 1. Update codebase
+git pull origin main
 
-Recommended implementation sequence balancing risk and value.
+# 2. Rebuild Docker image
+docker build -t cocosearch:v1.8 .
 
-### Phase 1: Reorganize Existing Tests (Low Risk)
+# 3. Enable new features in config
+cat >> cocosearch.yaml <<EOF
+cache:
+  enabled: true
+  maxSize: 1000
+  ttl: 3600
+EOF
 
-**Goal:** Separate unit/integration without breaking anything
+# 4. Restart services
+docker-compose down
+docker-compose up -d
 
-**Tasks:**
-1. Create `tests/unit/` directory
-2. Move existing test files to `tests/unit/` (preserve structure)
-3. Add pytest markers to existing tests: `@pytest.mark.unit`
-4. Update `pyproject.toml` to register markers
-5. Verify `pytest` and `pytest -m unit` produce same results
-6. Update CI to use markers (no functional change yet)
+# 5. Access dashboard
+open http://localhost:3000/dashboard
+```
 
-**Validation:**
-- All existing tests pass
-- No new dependencies
-- CI passes unchanged
+## Security Considerations
 
-**Estimated effort:** 2-4 hours
+### Skills System
 
-**Risk:** LOW (mechanical refactoring)
+**Risks:**
+- Skills execute arbitrary prompts
+- User-installed skills from untrusted sources
+- Potential for prompt injection
 
-### Phase 2: Add Docker Infrastructure (Medium Risk)
+**Mitigations:**
+1. Skills don't execute code - only generate prompts
+2. Validate YAML frontmatter schema
+3. Sandbox skill rendering (no template execution)
+4. Display skill source before installation
+5. Require explicit user confirmation for installs
 
-**Goal:** Enable Docker-based testing without writing integration tests yet
+### Dashboard Access
 
-**Tasks:**
-1. Add pytest-docker to dev dependencies: `uv add --dev pytest-docker`
-2. Enhance root `docker-compose.yml` with Ollama service + test profile
-3. Create `tests/integration/conftest.py` with Docker fixtures
-4. Create empty `tests/integration/` directory structure
-5. Write fixture test: `test_docker_fixtures.py` (validates containers start/stop)
-6. Document Docker setup in development guide
+**Risks:**
+- Dashboard exposes index statistics
+- Potential information disclosure
 
-**Validation:**
-- `pytest tests/integration/test_docker_fixtures.py` passes
-- Containers start with healthchecks
-- Containers clean up after tests
-- No interference with unit tests
+**Mitigations:**
+1. Dashboard bound to localhost by default
+2. Add optional authentication (future)
+3. Read-only API endpoints
+4. No index deletion via dashboard
 
-**Estimated effort:** 4-8 hours
+### Cache Poisoning
 
-**Risk:** MEDIUM (new infrastructure, potential Docker issues)
+**Risks:**
+- Malicious queries cached
+- Cache size exhaustion
 
-**Dependencies:** Docker installed locally + in CI
+**Mitigations:**
+1. LRU eviction prevents unbounded growth
+2. TTL ensures cache freshness
+3. Cache clear on index updates
+4. Configurable max size limit
 
-### Phase 3: PostgreSQL Integration Tests (Medium Risk)
+## Open Questions
 
-**Goal:** Validate database operations with real PostgreSQL
+1. **Dashboard authentication** - Add basic auth or OAuth?
+2. **Redis cache** - Support Redis out of the box or require manual setup?
+3. **Skills marketplace** - Central registry for community skills?
+4. **Query file validation** - Compile-time checks for query syntax?
 
-**Tasks:**
-1. Write `test_postgres_integration.py`:
-   - Test schema creation (extensions, tables)
-   - Test index storage (write chunks, verify persistence)
-   - Test vector search (insert, search, verify results)
-   - Test index management (clear, stats)
-2. Create `clean_postgres_db` fixture for test isolation
-3. Add `@pytest.mark.postgres @pytest.mark.integration` to tests
-4. Update CI to run PostgreSQL integration tests
+## References
 
-**Validation:**
-- Tests pass with real PostgreSQL
-- Tests isolated (no state leakage)
-- CI runs PostgreSQL tests successfully
-- Unit tests still fast (unaffected)
+### Web Dashboard Architecture
+- [TailAdmin Dashboard Templates](https://tailadmin.com/blog/saas-dashboard-templates) - Modern SaaS dashboard patterns
+- [Web Application Architecture Guide](https://www.clickittech.com/software-development/web-application-architecture/) - 2026 architecture trends
+- [React Dashboards Guide](https://www.untitledui.com/blog/react-dashboards) - Modern dashboard components
 
-**Estimated effort:** 8-12 hours
+### Developer Skills Systems
+- [Claude Code Skills Guide](https://vertu.com/lifestyle/claude-code-skills-the-complete-guide-to-automating-your-development-workflow/) - SKILL.md format and best practices
+- [install.md Specification](https://www.installmd.org) - Standardized installation files for AI agents
 
-**Risk:** MEDIUM (real DB adds complexity, timing issues)
+### Tree-sitter Query Systems
+- [Tree-sitter Query Documentation](https://tree-sitter.github.io/tree-sitter/cli/query.html) - Official query system guide
+- [Neovim Treesitter Guide](https://neovim.io/doc/user/treesitter.html) - Query file organization patterns
+- [Zed Syntax-Aware Editing](https://zed.dev/blog/syntax-aware-editing) - Tree-sitter queries for language features
 
-### Phase 4: Ollama Integration Tests (High Risk)
+### Semantic Caching
+- [Redis Semantic Caching Guide](https://redis.io/blog/what-is-semantic-caching/) - Semantic cache architecture
+- [Context-Enabled Semantic Cache](https://redis.io/blog/building-a-context-enabled-semantic-cache-with-redis/) - Multi-layer caching patterns
+- [Semantic Cache Optimization](https://redis.io/blog/10-techniques-for-semantic-cache-optimization/) - Performance tuning techniques
+- [Prompt vs Semantic Caching](https://redis.io/blog/prompt-caching-vs-semantic-caching/) - Caching strategy comparison
 
-**Goal:** Validate embedding generation with real Ollama
+## Conclusion
 
-**Tasks:**
-1. Write `test_ollama_integration.py`:
-   - Test embedding generation (text -> vector)
-   - Test model availability checks
-   - Test error handling (model not loaded, service down)
-2. Add fixture to pull nomic-embed-text model if missing
-3. Add `@pytest.mark.ollama @pytest.mark.slow` markers
-4. Support both native and Docker Ollama (env var toggle)
-5. Update CI to use Docker Ollama or skip Ollama tests
+All four v1.8 features integrate cleanly with minimal architectural disruption:
 
-**Validation:**
-- Tests pass with real embeddings
-- Tests skip gracefully if Ollama unavailable
-- CI strategy defined (Docker Ollama or skip)
+1. **Stats Dashboard** extends MCP server with HTTP routes
+2. **Developer Skills** adds new module with file-based storage
+3. **Symbol Extraction** refactors existing code to use query files
+4. **Query Caching** adds in-memory layer before embedding generation
 
-**Estimated effort:** 6-10 hours
+**Recommended build order:** Cache → Symbols → Skills → Dashboard
 
-**Risk:** HIGH (Ollama slow to start, large model downloads, CI complexity)
+**Total estimated effort:** 4-6 phases of development
 
-**Note:** May decide to keep Ollama mocked in CI (download cost/time) while supporting local integration testing.
-
-### Phase 5: Full Flow Integration Tests (Low-Medium Risk)
-
-**Goal:** End-to-end validation of index -> search workflow
-
-**Tasks:**
-1. Write `test_full_flow_integration.py`:
-   - Index a real codebase (tests/fixtures/sample_project/)
-   - Search with natural language queries
-   - Verify returned chunks match expected files
-   - Test incremental indexing (add file, reindex, search)
-   - Test DevOps file handling (Terraform, Dockerfile, Bash)
-2. Add `@pytest.mark.integration @pytest.mark.slow` markers
-3. Create fixture sample codebase with diverse languages
-
-**Validation:**
-- Full workflow works end-to-end
-- Results match expected behavior
-- Incremental indexing detected correctly
-- DevOps metadata extracted properly
-
-**Estimated effort:** 8-12 hours
-
-**Risk:** MEDIUM (complex test, many moving parts, but builds on previous phases)
-
-### Summary: Total Estimated Effort
-
-**Total:** 28-46 hours (3.5-5.75 working days)
-
-**Critical path:** Phase 1 → Phase 2 → Phase 3 → Phase 5 (PostgreSQL must work before full flow)
-
-**Parallel work:** Phase 4 (Ollama) can be developed alongside Phase 3 or after Phase 5
-
-**De-risk strategy:** Phases 1-2 establish foundation with minimal breaking changes. Phase 3 proves Docker integration works. Phases 4-5 add comprehensive coverage.
-
-## Key Architectural Decisions Summary
-
-| Decision | Rationale |
-|----------|-----------|
-| Separate `tests/unit/` and `tests/integration/` | Clear separation, enables fast unit tests without Docker |
-| pytest markers in addition to directories | Flexible test selection, CI can combine filters |
-| pytest-docker over testcontainers | Leverages existing docker-compose.yml, simpler model |
-| Session-scoped fixtures | Minimize container overhead, tests share infrastructure |
-| Docker Compose profiles over separate files | Single source of truth, prevents config drift |
-| Root conftest.py + directory-specific conftest.py | Hierarchical fixture organization, shared + specialized |
-| Healthchecks + wait_until_responsive | Prevent race conditions, reliable test startup |
-| Optional Docker Ollama via profile | Supports both native and Docker workflows |
-| CI runs unit and integration separately | Faster feedback, parallel execution |
-| Incremental adoption (5 phases) | De-risk changes, validate at each step |
-
-## Anti-Patterns to Avoid
-
-### Don't: Mix Docker and Mocks in Same Test
-
-**Why:** Confusing, defeats purpose of integration testing
-
-**Instead:** Integration tests use real services, unit tests use mocks exclusively
-
-### Don't: Function-Scoped Docker Fixtures by Default
-
-**Why:** Slow (containers restart per test), unnecessary overhead
-
-**Instead:** Session scope for containers, function scope only for data cleanup
-
-### Don't: Skip Healthchecks
-
-**Why:** Race conditions (tests start before services ready)
-
-**Instead:** Always use healthchecks + wait_until_responsive
-
-### Don't: Separate docker-compose.test.yml
-
-**Why:** Configuration drift, duplication, maintenance burden
-
-**Instead:** Use profiles in single docker-compose.yml
-
-### Don't: Commit Running Containers in CI
-
-**Why:** Resource leaks, port conflicts in subsequent runs
-
-**Instead:** Always `docker compose down -v` in cleanup step with `if: always()`
-
-### Don't: Rely on pytest-docker in CI (Debatable)
-
-**Why:** Extra abstraction, harder to debug CI failures
-
-**Instead:** Let CI start containers explicitly, pytest just runs tests
-
-**Alternative view:** pytest-docker in CI is fine if it works reliably
-
-## Confidence Assessment
-
-| Area | Confidence | Source Quality |
-|------|------------|----------------|
-| Test directory structure | HIGH | Official pytest docs + multiple credible sources |
-| Pytest markers | HIGH | Official pytest docs + community best practices |
-| Docker Compose profiles | HIGH | Official Docker docs + 2025-2026 articles |
-| pytest-docker vs testcontainers | MEDIUM | Community comparison articles (2020-2024) |
-| Fixture scoping | HIGH | Official pytest docs + plugin docs |
-| CI/CD patterns | MEDIUM | GitHub Actions examples + community articles |
-| Build order | MEDIUM | Based on CocoSearch architecture + general best practices |
-
-**Gaps identified:**
-- No 2026-specific pytest-docker updates found (plugin stable since 2020)
-- Limited examples of pytest + Docker Compose profiles together (pattern is new)
-- Ollama Docker healthcheck reliability unknown (may need custom wait logic)
-
-## Recommended Next Steps
-
-1. **Review this architecture** with team/stakeholder
-2. **Validate Docker setup** on development machine (docker-compose.yml enhancements)
-3. **Start with Phase 1** (reorganize tests) - lowest risk, immediate clarity
-4. **Prototype Phase 2** (Docker fixtures) in spike branch - validate pytest-docker works with existing setup
-5. **Decide on Ollama strategy** - Docker vs native vs mocked in CI
-6. **Create roadmap phases** based on this research
-
----
-
-**Sources:**
-
-*Test Organization:*
-- [Pytest Good Integration Practices](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html)
-- [5 Best Practices for Organizing Tests | Pytest with Eric](https://pytest-with-eric.com/pytest-best-practices/pytest-organize-tests/)
-- [How to Keep Unit and Integration Tests Separate | Python Tutorials](https://www.pythontutorials.net/blog/how-to-keep-unit-tests-and-integrations-tests-separate-in-pytest/)
-- [Pytest Conftest.py Hierarchy | Pytest with Eric](https://pytest-with-eric.com/pytest-best-practices/pytest-conftest/)
-
-*Docker Integration:*
-- [pytest-docker GitHub](https://github.com/avast/pytest-docker)
-- [pytest-docker-compose GitHub](https://github.com/pytest-docker-compose/pytest-docker-compose)
-- [Building Resilient API Test Automation: Pytest + Docker Integration | Medium](https://manishsaini74.medium.com/building-resilient-api-test-automation-pytest-docker-integration-guide-9710359b6d9b)
-- [Integration Testing with Pytest & Docker Compose | Medium](https://xnuinside.medium.com/integration-testing-for-bunch-of-services-with-pytest-docker-compose-4892668f9cba)
-
-*Docker Compose Patterns:*
-- [Docker Compose Profiles Official Docs](https://docs.docker.com/compose/how-tos/profiles/)
-- [Leveraging Compose Profiles for Environments | Collabnix](https://collabnix.com/leveraging-compose-profiles-for-dev-prod-test-and-staging-environments/)
-- [Managing Environment Configs with Docker Compose Profiles | OneUptime](https://oneuptime.com/blog/post/2025-11-27-manage-docker-compose-profiles/view)
-
-*Fixture Patterns:*
-- [Pytest Fixture Scopes Official Docs](https://docs.pytest.org/en/stable/how-to/fixtures.html)
-- [Managing Containers with Pytest Fixtures | blog.oddbit.com](https://blog.oddbit.com/post/2023-07-15-pytest-and-containers/)
-- [Testcontainers in Python | Medium](https://medium.com/@kandemirozenc/testcontainers-in-python-for-integration-testing-with-mysql-63160a004fb5)
-
-*CI/CD:*
-- [Pytest GitHub Actions Integration | Pytest with Eric](https://pytest-with-eric.com/integrations/pytest-github-actions/)
-- [Setup Docker for Integration Testing in GitHub Actions | DEV](https://dev.to/sahanonp/setup-docker-for-integration-testing-in-github-action-39fn)
-- [Speed up pytest GitHub Actions with Docker | Towards Data Science](https://towardsdatascience.com/speed-up-your-pytest-github-actions-with-docker-6b3a85b943f/)
-
-*Comparison & Strategy:*
-- [Python Integration Tests: docker-compose vs testcontainers | Medium](https://medium.com/codex/python-integration-tests-docker-compose-vs-testcontainers-94986d7547ce)
-- [Ultimate Guide to Pytest Markers | Pytest with Eric](https://pytest-with-eric.com/pytest-best-practices/pytest-markers/)
-- [pytest-skip-slow plugin](https://github.com/okken/pytest-skip-slow)
-
----
-
-*Researched: 2026-01-30*
+**Breaking changes:** None - all features are backward compatible

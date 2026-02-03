@@ -1,263 +1,207 @@
 # Project Research Summary
 
-**Project:** CocoSearch v1.7 Search Enhancement
-**Domain:** Semantic code search with hybrid retrieval, context expansion, and symbol-aware indexing
+**Project:** CocoSearch v1.8 (Polish & Observability)
+**Domain:** Semantic code search with hybrid retrieval, symbol extraction, and observability features
 **Researched:** 2026-02-03
 **Confidence:** HIGH
 
 ## Executive Summary
 
-CocoSearch v1.7 aims to enhance semantic code search with four integrated capabilities: hybrid search (vector + BM25), context expansion, symbol-aware indexing, and full language coverage (30+ languages). Research shows these are table stakes features for production code search tools in 2026. Missing them makes CocoSearch feel incomplete compared to Sourcegraph, Cursor, and GitHub Code Search.
+CocoSearch v1.8 is a polish and observability milestone that consolidates deferred v1.7 features and adds production-ready monitoring. The research reveals this is fundamentally an integration challenge: adding five feature categories (deferred v1.7 enhancements, symbol extraction expansion, stats dashboard, skills, documentation) to an existing 8,225 LOC local-first tool requires careful attention to performance overhead and architectural boundaries.
 
-The recommended approach is **incremental enhancement** using PostgreSQL-native features wherever possible. Use PostgreSQL's built-in `tsvector`/`tsquery` for keyword search rather than external BM25 extensions (avoids pre-release dependencies like pg_textsearch). Combine vector and keyword results using Reciprocal Rank Fusion (RRF) in the application layer (simple, proven, no score normalization issues). Context expansion is essentially free since CocoSearch already reads files on-demand for display — just extend existing utilities. Symbol extraction leverages Tree-sitter already used by CocoIndex for chunking, adding query-based symbol metadata extraction during indexing.
+The recommended approach prioritizes performance-sensitive features first (query caching, symbol extraction) before user-facing additions (dashboard, skills). Stack additions are minimal and aligned with CocoSearch's local-first philosophy: FastAPI/Uvicorn for optional HTTP stats API, tree-sitter-language-pack migration for expanded language support, and PostgreSQL JSONB for caching. No heavyweight external dependencies like Redis or build tooling are required.
 
-Key risks center on backward compatibility and performance. The reference-only storage architecture requires adding a `content_text` column for hybrid search (breaking change requiring re-indexing). Score normalization between BM25 and vector similarity is the most common hybrid search failure mode — mitigated by using RRF instead of linear score combination. File I/O for context expansion can thrash on slow disks if not batched by filename. Tree-sitter parser errors on malformed code can corrupt the symbol index if not validated. All risks are manageable with the prevention strategies documented in the pitfalls research.
+Key risks center on three areas: (1) statistics collection degrading search performance if done synchronously, (2) C/C++ symbol extraction failures due to preprocessor limitations, and (3) cache invalidation correctness for local-first expectations. These are mitigated through async metric collection, graceful fallback for failed symbol extraction, and revision-based cache invalidation. The research shows high confidence in stack choices and moderate confidence in C/C++ parsing capabilities.
 
 ## Key Findings
 
 ### Recommended Stack
 
-PostgreSQL-native approach minimizes dependencies and maintains CocoSearch's local-first philosophy. The core decision is using PostgreSQL's built-in full-text search instead of external BM25 extensions.
+v1.8 requires minimal new dependencies aligned with CocoSearch's local-first philosophy. The core additions are FastAPI + Uvicorn for HTTP stats API (optional feature), tree-sitter-language-pack migration for 5+ language support, PostgreSQL JSONB for query caching (no new external dependencies), and static markdown files for skills (no runtime dependencies).
 
 **Core technologies:**
-- **PostgreSQL `tsvector`/`tsquery` (built-in)**: Keyword/lexical search — Zero new dependencies, mature and stable, sufficient for code chunk search where BM25's advantage is marginal
-- **PostgreSQL `pg_trgm` (built-in contrib)**: Trigram similarity fallback — Optional enhancement for fuzzy matching
-- **RRF in Python application layer**: Score fusion algorithm — Simple formula, well-documented, avoids score normalization pitfalls
-- **`tree-sitter-languages` (v1.10.2+)**: Pre-built Tree-sitter grammars for 50+ languages — Enables symbol extraction with zero-config language support
-- **Python file I/O (stdlib)**: Context expansion — Zero dependencies, simple, fast enough (<1ms per file with seek)
+- **FastAPI 0.128.0+**: HTTP API framework for stats dashboard — de-facto standard for Python APIs, automatic OpenAPI docs, async-native, integrates with existing async codebase
+- **Uvicorn 0.40.0+**: ASGI server for stats API — lightweight, production-ready, no heavyweight deployment needed
+- **tree-sitter-language-pack 0.2.0+**: Replaces unmaintained tree-sitter-languages — actively maintained with 165+ languages, pre-built wheels, full typing support, includes all required grammars (Java, C, C++, Ruby, PHP)
+- **PostgreSQL JSONB**: Query caching storage — already have PostgreSQL, supports fast lookups with partial indexes, no external cache layer required
+- **Rich 14.3.2+**: Terminal dashboard UI — already a dependency, supports tables, live updates, layouts
 
-**Storage impact:** Adding `content_text` and `content_tsv` columns increases storage by ~10-20% (13MB per 10K chunks). Symbol metadata columns (`symbol_type`, `symbol_name`, `symbol_signature`) add ~500KB per 10K chunks. Total increase from baseline: ~20-25%.
-
-**Why NOT external BM25 extensions:**
-- `pg_textsearch` (Timescale): Pre-release v0.5.0, GA Feb 2026, too new for production
-- `pg_search` (ParadeDB): Requires Rust/Tantivy build, adds complexity
-- Code chunks are short (1000 bytes avg), BM25's length normalization advantage is marginal
+**Philosophy:** Prefer built-in PostgreSQL features over external caching layers. Avoid JavaScript build tooling for web UI (use static HTML + vanilla JS). Keep dependencies optional via feature flags.
 
 ### Expected Features
 
-Research shows hybrid search, context expansion, and symbol awareness are now table stakes for code search tools. Users expect grep-like context flags, identifier-aware search, and function/class filtering.
+Research identifies features across five categories for v1.8: deferred v1.7 functionality, symbol extraction expansion, observability dashboard, developer skills, and documentation overhaul.
 
 **Must have (table stakes):**
-- **Hybrid search with RRF** — Pure vector search misses exact identifier matches; users expect both semantic understanding AND literal matching
-- **Context expansion with configurable lines** — All code search tools (grep, ripgrep, Sourcegraph) show surrounding lines; `-A/-B/-C` flags are expected
-- **Symbol metadata extraction** — Users think in functions and classes, not arbitrary chunks; "find the User class" should filter to class definitions
-- **Symbol search filters** — `--symbol-type function` to narrow searches, complements existing `--language` filter
-- **Full language coverage (30+ languages)** — Modern repos are 40% config/docs (YAML, JSON, Markdown), not just code
+- **Hybrid + symbol filter combination** — v1.7 deferred this, users expect both filters to work together
+- **Nested symbol hierarchy** — fully qualified names (Class.method) for disambiguation
+- **Query caching** — repeated searches should be instant, expected in production tools
+- **Stats dashboard API** — JSON endpoints for monitoring, standard in 2026 tools
+- **Basic skill files** — at least 2-3 example skills to demonstrate capability
 
-**Should have (competitive differentiators):**
-- **Automatic hybrid mode** — Query analyzer detects identifier patterns ("AuthService") and enables hybrid automatically, no manual flag needed
-- **Symbol ranking boost** — Boost function/class definitions over references in RRF scoring (definitions more useful 80% of the time)
-- **Smart context boundaries** — Use Tree-sitter to expand to enclosing function/class rather than arbitrary line counts
-- **Language statistics** — Show language breakdown in stats command (15k lines Python, 8k TypeScript, etc.)
+**Should have (competitive):**
+- **Expanded symbol extraction (10 languages)** — Java, C, C++, Ruby, PHP added to existing Python, JS, TS, Go, Rust
+- **Terminal dashboard** — rich-based live stats view for CLI users
+- **Web dashboard UI** — static HTML visualization of stats
+- **Claude Code + OpenCode skills** — installation instructions and skill routing
+- **Documentation overhaul** — README rebrand, retrieval logic docs, MCP tools reference
 
-**Defer to v1.8+ (validate demand first):**
-- **Nested symbol hierarchy** — Fully qualified names (Class.method) requires AST traversal, complex
-- **Explain mode** — `--explain` showing query analysis and scoring decisions, useful for power users
-- **Phrase matching** — `"exact phrase"` keyword search, niche use case
-- **Negative keywords** — `NOT:test` exclusion, nice-to-have but not essential
-- **Symbol cross-references** — Count symbol usage ("used 47 times"), requires call graph analysis
+**Defer (v2+):**
+- **Redis-backed cache** — start with in-memory, add Redis only if multi-process deployments prove necessary
+- **Real-time dashboard updates** — WebSocket/SSE for live stats can wait, polling sufficient for v1.8
+- **Symbol cross-references** — "X uses this symbol" count requires two-pass indexing, high value but expensive
+- **Advanced query syntax** — phrase matching with tsquery `<->`, negative keywords with `NOT:`, defer to validate demand first
 
 ### Architecture Approach
 
-CocoSearch's existing reference-only storage architecture provides clean separation between indexing (store metadata) and display (read files on-demand). The enhancements integrate by extending the schema with new columns and adding parallel processing during indexing.
+All four v1.8 features integrate cleanly with minimal architectural changes. The existing modular package structure (cli.py, mcp/server.py, indexer/, search/, management/, config/) supports natural extension points. Stats dashboard extends MCP server with HTTP routes (no new process needed), skills add a new module with file-based storage, symbol extraction refactors existing code to use external query files, and query caching adds an in-memory layer before embedding generation.
 
 **Major components:**
-
-1. **Hybrid Search Layer** — Adds `content_text` and `content_tsv` columns to chunks table, creates GIN index on tsvector, implements RRF fusion query combining vector similarity and keyword search results at query time
-2. **Context Expansion Layer** — Already implemented via existing file reading utilities (`read_chunk_content`, `get_context_lines`), zero schema changes, batching file reads by filename prevents I/O thrashing
-3. **Symbol-Aware Layer** — Adds symbol metadata columns (`symbol_type`, `symbol_name`, `symbol_signature`), extracts symbols during indexing using Tree-sitter queries (parallel to chunking), enables filtering searches by symbol type
-
-**Integration pattern:** Same-table multi-index approach stores all data (embeddings, text, symbols) in one table with multiple indexes. This is the industry standard (ParadeDB, Timescale) because it simplifies RRF joins, ensures atomic updates, and has proven scalability to 1M+ chunks.
-
-**Key architectural decision:** Store chunk text in database for hybrid search but keep file reading for context expansion. Hybrid search is a retrieval concern (which results to return) requiring stored text for BM25 indexing. Context expansion is a formatting concern (how to display results) that benefits from always-fresh file content and flexible line counts.
+1. **Stats Dashboard** — Extend FastMCP server with `/dashboard` (HTML) and `/api/stats` (JSON) routes, reuse management/stats.py functions, serve static HTML with Chart.js via CDN
+2. **Query Cache** — In-memory LRU cache for embeddings (1000 entries, 1-hour TTL), revision-based invalidation on index updates, separate cache for query text → embedding vs results
+3. **Symbol Extraction** — Migrate from hardcoded Python functions to external `.scm` tree-sitter query files per language, generic loader with caching, custom query override via config
+4. **Skills System** — Markdown files with YAML frontmatter, discovery mechanism (project `.cocosearch/skills/` > user `~/.cocosearch/skills/` > built-in), CLI commands for list/show/install, optional MCP integration
+5. **Docker Integration** — No new services required, all features integrate with existing MCP process or as mounted volumes
 
 ### Critical Pitfalls
 
-Top pitfalls from research with prevention strategies:
+Research identifies five critical pitfalls specific to adding features to an existing system, not building from scratch.
 
-1. **Score scale incompatibility between BM25 and vector search** — BM25 scores are unbounded (0-50+) while pgvector cosine similarity returns [0,2]. Naive linear combination makes BM25 always dominate. **Prevention:** Use RRF (reciprocal rank fusion) as default, not score combination. RRF formula `score = 1/(rank + k)` requires no normalization and is robust to score scale differences. Industry standard in Elasticsearch, OpenSearch, Azure AI Search.
+1. **Statistics collection degrades search performance** — Synchronous metric collection adds latency, database write amplification creates I/O contention. MySQL Query Cache was deprecated for exactly this reason. **Prevention:** Async collection, in-memory aggregation with periodic flush, separate stats schema, opt-in via flag, HTTP-only dashboard pulls metrics instead of pushing during search.
 
-2. **Tokenization preprocessing inconsistency** — BM25 uses lowercased/stemmed tokens while vector embeddings use original case/form. Query "getUserById" matches vector but not BM25 or vice versa. **Prevention:** Apply identical preprocessing to both paths. For code search, minimal preprocessing is better (preserve case, no stemming which breaks identifiers). Split on non-alphanumeric, handle special characters (`_`, `.`, `::`) consistently.
+2. **MCP skill routing becomes unpredictable** — Claude Code skill selection uses LLM reasoning not algorithmic dispatch, poor descriptions or tool permission mistakes lead to wrong skills invoked. 54% of developers use 6+ tools leading to context fragmentation. **Prevention:** Specific skill names ("Installing CocoSearch" not "Installing Packages"), clear routing triggers in description, minimal tool permissions, test with ambiguous queries before shipping.
 
-3. **Context expansion file I/O thrashing** — Showing context for 10 results requires reading 10 files from disk. On slow disks (HDD, network mount), latency jumps from 100ms to 5+ seconds. **Prevention:** Batch file reads when multiple chunks from same file (group results by filename before reading). Make context expansion opt-in with `--context N` flag, not default. Cache file contents during search session with LRU eviction.
+3. **Tree-sitter C/C++ symbol extraction fails silently** — Preprocessor macros and templates fundamentally challenge tree-sitter parsing, "macros cannot be 100% correctly parsed by a grammar that isn't contextually aware." **Prevention:** Per-language extraction confidence tracking, fallback to chunk-only indexing if symbols fail, log at INFO level but don't block, test against real-world codebases (Linux kernel, Chromium), document limitations explicitly.
 
-4. **Tree-sitter parser errors corrupt symbol index** — Parser encounters malformed code (syntax error, incomplete file) and returns ERROR nodes instead of symbols. Symbol index contains garbage entries. **Prevention:** Check `tree.root_node.has_error` before extracting symbols. Log warning and skip symbol extraction for files with parse errors. Test with malformed code samples in test suite.
+4. **Query cache invalidation becomes correctness bug** — Index updates must invalidate cache immediately or users see stale results. Local-first tools need instant updates after re-indexing. **Prevention:** Revision-based cache keys (`{index_name}:{revision}:{query_hash}`), increment revision on re-index, size-bounded LRU (1000 entries max), short TTL (5 minutes), cache embeddings not final results.
 
-5. **Backward incompatible schema migration** — Adding new columns as NOT NULL fails on existing indexes with data, forcing reindexing. **Prevention:** Use "expand, migrate, contract" pattern. Add columns as nullable with defaults (`DEFAULT ''`). Detect schema version at runtime and gracefully degrade if columns missing (like v1.2 metadata). Provide explicit `--upgrade-schema` command for reindexing.
+5. **Documentation fragments into maintenance nightmare** — 69% of developers lose 8+ hours per week to fragmented tools and unclear navigation. Multiple doc locations (README, docs/, wiki, CLI help) go stale as code evolves. **Prevention:** Single source of truth (README for quickstart, docs/ for deep dives, no wiki), inline docstrings drive MCP tool descriptions, maintenance checklist in PR template, keep focused on user-facing features not internal functions.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure balances dependencies, risk, and user value:
+Based on research, suggested phase structure prioritizes performance-sensitive integrations before user-facing features:
 
-### Phase 1: Hybrid Search Foundation (Storage + Indexing)
-**Rationale:** Must come first because hybrid search requires schema changes and affects indexing pipeline. All other features depend on having the right data in the database. This phase is backward compatible (new columns are nullable, old indexes still work).
+### Phase 1: Deferred v1.7 Foundation
+**Rationale:** Completes functionality deferred from v1.7, unblocks other phases. Hybrid + symbol filter combination is dependency for stats accuracy. Nested symbol hierarchy needed before expanding to 10 languages. Query caching provides immediate performance improvement (60-75% latency reduction) with highest ROI.
 
-**Delivers:**
-- Schema additions: `content_text TEXT`, `content_tsv tsvector` columns
-- Modified indexing pipeline stores chunk text during CocoIndex flow
-- GIN index on `content_tsv` for keyword search performance
-- PostgreSQL extension setup: `CREATE EXTENSION IF NOT EXISTS pg_trgm`
+**Delivers:** Hybrid search works with symbol filters, nested symbol hierarchy (Class.method format), query caching with revision-based invalidation
 
-**Addresses features:** Lays groundwork for hybrid search (FEATURES.md table stakes)
+**Addresses:** Table stakes features users expect from v1.7
 
-**Avoids pitfalls:** Backward incompatible schema migration (nullable columns + graceful degradation)
+**Avoids:** Query cache invalidation bugs (Pitfall #4), hybrid + symbol filter complexity issues (Pitfall #6)
 
-**Estimated complexity:** MEDIUM (150-200 LOC, schema changes, pipeline modification)
+**Research flag:** Standard patterns, skip phase-specific research
 
-### Phase 2: Hybrid Search Query (RRF Implementation)
-**Rationale:** Once data is in place, implement the query logic. RRF fusion is simple (50 lines of Python) and well-documented. Separate from Phase 1 to allow incremental testing and rollback if needed.
+### Phase 2: Symbol Extraction Expansion
+**Rationale:** Natural extension of existing indexer/symbols.py. Migration to query files enables community contributions and unblocks language expansion. Must happen before stats dashboard to show accurate language coverage.
 
-**Delivers:**
-- RRF hybrid search query combining vector and keyword results
-- CLI flag: `--hybrid` to enable hybrid search (default: vector-only for backward compat)
-- MCP parameter: `use_hybrid_search: bool`
-- Query analyzer detecting identifier patterns (camelCase, snake_case) for automatic hybrid mode
+**Delivers:** 5 new languages (Java, C, C++, Ruby, PHP), tree-sitter-language-pack migration, external .scm query files, graceful fallback for parsing failures
 
-**Uses stack:** PostgreSQL `tsvector`/`tsquery` (from Phase 1), RRF algorithm in Python
+**Uses:** tree-sitter-language-pack 0.2.0+, query file loader with caching
 
-**Addresses features:** Hybrid search with RRF (FEATURES.md table stakes), Automatic hybrid mode (differentiator)
+**Implements:** Generic symbol extraction replacing hardcoded per-language functions
 
-**Avoids pitfalls:** Score scale incompatibility (use RRF not linear combination), Tokenization inconsistency (shared preprocessing function)
+**Avoids:** C/C++ silent extraction failures (Pitfall #3), symbol hierarchy display truncation (Pitfall #10)
 
-**Estimated complexity:** MEDIUM (150-200 LOC, RRF query logic, CLI integration)
+**Research flag:** Phase needs validation — test C/C++ extraction on 5+ real codebases during implementation, verify failure rates and fallback behavior
 
-### Phase 3: Symbol-Aware Indexing (Extraction + Storage)
-**Rationale:** Parallel to hybrid search implementation since they don't depend on each other. Symbol extraction can proceed independently while hybrid search is being tested. Start with Python only to validate approach before expanding to other languages.
+### Phase 3: Stats Dashboard
+**Rationale:** Builds on stable search/stats APIs from Phase 1. Requires symbol extraction accuracy from Phase 2. Lower priority than performance features but high value for Docker deployments. Async collection design prevents performance degradation.
 
-**Delivers:**
-- Schema additions: `symbol_type TEXT`, `symbol_name TEXT`, `symbol_signature TEXT` columns
-- Tree-sitter query loader for symbol extraction patterns
-- Symbol extraction pipeline integrated into indexing (parallel to chunking)
-- Initial language support: Python (validate approach)
+**Delivers:** HTTP API endpoints (/api/stats), terminal dashboard (rich-based), web UI (static HTML + Chart.js), language statistics
 
-**Implements architecture:** Symbol-Aware Layer component, Tree-sitter query-based extraction
+**Uses:** FastAPI 0.128.0+, Uvicorn 0.40.0+, Rich 14.3.2+ (existing), Chart.js via CDN
 
-**Addresses features:** Symbol metadata extraction (table stakes), Function-level chunking granularity
+**Implements:** FastMCP server extension with custom routes, management/stats.py aggregation functions
 
-**Avoids pitfalls:** Tree-sitter parser errors (check `has_error` before extracting), Schema complexity (limit to 3-4 columns not JSONB for v1.7)
+**Avoids:** Performance overhead from sync collection (Pitfall #1), HTTP API security issues (Pitfall #7)
 
-**Estimated complexity:** MEDIUM (200 LOC, Tree-sitter integration, per-language query files)
+**Research flag:** Needs framework evaluation — which terminal UI library (rich vs textual vs blessed), HTTP framework choice (FastAPI vs Flask vs http.server), benchmark stats collection overhead with CocoSearch's stack
 
-### Phase 4: Symbol Search Filters + Language Expansion
-**Rationale:** Once symbol extraction works for Python, expand to top 5 languages and add search filtering. This validates symbol extraction quality before committing to all 30+ languages.
+### Phase 4: Claude Code & OpenCode Skills
+**Rationale:** Independent of other features, CLI-first approach, foundation for MCP enhancements. User-facing value from skills depends on stats/search quality from earlier phases.
 
-**Delivers:**
-- Symbol extraction for JavaScript, TypeScript, Go, Rust (top 5 languages total)
-- CLI flags: `--symbol-type function`, `--symbol-name AuthService`
-- MCP parameters: `symbol_type` and `symbol_name` filters
-- Symbol ranking boost in RRF scoring (definitions weighted 1.5x over references)
+**Delivers:** Skill discovery system, CLI commands (list/show/install), 3-5 built-in example skills, installation documentation
 
-**Addresses features:** Symbol search filters (table stakes), Symbol ranking boost (differentiator)
+**Implements:** skills/ module with YAML frontmatter parser, registry with caching, optional MCP tool integration
 
-**Avoids pitfalls:** Large file timeouts (size threshold + timeout on parsing), Inconsistent language detection (skip generated/minified files)
+**Avoids:** Skill routing unpredictability (Pitfall #2), YAML frontmatter errors (Pitfall #9)
 
-**Estimated complexity:** LOW-MEDIUM (100 LOC, add filters to search query, expand query files)
+**Research flag:** Needs user testing — validate skill routing with ambiguous queries ("search this codebase", "install dependencies"), test both Claude Code and OpenCode independently
 
-### Phase 5: Context Expansion Enhancement
-**Rationale:** Can proceed in parallel with Phase 4 since it only touches display/formatting layer. Existing implementation already works, this phase adds optimizations and smart boundaries.
+### Phase 5: Documentation Overhaul
+**Rationale:** Must happen after all features stable. README rebrand reflects new positioning (v1.8 as "polish & observability"). Retrieval logic docs and MCP tools reference depend on complete feature set.
 
-**Delivers:**
-- Batched file reading (group results by filename before I/O)
-- Smart context boundaries using Tree-sitter (expand to enclosing function)
-- Syntax-highlighted context in `--pretty` mode (extend existing formatter)
-- Performance optimization: LRU cache for frequently accessed files
+**Delivers:** Restructured README (quickstart focus), docs/ARCHITECTURE.md (retrieval logic deep dive), docs/MCP_TOOLS.md (tool reference with examples), updated CLI help
 
-**Uses:** Python file I/O (stdlib), existing `get_context_lines` utility, Tree-sitter for boundary detection
+**Addresses:** Documentation fragmentation prevention (Pitfall #5)
 
-**Addresses features:** Context expansion with configurable lines (table stakes), Smart context boundaries (differentiator)
+**Avoids:** Multiple sources of truth, content gaps for new features, over-documentation of internals (Pitfall #9)
 
-**Avoids pitfalls:** File I/O thrashing (batching by filename), No syntax highlighting (use Pygments in pretty mode)
-
-**Estimated complexity:** LOW (100 LOC, optimize existing code, add caching)
-
-### Phase 6: Full Language Coverage + Documentation
-**Rationale:** Final phase adds remaining languages (essentially configuration, no code changes) and documents all features. Language coverage is lowest complexity because CocoIndex already supports 30+ languages.
-
-**Delivers:**
-- Enable all CocoIndex built-in languages (YAML, JSON, Markdown, 20+ more)
-- Update `LANGUAGE_EXTENSIONS` mapping
-- Language statistics in `cocosearch stats` command
-- Documentation: hybrid search guide, symbol search guide, supported languages list
-
-**Addresses features:** Full language coverage (table stakes), Language statistics (differentiator)
-
-**Avoids pitfalls:** (No new pitfalls in this phase, purely configuration + docs)
-
-**Estimated complexity:** LOW (50 LOC, mostly configuration and documentation)
+**Research flag:** Standard patterns, skip research — follow established documentation structure conventions
 
 ### Phase Ordering Rationale
 
-- **Phase 1 before Phase 2:** Schema changes must happen before query implementation. Incremental rollout allows testing storage without exposing hybrid search to users yet.
-- **Phase 3 parallel to Phases 1-2:** Symbol extraction is independent of hybrid search. Can proceed on separate development track.
-- **Phase 4 after Phase 3:** Validate symbol extraction quality with Python before expanding to more languages. Prevents wasted effort if approach needs adjustment.
-- **Phase 5 parallel to Phase 4:** Context expansion is display/formatting concern, independent of retrieval logic. Can optimize while symbol expansion is ongoing.
-- **Phase 6 last:** Language expansion and documentation come after core features are complete and validated.
-
-**Dependency chain:**
-```
-Phase 1 (storage) → Phase 2 (query) → User-facing hybrid search
-Phase 3 (symbol extraction) → Phase 4 (symbol filters) → User-facing symbol search
-Phase 5 (context optimization) → Improved UX
-Phase 6 (languages + docs) → Launch-ready
-```
+- **Performance first:** Query caching (Phase 1) provides immediate ROI, stats collection (Phase 3) must be async to avoid degradation
+- **Dependencies respected:** Symbol extraction (Phase 2) must precede stats dashboard (Phase 3) for accurate language statistics
+- **Integration risk managed:** Test deferred v1.7 features (Phase 1) before adding observability layer (Phase 3)
+- **User-facing last:** Skills (Phase 4) and docs (Phase 5) depend on stable search/stats foundation from earlier phases
+- **Module boundaries clear:** Each phase has defined module (cache in search/, symbols in indexer/, stats in management/, skills in skills/), prevents coupling
 
 ### Research Flags
 
-**Phases with standard patterns (skip research-phase):**
-- **Phase 1:** PostgreSQL schema changes are well-documented, CocoIndex pipeline is familiar
-- **Phase 2:** RRF algorithm has extensive documentation and examples across multiple sources
-- **Phase 5:** File I/O and caching are standard Python patterns
-- **Phase 6:** Configuration and documentation, no technical research needed
+Phases likely needing deeper research during planning:
+- **Phase 2 (Symbol Extraction):** Test C/C++ parsing on real-world codebases (Linux kernel, Chromium), measure actual failure rates, validate fallback behavior
+- **Phase 3 (Stats Dashboard):** Benchmark stats collection overhead, evaluate terminal UI library options, test HTTP framework performance
+- **Phase 4 (Skills):** User testing for skill routing validation, test LLM-based selection with ambiguous queries
 
-**Phases likely needing deeper research during planning:**
-- **Phase 3 (symbol extraction):** Tree-sitter query syntax is language-specific and poorly documented. May need to research AST node types for Python, examine existing query examples, and experiment with query patterns before finalizing extraction logic.
-- **Phase 4 (language expansion):** Each language (JavaScript, TypeScript, Go, Rust) has different AST node types for symbols. Minimal research per language (1-2 hours each) to write correct query files.
-
-**Low research needs overall:** 4 out of 6 phases follow established patterns. Only symbol extraction requires domain-specific investigation, and even that is straightforward (documented Tree-sitter query syntax, community examples exist).
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Deferred v1.7):** Well-documented RRF hybrid search, cache invalidation patterns established
+- **Phase 5 (Documentation):** Standard documentation structure, no novel patterns
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | PostgreSQL built-in features verified via official docs, Tree-sitter libraries verified via PyPI and GitHub (current versions), RRF algorithm verified via multiple sources with SQL examples |
-| Features | HIGH | Table stakes features verified against Sourcegraph, GitHub Code Search, Cursor, and other modern tools (2026 feature sets). Competitive analysis based on official documentation and product research. |
-| Architecture | HIGH | Same-table multi-index pattern is industry standard (ParadeDB, Timescale docs). Reference-only storage pattern proven in CocoSearch v1.0-v1.6. Hybrid search integration patterns well-documented across multiple vendors. |
-| Pitfalls | HIGH | Score normalization, tokenization inconsistency, and parser error pitfalls confirmed across multiple sources (Weaviate, Elasticsearch, Tree-sitter GitHub issues). File I/O performance patterns are established best practices. |
+| Stack | HIGH | Official docs for FastAPI/Uvicorn/Rich verified, tree-sitter-language-pack actively maintained with verified grammars, PostgreSQL JSONB well-documented for caching patterns |
+| Features | HIGH | Context7 library research on hybrid search and symbol extraction, 2026 industry research on observability tools, official Claude Code skills documentation |
+| Architecture | HIGH | Clean integration points identified, minimal coupling, all features additive and backward-compatible, Docker integration requires no new services |
+| Pitfalls | MEDIUM | High confidence on stats overhead and cache invalidation (well-researched), LOW confidence on C/C++ parsing failure severity (known limitations but unclear real-world impact) |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-Areas where research was inconclusive or needs validation during implementation:
+Research was comprehensive but several areas need validation during implementation:
 
-- **BM25 vs tsvector quality tradeoff:** Research suggests PostgreSQL's `ts_rank` is "good enough" for code search, but doesn't provide quantitative comparison. During Phase 2 implementation, benchmark hybrid search quality against known-good queries. If quality is insufficient, document upgrade path to pg_textsearch in v1.8.
-
-- **RRF k parameter tuning:** Default k=60 is empirically optimal across multiple domains, but optimal value may vary by codebase characteristics (size, language distribution, query patterns). During Phase 2, log k=40, k=60, k=80 results for sample queries. Validate k=60 is best or adjust default.
-
-- **Symbol extraction coverage:** Tree-sitter query syntax is straightforward, but symbol extraction quality depends on handling edge cases (nested functions, decorators, async functions, etc.). During Phase 3, test with real codebases containing complex structures. Iterate query patterns based on extraction failures.
-
-- **Context expansion default lines:** Research shows tools vary (grep default 2, ripgrep default 0, Sourcegraph shows variable context). During Phase 5, survey MCP users for preference. Recommendation: default 0 (explicit is better than implicit) with documentation suggesting 3-5 lines for typical use.
-
-- **Storage impact on large codebases:** Estimated 20-25% storage increase, but varies by codebase characteristics (average chunk size, comment density, language distribution). During Phase 1, monitor storage on test indexes of varying sizes. Document expected storage requirements in user guide.
+- **C/C++ symbol extraction failure rate:** Known that preprocessor macros cause issues, but what percentage of real-world files fail? Need production data from testing against 5+ large C/C++ codebases (Linux kernel, LLVM, Chromium, etc.)
+- **Query cache hit rate for code search:** General semantic caching achieves 60-80% hit rates, but code search queries may differ due to specificity. Monitor actual hit rates during implementation.
+- **Stats collection overhead magnitude:** Research shows async collection prevents major degradation, but exact millisecond cost for CocoSearch's stack needs benchmarking. Set threshold: fail CI if >10% regression.
+- **Skill routing accuracy with ambiguous queries:** LLM-based routing has no algorithmic fallback. Test with 20+ ambiguous queries ("search code", "find bugs", "install dependencies") to validate routing quality before shipping.
+- **Dashboard UI framework choice:** Rich vs Textual vs blessed for terminal, FastAPI vs Flask for HTTP. Needs prototyping to evaluate developer experience and performance tradeoffs.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- PostgreSQL 17 official documentation: Full-text search (`tsvector`, `tsquery`, `ts_rank`)
-- pgvector documentation: HNSW indexes, performance benchmarks, hybrid search patterns
-- Tree-sitter official documentation: Parser error handling, query syntax, code navigation
-- PyPI verified packages: `tree-sitter-languages` v1.10.2, `py-tree-sitter` v0.25.2
-- Industry vendor documentation: ParadeDB hybrid search guide, Timescale pg_textsearch, VectorChord-BM25
+- [FastAPI Official Documentation](https://fastapi.tiangolo.com/) — API patterns, async integration
+- [Anthropic Claude Code Skills Documentation](https://code.claude.com/docs/en/skills) — skill format, routing behavior
+- [tree-sitter-language-pack GitHub](https://github.com/Goldziher/tree-sitter-language-pack) — language support verification, API compatibility
+- [Tree-sitter Official Site](https://tree-sitter.github.io/tree-sitter/) — query system, parser capabilities
+- [Redis Semantic Caching Guide](https://redis.io/blog/what-is-semantic-caching/) — cache architecture patterns
+- [PostgreSQL as JSON Database (AWS)](https://aws.amazon.com/blogs/database/postgresql-as-a-json-database-advanced-patterns-and-best-practices/) — JSONB optimization techniques
+- [Tree-sitter C Preprocessor Issues #108](https://github.com/tree-sitter/tree-sitter-c/issues/108) — macro parsing limitations
 
 ### Secondary (MEDIUM confidence)
-- Research papers: Reciprocal Rank Fusion algorithm (Cormack et al. 2009), BM25 in code search
-- Blog posts from established vendors: Weaviate hybrid search explained (2026), Redis hybrid search (2026), OpenSearch semantic search tutorial (2026)
-- Community resources: Medium articles on BM25 tokenization, GitHub issues on Tree-sitter error handling (2024-2026)
-- CocoIndex documentation: Semantic code indexing, Tree-sitter integration, real-time indexing
+- [Claude Skills Deep Dive (Lee Han Chung)](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/) — routing mechanism analysis
+- [MCP Observability Overview](https://www.merge.dev/blog/mcp-observability) — 2026 monitoring patterns
+- [Hybrid Search: BM25 + Vector (Medium 2026)](https://medium.com/codex/96-hybrid-search-combining-bm25-and-vector-search-7a93adfd3f4e) — RRF implementation
+- [Redis Cache Invalidation (Milan Jovanovic)](https://www.milanjovanovic.tech/blog/solving-the-distributed-cache-invalidation-problem-with-redis-and-hybridcache) — distributed cache pitfalls
+- [Technical Debt Guide 2026 (Monday.com)](https://monday.com/blog/rnd/technical-debt/) — incremental feature development risks
+- [Developer Documentation Tools 2026](https://documentation.ai/blog/ai-tools-for-documentation) — fragmentation issues
 
-### Tertiary (validation recommended)
-- Performance estimates: File I/O timing (<1ms per file), Tree-sitter parsing overhead (1-2ms per file), HNSW memory formula — all extrapolated from vendor documentation, should be benchmarked on actual CocoSearch workload
-- User preferences: Context line defaults, hybrid search auto-enable heuristics — inferred from tool comparisons, should be validated with user surveys
+### Tertiary (LOW confidence)
+- [Claude Code Best Practices (Medium)](https://medium.com/@rub1cc/how-claude-codes-creator-uses-it-10-best-practices-from-the-team-e43be312836f) — skill count recommendations
+- [Tree-sitter Complications (Mastering Emacs)](https://www.masteringemacs.org/article/tree-sitter-complications-of-parsing-languages) — error recovery patterns
 
 ---
 *Research completed: 2026-02-03*

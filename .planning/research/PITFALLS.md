@@ -1,738 +1,583 @@
-# Domain Pitfalls
+# Domain Pitfalls: v1.8 Feature Integration
 
-**Domain:** All-in-One Docker Deployment + MCP Transport Support
-**Researched:** 2026-02-01
-**Milestone:** v2.0 -- Docker Image + MCP SSE/Streamable HTTP
-**Confidence:** HIGH
+**Project:** CocoSearch v1.8
+**Domain:** Adding observability, skills, expanded symbol extraction, query caching, and documentation to existing semantic code search tool
+**Researched:** 2026-02-03
+**Milestone:** v1.8 -- Polish & Observability
+**Confidence:** MEDIUM (verified with official docs and 2026 sources where available, LOW confidence on C/C++ symbol extraction specifics)
+
+## Executive Summary
+
+Adding these five feature categories to an existing 8,225 LOC local-first tool introduces integration risks:
+
+1. **Stats dashboard**: Performance overhead from metric collection can degrade search latency
+2. **Claude Code/OpenCode skills**: Routing complexity and tool permission mistakes
+3. **Symbol extraction expansion**: Language-specific parsing pitfalls, especially C/C++ preprocessor handling
+4. **Query caching**: Cache invalidation complexity and memory bloat in local-first context
+5. **Documentation overhaul**: Maintenance burden and content fragmentation
+
+This document focuses on pitfalls specific to **adding features to an existing system**, not building from scratch.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or fundamental architecture failures.
-
-### Pitfall 1: PID 1 Signal Handling Breaks Graceful Shutdown
+### Pitfall 1: Statistics Collection Degrades Search Performance
 
 **What goes wrong:**
-In a multi-service container (PostgreSQL + Ollama + Python app), the entrypoint process runs as PID 1. If that process is a shell script or the Python app itself, SIGTERM signals from `docker stop` are silently ignored. Docker waits 10 seconds, then sends SIGKILL, forcefully terminating all processes. PostgreSQL has no chance to flush WAL buffers, potentially corrupting the database.
+
+Adding monitoring to CLI/MCP tools can introduce performance overhead that defeats the purpose of a fast local-first tool. Users run CocoSearch on laptops during active development - every millisecond counts.
 
 **Why it happens:**
-- Linux kernel treats PID 1 specially: signals are ignored unless explicitly handled
-- Shell scripts (`#!/bin/bash`) don't forward signals to child processes by default
-- Python's default signal handlers don't propagate to subprocess children
-- Docker's `docker stop` sends SIGTERM, waits `--stop-timeout` (default 10s), then SIGKILL
-- PostgreSQL needs SIGTERM to initiate "smart shutdown" (wait for clients, flush buffers)
-- Ollama may be mid-inference when killed, leaving GPU memory in bad state
+
+1. **Synchronous metric collection**: Recording stats in-line with search operations adds latency
+2. **Database write amplification**: Writing stats to PostgreSQL for every search query creates I/O contention with vector operations
+3. **Memory pressure**: Keeping metrics in-memory without bounds leads to gradual degradation
+4. **Excessive granularity**: Tracking too many metrics (per-chunk timings, per-file stats) creates overhead
+
+**Real-world evidence:**
+
+- MySQL Query Cache was deprecated due to cache invalidation overhead where "any write to a table invalidated all cached queries for that table, memory fragmentation over time" [(Source: OneUpTime)](https://oneuptime.com/blog/post/2026-01-24-mysql-query-cache-deprecated/view)
+- Performance monitoring overhead varies based on "cache size, number and size of cached queries, and cache hit ratio" requiring monitoring of "cache statistics like hit ratio, free memory, and prune ratio" [(Source: LinkedIn)](https://www.linkedin.com/advice/0/how-can-you-troubleshoot-query-caching-zbfoc)
+- The "default configuration of 10ms for perf_event_mux_interval_ms is known to cause serious performance overhead for systems with large core counts" [(Source: How-To Geek)](https://www.howtogeek.com/monitor-linux-system-performance-from-the-terminal/)
 
 **Consequences:**
-- PostgreSQL database corruption on container restart
-- "invalid record length" errors in PostgreSQL WAL recovery
-- Lost indexed data requiring full re-index
-- Ollama model files corrupted mid-download
-- Users experience data loss after routine container restarts
 
-**Warning signs:**
-- Container takes exactly 10 seconds to stop (hitting SIGKILL timeout)
-- PostgreSQL logs showing recovery on every startup
-- Ollama re-downloading models after container restart
-- "database was not properly shut down" messages
+- Search latency increases from <100ms to 200-500ms
+- Index operations slow down due to stats writes blocking vector insertions
+- User perception shifts from "instant" to "sluggish"
+- Laptop battery drain increases from continuous monitoring
 
 **Prevention:**
-1. Use a proper init system as PID 1: [tini](https://github.com/krallin/tini) or [dumb-init](https://github.com/Yelp/dumb-init)
-2. If using Docker 1.13+, use `--init` flag: `docker run --init ...`
-3. Embed tini in the image: `ENTRYPOINT ["/tini", "--", "/entrypoint.sh"]`
-4. Use supervisord with `stopwaitsecs` configured for each service
-5. Implement explicit signal handlers in entrypoint script using `trap`
-6. Set `stop_grace_period: 30s` in docker-compose for PostgreSQL to complete shutdown
-7. Test with `docker stop --time=1` to verify graceful handling under time pressure
 
-**Detection strategy:**
-```bash
-# Time how long docker stop takes - should be < 10s for graceful shutdown
-time docker stop cocosearch-all-in-one
-# Check PostgreSQL startup logs for recovery mode
-docker logs cocosearch-all-in-one 2>&1 | grep -i "recovery"
-```
+1. **Async metric collection**: Use background threads/tasks for stats writes
+2. **In-memory aggregation**: Batch metrics in memory, flush periodically (every 10-100 operations)
+3. **Separate stats database/schema**: Don't let stats tables lock vector tables
+4. **Opt-in collection**: Stats collection OFF by default, enable with `--enable-stats` flag
+5. **Minimal hot-path metrics**: Only track critical metrics (query count, total time) during search
+6. **HTTP-only dashboard**: Stats dashboard runs as separate process, pulls from db (doesn't push during search)
 
-**Phase to address:** Phase 1 (Container foundation) -- must be correct before adding any services.
+**Detection:**
+
+- Warning sign: Search latency increases after adding stats
+- Warning sign: PostgreSQL queries show lock contention on stats tables
+- Warning sign: CPU usage spikes when stats are enabled
+- Test: Benchmark search with stats on/off, fail CI if >10% regression
+
+**Which phase addresses this:**
+
+- **Phase 2 (Stats Dashboard)**: Build with async collection from start
+- **Phase 7 (Testing)**: Add performance regression tests
 
 ---
 
-### Pitfall 2: MCP stdio Transport Corrupted by Logging to stdout
+### Pitfall 2: MCP Skill Routing Becomes Unpredictable
 
 **What goes wrong:**
-The existing CocoSearch MCP server logs to stderr (correctly configured in `server.py`), but adding SSE/HTTP transport requires additional dependencies that may log to stdout. Third-party libraries (httpx, uvicorn, starlette) default to stdout logging. Any non-JSON-RPC output to stdout corrupts the protocol stream, causing the MCP client to disconnect with cryptic parsing errors.
+
+Claude Code/OpenCode skill routing relies on LLM reasoning, not algorithmic dispatch. Poor skill descriptions or tool permission mistakes lead to:
+- Skills not being invoked when needed
+- Wrong skill invoked for task
+- Security issues from over-permissioned tools
 
 **Why it happens:**
-- MCP stdio transport uses stdout exclusively for JSON-RPC messages
-- The [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports) states: "The server MUST NOT write anything to its stdout that is not a valid MCP message"
-- Uvicorn's default logging goes to stdout
-- Third-party libraries may use `print()` or `logging.basicConfig()` with default stdout
-- Python warnings module defaults to stderr but some libraries override this
-- CocoIndex's internal logging may write to stdout during initialization
+
+Per official research: "The skill selection mechanism has no algorithmic routing or intent classification at the code level. Claude Code doesn't use embeddings, classifiers, or pattern matching to decide which skill to invoke. Instead, the system formats all available skills into a text description embedded in the Skill tool's prompt, and lets Claude's language model make the decision." [(Source: Lee Han Chung's Deep Dive)](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/)
+
+**Common mistakes (from 2026 research):**
+
+1. **Overly generic skill names**: "Use gerund form (verb + -ing) for Skill names" but avoid vague names like "Searching Code"
+2. **Tool permission bloat**: "A common mistake is listing every available tool, which creates a security risk" [(Source: Anthropic Skills Guide)](https://www.gend.co/blog/claude-skills-claude-md-guide)
+3. **No failure documentation**: Every skill should include "Failed Attempts section — documentation of approaches that didn't work" [(Source: Medium - Elliot)](https://medium.com/@elliotJL/your-ai-has-infinite-knowledge-and-zero-habits-heres-the-fix-e279215d478d)
+4. **Too many skills**: "The sweet spot in January 2026 is using about five skills regularly" [(Source: Medium - Best Practices)](https://medium.com/@rub1cc/how-claude-codes-creator-uses-it-10-best-practices-from-the-team-e43be312836f)
 
 **Consequences:**
-- MCP client reports "invalid JSON" or "unexpected token" errors
-- Connection drops silently with no clear error message
-- Intermittent failures when libraries log only on certain code paths
-- Extremely difficult to debug (logs themselves cause the problem)
 
-**Warning signs:**
-- MCP client shows "malformed messages" error
-- Protocol works with simple tools, fails with complex operations
-- Adding new dependencies breaks previously working stdio transport
-- Claude Code reports "MCP server disconnected" without explanation
+- User invokes "install cocosearch" -> skill routes to generic "installing packages" instead of CocoSearch-specific setup
+- "Search this codebase" -> routes to web search instead of CocoSearch MCP tool
+- Security: skill with Write permission when only Read needed
 
 **Prevention:**
-1. Keep the existing stderr logging configuration at the very top of server.py (before imports)
-2. When adding HTTP transport, configure uvicorn explicitly: `log_config=None` or custom config to stderr
-3. Audit all new dependencies for stdout usage: `grep -r "print(" vendor_code/`
-4. Add CI test that captures stdout and fails if any non-JSON-RPC output appears
-5. Use `contextlib.redirect_stdout` to stderr during library initialization
-6. Test stdio transport with MCP Inspector after every dependency addition
-7. Consider using `PYTHONUNBUFFERED=1` to catch buffered stdout issues early
 
-**Detection strategy (automated test):**
-```python
-def test_stdio_purity():
-    """Verify no stdout pollution during MCP operations."""
-    import subprocess
-    result = subprocess.run(
-        ["python", "-m", "cocosearch.mcp"],
-        input='{"jsonrpc":"2.0","method":"initialize","id":1}',
-        capture_output=True, text=True, timeout=5
-    )
-    # Every line of stdout must be valid JSON
-    for line in result.stdout.strip().split('\n'):
-        if line:
-            json.loads(line)  # Raises if not JSON
-```
+1. **Specific skill names**: "Installing CocoSearch" not "Installing Packages"
+2. **Clear routing triggers**: List exact phrases in description that should trigger skill ("index a codebase", "semantic search")
+3. **Minimal tool permissions**: Only grant tools actually needed (Read,Write not Read,Write,Bash,WebSearch)
+4. **Test with ambiguous queries**: Validate routing with queries like "how do I search code?" before shipping
+5. **Document non-triggers**: Add "This skill does NOT handle web search or grep" to prevent confusion
 
-**Phase to address:** Throughout -- every phase adding code must maintain stdout purity.
+**Detection:**
+
+- Warning sign: Users report skill isn't being invoked
+- Warning sign: Wrong skill consistently chosen for task
+- Test: Chat log analysis showing skill selection for test queries
+
+**Which phase addresses this:**
+
+- **Phase 3 (Claude Code Skill)**: Iterative testing with real Claude Code
+- **Phase 4 (OpenCode Skill)**: Validate routing differs from Claude Code skill where needed
 
 ---
 
-### Pitfall 3: PostgreSQL Initialization Scripts Silently Skipped
+### Pitfall 3: Tree-sitter C/C++ Symbol Extraction Fails Silently
 
 **What goes wrong:**
-PostgreSQL Docker images run scripts in `/docker-entrypoint-initdb.d/` only when the data directory is empty. In an all-in-one container with a persistent volume, the volume survives container recreation. On container update/restart, the init scripts don't run, and users don't get the pgvector extension or schema updates. The application fails with "extension pgvector does not exist."
+
+Expanding symbol extraction from 5 languages (Python, JS, TS, Go, Rust) to 10 by adding Java, C, C++, Ruby, PHP introduces language-specific parsing failures. C/C++ is especially problematic due to preprocessor macros and templates.
 
 **Why it happens:**
-- PostgreSQL official image design: init scripts run once, on first start with empty data dir
-- [Docker PostgreSQL docs](https://hub.docker.com/_/postgres/): "Scripts in /docker-entrypoint-initdb.d are only run if you start the container with a data directory that is empty"
-- Persistent volumes for data durability mean data dir is never empty after first run
-- Schema migrations require running SQL, but init scripts won't re-run
-- PostgreSQL 18+ changed volume structure (data is now a symlink), breaking some bind mounts
+
+Tree-sitter parsers have fundamental limitations with C/C++ preprocessor directives:
+
+- "Macros cannot be 100% correctly parsed by a grammar that isn't contextually aware and doesn't run the preprocessor" [(Source: GitHub Issue #108)](https://github.com/tree-sitter/tree-sitter-c/issues/108)
+- "Any preprocessor directive that modifies text (#if, #include) can appear in the middle of a grammatical rule and change it to something entirely different" [(Source: Habr Article)](https://habr.com/en/articles/835192/)
+- "An imported macro prevented the correct parsing of the following class" [(Source: GitHub Issue #85)](https://github.com/tree-sitter/tree-sitter-cpp/issues/85)
+
+**Real-world parsing issues:**
+
+- Function definitions with macros: "Tree-sitter's C/C++ parser has inconsistently parsed function definitions using macros" [(Source: GitHub Issue #3973)](https://github.com/tree-sitter/tree-sitter/issues/3973)
+- Error recovery: "Error recovery problems have been reproduced almost verbatim in Ruby and Java, and partially in most other tree-sitter parsers (C#, C++, Rust, etc.)" [(Source: Mastering Emacs)](https://www.masteringemacs.org/article/tree-sitter-complications-of-parsing-languages)
+- Parse quality: "In bad parses, tree-sitter may produce a block with a list of elements instead of proper call nodes" [(Source: Hacker News)](https://news.ycombinator.com/item?id=29327424)
 
 **Consequences:**
-- pgvector extension not created after container update
-- Schema migrations not applied
-- Application crashes with missing extension/table errors
-- Users must manually run SQL or wipe their data volume
-- "It worked before the update" -- classic regression
 
-**Warning signs:**
-- Init scripts have correct content but weren't executed
-- Extension exists in dev (fresh volume) but not in prod (existing volume)
-- Application errors about missing tables/extensions after container update
-- Init script timestamps show old dates despite recent container builds
+- Symbol extraction succeeds but returns incomplete results (missing 30-50% of symbols)
+- Users filter by symbol and get zero results despite symbols existing in file
+- No error/warning surfaced - silent degradation
+- Definition boost (2x) doesn't apply because symbols not extracted
 
 **Prevention:**
-1. Don't rely solely on init scripts for required schema -- implement application-level migrations
-2. Check extension existence at startup and create if missing: `CREATE EXTENSION IF NOT EXISTS vector;`
-3. Use CocoIndex's `flow.setup()` for table creation (it already handles schema evolution)
-4. For critical init (pgvector extension), add a startup check in the entrypoint script
-5. Document that users must wipe volumes when upgrading major PostgreSQL versions
-6. Test upgrade path: create container with v1, update to v2, verify everything works
 
-**Startup check pattern:**
-```bash
-# entrypoint.sh
-wait_for_postgres() {
-    until pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
-        sleep 1
-    done
-}
+1. **Per-language extraction confidence**: Track which languages have high-quality symbol extraction
+2. **Fallback to chunk-only**: If symbol extraction fails, still index file chunks normally
+3. **Logging but not blocking**: Log "symbol extraction failed for file.cpp" at INFO level, don't fail indexing
+4. **Test with real-world codebases**: Don't just test simple examples - test against Linux kernel, Chromium source
+5. **Document limitations**: README explicitly states "C/C++ symbol extraction may miss macros and templates"
+6. **Preprocessor handling**: For critical C/C++ projects, consider optional preprocessing step
 
-ensure_extensions() {
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector;"
-}
+**Language-specific considerations:**
 
-start_postgres &
-wait_for_postgres
-ensure_extensions
-```
+| Language | Confidence | Known Issues |
+|----------|-----------|--------------|
+| Java | HIGH | Generally reliable, watch for annotation processing |
+| Ruby | MEDIUM | Dynamic method definitions via metaprogramming |
+| PHP | MEDIUM | Mixed HTML/PHP files, dynamic class loading |
+| C | LOW | Preprocessor macros, conditional compilation |
+| C++ | LOW | Templates, preprocessor, multiple inheritance |
 
-**Phase to address:** Phase 1 (Container foundation) -- PostgreSQL setup must be robust from the start.
+**Detection:**
+
+- Warning sign: Symbol count suddenly drops when adding new language support
+- Warning sign: Symbol extraction takes >1s per file
+- Test: Index known C++ codebase, verify symbol counts match expected ranges
+- Monitor: Track symbol_extraction_errors metric per language
+
+**Which phase addresses this:**
+
+- **Phase 1 (Nested Symbol Hierarchy)**: Must handle missing symbols gracefully
+- **Phase 5 (Expanded Symbol Extraction)**: Add per-language error handling from start
+- **Phase 7 (Testing)**: Real-world codebase tests for C/C++
 
 ---
 
-### Pitfall 4: Ollama Cold Start Blocks Application Startup
+### Pitfall 4: Query Cache Invalidation Becomes Correctness Bug
 
 **What goes wrong:**
-Ollama in Docker must download models before serving embeddings. For the nomic-embed-text model (~274MB), this takes 30-120 seconds depending on network speed. The all-in-one container's healthcheck passes when Ollama responds to `ollama list`, but the model isn't loaded. CocoSearch tries to generate embeddings, times out, and fails with cryptic errors. Users see "connection refused" or timeout errors on first use.
+
+Adding query caching to improve performance introduces cache invalidation complexity. In local-first tools, users expect immediate results after re-indexing - stale cache breaks this expectation.
 
 **Why it happens:**
-- Ollama starts its HTTP server before downloading any models
-- `ollama list` healthcheck returns success even with no models
-- Model download happens on first API call, not at startup
-- First embedding request triggers download, which times out the request
-- [GitHub issue #6006](https://github.com/ollama/ollama/issues/6006): "Docker version of Ollama model loads slowly"
-- On HDD-backed volumes, model loading takes 3x longer due to I/O contention
+
+1. **Index updates don't invalidate cache**: User re-indexes codebase but searches return old results
+2. **Memory unbounded growth**: LRU cache with no size limit consumes laptop RAM
+3. **Multi-instance incoherence**: If running multiple MCP instances (Claude Desktop + Claude Code), cache not shared
+4. **TTL too long**: 10-minute TTL means stale results for 10 minutes after index update
+
+**Real-world evidence:**
+
+- "MySQL Query Cache was deprecated due to cache invalidation overhead where any write to a table invalidated all cached queries for that table" [(Source: OneUpTime)](https://oneuptime.com/blog/post/2026-01-24-mysql-query-cache-deprecated/view)
+- "When running multiple application instances, HybridCache doesn't automatically synchronize local L1 cache across nodes - if data is updated on Node A, Node B continues serving stale data from its in-memory cache until the entry expires" [(Source: Milan Jovanovic Blog)](https://www.milanjovanovic.tech/blog/solving-the-distributed-cache-invalidation-problem-with-redis-and-hybridcache)
+- "Local caches don't scale horizontally - each instance maintains its own cache, leading to data inconsistencies and duplicated memory usage across nodes" [(Source: DragonflyDB)](https://www.dragonflydb.io/guides/in-memory-cache-how-it-works-and-top-solutions)
 
 **Consequences:**
-- First search/index operation fails with timeout
-- Users must wait silently for model download with no progress indication
-- Retry logic may hammer Ollama, further slowing download
-- Container appears healthy but is unusable
-- Terrible first-run experience
 
-**Warning signs:**
-- Container healthcheck passes but operations fail
-- First operation takes 1-2 minutes, subsequent operations are fast
-- `ollama list` shows no models immediately after container start
-- High CPU/network usage with no apparent progress feedback
+- User indexes new version of code, searches return old results
+- Memory grows unbounded until laptop swap/crash
+- Confusion: "I just added this function, why isn't search finding it?"
 
 **Prevention:**
-1. Pull model in entrypoint script before marking container ready:
-   ```bash
-   ollama serve &
-   until curl -s http://localhost:11434 > /dev/null; do sleep 1; done
-   ollama pull nomic-embed-text
-   ```
-2. Use healthcheck that verifies model availability, not just Ollama server:
-   ```yaml
-   healthcheck:
-     test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-     # AND parse response to verify nomic-embed-text is present
-   ```
-3. Pre-bake model into Docker image (see Pitfall 5 for tradeoffs)
-4. Display download progress in container logs
-5. Add startup banner showing "Downloading embedding model... X%"
-6. Configure longer timeouts for first embedding operation
-7. Implement warm-up call at container start: send empty embedding request to load model into memory
 
-**Phase to address:** Phase 1 (Container foundation) -- startup sequence must handle model readiness.
+1. **Revision-based invalidation**: Track index version in cache key
+   - Cache key: `{index_name}:{revision}:{query_hash}`
+   - On re-index, increment revision counter
+   - Old revision caches auto-invalidated
+2. **Size-bounded cache**: `maxsize=1000` entries, not unlimited
+3. **Short TTL for semantic cache**: 5-minute TTL for embedding results (embeddings don't change)
+4. **No caching for search results**: Cache embeddings and tsvector preprocessing, NOT final search results
+5. **Memory monitoring**: Log cache size every 100 operations, warn if >100MB
+
+**Semantic caching strategy:**
+
+For semantic code search specifically:
+- "Set a similarity threshold (e.g., 0.85-0.95) to filter results. High thresholds reduce wrong cache hits but miss legitimate rephrases" [(Source: Redis Blog)](https://redis.io/blog/what-is-semantic-caching/)
+- "Limit cache size to prevent memory issues and use time-to-live (TTL) to refresh outdated cache entries" [(Source: Meilisearch)](https://www.meilisearch.com/blog/how-to-cache-semantic-search)
+- "MeanCache's embedding compression utility approximately reduces storage and memory needs by 83%" [(Source: ArXiv)](https://arxiv.org/html/2403.02694v3)
+
+**Detection:**
+
+- Warning sign: Search returns results not in current index
+- Warning sign: Memory usage grows without bound
+- Test: Re-index, verify search returns new results immediately
+- Monitor: Cache hit rate, cache size, memory usage
+
+**Which phase addresses this:**
+
+- **Phase 6 (Query Caching/History)**: Build with revision-based invalidation from start
+- **Phase 7 (Testing)**: Test re-index + cache invalidation explicitly
 
 ---
 
-### Pitfall 5: Baking Ollama Model into Image Creates 4GB+ Images
+### Pitfall 5: Documentation Fragments into Maintenance Nightmare
 
 **What goes wrong:**
-To avoid cold-start download, developers bake the embedding model into the Docker image. The nomic-embed-text model is ~274MB, but Ollama stores model layers inefficiently. Combined with the Ollama binary (~800MB), Python dependencies, and PostgreSQL, the image balloons to 4-5GB. Image pulls take 10+ minutes, CI/CD pipelines time out, and registry storage costs explode.
+
+Overhauling documentation for a tool that has grown from "semantic search" to "hybrid search + context expansion + symbol filtering + stats" creates maintenance burden:
+- Multiple documentation locations (README, docs/, CLI help, MCP docstrings)
+- Docs go stale as code evolves
+- Content gaps where new features aren't documented
+- Inconsistent terminology across docs
 
 **Why it happens:**
-- Ollama official image is ~800MB (includes CUDA support)
-- Model files stored in `/root/.ollama/models/` as multiple blob layers
-- Docker layer caching doesn't help -- model blobs are large single files
-- Each image update re-pushes the entire model layer
-- No way to share model layers between image versions
-- [Medium article](https://towardsdatascience.com/reducing-the-size-of-docker-images-serving-llm-models-b70ee66e5a76/): "A 1GB model increases to 8GB when deployed using Docker"
+
+Research shows this is a widespread 2026 problem:
+
+- "About 69% of developers say they lose eight or more hours per week to inefficiencies, including: unclear navigation, fragmented tools, and repeated context rebuilding. 54% of respondents say they use 6 or more tools to get work done" [(Source: Xurrent Blog)](https://www.xurrent.com/blog/observability-tools)
+- "Documentation tools in 2026 are best compared by use case, AI depth, and long-term maintenance effort, with fragmented tool stacks, outdated content, and higher long-term maintenance effort being common issues" [(Source: Documentation.ai)](https://documentation.ai/blog/ai-tools-for-documentation)
+- "Confluence remains common for internal docs, but struggles with long-term accuracy and maintenance" [(Source: Medium - 2026 Shift)](https://medium.com/@EmiliaBiblioKit/the-2026-shift-bridging-the-gap-between-design-and-dev-eeefb781af30)
+
+**Common gaps from 2026 research:**
+
+1. **Onboarding docs go stale**: "Multi-page wiki documents explaining how to install dependencies, configure databases, set up environment variables, and troubleshoot common issues are being replaced by automated solutions" [(Source: ClickHelp)](https://clickhelp.com/clickhelp-technical-writing-blog/top-20-software-documentation-tools/)
+2. **No single source of truth**: Multiple README files, docs/ directory, wiki, all with conflicting information
+3. **Missing retrieval logic docs**: How hybrid search actually works, what RRF k=60 means - critical for debugging
 
 **Consequences:**
-- 10+ minute image pull times
-- CI/CD pipeline failures due to timeout
-- Expensive registry storage
-- Slow deployment rollbacks
-- Users abandon the tool due to download times
 
-**Warning signs:**
-- Docker build takes 20+ minutes
-- `docker images` shows 4GB+ image size
-- Pull progress shows single large layer downloading slowly
-- Registry storage costs increasing rapidly
+- Users can't find documentation for advanced features
+- GitHub issues asking questions already answered in (hidden) docs
+- Maintainer burden answering same questions repeatedly
+- New contributors can't contribute because architecture undocumented
 
 **Prevention:**
-1. **Don't bake models** -- use volume mount for `/root/.ollama` with lazy download
-2. If baking, use alpine/ollama base (~70MB) instead of official (~800MB)
-3. Use multi-stage build to minimize Python dependencies
-4. Compress model files in image, decompress at runtime (trades startup time for image size)
-5. Consider separate "model sidecar" container that shares volume with main container
-6. Use image layer optimization: `--squash` flag or BuildKit optimizations
-7. Document expected image size in README so users know what to expect
-8. Provide both "full" (with model) and "lite" (download at runtime) image variants
 
-**Size budget recommendation:**
-| Component | Target Size |
-|-----------|-------------|
-| Base OS (Alpine) | ~50MB |
-| Python + deps | ~200MB |
-| PostgreSQL | ~100MB |
-| Ollama (alpine) | ~70MB |
-| Application code | ~10MB |
-| **Total (no model)** | **~450MB** |
-| With baked model | +300MB = ~750MB |
+1. **Single source of truth**: README for quickstart, docs/ for deep dives, NO wiki
+2. **Documentation structure**:
+   - README: Quick start, features overview, installation
+   - docs/ARCHITECTURE.md: How retrieval works, component boundaries
+   - docs/MCP_TOOLS.md: Tool reference with examples
+   - CLI --help: Always generated from code (argparse help text)
+3. **Inline docstrings drive MCP tool descriptions**: Don't duplicate - MCP tool descriptions FROM function docstrings
+4. **Maintenance checklist**: PR template requires "Docs updated?" checkbox
+5. **Content gap detection**: Track which features have no documentation (GitHub issue template asks "did you read docs on X?")
+6. **Keep focused**: Don't document every internal function - focus on user-facing features and architecture decisions
 
-**Phase to address:** Phase 2 (Image optimization) -- after basic functionality works.
+**Documentation anti-patterns to avoid:**
 
----
+From CLI Guidelines research:
+- "Design for humans first" - write docs for humans, not just reference
+- "Follow existing patterns" - use standard structure (like Keep a Changelog format) [(Source: clig.dev)](https://clig.dev/)
 
-### Pitfall 6: SSE Transport Deprecated, Users on Legacy Clients Can't Connect
+**Detection:**
 
-**What goes wrong:**
-MCP SSE transport was deprecated in spec version 2025-03-26 in favor of Streamable HTTP. CocoSearch implements only the new Streamable HTTP transport. Users with older MCP clients (pre-2025 Claude Desktop, older integrations) can't connect at all. They get HTTP 404 or 405 errors with no helpful message about upgrading.
+- Warning sign: GitHub issues asking questions answered in docs
+- Warning sign: README >500 lines (split into docs/)
+- Warning sign: Multiple versions of same information
+- Test: Search docs for feature name, verify found in <30 seconds
 
-**Why it happens:**
-- [MCP specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports): "SSE Transport has been deprecated"
-- MCP ecosystem fragmented: different clients upgraded at different times
-- SSE used two endpoints (GET for SSE stream, POST for messages); Streamable HTTP uses one
-- Transport negotiation is not automatic -- client must know which transport to use
-- Claude Code updated quickly, but third-party MCP clients lag behind
+**Which phase addresses this:**
 
-**Consequences:**
-- "It works in Claude Code but not in my custom client"
-- Users file bugs about connection failures
-- Support burden explaining SSE deprecation
-- Users abandon CocoSearch for tools that still support SSE
-
-**Warning signs:**
-- Users reporting "connection refused" with specific MCP clients
-- HTTP 404/405 errors in server logs from SSE endpoint paths
-- Feature requests asking for "SSE support"
-- GitHub issues from users of older Claude Desktop versions
-
-**Prevention:**
-1. Implement both transports during transition period:
-   - Streamable HTTP on `/mcp` (primary)
-   - Legacy SSE on `/sse` (deprecated, with warning headers)
-2. Use [Supergateway](https://github.com/supercorp-ai/supergateway) as SSE-to-stdio proxy for legacy clients
-3. Add clear error message when SSE endpoint hit: "SSE transport deprecated, use Streamable HTTP"
-4. Document supported transports and minimum client versions
-5. Log warnings when SSE endpoint accessed to track adoption
-6. Plan SSE removal timeline: warn now, remove in 6 months
-
-**Transport implementation strategy:**
-```python
-# Support both during transition
-@app.route('/mcp', methods=['POST', 'GET'])
-async def streamable_http():
-    """Modern Streamable HTTP transport."""
-    ...
-
-@app.route('/sse')
-async def legacy_sse():
-    """Deprecated SSE transport - warn and serve."""
-    response.headers['X-Deprecation'] = 'SSE transport deprecated, use /mcp'
-    ...
-```
-
-**Phase to address:** Phase 3 (Transport implementation) -- design must account for both transports.
+- **Phase 8 (README Rebrand)**: Restructure for new positioning
+- **Phase 9 (Retrieval Logic Documentation)**: Add technical deep dive
+- **Phase 10 (MCP Tools Reference)**: Tool reference with examples
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays, technical debt, or degraded user experience.
-
-### Pitfall 7: MCP Working Directory Not Propagated to Container
+### Pitfall 6: Hybrid + Symbol Filter Combination Complexity
 
 **What goes wrong:**
-When CocoSearch MCP server runs in Docker, it has no knowledge of the host's working directory. The `index_codebase(path="/code")` tool receives paths relative to the container, not the user's actual project. Users must manually figure out volume mappings and translate paths. Auto-detection of "current project" is impossible.
+
+v1.7 deferred the combination of hybrid search + symbol filtering, falling back to vector-only. Implementing this in v1.8 introduces SQL query complexity and performance considerations.
 
 **Why it happens:**
-- Docker containers have isolated filesystems
-- No standard MCP mechanism for passing client CWD to server
-- [GitHub Issue #1520](https://github.com/modelcontextprotocol/python-sdk/issues/1520): "How to access the current working directory when an MCP server is launched"
-- Volume mounts map host paths to container paths, but mapping is configurable
-- Users may mount at `/code`, `/app`, `/workspace`, or any arbitrary path
-- `os.getcwd()` in container returns container's cwd, not host's
 
-**Consequences:**
-- Path confusion: "index /Users/me/project" fails because container sees "/code"
-- Users must remember their volume mapping
-- Can't implement "index current directory" convenience feature
-- Error messages show container paths, confusing users
-- Multi-project users must manually specify index names
-
-**Warning signs:**
-- User confusion about which path to provide
-- "File not found" errors with paths that exist on host
-- Users asking "what path do I use?"
-- Index names defaulting to "code" for every project (from mount point)
+- Hybrid search uses RRF (Reciprocal Rank Fusion) combining vector + keyword results
+- Symbol filtering requires JOIN on symbols table
+- Combining both means RRF must operate on pre-filtered result sets
+- Query planner may choose inefficient join order
 
 **Prevention:**
-1. Require `PROJECT_ROOT` environment variable in docker run:
-   ```bash
-   docker run -v /Users/me/project:/code -e PROJECT_ROOT=/Users/me/project ...
-   ```
-2. Store both container path and original host path in index metadata
-3. Auto-detect common mount patterns: if cwd is `/code`, check `PROJECT_ROOT` env
-4. Add helper tool `detect_project()` that reads `.git/config` or `package.json` for project name
-5. Derive index name from git remote URL or directory name, not mount point
-6. Document required environment variables prominently
 
-**Index name derivation logic:**
-```python
-def derive_index_name(container_path: str) -> str:
-    """Derive index name from project, not mount point."""
-    # Check for git remote
-    git_config = Path(container_path) / ".git" / "config"
-    if git_config.exists():
-        # Parse remote URL for repo name
-        ...
-    # Fall back to PROJECT_ROOT env var
-    if host_path := os.environ.get("PROJECT_ROOT"):
-        return Path(host_path).name
-    # Last resort: use mount point name (not ideal)
-    return Path(container_path).name
-```
+1. **Test with large indexes**: Verify performance with 100K+ chunks, 50K+ symbols
+2. **Index strategy**: Ensure GIN index on symbols.symbol_name and vector index on chunks.embedding
+3. **Query order matters**: Filter by symbols first (smaller result set), then RRF
+4. **Explain analyze**: Run EXPLAIN ANALYZE on combined queries, optimize as needed
 
-**Phase to address:** Phase 2 (Docker integration) -- path mapping must be designed before tools work correctly.
+**Which phase addresses this:**
+
+- **Phase 1 (Hybrid + Symbol Filter Combination)**
 
 ---
 
-### Pitfall 8: Service Startup Order Race Conditions
+### Pitfall 7: Stats Dashboard HTTP API Security
 
 **What goes wrong:**
-In an all-in-one container, PostgreSQL, Ollama, and the Python app start concurrently (or via supervisord in rapid succession). The Python app tries to connect to PostgreSQL before it's ready, or calls Ollama before model is loaded. Retry logic helps but adds startup latency and complexity. Users see intermittent "connection refused" errors.
+
+Adding HTTP API for stats dashboard exposes CocoSearch to network attacks if not properly secured. Local-first tool shouldn't require authentication, but also shouldn't be exploitable.
 
 **Why it happens:**
-- Supervisord starts all services simultaneously by default
-- PostgreSQL takes 5-10 seconds to initialize on first run
-- Ollama model download/load takes 30+ seconds
-- Python app starts in ~1 second and immediately tries connections
-- [Docker docs](https://docs.docker.com/compose/how-tos/startup-order/): "Compose does not wait until a container is 'ready'"
-- Health checks help in Compose but don't exist inside a single container
 
-**Consequences:**
-- Intermittent startup failures
-- App crashes on first connection attempt
-- Confusing error messages about connection refused
-- Users restart container multiple times before it works
-- Retry loops waste startup time
-
-**Warning signs:**
-- Container logs show "connection refused" then later success
-- Startup time varies widely (5s to 60s)
-- `docker logs` shows PostgreSQL still initializing when app tries to connect
-- supervisord shows app process restarting during startup
+- HTTP server bound to 0.0.0.0 allows remote access
+- No rate limiting on stats endpoints
+- CORS misconfiguration allows malicious sites to query stats
 
 **Prevention:**
-1. Implement explicit startup sequencing in entrypoint script:
-   ```bash
-   # 1. Start PostgreSQL, wait for ready
-   pg_ctl start && until pg_isready; do sleep 1; done
-   # 2. Start Ollama, wait for ready + model loaded
-   ollama serve & until ollama list | grep nomic; do sleep 1; done
-   # 3. Start Python app
-   exec python -m cocosearch.mcp
-   ```
-2. Use supervisord with `priority` settings (lower = start earlier)
-3. Implement connection retry with exponential backoff in Python app
-4. Add explicit dependency checks at app startup (before serving requests)
-5. Use health check that verifies all services are ready
-6. Log startup phase clearly: "Waiting for PostgreSQL... Waiting for Ollama... Ready"
 
-**Supervisord priority example:**
-```ini
-[program:postgres]
-priority=100  ; Start first
-command=/usr/lib/postgresql/17/bin/postgres
+1. **Bind to localhost only**: HTTP API on 127.0.0.1, not 0.0.0.0
+2. **Read-only API**: Stats dashboard is GET only, no POST/PUT/DELETE
+3. **No sensitive data**: Don't expose file contents in stats, only counts/metadata
+4. **CORS whitelist**: Only allow localhost origins
 
-[program:ollama]
-priority=200  ; Start after postgres
-command=/usr/bin/ollama serve
-startsecs=30  ; Wait for model load
+**Which phase addresses this:**
 
-[program:cocosearch]
-priority=300  ; Start last
-command=python -m cocosearch.mcp
-```
-
-**Phase to address:** Phase 1 (Container foundation) -- startup sequence is foundational.
+- **Phase 2 (Stats Dashboard)**
 
 ---
 
-### Pitfall 9: Supervisord Doesn't Exit on Service Failure
+### Pitfall 8: Incremental Feature Development Technical Debt
 
 **What goes wrong:**
-Supervisord keeps running even when critical services (PostgreSQL) crash. The container stays "running" but is non-functional. Docker healthcheck may pass (supervisord responds) even though PostgreSQL is down. Orchestrators like Kubernetes don't restart the container because it appears healthy.
+
+Adding 5 major feature categories (stats, skills, symbols, caching, docs) to existing 8,225 LOC codebase creates technical debt if not managed carefully.
 
 **Why it happens:**
-- Supervisord is designed to be a long-running process manager, not a one-shot init
-- By default, supervisord restarts failed processes rather than exiting
-- Even with `autorestart=false`, supervisord itself doesn't exit
-- Container health is based on PID 1 (supervisord), not application health
-- Zombie processes from crashed services accumulate
+
+Research shows this is a critical 2026 concern:
+
+- "75% of technology decision-makers anticipate that their technical debt will reach moderate to severe levels by 2026, partly due to accelerated AI adoption" [(Source: Monday.com)](https://monday.com/blog/rnd/technical-debt/)
+- "Technical debt has recently doubled in scale, growing by approximately $6 trillion globally, according to a July 2024 report from Oliver Wyman" [(Source: IBM Think)](https://www.ibm.com/think/topics/technical-debt)
+- "As developers add new features and make revisions, software quality can suffer. For instance, repeatedly adding lines to a class can turn it into a large, unwieldy codebase" [(Source: Qt Blog)](https://www.qt.io/quality-assurance/blog/how-to-tackle-technical-debt)
 
 **Consequences:**
-- Container appears healthy but doesn't work
-- Kubernetes doesn't trigger restart
-- Users manually restart containers repeatedly
-- Resource leaks from zombie processes
-- Monitoring shows green even during outages
 
-**Warning signs:**
-- Supervisord running but `supervisorctl status` shows services STOPPED
-- Container uptime increasing but service unavailable
-- `docker top` shows zombie processes
-- Memory usage growing over time (zombie accumulation)
+- Feature additions slow down as codebase becomes harder to understand
+- Test suite becomes brittle and slow
+- Bug fix in one feature breaks another
 
 **Prevention:**
-1. Use supervisord's `eventlistener` to exit on critical service failure:
-   ```ini
-   [eventlistener:exit_on_fatal]
-   command=kill -SIGTERM 1
-   events=PROCESS_STATE_FATAL
-   ```
-2. Configure health check to verify actual service, not just supervisord
-3. Consider alternatives: s6-overlay handles this better by design
-4. Use `supervisorctl shutdown` in eventlistener instead of kill
-5. Set `startsecs=10` to avoid flapping detection during startup
-6. Monitor for FATAL state in logs and alert
 
-**s6-overlay alternative:**
-```dockerfile
-# s6-overlay automatically exits if service marked as "essential" dies
-FROM base
-ADD https://github.com/just-containers/s6-overlay/releases/.../s6-overlay.tar.gz /
-ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2  # Exit container on service failure
-```
+1. **Reserve 15-25% of effort for refactoring**: "Reserve 15-25% of each sprint for debt reduction and treat it as seriously as feature development" [(Source: Metamindz)](https://www.metamindz.co.uk/post/technical-debt-vs-feature-development-what-to-prioritize)
+2. **Module boundaries**: Each feature has clear module (stats/, skills/, symbols/)
+3. **Interface-driven design**: Features communicate through defined interfaces, not direct coupling
+4. **Regression tests**: Add tests BEFORE implementing feature to catch breakage
+5. **Code review checklist**: "Does this feature increase coupling?" "Is this testable?"
 
-**Phase to address:** Phase 1 (Container foundation) -- process supervision design affects everything.
+**Which phase addresses this:**
 
----
-
-### Pitfall 10: Dual Transport Mode Creates Maintenance Burden
-
-**What goes wrong:**
-Supporting both stdio transport (for local Claude Code) and HTTP/SSE transport (for remote access) requires different code paths: stdio uses stdin/stdout, HTTP uses request/response. Bugs in one transport don't appear in the other. Test coverage must cover both. Features added to one transport are forgotten in the other.
-
-**Why it happens:**
-- stdio transport: synchronous, line-delimited JSON-RPC on stdin/stdout
-- HTTP transport: async, request/response or SSE streaming
-- Different error handling (stdio crashes silently, HTTP returns error responses)
-- Different authentication (stdio is implicitly trusted, HTTP needs auth)
-- Different deployment (stdio via CLI, HTTP via server)
-- MCP Python SDK abstracts some but not all transport differences
-
-**Consequences:**
-- Bug fixes applied to one transport, not the other
-- Test matrix explosion (each feature x each transport)
-- User confusion about which transport to use
-- "Works locally but not remotely" support tickets
-- Codebase complexity grows with transport-specific branches
-
-**Warning signs:**
-- Tests pass on stdio, fail on HTTP (or vice versa)
-- Feature works in Claude Code but not in web client
-- `if transport == "stdio"` conditionals spreading through codebase
-- HTTP transport missing features that stdio has
-
-**Prevention:**
-1. Implement tool logic once, transport layer wraps it:
-   ```python
-   # tools.py - pure business logic, no transport awareness
-   def search_code(query: str, index_name: str) -> list[dict]:
-       ...
-
-   # stdio_transport.py - wraps tools for stdio
-   # http_transport.py - wraps tools for HTTP
-   ```
-2. Use MCP SDK's transport abstraction consistently
-3. Write transport-agnostic integration tests that run against both
-4. Document which transport supports which features
-5. Feature parity checklist in PR template
-6. Consider transport as configuration, not code branches
-
-**Test strategy:**
-```python
-@pytest.mark.parametrize("transport", ["stdio", "http"])
-def test_search_returns_results(transport, transport_client):
-    """Same test runs against both transports."""
-    client = transport_client(transport)
-    result = client.call("search_code", {"query": "test", "index_name": "demo"})
-    assert len(result) > 0
-```
-
-**Phase to address:** Phase 3 (Transport implementation) -- architecture must separate transport from logic.
-
----
-
-### Pitfall 11: Volume Permissions Mismatch Between Host and Container
-
-**What goes wrong:**
-PostgreSQL runs as user `postgres` (UID 999), Ollama as `ollama` (UID 1000), Python as `root` or custom user. When host directories are mounted as volumes, file ownership doesn't match. PostgreSQL can't write to its data directory, Ollama can't save models, or indexed files aren't readable.
-
-**Why it happens:**
-- Linux file permissions based on UID/GID, not usernames
-- Host UID 1000 (typical user) != container UID 999 (postgres)
-- Docker doesn't translate UIDs between host and container
-- macOS Docker Desktop uses VM, adding another layer of permission complexity
-- SELinux/AppArmor may block access even with correct UIDs
-
-**Consequences:**
-- "Permission denied" errors on startup
-- PostgreSQL refuses to start (data dir not owned by postgres)
-- Ollama can't save downloaded models
-- Works on one machine, fails on another
-- Confusing errors about ownership
-
-**Warning signs:**
-- `ls -la` in container shows wrong ownership
-- Startup errors mentioning permissions
-- Works with `docker run --privileged` but not without
-- macOS and Linux behave differently
-
-**Prevention:**
-1. Use named volumes (Docker manages permissions) instead of bind mounts for data:
-   ```yaml
-   volumes:
-     postgres_data:  # Named volume - Docker handles permissions
-   ```
-2. For code directories (bind mounts), ensure consistent UID:
-   ```dockerfile
-   RUN useradd -u 1000 appuser  # Match typical host UID
-   ```
-3. Use `user` directive in compose to match host user
-4. Initialize data directories with correct ownership in entrypoint
-5. Document required host directory permissions
-6. Add startup check that verifies write permissions to data directories
-
-**Permission fix in entrypoint:**
-```bash
-# Fix permissions on mounted volumes
-chown -R postgres:postgres /var/lib/postgresql/data
-chown -R ollama:ollama /root/.ollama
-```
-
-**Phase to address:** Phase 1 (Container foundation) -- permissions must be correct before services start.
+- **All phases**: Continuous vigilance during development
 
 ---
 
 ## Minor Pitfalls
 
-Mistakes that cause annoyance but are fixable without major rework.
-
-### Pitfall 12: Container Logs Interleave Service Output Chaotically
+### Pitfall 9: Skill YAML Frontmatter Errors
 
 **What goes wrong:**
-PostgreSQL, Ollama, and Python all write to container stdout/stderr. Logs interleave randomly, making debugging difficult. No way to filter by service. Log aggregation tools can't parse the mixed output.
+
+YAML syntax errors in skill frontmatter prevent skill from loading, with unclear error messages.
 
 **Prevention:**
-1. Use supervisord's per-service log files: `stdout_logfile=/var/log/%(program_name)s.log`
-2. Prefix each service's output with service name: `[postgres]`, `[ollama]`, `[app]`
-3. For stdio transport, keep app logs on stderr only (stdout is protocol)
-4. Provide `docker exec` commands to tail individual service logs
-5. Consider structured logging (JSON) with service field
 
-**Phase to address:** Phase 2 (Polish) -- nice to have, not blocking.
+1. **Validate YAML in tests**: CI checks skills/ directory for valid YAML
+2. **Schema validation**: Use yamllint or similar to catch common errors
+3. **Required fields**: Ensure `name` and `description` always present
+
+**Which phase addresses this:**
+
+- **Phase 3 (Claude Code Skill)**, **Phase 4 (OpenCode Skill)**
 
 ---
 
-### Pitfall 13: HTTPS/TLS Not Configured for HTTP Transport
+### Pitfall 10: Symbol Hierarchy Display Truncation
 
 **What goes wrong:**
-HTTP transport exposes an endpoint without TLS. In production, this means credentials (if any) transmitted in clear text. Reverse proxies or load balancers may require HTTPS upstream. Users deploy to cloud without realizing traffic is unencrypted.
+
+Nested symbol hierarchy (Class.method.inner_function) becomes too long for terminal display or MCP responses.
 
 **Prevention:**
-1. Document that TLS termination should happen at reverse proxy (nginx, Cloudflare)
-2. Optionally support `--tls-cert` and `--tls-key` flags for direct TLS
-3. Add warning log if HTTP transport runs without TLS in non-localhost mode
-4. Provide example nginx/Caddy config for TLS termination
-5. Consider using Let's Encrypt integration for easy TLS
 
-**Phase to address:** Phase 4 (Production hardening) -- not required for MVP.
+1. **Configurable depth**: Default to 2 levels, allow --symbol-depth flag
+2. **Truncation with ellipsis**: Display "LongClassName...method" if too long
+3. **Full path in structured output**: JSON includes full path even if display truncated
+
+**Which phase addresses this:**
+
+- **Phase 1 (Nested Symbol Hierarchy)**
 
 ---
 
-### Pitfall 14: No Resource Limits Leads to OOM Kills
+### Pitfall 11: Query History Disk Space Growth
 
 **What goes wrong:**
-Ollama loads models into memory (~500MB for nomic-embed-text). PostgreSQL allocates shared buffers. Without memory limits, the container consumes available host memory and gets OOM-killed by the kernel. On systems with limited RAM (CI runners, small VMs), this happens frequently.
+
+Storing query history indefinitely consumes disk space, especially with embeddings.
 
 **Prevention:**
-1. Document minimum memory requirements: 2GB recommended, 4GB for large indexes
-2. Set default memory limits in docker-compose: `mem_limit: 2g`
-3. Configure PostgreSQL `shared_buffers` appropriately (128MB for small setups)
-4. Use Ollama's CPU-only mode for memory-constrained environments
-5. Add startup check that warns if available memory is below threshold
 
-**Phase to address:** Phase 2 (Docker optimization) -- important for CI and constrained environments.
+1. **Don't store embeddings in history**: Only store query text, timestamp, result count
+2. **Automatic pruning**: Keep last 1000 queries or 30 days, whichever is smaller
+3. **Opt-in**: History collection OFF by default, enable with config flag
+
+**Which phase addresses this:**
+
+- **Phase 6 (Query Caching/History)**
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Severity | Mitigation |
-|-------------|---------------|----------|------------|
-| Container foundation | PID 1 signal handling (Pitfall 1) | CRITICAL | Use tini/dumb-init as init |
-| Container foundation | PostgreSQL init scripts skipped (Pitfall 3) | CRITICAL | App-level schema management |
-| Container foundation | Service startup race (Pitfall 8) | MODERATE | Explicit startup sequencing |
-| Container foundation | Supervisord no-exit (Pitfall 9) | MODERATE | Use s6-overlay or exit listener |
-| Container foundation | Volume permissions (Pitfall 11) | MODERATE | Named volumes, UID alignment |
-| Model/image optimization | Cold start blocks app (Pitfall 4) | CRITICAL | Entrypoint model pull |
-| Model/image optimization | 4GB+ image size (Pitfall 5) | MODERATE | Volume mount, alpine base |
-| Transport implementation | stdout corruption (Pitfall 2) | CRITICAL | stderr-only logging |
-| Transport implementation | SSE deprecation (Pitfall 6) | MODERATE | Support both transports |
-| Transport implementation | Dual transport burden (Pitfall 10) | MODERATE | Separate transport from logic |
-| Docker integration | CWD not propagated (Pitfall 7) | MODERATE | PROJECT_ROOT env var |
+| Phase | Topic | Likely Pitfall | Mitigation |
+|-------|-------|---------------|------------|
+| 1 | Hybrid + Symbol Filter | Query performance on large indexes | Test with 100K+ chunks, EXPLAIN ANALYZE |
+| 1 | Nested Symbol Hierarchy | Display truncation | Configurable depth, ellipsis truncation |
+| 2 | Stats Dashboard | Performance overhead from sync collection | Async collection, batch writes, opt-in |
+| 2 | Stats Dashboard | HTTP API security | Bind to localhost, read-only, CORS whitelist |
+| 3 | Claude Code Skill | Routing unpredictability | Specific names, clear triggers, minimal permissions |
+| 4 | OpenCode Skill | Duplicate routing with Claude Code skill | Test both independently |
+| 5 | Expanded Symbol Extraction | C/C++ preprocessor failures | Fallback to chunk-only, document limitations |
+| 6 | Query Caching | Cache invalidation on re-index | Revision-based cache keys |
+| 6 | Query History | Disk space growth | Prune old entries, no embeddings in history |
+| 7 | Testing | Test suite slowdown | Unit tests remain fast (<5s), integration opt-in |
+| 8 | README Rebrand | Documentation fragmentation | Single source of truth, clear structure |
+| 9 | Retrieval Logic Docs | Over-documentation of internals | Focus on user-facing behavior and architecture |
+| 10 | MCP Tools Reference | Docs drift from code | Generate from docstrings where possible |
 
 ---
 
-## Technical Debt Patterns (v2.0 Specific)
+## Integration-Specific Warnings
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Skip tini, use bash PID 1 | Simpler Dockerfile | Data corruption on restart | Never |
-| Bake model into image | No cold start | 4GB+ images, slow pulls | Only for airgapped deployments |
-| stdio transport only | Simpler code | No remote access | MVP only |
-| No TLS support | Faster development | Security concerns | Local-only deployments |
-| Hardcode volume paths | Quick setup | Inflexible for users | Never; use env vars |
-| Skip startup sequencing | Faster container start | Intermittent failures | Never |
+Adding features to existing 8,225 LOC system introduces coupling risks:
 
----
+### Database Schema Evolution
 
-## Recovery Strategies (v2.0 Specific)
+**Risk**: Adding stats tables, symbol hierarchy columns, cache tables
 
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| PID 1 signal handling | LOW | Add tini to Dockerfile, rebuild |
-| stdout logging corruption | LOW | Fix logging config, redeploy |
-| PostgreSQL init skipped | MEDIUM | Run init SQL manually or wipe volume |
-| Cold start timeout | LOW | Add model pull to entrypoint, rebuild |
-| Image too large | MEDIUM | Refactor to volume-based model loading |
-| SSE clients can't connect | LOW | Add legacy SSE endpoint |
-| Service race conditions | LOW | Fix entrypoint sequencing, redeploy |
-| Permission denied | LOW | Fix volume permissions, restart |
+**Mitigation**:
+- Additive schema only (no breaking changes to existing tables)
+- Schema versioning in metadata table
+- Graceful degradation if schema not upgraded
 
----
+### Module Coupling
 
-## "Looks Done But Isn't" Checklist (v2.0)
+**Risk**: Stats collection code scattered throughout search/index modules
 
-- [ ] **Graceful shutdown:** `docker stop` completes in <10 seconds without SIGKILL
-- [ ] **PostgreSQL data persists:** Stop container, restart, verify data still present
-- [ ] **Ollama model ready:** Container healthcheck passes only after model is loaded
-- [ ] **stdio purity:** Run MCP stdio transport, capture stdout, verify only JSON-RPC
-- [ ] **HTTP transport works:** Connect via HTTP from external client
-- [ ] **Volume permissions:** Works on both macOS and Linux hosts
-- [ ] **Startup sequence:** Fresh container starts reliably 10/10 times
-- [ ] **Service failure handling:** Kill PostgreSQL process, verify container restarts or logs error
-- [ ] **Image size:** `docker images` shows <1GB (or <500MB without baked model)
-- [ ] **Multi-project:** Index two different projects, verify both searchable
+**Mitigation**:
+- Stats as separate module with clear interface
+- Decorator pattern for metric collection (doesn't modify core logic)
+- Feature flags to disable entirely
 
----
+### Configuration Complexity
 
-## Sources
+**Risk**: Config file grows with stats options, cache options, skill paths
 
-- [PID 1 Signal Handling in Docker](https://petermalmgren.com/signal-handling-docker/) - Peter Malmgren (HIGH confidence)
-- [krallin/tini](https://github.com/krallin/tini) - Official tini GitHub (HIGH confidence)
-- [Yelp/dumb-init](https://github.com/Yelp/dumb-init) - Official dumb-init GitHub (HIGH confidence)
-- [MCP Transports Specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports) - Official MCP docs (HIGH confidence)
-- [MCP stdio Transport Corruption Issue](https://github.com/ruvnet/claude-flow/issues/835) - Real-world bug report (HIGH confidence)
-- [PostgreSQL Docker Hub](https://hub.docker.com/_/postgres/) - Official PostgreSQL Docker docs (HIGH confidence)
-- [Docker Compose Startup Order](https://docs.docker.com/compose/how-tos/startup-order/) - Official Docker docs (HIGH confidence)
-- [Ollama Docker Hub](https://hub.docker.com/r/ollama/ollama) - Official Ollama Docker docs (HIGH confidence)
-- [Ollama Cold Start Issues](https://github.com/ollama/ollama/issues/6006) - GitHub issue (HIGH confidence)
-- [A Pull-first Ollama Docker Image](https://www.dolthub.com/blog/2025-03-19-a-pull-first-ollama-docker-image/) - DoltHub blog (MEDIUM confidence)
-- [Reducing Docker Images for LLMs](https://towardsdatascience.com/reducing-the-size-of-docker-images-serving-llm-models-b70ee66e5a76/) - Towards Data Science (MEDIUM confidence)
-- [MCP SSE to Streamable HTTP Migration](https://brightdata.com/blog/ai/sse-vs-streamable-http) - Bright Data blog (MEDIUM confidence)
-- [MCP Working Directory Issue](https://github.com/modelcontextprotocol/python-sdk/issues/1520) - GitHub issue (HIGH confidence)
-- [Supergateway SSE-to-stdio Proxy](https://github.com/supercorp-ai/supergateway) - GitHub project (HIGH confidence)
-- [Supervisord Documentation](https://supervisord.org/) - Official supervisord docs (HIGH confidence)
-- [s6-overlay for Containers](https://www.sliceofexperiments.com/p/s6-run-multiple-processes-in-your) - Slice of Experiments (MEDIUM confidence)
+**Mitigation**:
+- Nested config sections (stats: {}, cache: {})
+- Sensible defaults (features OFF by default)
+- Config validation with helpful error messages
+
+### Testing Combinatorial Explosion
+
+**Risk**: 5 new features = 2^5 = 32 combinations to test
+
+**Mitigation**:
+- Test features independently first
+- Integration tests for common combinations only (hybrid + symbols, not all 32)
+- Property-based testing for edge cases
 
 ---
 
-*Pitfalls research for: CocoSearch v2.0 (All-in-One Docker + MCP Transports)*
-*Researched: 2026-02-01*
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|----------|-------|
+| Stats Dashboard | HIGH | Well-researched with 2026 MCP observability sources |
+| Claude Code Skills | HIGH | Official Anthropic documentation and 2026 blog posts |
+| Symbol Extraction (Java, Ruby, PHP) | MEDIUM | Tree-sitter issues documented but limited production data |
+| Symbol Extraction (C/C++) | LOW | Known limitations but unclear severity in practice |
+| Query Caching | HIGH | Extensive research on semantic caching and invalidation |
+| Documentation | HIGH | 2026 developer tool documentation research |
+
+---
+
+## Research Sources
+
+### High Confidence (Official/Technical)
+
+1. [Anthropic Claude Code Skills Documentation](https://code.claude.com/docs/en/skills)
+2. [Skill Authoring Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+3. [MCP Observability Overview](https://www.merge.dev/blog/mcp-observability)
+4. [MCP Best Practices: Architecture & Implementation](https://modelcontextprotocol.info/docs/best-practices/)
+5. [Tree-sitter C Preprocessor Issues](https://github.com/tree-sitter/tree-sitter-c/issues/108)
+6. [Redis Cache Invalidation](https://redis.io/glossary/cache-invalidation/)
+7. [Semantic Caching Guide](https://redis.io/blog/what-is-semantic-caching/)
+8. [CLI Guidelines](https://clig.dev/)
+
+### Medium Confidence (2026 Industry Research)
+
+9. [Google Gemini CLI Monitoring Dashboards 2026](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards)
+10. [Top Infrastructure Monitoring Tools 2026](https://clickhouse.com/resources/engineering/top-infrastructure-monitoring-tools-comparison)
+11. [MCP Performance Monitoring 2026](https://www.byteplus.com/en/topic/541572)
+12. [MCP Server Best Practices 2026](https://www.cdata.com/blog/mcp-server-best-practices-2026)
+13. [Technical Debt Strategic Guide 2026](https://monday.com/blog/rnd/technical-debt/)
+14. [Developer Documentation Tools 2026](https://documentation.ai/blog/ai-tools-for-documentation)
+
+### Medium Confidence (Technical Deep Dives)
+
+15. [Claude Skills Deep Dive](https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/)
+16. [Tree-sitter and Preprocessing](https://habr.com/en/articles/835192/)
+17. [Mastering Emacs: Tree-sitter Complications](https://www.masteringemacs.org/article/tree-sitter-complications-of-parsing-languages)
+18. [Distributed Cache Invalidation with Redis](https://www.milanjovanovic.tech/blog/solving-the-distributed-cache-invalidation-problem-with-redis-and-hybridcache)
+
+### Low Confidence (Community/Blog Posts)
+
+19. [Claude Code Best Practices Blog](https://medium.com/@rub1cc/how-claude-codes-creator-uses-it-10-best-practices-from-the-team-e43be312836f)
+20. [Claude Skills and CLAUDE.md Practical Guide](https://www.gend.co/blog/claude-skills-claude-md-guide)
+
+---
+
+## Gaps to Address
+
+### Areas Needing Phase-Specific Research
+
+1. **Stats dashboard UI framework**: Which terminal UI library (rich, textual, blessed)? Needs evaluation in Phase 2
+2. **HTTP framework for stats API**: FastAPI, Flask, or built-in http.server? Needs benchmarking
+3. **Symbol hierarchy storage**: Nested arrays vs JSONB vs separate table? Database design decision in Phase 1
+4. **Cache storage**: In-memory only vs SQLite vs PostgreSQL table? Performance tradeoff in Phase 6
+
+### Known Unknowns
+
+1. **Real-world C++ parsing failure rate**: We know it's problematic, but what % of files fail? Need production data
+2. **Query cache hit rate**: What's realistic for code search? General semantic caching is 60-80%, but code queries may differ
+3. **Stats collection overhead**: How many milliseconds does async write add? Need benchmarking with CocoSearch's stack
+
+### Validation Needed
+
+These pitfalls are based on research and analogous systems. Validation during implementation:
+- [ ] Measure actual stats collection overhead in Phase 2
+- [ ] Test C/C++ symbol extraction on 5+ real codebases in Phase 5
+- [ ] Benchmark cache invalidation strategies in Phase 6
+- [ ] User testing of skill routing with ambiguous queries in Phase 3/4
+
+---
+
+*Last updated: 2026-02-03 - Based on web search of 2026 sources and official documentation*
