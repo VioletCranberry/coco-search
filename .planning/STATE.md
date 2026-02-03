@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 29 of 32 in progress (Symbol-Aware Indexing)
-Plan: 1 of 2 in phase 29 (completed)
-Status: Plan 29-01 complete, ready for Plan 29-02
-Last activity: 2026-02-03 — Completed 29-01-PLAN.md (symbol extraction module)
+Phase: 29 of 32 complete (Symbol-Aware Indexing)
+Plan: 2 of 2 in phase 29 (completed)
+Status: Phase 29 complete, ready for Phase 30
+Last activity: 2026-02-03 — Completed 29-02-PLAN.md (symbol indexing integration)
 
-Progress: [███████████████████████████████░] 91% (77 of 85 estimated plans complete)
+Progress: [███████████████████████████████░] 92% (78 of 85 estimated plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 77
+- Total plans completed: 78
 - Milestones shipped: 6 (v1.0-v1.6)
 - Current milestone: v1.7 Search Enhancement
 
@@ -31,7 +31,7 @@ Progress: [███████████████████████
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 | v1.4 Dogfooding | 15-18 | 7 | 2026-01-31 |
 
-*Updated: 2026-02-03 after Plan 29-01 completion*
+*Updated: 2026-02-03 after Plan 29-02 completion*
 
 ## Accumulated Context
 
@@ -39,6 +39,10 @@ Progress: [███████████████████████
 
 Recent decisions affecting v1.7 work:
 
+- **29-02**: Call ensure_symbol_columns() after flow.setup() but before flow.update()
+- **29-02**: Use CocoIndex table naming: codeindex_{index_name}__{index_name}_chunks
+- **29-02**: Symbol columns as nullable TEXT (backward compatible, no defaults)
+- **29-02**: Schema migration is idempotent (safe to run multiple times)
 - **29-01**: Tree-sitter 0.21.x for API compatibility with tree-sitter-languages
 - **29-01**: Async function detection via AST child nodes (not text prefix)
 - **29-01**: Skip nested functions (implementation details)
@@ -77,12 +81,12 @@ None yet.
 
 **v1.7 Architecture:**
 - Adding content_text column requires re-indexing existing indexes (breaking change)
-- Symbol extraction module complete, quality validated with 36 unit tests
+- Symbol extraction and indexing complete - ready for Phase 30 search integration
+- Symbol columns are nullable TEXT - pre-v1.7 indexes work without re-indexing
 - Tree-sitter deprecation warning in tree-sitter-languages 1.10.2 (harmless, awaiting upstream fix)
-- RRF k parameter may need tuning based on codebase characteristics (benchmark during Phase 28)
 
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 29-01-PLAN.md (symbol extraction module)
+Stopped at: Completed 29-02-PLAN.md (symbol indexing integration)
 Resume file: None
