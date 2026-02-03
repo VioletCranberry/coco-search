@@ -1,23 +1,24 @@
 ;; @doc Rust symbol extraction: functions, methods, structs, traits, enums
 
-;; Function definitions (top-level)
-(function_item
-  name: (identifier) @name) @definition.function
-
-;; Methods (inside impl blocks)
+;; Methods (function_item inside impl_item)
 (impl_item
-  body: (declaration_list
+  (declaration_list
     (function_item
-      name: (identifier) @name))) @definition.method
+      (identifier) @name) @definition.method))
+
+;; Top-level functions (not in impl)
+(source_file
+  (function_item
+    (identifier) @name) @definition.function)
 
 ;; Struct definitions
 (struct_item
-  name: (type_identifier) @name) @definition.class
+  (type_identifier) @name) @definition.class
 
 ;; Trait definitions
 (trait_item
-  name: (type_identifier) @name) @definition.interface
+  (type_identifier) @name) @definition.interface
 
 ;; Enum definitions
 (enum_item
-  name: (type_identifier) @name) @definition.class
+  (type_identifier) @name) @definition.class

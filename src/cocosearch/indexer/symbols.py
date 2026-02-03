@@ -193,11 +193,32 @@ def _build_qualified_name(node, name: str, chunk_text: str, language: str) -> st
     Returns:
         Qualified name with parent context.
     """
+    # Special handling for Go methods - extract receiver type
+    if language == "go" and node.type == "method_declaration":
+        # Find the receiver parameter_list (first parameter_list child)
+        for child in node.children:
+            if child.type == "parameter_list":
+                # This is the receiver
+                for param_child in child.children:
+                    if param_child.type == "parameter_declaration":
+                        # Find the type (pointer_type or type_identifier)
+                        for type_child in param_child.children:
+                            if type_child.type == "pointer_type":
+                                # Extract type_identifier from pointer_type
+                                for ptr_child in type_child.children:
+                                    if ptr_child.type == "type_identifier":
+                                        receiver_type = _get_node_text(chunk_text, ptr_child)
+                                        return f"{receiver_type}.{name}"
+                            elif type_child.type == "type_identifier":
+                                receiver_type = _get_node_text(chunk_text, type_child)
+                                return f"{receiver_type}.{name}"
+                break
+
     container_types = {
         "python": ["class_definition"],
         "javascript": ["class_declaration", "class_body"],
         "typescript": ["class_declaration", "class_body"],
-        "go": [],  # Go methods use receiver in query, handled differently
+        "go": [],  # Go methods use receiver extraction above
         "rust": ["impl_item"],
     }
 
@@ -220,6 +241,10 @@ def _build_qualified_name(node, name: str, chunk_text: str, language: str) -> st
 def _build_signature(node, chunk_text: str, language: str, symbol_type: str) -> str:
     """Build symbol signature from node.
 
+    Extracts the declaration line without the body. For functions, this means
+    everything up to (but not including) the opening brace or up to and including
+    the colon for Python.
+
     Args:
         node: Definition node.
         chunk_text: Source code text.
@@ -229,17 +254,32 @@ def _build_signature(node, chunk_text: str, language: str, symbol_type: str) -> 
     Returns:
         Symbol signature string.
     """
-    # For now, use a simplified approach: extract first line of node
-    # This preserves most signature information without complex per-language logic
     node_text = _get_node_text(chunk_text, node)
-    lines = node_text.split("\n")
-    first_line = lines[0].strip()
+
+    # For most languages, find the body and extract everything before it
+    if language == "python":
+        # Python uses colon - include it
+        colon_pos = node_text.find(":")
+        if colon_pos != -1:
+            signature = node_text[:colon_pos + 1].strip()
+        else:
+            lines = node_text.split("\n")
+            signature = lines[0].strip()
+    else:
+        # Other languages use braces - exclude the brace
+        brace_pos = node_text.find("{")
+        if brace_pos != -1:
+            signature = node_text[:brace_pos].strip()
+        else:
+            # No body found, use first line
+            lines = node_text.split("\n")
+            signature = lines[0].strip()
 
     # Truncate if too long
-    if len(first_line) > 120:
-        first_line = first_line[:117] + "..."
+    if len(signature) > 120:
+        signature = signature[:117] + "..."
 
-    return first_line
+    return signature
 
 
 # ============================================================================
