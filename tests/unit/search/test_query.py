@@ -435,3 +435,162 @@ class TestGracefulDegradation:
 
         assert len(results) == 1
         cursor.assert_query_contains("LIKE")
+
+
+class TestSymbolFilters:
+    """Tests for symbol filtering in search function."""
+
+    def test_search_symbol_type_filter(self, mock_code_to_embedding, mock_db_pool):
+        """Symbol type filter should generate WHERE clause with symbol_type condition."""
+        # Results with 10 columns: 7 metadata + 3 symbol columns
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "process_data", "def process_data()"),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+                results = search(
+                    query="test",
+                    index_name="testindex",
+                    symbol_type="function",
+                )
+
+        cursor.assert_query_contains("symbol_type = %s")
+        cursor.assert_called_with_param("function")
+        assert len(results) == 1
+        assert results[0].symbol_type == "function"
+        assert results[0].symbol_name == "process_data"
+
+    def test_search_symbol_name_filter(self, mock_code_to_embedding, mock_db_pool):
+        """Symbol name filter should generate WHERE clause with ILIKE condition."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "get_user", "def get_user()"),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+                results = search(
+                    query="test",
+                    index_name="testindex",
+                    symbol_name="get*",
+                )
+
+        cursor.assert_query_contains("symbol_name ILIKE %s")
+        cursor.assert_called_with_param("get%")
+
+    def test_search_symbol_filters_combined(self, mock_code_to_embedding, mock_db_pool):
+        """Both symbol filters should combine with AND."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "get_user", "def get_user()"),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+                results = search(
+                    query="test",
+                    index_name="testindex",
+                    symbol_type="function",
+                    symbol_name="get*",
+                )
+
+        cursor.assert_query_contains("symbol_type = %s")
+        cursor.assert_query_contains("symbol_name ILIKE %s")
+
+    def test_search_symbol_filter_prv17_error(self, mock_code_to_embedding, mock_db_pool):
+        """Symbol filter on pre-v1.7 index should raise helpful ValueError."""
+        pool, cursor, _conn = mock_db_pool(results=[])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=False):
+                with pytest.raises(ValueError) as exc_info:
+                    search(
+                        query="test",
+                        index_name="testindex",
+                        symbol_type="function",
+                    )
+
+        assert "v1.7" in str(exc_info.value)
+        assert "Re-index" in str(exc_info.value)
+        assert "testindex" in str(exc_info.value)
+
+    def test_search_result_includes_symbol_fields(self, mock_code_to_embedding, mock_db_pool):
+        """SearchResult should include symbol_type, symbol_name, symbol_signature."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/utils.py", 0, 100, 0.85, "", "", "",
+             "method", "UserService.get_user", "def get_user(self, id: int)"),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+                results = search(
+                    query="test",
+                    index_name="testindex",
+                    symbol_type="method",
+                )
+
+        assert len(results) == 1
+        assert results[0].symbol_type == "method"
+        assert results[0].symbol_name == "UserService.get_user"
+        assert results[0].symbol_signature == "def get_user(self, id: int)"
+
+    def test_search_symbol_filter_with_language_filter(self, mock_code_to_embedding, mock_db_pool):
+        """Symbol filter should combine with language filter via AND."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "process", "def process()"),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+                results = search(
+                    query="test",
+                    index_name="testindex",
+                    language_filter="python",
+                    symbol_type="function",
+                )
+
+        # Both conditions should be present
+        cursor.assert_query_contains("LIKE")  # Language filter
+        cursor.assert_query_contains("symbol_type = %s")  # Symbol filter
+
+    def test_search_multiple_symbol_types(self, mock_code_to_embedding, mock_db_pool):
+        """Multiple symbol types should generate IN clause."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "process", "def process()"),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+                results = search(
+                    query="test",
+                    index_name="testindex",
+                    symbol_type=["function", "method"],
+                )
+
+        cursor.assert_query_contains("symbol_type IN")
+
+    def test_search_symbol_fields_default_none(self):
+        """SearchResult symbol fields should default to None."""
+        result = SearchResult(
+            filename="/path/file.py",
+            start_byte=0,
+            end_byte=100,
+            score=0.85,
+        )
+        assert result.symbol_type is None
+        assert result.symbol_name is None
+        assert result.symbol_signature is None
+
+    def test_search_without_symbol_filter_no_extra_columns(self, mock_code_to_embedding, mock_db_pool):
+        """Search without symbol filter should not include symbol columns."""
+        pool, cursor, _conn = mock_db_pool(results=[
+            ("/path/file.py", 0, 100, 0.85, "", "", ""),
+        ])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            results = search(query="test", index_name="testindex")
+
+        # Should not query for symbol columns when not filtering
+        last_query = cursor.calls[-1][0]
+        assert "symbol_type," not in last_query
+        assert "symbol_name," not in last_query
+        assert "symbol_signature" not in last_query
