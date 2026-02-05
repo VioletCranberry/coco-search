@@ -130,9 +130,11 @@ class TestSearchCodeAutoDetect:
 
         # Should proceed to search, not return collision error
         assert isinstance(result, list)
-        # If we got results, no error occurred
-        if len(result) > 0 and "error" not in result[0]:
-            assert result[0]["file_path"] == "/test/file.py"
+        # First item is search_context header when auto-detecting
+        assert result[0].get("type") == "search_context"
+        # If we got actual search results, no error occurred
+        if len(result) > 1 and "error" not in result[1]:
+            assert result[1]["file_path"] == "/test/file.py"
 
     def test_logs_auto_detected_index(self):
         """search_code logs auto-detected index info."""

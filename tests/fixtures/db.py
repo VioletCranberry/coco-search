@@ -17,11 +17,13 @@ def reset_search_module_state():
     Autouse fixture that:
     1. Patches check_column_exists to return True (simulates v1.7+ index)
     2. Resets module-level flags after each test
+    3. Clears the query cache to prevent test pollution
 
     This prevents the hybrid column check from hitting a real database
     and ensures test isolation for module-level state.
     """
     import cocosearch.search.query as query_module
+    import cocosearch.search.cache as cache_module
 
     with patch.object(query_module, "check_column_exists", return_value=True):
         yield
@@ -31,6 +33,9 @@ def reset_search_module_state():
     query_module._metadata_warning_emitted = False
     query_module._has_content_text_column = True
     query_module._hybrid_warning_emitted = False
+
+    # Clear query cache singleton to prevent test pollution
+    cache_module._query_cache = None
 
 
 @pytest.fixture

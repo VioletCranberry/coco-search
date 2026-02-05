@@ -21,6 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from pathlib import Path
 from typing import Annotated
 
 import cocoindex
@@ -39,7 +40,7 @@ from cocosearch.management import (
     get_index_metadata,
     register_index_path,
 )
-from cocosearch.management.stats import get_comprehensive_stats
+from cocosearch.management.stats import check_staleness, get_comprehensive_stats
 from cocosearch.search import byte_to_line, read_chunk_content, search
 from cocosearch.search.context_expander import ContextExpander
 
@@ -206,9 +207,20 @@ def search_code(
     for better results when searching for code identifiers.
     If index_name is not provided, auto-detects from current working directory.
     """
+    # Track root_path for search header (set during auto-detection)
+    root_path: Path | None = None
+
+    # Check for explicit project path from --project-from-cwd flag
+    project_path_env = os.environ.get("COCOSEARCH_PROJECT_PATH")
+
     # Auto-detect index if not provided
     if index_name is None:
-        root_path, detection_method = find_project_root()
+        if project_path_env:
+            # Use explicit path from --project-from-cwd flag
+            start_path = Path(project_path_env)
+            root_path, detection_method = find_project_root(start_path)
+        else:
+            root_path, detection_method = find_project_root()
 
         if root_path is None:
             # Not in a project directory
@@ -289,8 +301,17 @@ def search_code(
     # Create context expander for file caching
     expander = ContextExpander()
 
-    # Convert results to dicts with line numbers, content, and context
+    # Build header with project context when auto-detecting
     output = []
+    if root_path is not None:
+        search_header = {
+            "type": "search_context",
+            "searching": str(root_path),
+            "index_name": index_name,
+        }
+        output.append(search_header)
+
+    # Convert results to dicts with line numbers, content, and context
     for r in results:
         start_line = byte_to_line(r.filename, r.start_byte)
         end_line = byte_to_line(r.filename, r.end_byte)
@@ -352,6 +373,26 @@ def search_code(
 
     # Clear cache after processing
     expander.clear_cache()
+
+    # Check staleness and add footer warning if needed
+    try:
+        is_stale, staleness_days = check_staleness(index_name, threshold_days=7)
+    except Exception:
+        # Database not available or other error - skip staleness check
+        is_stale, staleness_days = False, -1
+
+    if is_stale and staleness_days > 0:
+        # Determine path for reindex command (use root_path if available)
+        reindex_path = str(root_path) if root_path else f"<path-to-project>"
+        output.append({
+            "type": "staleness_warning",
+            "warning": "Index may be stale",
+            "message": (
+                f"Index last updated {staleness_days} days ago. "
+                f"Run `cocosearch index {reindex_path}` to refresh."
+            ),
+            "staleness_days": staleness_days,
+        })
 
     return output
 
