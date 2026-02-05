@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** Phase 36 - Developer Skills
+**Current focus:** Phase 37 - Documentation Rebrand
 
 ## Current Position
 
-Phase: 36 of 37 (Developer Skills)
-Plan: 2 of 2 in current phase
+Phase: 37 of 37 (Documentation Rebrand)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-02-05 — Phase 36 verified and complete
+Last activity: 2026-02-05 — Completed 37-01-PLAN.md
 
-Progress: [======================================....] 95% (36/37 phases, 102/103 plans)
+Progress: [==========================================] 100% (37/37 phases, 103/103 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 102
+- Total plans completed: 103
 - Milestones shipped: 7 (v1.0-v1.7)
-- Current milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
+- Current milestone: v1.8 Polish & Observability (phases 33-37, 13 plans) - COMPLETE
 
 **By Recent Milestone:**
 
@@ -31,13 +31,20 @@ Progress: [======================================....] 95% (36/37 phases, 102/10
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | 2026-02-02 |
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 
-*Updated: 2026-02-05 after Phase 36 complete*
+*Updated: 2026-02-05 after Phase 37 complete (ALL PHASES COMPLETE)*
 
 ## Accumulated Context
 
 ### Decisions
 
 Full decision log in PROJECT.md Key Decisions table.
+
+Recent Phase 37 decisions:
+- Lead with 'Hybrid search for codebases' tagline, not semantic search
+- Quick Start as first section for immediate action
+- 5 symbol-aware languages (Python, JS, TS, Go, Rust) in Full Support tier
+- Observability section at same level as Search Features (v1.8 capability)
+- Troubleshooting de-emphasized by moving to end of document
 
 Recent Phase 36 decisions:
 - OpenCode MCP config format differs: type: local, command array, environment not env, enabled: true
@@ -79,7 +86,7 @@ Recent Phase 33 decisions:
 
 ### Pending Todos
 
-None — Phase 36 plan 02 complete.
+None — All 103 plans complete.
 
 ### Blockers/Concerns
 
@@ -96,5 +103,5 @@ None
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Phase 36 complete, verified
+Stopped at: Phase 37 complete — ALL PHASES COMPLETE
 Resume file: None
