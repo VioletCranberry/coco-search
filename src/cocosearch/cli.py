@@ -24,6 +24,7 @@ from cocosearch.config import (
     generate_config,
     load_config as load_project_config,
 )
+from cocosearch.dashboard import run_terminal_dashboard
 from cocosearch.indexer import IndexingConfig, load_config, run_index
 from cocosearch.indexer.progress import IndexingProgress
 from cocosearch.management import clear_index, derive_index_from_git, get_comprehensive_stats, get_language_stats, get_stats, list_indexes
@@ -512,6 +513,42 @@ def stats_command(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for error).
     """
     console = Console()
+
+    # Validate --watch requires --live
+    if args.watch and not args.live:
+        console.print("[bold red]Error:[/bold red] --watch requires --live")
+        return 1
+
+    # Handle --live mode (terminal dashboard)
+    if args.live:
+        # Initialize CocoIndex
+        cocoindex.init()
+
+        # Dashboard requires a specific index
+        if not args.index:
+            # Auto-detect from cwd
+            git_index = derive_index_from_git()
+            if git_index:
+                index_name = git_index
+            else:
+                index_name = derive_index_name(os.getcwd())
+        else:
+            index_name = args.index
+
+        # Validate index exists before starting dashboard
+        try:
+            get_stats(index_name)  # Quick validation
+        except ValueError as e:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+            return 1
+
+        # Run terminal dashboard
+        run_terminal_dashboard(
+            index_name=index_name,
+            watch=args.watch,
+            refresh_interval=args.refresh_interval,
+        )
+        return 0
 
     # Initialize CocoIndex
     cocoindex.init()
@@ -1150,6 +1187,23 @@ def main() -> None:
         type=int,
         default=7,
         help="Days before staleness warning (default: 7)",
+    )
+    stats_parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Show terminal dashboard (multi-pane layout with bar charts)",
+    )
+    stats_parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Auto-refresh terminal dashboard (requires --live)",
+    )
+    stats_parser.add_argument(
+        "--refresh-interval",
+        type=float,
+        default=1.0,
+        metavar="SECONDS",
+        help="Refresh interval for --watch mode (default: 1.0)",
     )
 
     # Languages subcommand
