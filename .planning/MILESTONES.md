@@ -1,5 +1,34 @@
 # Project Milestones: CocoSearch
 
+## v1.8 Polish & Observability (Shipped: 2026-02-05)
+
+**Delivered:** Query caching with semantic similarity, symbol extraction expanded to 10 languages (Java, C, C++, Ruby, PHP), stats dashboard with CLI/terminal/web interfaces, developer skills for Claude Code and OpenCode, and documentation rebrand — comprehensive observability and polish for production use.
+
+**Phases completed:** 33-37 (13 plans total)
+
+**Key accomplishments:**
+
+- Hybrid + symbol filter combination working together (filters applied before RRF fusion)
+- Nested symbol display with fully qualified names (ClassName.method_name format)
+- Query caching with exact hash and semantic similarity (0.95 cosine threshold)
+- Symbol extraction for 10 languages with external .scm query files
+- Stats dashboard: CLI with Unicode bars, HTTP API, terminal dashboard, web UI with Chart.js
+- Developer skills: Claude Code and OpenCode SKILL.md with installation and routing guidance
+- README rebrand: hybrid search positioning, observability section, language tiering
+
+**Stats:**
+
+- 81 files created/modified
+- +15,962 / -987 lines (9,210 Python LOC in src/)
+- 5 phases, 13 plans
+- 3 days (2026-02-03 → 2026-02-05)
+
+**Git range:** `docs(33)` → `docs(audit) v1.8`
+
+**What's next:** Planning next milestone
+
+---
+
 ## v1.7 Search Enhancement (Shipped: 2026-02-03)
 
 **Delivered:** Hybrid search combining vector similarity and keyword matching via RRF fusion, context expansion with smart tree-sitter boundaries, symbol-aware indexing for 5 languages (Python, JS, TS, Go, Rust), and full language coverage (31 languages) — comprehensive search quality improvements for code understanding.

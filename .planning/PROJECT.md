@@ -82,48 +82,46 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - `cocosearch languages` command for language discovery — v1.7
 - Per-language statistics in `cocosearch stats` command — v1.7
 - Comprehensive v1.7 feature documentation in README — v1.7
+- Hybrid + symbol filter combination (filters before RRF fusion) — v1.8
+- Nested symbol hierarchy (ClassName.method_name format) — v1.8
+- Query caching with exact hash and semantic similarity (0.95 cosine) — v1.8
+- Symbol extraction for 10 languages (Java, C, C++, Ruby, PHP added) — v1.8
+- External .scm query files for user-extensible symbol extraction — v1.8
+- Stats CLI with health metrics, language breakdown, staleness warnings — v1.8
+- HTTP API endpoint for stats (/api/stats) — v1.8
+- Terminal dashboard with Rich Layout and Unicode graphs — v1.8
+- Web UI dashboard with Chart.js visualization — v1.8
+- Claude Code skill with installation and routing guidance — v1.8
+- OpenCode skill with installation and routing guidance — v1.8
+- README rebrand with hybrid search positioning — v1.8
 
 ### Active
 
-**Current Milestone: v1.8 Polish & Observability**
-
-**Goal:** Complete deferred search features, expand symbol coverage, add stats dashboard, create developer skills, and overhaul documentation to reflect CocoSearch's full capabilities.
-
-**Target features:**
-- Hybrid + symbol filter combination (fix fallback to vector-only)
-- Nested symbol hierarchy (fully qualified Class.method names)
-- Query caching/history
-- Symbol extraction for 10 languages (add Java, C, C++, Ruby, PHP)
-- Stats dashboard (HTTP API + terminal + web UI)
-- Claude Code skill (installation + code exploration routing)
-- OpenCode skill (installation + code exploration routing)
-- README rebrand (not just "semantic search" anymore)
-- Retrieval logic documentation
-- MCP tools reference documentation
+**Planning next milestone**
 
 ### Out of Scope
 
 - Answer synthesis inside MCP — Claude (the caller) handles synthesis from returned chunks
 - Cloud storage or external embedding APIs — this is local-first
 - Real-time file watching / auto-reindex — manual index trigger only
-- Web UI — MCP and CLI interface only
 - Dockerfile stage tracking for non-FROM instructions — requires two-pass processing
 - Block type / hierarchy search filters — validate demand first
 - Config inheritance (base + override) — complexity vs value tradeoff, skip for now
 - Per-directory config overrides — skip for now, reassess if demand emerges
-- Hybrid + symbol filter combination — deferred to v1.8 (currently falls back to vector-only)
-- Nested symbol hierarchy (fully qualified names) — deferred to v1.8
-- Query caching/history — deferred to v1.8
+- Multi-step workflow skills (onboarding, debugging, refactoring) — deferred from v1.8
+- Retrieval logic documentation — deferred from v1.8
+- MCP tools reference documentation — deferred from v1.8
 
 ## Current State
 
-Shipped v1.7 with 8,225 LOC Python (src/).
-Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP, tree-sitter.
-Primary use case: onboarding to unfamiliar codebases via semantic search.
-Language support: 31 languages (28 standard + 3 DevOps) with symbol extraction for 5.
-Search features: Hybrid search (RRF), context expansion, symbol filtering, definition boost.
+Shipped v1.8 with 9,210 LOC Python (src/).
+Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP, tree-sitter, tree-sitter-language-pack.
+Primary use case: onboarding to unfamiliar codebases via hybrid search.
+Language support: 31 languages (28 standard + 3 DevOps) with symbol extraction for 10.
+Search features: Hybrid search (RRF), context expansion, symbol filtering, query caching, definition boost.
+Observability: CLI stats, HTTP API, terminal dashboard, web UI with Chart.js.
 Test coverage: 550+ unit tests + integration tests with real PostgreSQL and Ollama.
-Documentation: Comprehensive README with Quick Start, Search Features, and Supported Languages.
+Documentation: README with hybrid search positioning, developer skills for Claude Code and OpenCode.
 Configuration: YAML config with env var substitution, 4-level precedence, config check command.
 Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
 Docker deployment: All-in-one container with s6-overlay, multi-transport support (stdio/SSE/HTTP).
@@ -188,6 +186,15 @@ Environment: COCOSEARCH_DATABASE_URL (required), COCOSEARCH_OLLAMA_URL (optional
 | Instance-level LRU cache | Search session isolation for context expansion | ✓ Good |
 | 50-line context cap | Prevent unbounded context growth | ✓ Good |
 | Definition boost after RRF | 2x multiplier applied post-fusion | ✓ Good |
+| Symbol filters before RRF | Apply WHERE clause to both vector/keyword before fusion | ✓ Good |
+| In-memory session-scoped cache | Simpler than diskcache, sufficient for repeated queries | ✓ Good |
+| 0.95 cosine threshold for semantic cache | Balances cache hits with query relevance | ✓ Good |
+| tree-sitter-language-pack 0.13.0 | Modern API, external query file support | ✓ Good |
+| External .scm query files | User-extensible symbol extraction | ✓ Good |
+| IndexStats dataclass | Single source of truth for all health metrics | ✓ Good |
+| Single-page HTML dashboard | No build step, embedded CSS/JS | ✓ Good |
+| Chart.js via CDN | Zero-config, browser caching | ✓ Good |
+| Hybrid search tagline | Better positioning than "semantic search" | ✓ Good |
 
 ---
-*Last updated: 2026-02-03 after v1.8 milestone started*
+*Last updated: 2026-02-05 after v1.8 milestone complete*
