@@ -122,7 +122,10 @@ flowchart LR
   - [Getting Started](#getting-started-1)
   - [Pull Requests](#pull-requests)
   - [Reporting Issues](#reporting-issues)
-- [🔧 Troubleshooting Docker](#troubleshooting-docker)
+- [🔧 Troubleshooting](#troubleshooting)
+  - [Index Not Found Error](#index-not-found-error)
+  - [Index May Be Stale Warning](#index-may-be-stale-warning)
+- [🐳 Troubleshooting Docker](#troubleshooting-docker)
   - [Container Startup Issues](#container-startup-issues)
   - [PostgreSQL Issues](#postgresql-issues)
   - [Ollama Issues](#ollama-issues)
@@ -1090,6 +1093,46 @@ uv run ruff check .
 ### Reporting Issues
 
 Found a bug or have a feature request? [Open an issue](https://github.com/VioletCranberry/coco-s/issues).
+
+[↑ Back to top](#table-of-contents)
+
+## Troubleshooting
+
+### Index Not Found Error
+
+This error appears when you search a project that hasn't been indexed yet:
+
+```
+Error: Index not found
+Project detected at /path/to/your-project but not indexed.
+Index this project first using:
+  CLI: cocosearch index /path/to/your-project
+  MCP: index_codebase(path='/path/to/your-project')
+```
+
+**Solution:** Run the indexing command shown in the error message. With single-registration MCP, you can also ask Claude: "Please index this codebase first."
+
+**Common causes:**
+- New project that hasn't been indexed
+- Project was moved to a different directory
+- Index database was cleared or reset
+
+### Index May Be Stale Warning
+
+This warning appears when searching an index that hasn't been updated in over 7 days:
+
+```
+Warning: Index may be stale
+Index last updated 12 days ago. Run `cocosearch index /path/to/project` to refresh.
+```
+
+**Solution:** Re-run the index command to pick up any code changes since the last index:
+
+```bash
+cocosearch index /path/to/project
+```
+
+Or ask Claude: "Please refresh the index for this codebase."
 
 [↑ Back to top](#table-of-contents)
 
