@@ -38,6 +38,7 @@ from cocosearch.management import (
     get_index_metadata,
     register_index_path,
 )
+from cocosearch.management.stats import get_comprehensive_stats
 from cocosearch.search import byte_to_line, read_chunk_content, search
 from cocosearch.search.context_expander import ContextExpander
 
@@ -50,6 +51,58 @@ mcp = FastMCP("cocosearch")
 async def health_check(request):
     """Health check endpoint for Docker HEALTHCHECK and load balancers."""
     return JSONResponse({"status": "ok"})
+
+
+# Stats API endpoints
+@mcp.custom_route("/api/stats", methods=["GET"])
+async def api_stats(request):
+    """Stats API endpoint for web dashboard and programmatic access."""
+    # Initialize CocoIndex (required for database connection)
+    cocoindex.init()
+
+    index_name = request.query_params.get("index")
+
+    if index_name:
+        # Single index stats
+        try:
+            stats = get_comprehensive_stats(index_name)
+            return JSONResponse(
+                stats.to_dict(),
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+            )
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=404)
+    else:
+        # All indexes stats
+        indexes = mgmt_list_indexes()
+        all_stats = []
+        for idx in indexes:
+            try:
+                stats = get_comprehensive_stats(idx["name"])
+                all_stats.append(stats.to_dict())
+            except ValueError:
+                continue
+        return JSONResponse(
+            all_stats,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
+
+
+@mcp.custom_route("/api/stats/{index_name}", methods=["GET"])
+async def api_stats_single(request):
+    """Stats for a single index by name."""
+    # Initialize CocoIndex (required for database connection)
+    cocoindex.init()
+
+    index_name = request.path_params["index_name"]
+    try:
+        stats = get_comprehensive_stats(index_name)
+        return JSONResponse(
+            stats.to_dict(),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=404)
 
 
 def _get_treesitter_language(ext: str) -> str | None:
