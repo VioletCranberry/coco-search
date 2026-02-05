@@ -109,8 +109,15 @@ class TestSearchCommand:
                 lang=None,
                 min_score=0.3,
                 context=5,
+                before_context=None,
+                after_context=None,
+                no_smart=False,
                 pretty=False,
                 interactive=False,
+                hybrid=None,
+                symbol_type=None,
+                symbol_name=None,
+                no_cache=False,
             )
             result = search_command(args)
         assert result == 1
@@ -133,8 +140,15 @@ class TestSearchCommand:
                     lang=None,
                     min_score=0.3,
                     context=5,
+                    before_context=None,
+                    after_context=None,
+                    no_smart=False,
                     pretty=False,
                     interactive=False,
+                    hybrid=None,
+                    symbol_type=None,
+                    symbol_name=None,
+                    no_cache=False,
                 )
                 result = search_command(args)
 
@@ -171,16 +185,36 @@ class TestStatsCommand:
 
     def test_specific_index_json(self, capsys):
         """Returns stats for specific index."""
-        mock_stats = {
-            "file_count": 10,
-            "chunk_count": 50,
-            "storage_size_bytes": 1024 * 1024,
-            "storage_size_pretty": "1.0 MB",
-        }
+        from cocosearch.management.stats import IndexStats
+
+        mock_stats = IndexStats(
+            name="testindex",
+            file_count=10,
+            chunk_count=50,
+            storage_size=1024 * 1024,
+            storage_size_pretty="1.0 MB",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=-1,
+            languages=[],
+            symbols={},
+            warnings=[],
+        )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.cli.get_stats", return_value=mock_stats):
-                args = argparse.Namespace(index="testindex", pretty=False)
+            with patch("cocosearch.cli.get_comprehensive_stats", return_value=mock_stats):
+                args = argparse.Namespace(
+                    index="testindex",
+                    pretty=False,
+                    verbose=False,
+                    json=True,
+                    all=False,
+                    staleness_threshold=7,
+                    live=False,
+                    watch=False,
+                    refresh_interval=1.0,
+                )
                 result = stats_command(args)
 
         assert result == 0
@@ -192,8 +226,18 @@ class TestStatsCommand:
     def test_nonexistent_index_error(self, capsys):
         """Returns error for nonexistent index."""
         with patch("cocoindex.init"):
-            with patch("cocosearch.cli.get_stats", side_effect=ValueError("Index not found")):
-                args = argparse.Namespace(index="missing", pretty=False)
+            with patch("cocosearch.cli.get_comprehensive_stats", side_effect=ValueError("Index not found")):
+                args = argparse.Namespace(
+                    index="missing",
+                    pretty=False,
+                    verbose=False,
+                    json=True,
+                    all=False,
+                    staleness_threshold=7,
+                    live=False,
+                    watch=False,
+                    refresh_interval=1.0,
+                )
                 result = stats_command(args)
 
         assert result == 1
@@ -253,8 +297,15 @@ class TestErrorHandling:
                     lang=None,
                     min_score=0.3,
                     context=5,
+                    before_context=None,
+                    after_context=None,
+                    no_smart=False,
                     pretty=False,
                     interactive=False,
+                    hybrid=None,
+                    symbol_type=None,
+                    symbol_name=None,
+                    no_cache=False,
                 )
                 result = search_command(args)
 
@@ -386,7 +437,11 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport=None, port=None)
+            args = argparse.Namespace(
+                transport=None,
+                port=None,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             mock_run.assert_called_once()
             call_kwargs = mock_run.call_args[1]
@@ -398,7 +453,11 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport="sse", port=None)
+            args = argparse.Namespace(
+                transport="sse",
+                port=None,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["transport"] == "sse"
@@ -409,7 +468,11 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport=None, port=None)
+            args = argparse.Namespace(
+                transport=None,
+                port=None,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["transport"] == "http"
@@ -419,7 +482,11 @@ class TestMCPCommand:
         monkeypatch.setenv("MCP_TRANSPORT", "invalid")
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         from cocosearch.cli import mcp_command
-        args = argparse.Namespace(transport=None, port=None)
+        args = argparse.Namespace(
+            transport=None,
+            port=None,
+            project_from_cwd=False,
+        )
         result = mcp_command(args)
         assert result == 1
         captured = capsys.readouterr()
@@ -430,7 +497,11 @@ class TestMCPCommand:
         monkeypatch.delenv("MCP_TRANSPORT", raising=False)
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         from cocosearch.cli import mcp_command
-        args = argparse.Namespace(transport="websocket", port=None)
+        args = argparse.Namespace(
+            transport="websocket",
+            port=None,
+            project_from_cwd=False,
+        )
         result = mcp_command(args)
         assert result == 1
         captured = capsys.readouterr()
@@ -442,7 +513,11 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport="sse", port=8080)
+            args = argparse.Namespace(
+                transport="sse",
+                port=8080,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["port"] == 8080
@@ -453,7 +528,11 @@ class TestMCPCommand:
         monkeypatch.setenv("COCOSEARCH_MCP_PORT", "9000")
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport="sse", port=None)
+            args = argparse.Namespace(
+                transport="sse",
+                port=None,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["port"] == 9000
@@ -464,7 +543,11 @@ class TestMCPCommand:
         monkeypatch.setenv("COCOSEARCH_MCP_PORT", "9000")
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport="sse", port=8080)
+            args = argparse.Namespace(
+                transport="sse",
+                port=8080,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["port"] == 8080
@@ -474,7 +557,11 @@ class TestMCPCommand:
         monkeypatch.delenv("MCP_TRANSPORT", raising=False)
         monkeypatch.setenv("COCOSEARCH_MCP_PORT", "not-a-number")
         from cocosearch.cli import mcp_command
-        args = argparse.Namespace(transport="sse", port=None)
+        args = argparse.Namespace(
+            transport="sse",
+            port=None,
+            project_from_cwd=False,
+        )
         result = mcp_command(args)
         assert result == 1
         captured = capsys.readouterr()
@@ -486,7 +573,11 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
-            args = argparse.Namespace(transport="sse", port=None)
+            args = argparse.Namespace(
+                transport="sse",
+                port=None,
+                project_from_cwd=False,
+            )
             mcp_command(args)
             call_kwargs = mock_run.call_args[1]
             assert call_kwargs["port"] == 3000
