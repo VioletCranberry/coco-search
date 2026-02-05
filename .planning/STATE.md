@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 38 of 42 (Multi-Repo MCP Support)
-Plan: 2 of 3 complete
-Status: In progress
-Last activity: 2026-02-05 — Completed 38-02-PLAN.md
+Plan: 3 of 3 complete
+Status: Phase complete
+Last activity: 2026-02-05 — Completed 38-01-PLAN.md (CLI flag & staleness warning)
 
-Progress: [##########..........] 90% (105/117 estimated plans)
+Progress: [##########..........] 91% (106/117 estimated plans)
 
 ## Performance Metrics
 
@@ -40,6 +40,11 @@ Progress: [##########..........] 90% (105/117 estimated plans)
 
 Full decision log in PROJECT.md Key Decisions table.
 
+**Phase 38-01 decisions:**
+- Used environment variable (COCOSEARCH_PROJECT_PATH) for CLI-to-MCP workspace communication
+- Added type field to search result header/footer for programmatic identification
+- Staleness threshold hardcoded to 7 days (matches stats command default)
+
 ### Pending Todos
 
 None — ready for phase planning.
@@ -58,5 +63,5 @@ None — ready for phase planning.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 38-02-PLAN.md
+Stopped at: Completed 38-01-PLAN.md (phase 38 complete)
 Resume file: None
