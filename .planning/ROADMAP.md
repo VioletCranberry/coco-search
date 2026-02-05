@@ -45,10 +45,11 @@ See project history for earlier milestones:
   3. When user searches an unindexed project, they receive a prompt to index it (not silent failure or cryptic error)
   4. When user searches a stale index, they receive a warning about index freshness
   5. Documentation clearly shows the single-registration pattern with `--project-from-cwd` flag
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 38-01: TBD
+- [ ] 38-01-PLAN.md — Add --project-from-cwd flag and staleness warnings
+- [ ] 38-02-PLAN.md — Document user-scope MCP registration patterns
 
 #### Phase 39: Test Fixes
 **Goal**: Test suite passes reliably with correct signature format expectations
