@@ -879,53 +879,39 @@ cocosearch search "parse config" -C 5 --no-smart --pretty
 
 [↑ Back to top](#table-of-contents)
 
-## Supported Languages
+## Observability
 
-CocoSearch indexes 30+ programming languages using CocoIndex's Tree-sitter integration.
+Monitor index health, language distribution, and symbol breakdown.
 
-**View all languages:**
-```bash
-cocosearch languages
-```
-
-**Output:**
-```
-                Supported Languages
-┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
-┃ Language     ┃ Extensions            ┃ Symbols ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ Python       │ .py, .pyw, .pyi       │    ✓    │
-│ JavaScript   │ .js, .mjs, .cjs       │    ✓    │
-│ TypeScript   │ .ts, .tsx, .mts, .cts │    ✓    │
-│ Go           │ .go                   │    ✓    │
-│ Rust         │ .rs                   │    ✓    │
-│ Java         │ .java                 │    ✗    │
-│ C            │ .c, .h                │    ✗    │
-│ C++          │ .cpp, .cc, .hpp       │    ✗    │
-│ YAML         │ .yaml, .yml           │    ✗    │
-│ JSON         │ .json                 │    ✗    │
-│ Markdown     │ .md, .mdx             │    ✗    │
-│ ...          │ ...                   │   ...   │
-└──────────────┴───────────────────────┴─────────┘
-```
-
-**Symbol-aware languages (✓):** Support `--symbol-type` and `--symbol-name` filtering. These languages have full function, class, and method extraction.
-
-**Other languages (✗):** Indexed for semantic search but without symbol metadata.
-
-### Language Statistics
-
-View per-language breakdown for an index:
+### Index Statistics
 
 ```bash
 cocosearch stats myproject --pretty
 ```
 
-**Output:**
-```
-Index: myproject
-Files: 68 | Chunks: 488 | Size: 2.1 MB
+Output shows file count, chunk count, size, and staleness warnings:
 
+```
+    Index: myproject
+┏━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃ Metric  ┃ Value       ┃
+┡━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ Files   │ 68          │
+│ Chunks  │ 488         │
+│ Size    │ 2.1 MB      │
+│ Updated │ 2 days ago  │
+└─────────┴─────────────┘
+```
+
+### Language Breakdown
+
+View per-language file counts, chunk distribution, and line counts:
+
+```bash
+cocosearch stats myproject --pretty
+```
+
+```
            Language Statistics
 ┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
 ┃ Language   ┃ Files ┃ Chunks ┃  Lines ┃
@@ -933,32 +919,121 @@ Files: 68 | Chunks: 488 | Size: 2.1 MB
 │ python     │    42 │    287 │  3,521 │
 │ typescript │    18 │    156 │  2,103 │
 │ markdown   │     5 │     32 │    654 │
-│ yaml       │     3 │     13 │    238 │
 ├────────────┼───────┼────────┼────────┤
 │ TOTAL      │    68 │    488 │  6,516 │
 └────────────┴───────┴────────┴────────┘
 ```
 
-**JSON output** for scripting:
+### Dashboard
+
+Web-based stats visualization:
+
+```bash
+cocosearch serve-dashboard
+# Opens browser to http://localhost:8080
+```
+
+The dashboard displays real-time index health with language distribution charts.
+
+### JSON Output
+
+Machine-readable stats for automation:
+
 ```bash
 cocosearch stats myproject --json
 ```
 
-### DevOps Languages
+[↑ Back to top](#table-of-contents)
 
-CocoSearch includes specialized support for infrastructure-as-code:
+## Supported Languages
 
-| Language | Extensions | Block Detection |
-|----------|------------|-----------------|
-| HCL (Terraform) | `.tf`, `.hcl` | Resources, modules, variables |
-| Dockerfile | `Dockerfile` | Instructions (FROM, RUN, etc.) |
-| Bash | `.sh`, `.bash` | Functions |
+CocoSearch indexes 31 programming languages via Tree-sitter. Symbol extraction (for `--symbol-type` and `--symbol-name` filtering) is available for 5 languages.
 
-**Filter by DevOps language:**
+### Full Support (Symbol-Aware)
+
+**Python**, **JavaScript**, **TypeScript**, **Go**, **Rust**
+
+All features: Hybrid search, symbol filtering, smart context expansion
+
+Symbol types extracted: `function`, `class`, `method`, `interface`
+
+### Basic Support
+
+C, C++, C#, CSS, Fortran, HTML, Java, JSON, Kotlin, Markdown, Pascal, PHP, R, Ruby, Scala, Shell, Solidity, SQL, Swift, TOML, XML, YAML, Bash, Dockerfile, HCL, and more
+
+Features: Hybrid search, semantic + keyword search
+
+View all supported extensions:
+
 ```bash
-cocosearch search "s3 bucket" --lang hcl --pretty
-cocosearch search "base image" --lang dockerfile --pretty
+cocosearch languages
 ```
+
+[↑ Back to top](#table-of-contents)
+
+## Configuration
+
+### Configuration File
+
+Create `.cocosearch.yaml` in your project root to customize indexing:
+
+```yaml
+indexing:
+  # See also https://cocoindex.io/docs/ops/functions#supported-languages
+  include_patterns:
+    - "*.py"
+    - "*.js"
+    - "*.ts"
+    - "*.go"
+    - "*.rs"
+  exclude_patterns:
+    - "*_test.go"
+    - "*.min.js"
+  chunk_size: 1000 # bytes
+  chunk_overlap: 300 # bytes
+```
+
+### Environment Variables
+
+| Variable                 | Description               | Default                                                     |
+| ------------------------ | ------------------------- | ----------------------------------------------------------- |
+| `COCOSEARCH_DATABASE_URL` | PostgreSQL connection URL | `postgresql://cocoindex:cocoindex@localhost:5432/cocoindex` |
+| `COCOSEARCH_OLLAMA_URL`            | Ollama API URL            | `http://localhost:11434`                                    |
+
+[↑ Back to top](#table-of-contents)
+
+## Contributing
+
+Contributions are welcome! CocoSearch is open source under AGPL-3.0.
+
+### Getting Started
+
+```bash
+# Clone the repository
+git clone https://github.com/VioletCranberry/coco-s.git
+cd coco-s
+
+# Install dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Run linting
+uv run ruff check .
+```
+
+### Pull Requests
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+### Reporting Issues
+
+Found a bug or have a feature request? [Open an issue](https://github.com/VioletCranberry/coco-s/issues).
 
 [↑ Back to top](#table-of-contents)
 
@@ -1022,36 +1097,5 @@ docker exec -it cocosearch sh
 # Restart container
 docker restart cocosearch
 ```
-
-[↑ Back to top](#table-of-contents)
-
-## Configuration
-
-### Configuration File
-
-Create `.cocosearch.yaml` in your project root to customize indexing:
-
-```yaml
-indexing:
-  # See also https://cocoindex.io/docs/ops/functions#supported-languages
-  include_patterns:
-    - "*.py"
-    - "*.js"
-    - "*.ts"
-    - "*.go"
-    - "*.rs"
-  exclude_patterns:
-    - "*_test.go"
-    - "*.min.js"
-  chunk_size: 1000 # bytes
-  chunk_overlap: 300 # bytes
-```
-
-### Environment Variables
-
-| Variable                 | Description               | Default                                                     |
-| ------------------------ | ------------------------- | ----------------------------------------------------------- |
-| `COCOSEARCH_DATABASE_URL` | PostgreSQL connection URL | `postgresql://cocoindex:cocoindex@localhost:5432/cocoindex` |
-| `COCOSEARCH_OLLAMA_URL`            | Ollama API URL            | `http://localhost:11434`                                    |
 
 [↑ Back to top](#table-of-contents)
