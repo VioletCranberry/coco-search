@@ -10,7 +10,7 @@
 - v1.5 Configuration & Architecture Polish -- Phases 19-22 (shipped 2026-02-01)
 - v1.6 All-in-One Docker & Auto-Detect -- Phases 23-26 (shipped 2026-02-02)
 - v1.7 Search Enhancement -- Phases 27-32 (shipped 2026-02-03)
-- v1.8 Polish & Observability -- Phases 33-37 (in progress)
+- v1.8 Polish & Observability -- Phases 33-37 (shipped 2026-02-05)
 
 ## Phases
 
@@ -29,7 +29,7 @@ See project history for earlier milestones:
 
 </details>
 
-### v1.8 Polish & Observability (In Progress)
+### v1.8 Polish & Observability (Complete)
 
 **Milestone Goal:** Complete deferred v1.7 features, expand symbol coverage to 10 languages, add observability dashboard with CLI/terminal/web interfaces, create developer skills for Claude Code and OpenCode, and rebrand documentation.
 
@@ -107,18 +107,19 @@ Plans:
 - [x] 36-01-PLAN.md -- Claude Code skill (installation + MCP config + routing guidance)
 - [x] 36-02-PLAN.md -- OpenCode skill (installation + MCP config + routing guidance)
 
-#### Phase 37: Documentation Rebrand
+#### Phase 37: Documentation Rebrand ✓
 **Goal**: Update README to reflect CocoSearch's full capabilities beyond "semantic search"
 **Depends on**: Phase 36
 **Requirements**: REQ-023
 **Success Criteria** (what must be TRUE):
-  1. README positions CocoSearch as hybrid search + symbol filtering + context expansion tool
-  2. README accurately describes all v1.8 features (caching, 10-language symbols, stats dashboard)
-  3. Feature overview matches current capabilities (not just "semantic code search")
-**Plans**: 1 plan
+  1. ✓ README positions CocoSearch as hybrid search + symbol filtering + context expansion tool
+  2. ✓ README accurately describes all v1.8 features (caching, 10-language symbols, stats dashboard)
+  3. ✓ Feature overview matches current capabilities (not just "semantic code search")
+**Plans**: 1 plan (complete)
+**Completed**: 2026-02-05
 
 Plans:
-- [ ] 37-01-PLAN.md — Rebrand README with hybrid search positioning, observability section, language tiering
+- [x] 37-01-PLAN.md — Rebrand README with hybrid search positioning, observability section, language tiering
 
 ## Progress
 
@@ -132,8 +133,8 @@ Plans:
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
 | v1.7 Search Enhancement | 27-32 | 21 | Complete | 2026-02-03 |
-| v1.8 Polish & Observability | 33-37 | 12/13 | In progress | - |
+| v1.8 Polish & Observability | 33-37 | 13/13 | Complete | 2026-02-05 |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-05 after Phase 36 complete*
+*Last updated: 2026-02-05 after Phase 37 complete — v1.8 milestone complete*

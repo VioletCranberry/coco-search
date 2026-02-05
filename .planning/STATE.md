@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** Phase 37 - Documentation Rebrand
+**Current focus:** v1.8 milestone complete
 
 ## Current Position
 
 Phase: 37 of 37 (Documentation Rebrand)
 Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-02-05 — Completed 37-01-PLAN.md
+Status: Milestone complete
+Last activity: 2026-02-05 — Phase 37 verified and complete, v1.8 milestone shipped
 
 Progress: [==========================================] 100% (37/37 phases, 103/103 plans)
 
@@ -20,13 +20,14 @@ Progress: [==========================================] 100% (37/37 phases, 103/1
 
 **Velocity:**
 - Total plans completed: 103
-- Milestones shipped: 7 (v1.0-v1.7)
+- Milestones shipped: 8 (v1.0-v1.8)
 - Current milestone: v1.8 Polish & Observability (phases 33-37, 13 plans) - COMPLETE
 
 **By Recent Milestone:**
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
+| v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | 2026-02-02 |
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
@@ -42,9 +43,10 @@ Full decision log in PROJECT.md Key Decisions table.
 Recent Phase 37 decisions:
 - Lead with 'Hybrid search for codebases' tagline, not semantic search
 - Quick Start as first section for immediate action
-- 5 symbol-aware languages (Python, JS, TS, Go, Rust) in Full Support tier
+- 10 symbol-aware languages (Python, JS, TS, Go, Rust, Java, C, C++, Ruby, PHP) in Full Support tier
 - Observability section at same level as Search Features (v1.8 capability)
 - Troubleshooting de-emphasized by moving to end of document
+- --no-cache flag documented in CLI reference for query caching (Phase 33 feature)
 
 Recent Phase 36 decisions:
 - OpenCode MCP config format differs: type: local, command array, environment not env, enabled: true
@@ -103,5 +105,5 @@ None
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Phase 37 complete — ALL PHASES COMPLETE
+Stopped at: v1.8 milestone complete — ready for /gsd:audit-milestone
 Resume file: None
