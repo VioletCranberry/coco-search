@@ -852,6 +852,11 @@ def mcp_command(args: argparse.Namespace) -> int:
             print(f"Error: Invalid port value in COCOSEARCH_MCP_PORT: '{port_env}'", file=sys.stderr)
             return 1
 
+    # Pass project path via environment variable if --project-from-cwd is set
+    if args.project_from_cwd:
+        project_path = os.getcwd()
+        os.environ["COCOSEARCH_PROJECT_PATH"] = project_path
+
     try:
         run_server(transport=transport, host="0.0.0.0", port=port)
         return 0
@@ -1297,6 +1302,12 @@ def main() -> None:
         type=int,
         default=None,
         help="Port for SSE/HTTP transports (default: 3000). [env: COCOSEARCH_MCP_PORT]",
+    )
+    mcp_parser.add_argument(
+        "--project-from-cwd",
+        action="store_true",
+        default=False,
+        help="Auto-detect project from current working directory. Required for user-scope MCP registration.",
     )
 
     # Config subcommand
