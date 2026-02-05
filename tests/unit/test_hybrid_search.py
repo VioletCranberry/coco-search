@@ -240,11 +240,12 @@ class TestHybridSearch:
         pool, cursor, conn = mock_db_pool(results=vector_results)
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
-                with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
-                    with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
-                        mock_embed.eval.return_value = [0.1] * 1024
-                        results = hybrid_search("test query", "test_index")
+            with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
+                with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
+                    with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
+                        with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
+                            mock_embed.eval.return_value = [0.1] * 1024
+                            results = hybrid_search("test query", "test_index")
 
         assert len(results) == 1
         assert results[0].match_type == "semantic"
@@ -272,11 +273,12 @@ class TestHybridSearch:
         cursor.fetchall = mock_fetchall
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
-                with patch("cocosearch.search.hybrid.check_column_exists", return_value=True):
-                    with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
-                        mock_embed.eval.return_value = [0.1] * 1024
-                        results = hybrid_search("getUserById", "test_index")
+            with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
+                with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
+                    with patch("cocosearch.search.hybrid.check_column_exists", return_value=True):
+                        with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
+                            mock_embed.eval.return_value = [0.1] * 1024
+                            results = hybrid_search("getUserById", "test_index")
 
         # Should have results from both sources
         assert len(results) >= 1
@@ -291,11 +293,12 @@ class TestHybridSearch:
         pool, cursor, conn = mock_db_pool(results=vector_results)
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
-                with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
-                    with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
-                        mock_embed.eval.return_value = [0.1] * 1024
-                        results = hybrid_search("test", "test_index", limit=5)
+            with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
+                with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
+                    with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
+                        with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
+                            mock_embed.eval.return_value = [0.1] * 1024
+                            results = hybrid_search("test", "test_index", limit=5)
 
         assert len(results) <= 5
 
