@@ -1,15 +1,8 @@
 # CocoSearch
 
-Local-first semantic code search via MCP. Search your codebase using natural language, entirely offline.
+Hybrid search for codebases — semantic understanding meets keyword precision.
 
-## What CocoSearch Does
-
-CocoSearch indexes your code and enables semantic search powered by local embeddings. All processing happens on your machine - no data leaves your system.
-
-- **Index codebases** using Ollama embeddings stored in PostgreSQL with pgvector
-- **Search semantically** via CLI or any MCP-compatible client (Claude Code, Claude Desktop, OpenCode)
-- **Stay private** - everything runs locally, no external API calls
-- **Use with AI assistants** - integrate via Model Context Protocol (MCP)
+Search your code with natural language, filter by symbols, expand context. Works as CLI or MCP server. Everything runs locally.
 
 ## Quick Start (5 minutes)
 
@@ -39,6 +32,17 @@ docker exec cocosearch cocosearch search "authentication logic" --index myprojec
 ```
 
 **That's it!** For local development setup without Docker, see [Installing](#installing).
+
+## What CocoSearch Does
+
+CocoSearch indexes your code and enables hybrid search — combining semantic understanding with keyword precision. All processing happens on your machine.
+
+- **Hybrid search** — semantic similarity + keyword matching via RRF fusion
+- **Symbol filtering** — filter by function, class, method, or symbol name patterns
+- **Context expansion** — smart expansion to enclosing function/class boundaries
+- **Index observability** — stats dashboard for monitoring index health
+- **Stay private** — everything runs locally, no external API calls
+- **Use with AI assistants** — integrate via CLI or MCP (Claude Code, Claude Desktop, OpenCode)
 
 ## Architecture
 
@@ -100,16 +104,27 @@ flowchart LR
   - [Hybrid Search](#hybrid-search)
   - [Symbol Filtering](#symbol-filtering)
   - [Context Expansion](#context-expansion)
+- [📊 Observability](#observability)
+  - [Index Statistics](#index-statistics)
+  - [Language Breakdown](#language-breakdown)
+  - [Dashboard](#dashboard)
+  - [JSON Output](#json-output)
 - [📚 Supported Languages](#supported-languages)
+  - [Full Support (Symbol-Aware)](#full-support-symbol-aware)
+  - [Basic Support](#basic-support)
+- [🛠️ Configuration](#configuration)
+  - [Configuration File](#configuration-file)
+  - [Environment Variables](#environment-variables)
+- [🤝 Contributing](#contributing)
+  - [Getting Started](#getting-started-1)
+  - [Pull Requests](#pull-requests)
+  - [Reporting Issues](#reporting-issues)
 - [🔧 Troubleshooting Docker](#troubleshooting-docker)
   - [Container Startup Issues](#container-startup-issues)
   - [PostgreSQL Issues](#postgresql-issues)
   - [Ollama Issues](#ollama-issues)
   - [MCP Connection Issues](#mcp-connection-issues)
   - [Useful Commands](#useful-commands)
-- [🛠️ Configuration](#configuration)
-  - [Configuration File](#configuration-file)
-  - [Environment Variables](#environment-variables)
 
 ## Installing
 
