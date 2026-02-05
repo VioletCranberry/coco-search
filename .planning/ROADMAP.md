@@ -76,17 +76,17 @@ Plans:
 **Depends on**: Phase 34
 **Requirements**: REQ-005, REQ-006, REQ-007, REQ-008, REQ-009, REQ-010, REQ-011, REQ-012
 **Success Criteria** (what must be TRUE):
-  1. `cocosearch stats` shows health metrics (files, chunks, size, last update)
-  2. Stats include per-language breakdown and symbol type counts
-  3. `--json` flag outputs machine-readable stats for automation
-  4. Stats warn if index is stale (>7 days since last update)
+  1. ✓ `cocosearch stats` shows health metrics (files, chunks, size, last update)
+  2. ✓ Stats include per-language breakdown and symbol type counts
+  3. ✓ `--json` flag outputs machine-readable stats for automation
+  4. ✓ Stats warn if index is stale (>7 days since last update)
   5. HTTP API serves stats at /api/stats endpoint
   6. Terminal dashboard shows live stats with Unicode graphs
   7. Web UI accessible via browser at /dashboard
-**Plans**: 3 plans
+**Plans**: 3 plans (1/3 complete)
 
 Plans:
-- [ ] 35-01-PLAN.md -- Stats CLI enhancement (IndexStats dataclass, Unicode bars, warnings, -v/--json/--all flags)
+- [x] 35-01-PLAN.md -- Stats CLI enhancement (IndexStats dataclass, Unicode bars, warnings, -v/--json/--all flags)
 - [ ] 35-02-PLAN.md -- HTTP API + terminal dashboard (/api/stats endpoint, Rich Layout multi-pane dashboard)
 - [ ] 35-03-PLAN.md -- Web UI dashboard (Chart.js visualization, serve-dashboard command)
 
@@ -130,8 +130,8 @@ Plans:
 | v1.5 Config & Architecture | 19-22 | 11 | Complete | 2026-02-01 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | Complete | 2026-02-02 |
 | v1.7 Search Enhancement | 27-32 | 21 | Complete | 2026-02-03 |
-| v1.8 Polish & Observability | 33-37 | 10/13 | In progress | - |
+| v1.8 Polish & Observability | 33-37 | 11/13 | In progress | - |
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-04 after Phase 35 planned*
+*Last updated: 2026-02-05 after Phase 35 plan 01 complete*
