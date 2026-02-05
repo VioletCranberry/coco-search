@@ -15,7 +15,7 @@ import psycopg
 import logging
 
 from cocosearch.indexer.config import IndexingConfig
-from cocosearch.indexer.embedder import code_to_embedding, extract_extension, extract_language
+from cocosearch.indexer.embedder import code_to_embedding, extract_language
 from cocosearch.indexer.tsvector import text_to_tsvector_sql
 from cocosearch.handlers import get_custom_languages, extract_devops_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
