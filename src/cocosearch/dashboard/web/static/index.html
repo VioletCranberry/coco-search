@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CocoSearch Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-card: #ffffff;
+            --border-color: #e0e0e0;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-muted: #999999;
+            --accent-blue: #2196F3;
+            --accent-green: #4CAF50;
+            --accent-orange: #FF9800;
+            --accent-red: #f44336;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #1a1a1a;
+                --bg-secondary: #2d2d2d;
+                --bg-card: #252525;
+                --border-color: #404040;
+                --text-primary: #e0e0e0;
+                --text-secondary: #b0b0b0;
+                --text-muted: #707070;
+                --accent-blue: #64B5F6;
+                --accent-green: #81C784;
+                --accent-orange: #FFB74D;
+                --accent-red: #E57373;
+                --shadow: rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .index-selector {
+            margin: 16px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .index-selector label {
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .index-selector select {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 200px;
+        }
+
+        .warning-banner {
+            background: var(--accent-red);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .warning-banner.visible {
+            display: block;
+        }
+
+        .warning-banner h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .warning-banner ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .warning-banner li {
+            padding: 4px 0;
+            font-size: 14px;
+        }
+
+        .warning-banner li:before {
+            content: "⚠ ";
+            margin-right: 8px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .summary-card h3 {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .summary-card .value {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .summary-card .label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .chart-card h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .error {
+            background: var(--accent-red);
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 768px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CocoSearch Dashboard</h1>
+            <p class="subtitle">Real-time code index statistics and health monitoring</p>
+
+            <div class="index-selector">
+                <label for="indexSelect">Index:</label>
+                <select id="indexSelect">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+        </header>
+
+        <div id="warningBanner" class="warning-banner">
+            <h3>Index Warnings</h3>
+            <ul id="warningList"></ul>
+        </div>
+
+        <div id="loadingMessage" class="loading">Loading dashboard data...</div>
+        <div id="errorMessage" class="error" style="display: none;"></div>
+
+        <div id="dashboardContent" style="display: none;">
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>Files Indexed</h3>
+                    <div class="value" id="fileCount">-</div>
+                    <div class="label">Total files</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Code Chunks</h3>
+                    <div class="value" id="chunkCount">-</div>
+                    <div class="label">Searchable chunks</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Storage Size</h3>
+                    <div class="value" id="storageSize">-</div>
+                    <div class="label">Database size</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Last Updated</h3>
+                    <div class="value" id="lastUpdated">-</div>
+                    <div class="label" id="stalenessLabel">Index age</div>
+                </div>
+            </div>
+
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h2>Language Distribution</h2>
+                    <div class="chart-container">
+                        <canvas id="languageChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h2>Symbol Types</h2>
+                    <div class="chart-container">
+                        <canvas id="symbolChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>CocoSearch Dashboard - Semantic Code Search</p>
+        </footer>
+    </div>
+
+    <script>
+        let languageChart = null;
+        let symbolChart = null;
+        let allIndexes = [];
+
+        async function fetchStats(indexName = null) {
+            const url = indexName
+                ? `/api/stats?index=${encodeURIComponent(indexName)}`
+                : '/api/stats';
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return await response.json();
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString();
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Never';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
+
+            return date.toLocaleDateString();
+        }
+
+        function updateSummaryCards(stats) {
+            document.getElementById('fileCount').textContent = formatNumber(stats.file_count);
+            document.getElementById('chunkCount').textContent = formatNumber(stats.chunk_count);
+            document.getElementById('storageSize').textContent = stats.storage_size_pretty;
+
+            const updatedDate = formatDate(stats.updated_at);
+            document.getElementById('lastUpdated').textContent = updatedDate;
+
+            if (stats.staleness_days !== null && stats.staleness_days >= 0) {
+                document.getElementById('stalenessLabel').textContent = `${stats.staleness_days} days old`;
+            } else {
+                document.getElementById('stalenessLabel').textContent = 'Index age';
+            }
+        }
+
+        function updateWarnings(warnings) {
+            const banner = document.getElementById('warningBanner');
+            const list = document.getElementById('warningList');
+
+            if (warnings && warnings.length > 0) {
+                list.innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+                banner.classList.add('visible');
+            } else {
+                banner.classList.remove('visible');
+            }
+        }
+
+        function updateLanguageChart(languages) {
+            const ctx = document.getElementById('languageChart');
+
+            // Sort by chunk count and take top 10
+            const topLanguages = languages
+                .sort((a, b) => b.chunk_count - a.chunk_count)
+                .slice(0, 10);
+
+            const labels = topLanguages.map(l => l.language);
+            const data = topLanguages.map(l => l.chunk_count);
+
+            // Destroy existing chart
+            if (languageChart) {
+                languageChart.destroy();
+            }
+
+            // Detect color scheme
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
+            const gridColor = isDark ? '#404040' : '#e0e0e0';
+
+            languageChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Chunks',
+                        data: data,
+                        backgroundColor: 'rgba(33, 150, 243, 0.7)',
+                        borderColor: 'rgba(33, 150, 243, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: textColor
+                            },
+                            grid: {
+                                color: gridColor
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: textColor
+                            },
+                            grid: {
+                                color: gridColor
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateSymbolChart(symbols) {
+            const ctx = document.getElementById('symbolChart');
+
+            if (!symbols || Object.keys(symbols).length === 0) {
+                // No symbols - show message
+                if (symbolChart) {
+                    symbolChart.destroy();
+                    symbolChart = null;
+                }
+                ctx.parentElement.innerHTML = '<p style="text-align: center; padding: 40px; color: var(--text-secondary);">No symbol data available</p>';
+                return;
+            }
+
+            const entries = Object.entries(symbols).sort((a, b) => b[1] - a[1]);
+            const labels = entries.map(e => e[0]);
+            const data = entries.map(e => e[1]);
+
+            // Destroy existing chart
+            if (symbolChart) {
+                symbolChart.destroy();
+            }
+
+            // Detect color scheme
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
+            const gridColor = isDark ? '#404040' : '#e0e0e0';
+
+            symbolChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Count',
+                        data: data,
+                        backgroundColor: 'rgba(76, 175, 80, 0.7)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: textColor
+                            },
+                            grid: {
+                                color: gridColor
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: textColor
+                            },
+                            grid: {
+                                color: gridColor
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDashboard(stats) {
+            updateSummaryCards(stats);
+            updateWarnings(stats.warnings);
+            updateLanguageChart(stats.languages || []);
+            updateSymbolChart(stats.symbols || {});
+        }
+
+        async function loadIndexList() {
+            try {
+                const data = await fetchStats();
+                allIndexes = Array.isArray(data) ? data : [data];
+
+                const select = document.getElementById('indexSelect');
+                select.innerHTML = allIndexes.map((idx, i) =>
+                    `<option value="${i}">${idx.name}</option>`
+                ).join('');
+
+                // Load first index by default
+                if (allIndexes.length > 0) {
+                    await loadDashboard(0);
+                }
+            } catch (error) {
+                showError(`Failed to load index list: ${error.message}`);
+            }
+        }
+
+        async function loadDashboard(indexIndex) {
+            const stats = allIndexes[indexIndex];
+
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'block';
+
+            updateDashboard(stats);
+        }
+
+        function showError(message) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('dashboardContent').style.display = 'none';
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        // Index selector change handler
+        document.getElementById('indexSelect').addEventListener('change', (e) => {
+            const indexIndex = parseInt(e.target.value);
+            loadDashboard(indexIndex);
+        });
+
+        // Listen for color scheme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            // Reload charts with new colors
+            const select = document.getElementById('indexSelect');
+            const indexIndex = parseInt(select.value);
+            if (!isNaN(indexIndex) && allIndexes[indexIndex]) {
+                updateDashboard(allIndexes[indexIndex]);
+            }
+        });
+
+        // Initialize dashboard
+        loadIndexList();
+    </script>
+</body>
+</html>
