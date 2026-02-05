@@ -91,20 +91,21 @@ Plans:
 - [x] 35-02-PLAN.md -- HTTP API + terminal dashboard (/api/stats endpoint, Rich Layout multi-pane dashboard)
 - [x] 35-03-PLAN.md -- Web UI dashboard (Chart.js visualization, serve-dashboard command)
 
-#### Phase 36: Developer Skills
+#### Phase 36: Developer Skills ✓
 **Goal**: Create skills for Claude Code and OpenCode with installation and routing guidance
 **Depends on**: Phase 35
 **Requirements**: REQ-019, REQ-020, REQ-021, REQ-022
 **Success Criteria** (what must be TRUE):
-  1. Claude Code SKILL.md exists with setup instructions and MCP configuration
-  2. Claude Code skill includes routing guidance (when CocoSearch vs grep/find)
-  3. OpenCode SKILL.md exists with setup instructions
-  4. OpenCode skill includes routing guidance for code exploration workflows
-**Plans**: 2 plans
+  1. ✓ Claude Code SKILL.md exists with setup instructions and MCP configuration
+  2. ✓ Claude Code skill includes routing guidance (when CocoSearch vs grep/find)
+  3. ✓ OpenCode SKILL.md exists with setup instructions
+  4. ✓ OpenCode skill includes routing guidance for code exploration workflows
+**Plans**: 2 plans (complete)
+**Completed**: 2026-02-05
 
 Plans:
-- [ ] 36-01-PLAN.md -- Claude Code skill (installation + MCP config + routing guidance)
-- [ ] 36-02-PLAN.md -- OpenCode skill (installation + MCP config + routing guidance)
+- [x] 36-01-PLAN.md -- Claude Code skill (installation + MCP config + routing guidance)
+- [x] 36-02-PLAN.md -- OpenCode skill (installation + MCP config + routing guidance)
 
 #### Phase 37: Documentation Rebrand
 **Goal**: Update README to reflect CocoSearch's full capabilities beyond "semantic search"
@@ -135,4 +136,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-05 after Phase 35 complete*
+*Last updated: 2026-02-05 after Phase 36 complete*
