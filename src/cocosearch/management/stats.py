@@ -244,38 +244,42 @@ def check_staleness(index_name: str, threshold_days: int = 7) -> tuple[bool, int
     """
     pool = get_connection_pool()
 
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            # Query cocosearch_index_metadata for updated_at
-            metadata_query = """
-                SELECT updated_at
-                FROM cocosearch_index_metadata
-                WHERE index_name = %s
-            """
-            cur.execute(metadata_query, (index_name,))
-            row = cur.fetchone()
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Query cocosearch_index_metadata for updated_at
+                metadata_query = """
+                    SELECT updated_at
+                    FROM cocosearch_index_metadata
+                    WHERE index_name = %s
+                """
+                cur.execute(metadata_query, (index_name,))
+                row = cur.fetchone()
 
-            if not row or row[0] is None:
-                # No metadata or no updated_at
-                return True, -1
+                if not row or row[0] is None:
+                    # No metadata or no updated_at
+                    return True, -1
 
-            updated_at = row[0]
-            # Calculate days since update
-            from datetime import datetime, timezone
+                updated_at = row[0]
+                # Calculate days since update
+                from datetime import datetime, timezone
 
-            now = datetime.now(timezone.utc)
-            # Handle timezone-aware and naive datetimes
-            if updated_at.tzinfo is None:
-                # Assume UTC if naive
-                from datetime import timezone
-                updated_at = updated_at.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                # Handle timezone-aware and naive datetimes
+                if updated_at.tzinfo is None:
+                    # Assume UTC if naive
+                    from datetime import timezone
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
 
-            delta = now - updated_at
-            days_since_update = delta.days
+                delta = now - updated_at
+                days_since_update = delta.days
 
-            is_stale = days_since_update >= threshold_days
+                is_stale = days_since_update >= threshold_days
 
-            return is_stale, days_since_update
+                return is_stale, days_since_update
+    except Exception:
+        # Table doesn't exist or other database error - treat as no metadata
+        return True, -1
 
 
 def get_symbol_stats(index_name: str) -> dict[str, int]:
@@ -408,17 +412,21 @@ def get_comprehensive_stats(index_name: str, staleness_threshold: int = 7) -> In
     created_at = None
     updated_at = None
 
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            metadata_query = """
-                SELECT created_at, updated_at
-                FROM cocosearch_index_metadata
-                WHERE index_name = %s
-            """
-            cur.execute(metadata_query, (index_name,))
-            row = cur.fetchone()
-            if row:
-                created_at, updated_at = row
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                metadata_query = """
+                    SELECT created_at, updated_at
+                    FROM cocosearch_index_metadata
+                    WHERE index_name = %s
+                """
+                cur.execute(metadata_query, (index_name,))
+                row = cur.fetchone()
+                if row:
+                    created_at, updated_at = row
+    except Exception:
+        # Table doesn't exist - timestamps remain None
+        pass
 
     # Collect warnings
     warnings = collect_warnings(index_name, is_stale, staleness_days)

@@ -553,8 +553,8 @@ def stats_command(args: argparse.Namespace) -> int:
     # Initialize CocoIndex
     cocoindex.init()
 
-    # Determine output mode: --json takes precedence over --pretty
-    json_output = args.json or not args.pretty
+    # Determine output mode: visual is default, --json enables JSON output
+    json_output = args.json
 
     # Determine which index(es) to show
     if args.all:
