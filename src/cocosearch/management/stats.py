@@ -94,7 +94,7 @@ def get_language_stats(index_name: str) -> list[dict]:
     """Get per-language statistics for an index.
 
     Uses SQL GROUP BY for efficient aggregation at database level.
-    Gracefully handles pre-v1.7 indexes that lack content_text column.
+    Line counting requires content_text column added in v1.7.
 
     Args:
         index_name: The name of the index.
@@ -104,7 +104,7 @@ def get_language_stats(index_name: str) -> list[dict]:
         - language: Language identifier (e.g., "python", "hcl")
         - file_count: Number of unique files for this language
         - chunk_count: Number of chunks for this language
-        - line_count: Number of lines (None if pre-v1.7 index)
+        - line_count: Number of lines (None if index lacks content_text column)
 
         List is sorted by chunk_count descending.
 
@@ -152,7 +152,7 @@ def get_language_stats(index_name: str) -> list[dict]:
                     ORDER BY chunk_count DESC
                 """
             else:
-                # Graceful degradation for pre-v1.7 indexes
+                # Pre-v1.7 indexes lack content_text column for line counting
                 stats_query = f"""
                     SELECT
                         COALESCE(language_id, 'unknown') as language,
@@ -290,7 +290,7 @@ def get_symbol_stats(index_name: str) -> dict[str, int]:
 
     Returns:
         Dictionary mapping symbol types to counts (e.g., {"function": 150, "class": 25}).
-        Empty dict if symbol_type column doesn't exist (pre-v1.7 index).
+        Empty dict if symbol_type column doesn't exist (requires v1.7+ index).
 
     Raises:
         ValueError: If the index does not exist.
@@ -309,7 +309,7 @@ def get_symbol_stats(index_name: str) -> dict[str, int]:
             has_symbol_type = cur.fetchone() is not None
 
             if not has_symbol_type:
-                # Graceful degradation for pre-v1.7 indexes
+                # Pre-v1.7 indexes lack symbol_type column
                 return {}
 
             # Get symbol type counts

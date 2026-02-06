@@ -70,8 +70,8 @@ def get_table_name(index_name: str) -> str:
 def check_column_exists(table_name: str, column_name: str) -> bool:
     """Check if a column exists in a table.
 
-    Used for graceful degradation when schema versions differ.
-    For example, pre-v1.7 indexes lack content_text column for hybrid search.
+    Used for feature detection when schema versions differ
+    (e.g., hybrid search requires content_text column added in v1.7).
 
     Args:
         table_name: Full table name (e.g., "codeindex_myproject__myproject_chunks")
