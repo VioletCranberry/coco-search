@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 42 of 42 (Technical Documentation)
-Plan: 3 of 3 — MCP tools reference complete
+Plan: 2 of 3 — Retrieval logic documentation complete
 Status: In progress
-Last activity: 2026-02-06 — Completed 42-03-PLAN.md
+Last activity: 2026-02-06 — Completed 42-02-PLAN.md
 
 Progress: [###################.] 97% (113/117 estimated plans)
 
@@ -45,6 +45,12 @@ Full decision log in PROJECT.md Key Decisions table.
 - Dual-format examples (natural language intent + JSON request/response)
 - Documented optional fields and version-specific features (v1.7+ symbol filtering, hybrid search)
 - Error response examples for destructive operations (clear_index, index_codebase)
+
+**Phase 42-02 decisions:**
+- Documented actual parameter values from source code (k=60, TTL=24h, chunk_size=1000) rather than using placeholders
+- Included RRF formula with worked example showing double-match scoring advantage
+- Two-level cache architecture explained: L1 exact (SHA256), L2 semantic (cosine >= 0.95)
+- Definition boost applied after RRF to preserve rank-based algorithm semantics
 
 **Phase 42-01 decisions:**
 - Text-only architecture descriptions (no diagrams per user decision)
@@ -111,5 +117,5 @@ None — ready for phase planning.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 42-03-PLAN.md (MCP tools reference documentation)
+Stopped at: Completed 42-02-PLAN.md (Retrieval logic documentation)
 Resume file: None
