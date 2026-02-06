@@ -28,9 +28,9 @@ Requirements for v1.9 Multi-Repo & Polish milestone.
 
 ### Documentation
 
-- [ ] **DOC-01**: Create onboarding workflow skill (multi-step)
-- [ ] **DOC-02**: Create debugging workflow skill (multi-step)
-- [ ] **DOC-03**: Create refactoring workflow skill (multi-step)
+- [x] **DOC-01**: Create onboarding workflow skill (multi-step)
+- [x] **DOC-02**: Create debugging workflow skill (multi-step)
+- [x] **DOC-03**: Create refactoring workflow skill (multi-step)
 - [ ] **DOC-04**: Document retrieval logic (hybrid search, RRF fusion, symbol filtering)
 - [ ] **DOC-05**: Create MCP tools reference with complete examples
 
@@ -71,9 +71,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLEAN-02 | Phase 40 | Complete |
 | CLEAN-03 | Phase 40 | Complete |
 | CLEAN-04 | Phase 40 | Complete |
-| DOC-01 | Phase 41 | Pending |
-| DOC-02 | Phase 41 | Pending |
-| DOC-03 | Phase 41 | Pending |
+| DOC-01 | Phase 41 | Complete |
+| DOC-02 | Phase 41 | Complete |
+| DOC-03 | Phase 41 | Complete |
 | DOC-04 | Phase 42 | Pending |
 | DOC-05 | Phase 42 | Pending |
 
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-06 after phase 40 completion (CLEAN-02, CLEAN-03, CLEAN-04 complete)*
+*Last updated: 2026-02-06 after phase 41 completion (DOC-01, DOC-02, DOC-03 complete)*

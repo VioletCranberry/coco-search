@@ -67,21 +67,17 @@ Plans:
 - [x] 40-01-PLAN.md — Remove deprecated languages.py and metadata.py re-export modules
 - [x] 40-02-PLAN.md — Remove v1.2 graceful degradation code from search modules
 
-#### Phase 41: Workflow Skills
+#### Phase 41: Workflow Skills ✓
 **Goal**: Users have multi-step workflow guidance for common tasks
 **Depends on**: Phase 38 (multi-repo enables workflows)
 **Requirements**: DOC-01, DOC-02, DOC-03
-**Success Criteria** (what must be TRUE):
-  1. Onboarding workflow skill guides users through understanding a new codebase step-by-step
-  2. Debugging workflow skill guides users through finding root cause of issues
-  3. Refactoring workflow skill guides users through safe code changes with impact analysis
-  4. Skills follow consistent multi-step format with clear when-to-use guidance
+**Status**: Complete (2026-02-06)
 **Plans**: 3 plans
 
 Plans:
-- [ ] 41-01-PLAN.md -- Create onboarding workflow skill
-- [ ] 41-02-PLAN.md -- Create debugging workflow skill
-- [ ] 41-03-PLAN.md -- Create refactoring workflow skill
+- [x] 41-01-PLAN.md — Create onboarding workflow skill
+- [x] 41-02-PLAN.md — Create debugging workflow skill
+- [x] 41-03-PLAN.md — Create refactoring workflow skill
 
 #### Phase 42: Technical Documentation
 **Goal**: Users and contributors understand retrieval logic and MCP tool usage
@@ -113,4 +109,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-06 — Phase 41 planned*
+*Last updated: 2026-02-06 — Phase 41 complete*
