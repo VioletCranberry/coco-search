@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 40 of 42 (Code Cleanup)
-Plan: 1 of 3
+Plan: 2 of 3
 Status: In progress
-Last activity: 2026-02-05 — Completed 40-01-PLAN.md
+Last activity: 2026-02-06 — Completed 40-02-PLAN.md
 
-Progress: [##########..........] 91% (107/117 estimated plans)
+Progress: [##########..........] 92% (108/117 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 105
+- Total plans completed: 106
 - Milestones shipped: 8 (v1.0-v1.8)
 - Last milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
 
@@ -39,6 +39,11 @@ Progress: [##########..........] 91% (107/117 estimated plans)
 ### Decisions
 
 Full decision log in PROJECT.md Key Decisions table.
+
+**Phase 40-02 decisions:**
+- Removed pre-v1.2 graceful degradation - metadata columns now required
+- Preserved v1.7 feature detection for content_text and symbol columns
+- Removed TestGracefulDegradation test class testing deprecated behavior
 
 **Phase 40-01 decisions:**
 - Removed DevOpsMetadata from indexer __all__ exports (backward-compat wrapper no longer public API)
@@ -63,7 +68,7 @@ None — ready for phase planning.
 
 **From research:**
 - uvx cwd behavior needs validation: `os.getcwd()` may return uvx cache path, not workspace. Document `--directory $(pwd)` pattern in MCP registration.
-- Old index prevalence unknown: May need migration guidance before removing graceful degradation in Phase 40.
+- Old index prevalence RESOLVED (40-02): Pre-v1.2 graceful degradation removed. Users with old indexes will get clear SQL error directing them to re-index.
 - CocoIndex schema completeness RESOLVED (40-01): CocoIndex natively creates TEXT/vector columns. schema_migration.py is necessary for PostgreSQL-specific features (TSVECTOR, GIN indexes), not deprecated migration code.
 
 **Research flags from v1.8 (still relevant):**
@@ -72,6 +77,6 @@ None — ready for phase planning.
 
 ## Session Continuity
 
-Last session: 2026-02-05
-Stopped at: Completed 40-01-PLAN.md (removed deprecated re-export modules)
+Last session: 2026-02-06
+Stopped at: Completed 40-02-PLAN.md (removed v1.2 graceful degradation)
 Resume file: None
