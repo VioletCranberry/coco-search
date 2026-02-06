@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 40 of 42 (Code Cleanup)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-05 — Phase 39 complete (verified)
+Plan: 1 of 3
+Status: In progress
+Last activity: 2026-02-05 — Completed 40-01-PLAN.md
 
-Progress: [##########..........] 91% (106/117 estimated plans)
+Progress: [##########..........] 91% (107/117 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 104
+- Total plans completed: 105
 - Milestones shipped: 8 (v1.0-v1.8)
 - Last milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
 
@@ -40,6 +40,11 @@ Progress: [##########..........] 91% (106/117 estimated plans)
 
 Full decision log in PROJECT.md Key Decisions table.
 
+**Phase 40-01 decisions:**
+- Removed DevOpsMetadata from indexer __all__ exports (backward-compat wrapper no longer public API)
+- Tests that need DevOpsMetadata now define local dataclass rather than importing from deprecated module
+- Fixed unused import (extract_extension) discovered during lint check
+
 **Phase 39-01 decisions:**
 - Fixed symbol signature extraction bugs rather than updating tests to accept broken output
 - Increased signature truncation limit from 120 to 200 characters for realistic code
@@ -59,7 +64,7 @@ None — ready for phase planning.
 **From research:**
 - uvx cwd behavior needs validation: `os.getcwd()` may return uvx cache path, not workspace. Document `--directory $(pwd)` pattern in MCP registration.
 - Old index prevalence unknown: May need migration guidance before removing graceful degradation in Phase 40.
-- CocoIndex schema completeness: Verify CocoIndex natively creates all columns before removing migration functions.
+- CocoIndex schema completeness RESOLVED (40-01): CocoIndex natively creates TEXT/vector columns. schema_migration.py is necessary for PostgreSQL-specific features (TSVECTOR, GIN indexes), not deprecated migration code.
 
 **Research flags from v1.8 (still relevant):**
 - Test C/C++ extraction on real codebases with heavy macros, verify failure rates
@@ -68,5 +73,5 @@ None — ready for phase planning.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Phase 39 verified — ready for /gsd:plan-phase 40
+Stopped at: Completed 40-01-PLAN.md (removed deprecated re-export modules)
 Resume file: None
