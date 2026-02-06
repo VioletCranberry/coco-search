@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 41 of 42 (Workflow Skills) — IN PROGRESS
-Plan: 1 of estimated 2 — Plan 01 complete
+Plan: 2 of estimated 2 — Plan 02 complete
 Status: In progress
-Last activity: 2026-02-06 — Completed 41-01-PLAN.md (onboarding workflow skill)
+Last activity: 2026-02-06 — Completed 41-02-PLAN.md (debugging workflow skill)
 
-Progress: [##################..] 93% (109/117 estimated plans)
+Progress: [##################..] 94% (110/117 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 107
+- Total plans completed: 108
 - Milestones shipped: 8 (v1.0-v1.8)
 - Last milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
 
@@ -39,6 +39,12 @@ Progress: [##################..] 93% (109/117 estimated plans)
 ### Decisions
 
 Full decision log in PROJECT.md Key Decisions table.
+
+**Phase 41-02 decisions:**
+- Wide-net search combines semantic + symbol in same step for richer context
+- Adaptive trace depth defaults to one hop, expands only on user request
+- Fix suggestions are opt-in only - skill focuses on root cause identification
+- Pre-flight index health check warns about stale indexes before debugging
 
 **Phase 41-01 decisions:**
 - Onboarding skill uses "Use when..." trigger format for skill discovery
@@ -86,5 +92,5 @@ None — ready for phase planning.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 41-01-PLAN.md (onboarding workflow skill)
+Stopped at: Completed 41-02-PLAN.md (debugging workflow skill)
 Resume file: None
