@@ -1,5 +1,32 @@
 # Project Milestones: CocoSearch
 
+## v1.9 Multi-Repo & Polish (Shipped: 2026-02-06)
+
+**Delivered:** Single MCP registration for all projects via --project-from-cwd, codebase cleanup removing 237+ LOC of deprecated code, three adaptive workflow skills (onboarding, debugging, refactoring), and comprehensive technical documentation covering architecture, retrieval logic, and MCP tools reference.
+
+**Phases completed:** 38-42 (11 plans total)
+
+**Key accomplishments:**
+
+- Multi-repo MCP support with --project-from-cwd flag, staleness warnings, and unindexed-repo prompts
+- Fixed 29 failing tests (1022 passing) with corrected symbol signature extraction and CLI mocks
+- Removed 237+ LOC of deprecated modules (languages.py, metadata.py) and v1.2 graceful degradation
+- Three adaptive workflow skills (773 lines): onboarding, debugging, refactoring with index freshness checks
+- Technical documentation (811 lines): architecture overview, retrieval logic with RRF formulas, MCP tools reference
+
+**Stats:**
+
+- 27 files created/modified
+- +2,043 / -485 lines (9,012 Python LOC in src/)
+- 5 phases, 11 plans
+- 1 day (2026-02-05 → 2026-02-06)
+
+**Git range:** `feat(38-01)` → `docs(42)`
+
+**What's next:** Planning next milestone
+
+---
+
 ## v1.8 Polish & Observability (Shipped: 2026-02-05)
 
 **Delivered:** Query caching with semantic similarity, symbol extraction expanded to 10 languages (Java, C, C++, Ruby, PHP), stats dashboard with CLI/terminal/web interfaces, developer skills for Claude Code and OpenCode, and documentation rebrand — comprehensive observability and polish for production use.

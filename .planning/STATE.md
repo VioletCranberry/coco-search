@@ -2,37 +2,38 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-05)
+See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Semantic code search that runs entirely locally — no data leaves your machine.
-**Current focus:** v1.9 Multi-Repo & Polish
+**Current focus:** Planning next milestone
 
 ## Current Position
 
 Phase: 42 of 42 (Technical Documentation) — COMPLETE
-Plan: 3 of 3 — All plans complete
-Status: Phase verified, milestone ready for completion
-Last activity: 2026-02-06 — Phase 42 complete (3 documentation files created)
+Plan: All plans complete
+Status: v1.9 milestone shipped
+Last activity: 2026-02-06 — v1.9 milestone complete
 
-Progress: [####################] 100% (112/112 plans)
+Progress: [####################] 100% (114/114 plans across 10 milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 112
-- Milestones shipped: 8 (v1.0-v1.8)
-- Last milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
+- Total plans completed: 114
+- Milestones shipped: 10 (v1.0-v1.9)
+- Last milestone: v1.9 Multi-Repo & Polish (phases 38-42, 11 plans)
 
 **By Recent Milestone:**
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
+| v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 | v1.6 Docker & Auto-Detect | 23-26 | 11 | 2026-02-02 |
 | v1.5 Config & Architecture | 19-22 | 11 | 2026-02-01 |
 
-*Updated: 2026-02-05 after v1.9 roadmap created*
+*Updated: 2026-02-06 after v1.9 milestone complete*
 
 ## Accumulated Context
 
@@ -40,82 +41,22 @@ Progress: [####################] 100% (112/112 plans)
 
 Full decision log in PROJECT.md Key Decisions table.
 
-**Phase 42-03 decisions:**
-- 5-column parameter table format (Parameter, Type, Required, Default, Description)
-- Dual-format examples (natural language intent + JSON request/response)
-- Documented optional fields and version-specific features (v1.7+ symbol filtering, hybrid search)
-- Error response examples for destructive operations (clear_index, index_codebase)
-
-**Phase 42-02 decisions:**
-- Documented actual parameter values from source code (k=60, TTL=24h, chunk_size=1000) rather than using placeholders
-- Included RRF formula with worked example showing double-match scoring advantage
-- Two-level cache architecture explained: L1 exact (SHA256), L2 semantic (cosine >= 0.95)
-- Definition boost applied after RRF to preserve rank-based algorithm semantics
-
-**Phase 42-01 decisions:**
-- Text-only architecture descriptions (no diagrams per user decision)
-- Cross-reference detailed docs rather than duplicate content
-- Brief 2-3 sentence primers for core ML concepts (embeddings, vector search, RRF)
-
-**Phase 41-03 decisions:**
-- Require fresh index (staleness_days <= 7) for refactoring - unlike debugging/onboarding
-- Use hybrid search for all refactoring searches (identifier-heavy queries)
-- Use symbol_name glob patterns to catch all variants (User* catches User, UserProfile, etc.)
-- Leaf-first ordering prevents cascading import failures
-- Every code change requires explicit user confirmation
-- Suggest testing after each change, not just at end
-
-**Phase 41-02 decisions:**
-- Wide-net search combines semantic + symbol in same step for richer context
-- Adaptive trace depth defaults to one hop, expands only on user request
-- Fix suggestions are opt-in only - skill focuses on root cause identification
-- Pre-flight index health check warns about stale indexes before debugging
-
-**Phase 41-01 decisions:**
-- Onboarding skill uses "Use when..." trigger format for skill discovery
-- Auto-executes MCP tools without requiring user CLI commands
-- Adaptive branching based on codebase type (web app, CLI, library, service)
-- Staleness threshold of 7 days for suggesting reindex
-- Optional CODEBASE_OVERVIEW.md with date and index version for freshness tracking
-- Conversational tone like senior developer walkthrough (not documentation-style)
-
-**Phase 40-02 decisions:**
-- Removed pre-v1.2 graceful degradation - metadata columns now required
-- Preserved v1.7 feature detection for content_text and symbol columns
-- Removed TestGracefulDegradation test class testing deprecated behavior
-
-**Phase 40-01 decisions:**
-- Removed DevOpsMetadata from indexer __all__ exports (backward-compat wrapper no longer public API)
-- Tests that need DevOpsMetadata now define local dataclass rather than importing from deprecated module
-- Fixed unused import (extract_extension) discovered during lint check
-
-**Phase 39-01 decisions:**
-- Fixed symbol signature extraction bugs rather than updating tests to accept broken output
-- Increased signature truncation limit from 120 to 200 characters for realistic code
-- Updated CLI test mocks to match refactored stats_command implementation using IndexStats
-
-**Phase 38-01 decisions:**
-- Used environment variable (COCOSEARCH_PROJECT_PATH) for CLI-to-MCP workspace communication
-- Added type field to search result header/footer for programmatic identification
-- Staleness threshold hardcoded to 7 days (matches stats command default)
-
 ### Pending Todos
 
-None — ready for phase planning.
+None — ready for next milestone planning.
 
 ### Blockers/Concerns
 
-**From research:**
-- uvx cwd behavior needs validation: `os.getcwd()` may return uvx cache path, not workspace. Document `--directory $(pwd)` pattern in MCP registration.
-- Old index prevalence RESOLVED (40-02): Pre-v1.2 graceful degradation removed. Users with old indexes will get clear SQL error directing them to re-index.
-- CocoIndex schema completeness RESOLVED (40-01): CocoIndex natively creates TEXT/vector columns. schema_migration.py is necessary for PostgreSQL-specific features (TSVECTOR, GIN indexes), not deprecated migration code.
-
-**Research flags from v1.8 (still relevant):**
+**Research flags (still relevant):**
 - Test C/C++ extraction on real codebases with heavy macros, verify failure rates
 - Consider parse failure tracking in stats output (per-language counts)
+
+**Deferred protocol enhancements:**
+- PROTO-01: MCP Roots capability support (protocol-correct project detection)
+- PROTO-02: HTTP transport project context via query params
 
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Phase 42 complete and verified (15/15 must-haves). Milestone v1.9 ready for audit/completion.
+Stopped at: v1.9 milestone complete. Ready for `/gsd:new-milestone`.
 Resume file: None

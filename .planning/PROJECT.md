@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A local-first semantic code search tool exposed via MCP and CLI. Point it at a codebase, it indexes using CocoIndex with Ollama embeddings and PostgreSQL storage, then search semantically through natural language queries. Built for understanding unfamiliar codebases without sending code to external services. Supports 31 languages including DevOps files (Terraform, Dockerfile, Bash) with language-aware chunking, symbol extraction, and rich metadata. Features hybrid search (vector + keyword), context expansion, and symbol filtering. Configurable via YAML config file with developer setup automation. Available as all-in-one Docker container or native installation.
+A local-first semantic code search tool exposed via MCP and CLI. Point it at a codebase, it indexes using CocoIndex with Ollama embeddings and PostgreSQL storage, then search semantically through natural language queries. Built for understanding unfamiliar codebases without sending code to external services. Supports 31 languages including DevOps files (Terraform, Dockerfile, Bash) with language-aware chunking, symbol extraction, and rich metadata. Features hybrid search (vector + keyword), context expansion, symbol filtering, and multi-repo MCP support. Configurable via YAML config file with developer setup automation. Available as all-in-one Docker container or native installation. Includes workflow skills for onboarding, debugging, and refactoring.
 
 ## Core Value
 
@@ -94,22 +94,19 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - Claude Code skill with installation and routing guidance — v1.8
 - OpenCode skill with installation and routing guidance — v1.8
 - README rebrand with hybrid search positioning — v1.8
+- ✓ Single MCP registration for multiple repos (--project-from-cwd) — v1.9
+- ✓ Prompt to index when unindexed repo detected — v1.9
+- ✓ Per-project and global MCP configuration patterns documented — v1.9
+- ✓ Test signature format mismatches fixed (1022 tests passing) — v1.9
+- ✓ Deprecated functions removed (languages.py, metadata.py shims) — v1.9
+- ✓ v1.2 graceful degradation removed (fail-fast with clear errors) — v1.9
+- ✓ Multi-step workflow skills: onboarding, debugging, refactoring — v1.9
+- ✓ Retrieval logic documentation (indexing + search pipelines, RRF) — v1.9
+- ✓ MCP tools reference with complete parameter docs and examples — v1.9
 
 ### Active
 
-**v1.9 Multi-Repo & Polish**
-
-- [ ] Single MCP registration for multiple repos (Serena-style cwd detection)
-- [ ] Prompt to index when unindexed repo detected
-- [ ] UV-based installation support (`uvx --from git+...`)
-- [ ] Per-project and global MCP configuration patterns
-- [ ] Fix test signature format mismatches
-- [ ] Remove DB migrations logic (single-user, no backwards compat needed)
-- [ ] Remove deprecated functions and v1.2 graceful degradation
-- [ ] Remove unused code paths
-- [ ] Multi-step workflow skills (onboarding, debugging, refactoring)
-- [ ] Retrieval logic documentation
-- [ ] MCP tools reference documentation
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -123,14 +120,15 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ## Current State
 
-Shipped v1.8 with 9,210 LOC Python (src/).
+Shipped v1.9 with 9,012 LOC Python (src/).
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP, tree-sitter, tree-sitter-language-pack.
 Primary use case: onboarding to unfamiliar codebases via hybrid search.
 Language support: 31 languages (28 standard + 3 DevOps) with symbol extraction for 10.
 Search features: Hybrid search (RRF), context expansion, symbol filtering, query caching, definition boost.
+Multi-repo: Single MCP registration via --project-from-cwd with staleness warnings.
 Observability: CLI stats, HTTP API, terminal dashboard, web UI with Chart.js.
-Test coverage: 550+ unit tests + integration tests with real PostgreSQL and Ollama.
-Documentation: README with hybrid search positioning, developer skills for Claude Code and OpenCode.
+Test coverage: 1022 unit tests + integration tests with real PostgreSQL and Ollama.
+Documentation: Architecture overview, retrieval logic docs, MCP tools reference, workflow skills (onboarding, debugging, refactoring).
 Configuration: YAML config with env var substitution, 4-level precedence, config check command.
 Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
 Docker deployment: All-in-one container with s6-overlay, multi-transport support (stdio/SSE/HTTP).
@@ -168,7 +166,6 @@ Environment: COCOSEARCH_DATABASE_URL (required), COCOSEARCH_OLLAMA_URL (optional
 | Empty strings over NULLs for metadata | Simplifies SQL, consistent pattern across all files | ✓ Good |
 | Standard Rust regex for separators | CocoIndex uses regex v1.12.2, not fancy-regex | ✓ Good |
 | Additive schema only | No primary key changes, safe schema migration | ✓ Good |
-| Module-level graceful degradation | One-time flag prevents repeated failing SQL for pre-v1.2 indexes | ✓ Good |
 | Flat metadata in MCP response | Top-level fields, not nested, for simplicity | ✓ Good |
 | Default unit-only test execution | Fast feedback via -m unit marker in pytest addopts | ✓ Good |
 | Session-scoped container fixtures | One container per session for performance | ✓ Good |
@@ -204,6 +201,13 @@ Environment: COCOSEARCH_DATABASE_URL (required), COCOSEARCH_OLLAMA_URL (optional
 | Single-page HTML dashboard | No build step, embedded CSS/JS | ✓ Good |
 | Chart.js via CDN | Zero-config, browser caching | ✓ Good |
 | Hybrid search tagline | Better positioning than "semantic search" | ✓ Good |
+| Env var for CLI-to-MCP workspace | COCOSEARCH_PROJECT_PATH for --project-from-cwd | ✓ Good |
+| Fix bugs, not tests | Fixed symbol extraction logic rather than updating tests | ✓ Good |
+| schema_migration.py retained | Research proved it's necessary PostgreSQL enhancement | ✓ Good |
+| Fail-fast over graceful degradation | Pre-v1.2 indexes get clear SQL errors directing reindex | ✓ Good |
+| Skills auto-execute MCP tools | No manual CLI commands needed in workflows | ✓ Good |
+| Text-only architecture docs | No diagrams, cross-reference detailed docs | ✓ Good |
+| Actual values in docs | k=60, TTL=24h, chunk_size=1000 from source code | ✓ Good |
 
 ---
-*Last updated: 2026-02-05 after v1.9 milestone started*
+*Last updated: 2026-02-06 after v1.9 milestone*
