@@ -76,10 +76,12 @@ Plans:
   2. Debugging workflow skill guides users through finding root cause of issues
   3. Refactoring workflow skill guides users through safe code changes with impact analysis
   4. Skills follow consistent multi-step format with clear when-to-use guidance
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 41-01: TBD
+- [ ] 41-01-PLAN.md -- Create onboarding workflow skill
+- [ ] 41-02-PLAN.md -- Create debugging workflow skill
+- [ ] 41-03-PLAN.md -- Create refactoring workflow skill
 
 #### Phase 42: Technical Documentation
 **Goal**: Users and contributors understand retrieval logic and MCP tool usage
@@ -111,4 +113,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-25*
-*Last updated: 2026-02-05 — Phase 40 planned*
+*Last updated: 2026-02-06 — Phase 41 planned*
