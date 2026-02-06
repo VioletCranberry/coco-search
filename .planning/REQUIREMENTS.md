@@ -22,9 +22,9 @@ Requirements for v1.9 Multi-Repo & Polish milestone.
 ### Code Cleanup
 
 - [x] **CLEAN-01**: ~~Remove DB migrations logic from codebase~~ **Resolved with clarification** — Research (40-RESEARCH.md lines 357-362) proved `schema_migration.py` is NOT deprecated migration logic but necessary PostgreSQL feature enhancement (TSVECTOR generated columns, GIN indexes, symbol columns). CocoIndex cannot create these PostgreSQL-specific features. File should remain in codebase.
-- [ ] **CLEAN-02**: Remove deprecated functions
-- [ ] **CLEAN-03**: Remove v1.2 graceful degradation (old index compat)
-- [ ] **CLEAN-04**: Update test imports before module removal (prerequisite for CLEAN-01/02/03)
+- [x] **CLEAN-02**: Remove deprecated functions
+- [x] **CLEAN-03**: Remove v1.2 graceful degradation (old index compat)
+- [x] **CLEAN-04**: Update test imports before module removal (prerequisite for CLEAN-01/02/03)
 
 ### Documentation
 
@@ -68,9 +68,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-05 | Phase 38 | Complete |
 | TEST-01 | Phase 39 | Complete |
 | CLEAN-01 | Phase 40 | Resolved (research proved assumption incorrect) |
-| CLEAN-02 | Phase 40 | Pending |
-| CLEAN-03 | Phase 40 | Pending |
-| CLEAN-04 | Phase 40 | Pending |
+| CLEAN-02 | Phase 40 | Complete |
+| CLEAN-03 | Phase 40 | Complete |
+| CLEAN-04 | Phase 40 | Complete |
 | DOC-01 | Phase 41 | Pending |
 | DOC-02 | Phase 41 | Pending |
 | DOC-03 | Phase 41 | Pending |
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after phase 40 planning revision (CLEAN-01 clarified)*
+*Last updated: 2026-02-06 after phase 40 completion (CLEAN-02, CLEAN-03, CLEAN-04 complete)*

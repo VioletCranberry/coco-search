@@ -56,21 +56,16 @@ Plans:
 Plans:
 - [x] 39-01-PLAN.md — Fix test failures (symbol signatures, CLI Namespace mocks, hybrid search mocks)
 
-#### Phase 40: Code Cleanup
+#### Phase 40: Code Cleanup ✓
 **Goal**: Remove deprecated code and migration logic safely without breaking functionality
 **Depends on**: Phase 39 (tests must pass first)
 **Requirements**: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04
-**Success Criteria** (what must be TRUE):
-  1. DB migrations module removed from codebase (single-user tool, no backwards compat needed)
-  2. All deprecated functions removed with no remaining references
-  3. v1.2 graceful degradation code removed (old index compat no longer supported)
-  4. All tests updated and passing after each cleanup step
-  5. Codebase is cleaner with reduced LOC count
+**Status**: Complete (2026-02-06)
 **Plans**: 2 plans
 
 Plans:
-- [ ] 40-01-PLAN.md — Remove deprecated languages.py and metadata.py re-export modules
-- [ ] 40-02-PLAN.md — Remove v1.2 graceful degradation code from search modules
+- [x] 40-01-PLAN.md — Remove deprecated languages.py and metadata.py re-export modules
+- [x] 40-02-PLAN.md — Remove v1.2 graceful degradation code from search modules
 
 #### Phase 41: Workflow Skills
 **Goal**: Users have multi-step workflow guidance for common tasks
