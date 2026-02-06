@@ -291,35 +291,8 @@ def execute_vector_search(
 
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            try:
-                cur.execute(sql, params)
-                rows = cur.fetchall()
-            except Exception as e:
-                # Graceful degradation for pre-v1.2 indexes without metadata
-                logger.debug(f"Falling back to query without metadata: {e}")
-                sql_fallback = f"""
-                    SELECT
-                        filename,
-                        lower(location) as start_byte,
-                        upper(location) as end_byte,
-                        1 - (embedding <=> %s::vector) AS score
-                    FROM {table_name}
-                    {where_sql}
-                    ORDER BY embedding <=> %s::vector
-                    LIMIT %s
-                """
-                cur.execute(sql_fallback, params)
-                rows = cur.fetchall()
-                # Return results without metadata
-                return [
-                    VectorResult(
-                        filename=row[0],
-                        start_byte=int(row[1]),
-                        end_byte=int(row[2]),
-                        score=float(row[3]),
-                    )
-                    for row in rows
-                ]
+            cur.execute(sql, params)
+            rows = cur.fetchall()
 
     # Build results based on whether symbol columns were included
     if include_symbol_columns:
