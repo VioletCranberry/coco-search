@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 ## Current Position
 
-Phase: 40 of 42 (Code Cleanup) — COMPLETE
-Plan: 2 of 2 — All plans complete
-Status: Phase verified, ready for next phase
-Last activity: 2026-02-06 — Phase 40 complete (262 LOC removed)
+Phase: 41 of 42 (Workflow Skills) — IN PROGRESS
+Plan: 1 of estimated 2 — Plan 01 complete
+Status: In progress
+Last activity: 2026-02-06 — Completed 41-01-PLAN.md (onboarding workflow skill)
 
-Progress: [##################..] 92% (108/117 estimated plans)
+Progress: [##################..] 93% (109/117 estimated plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 106
+- Total plans completed: 107
 - Milestones shipped: 8 (v1.0-v1.8)
 - Last milestone: v1.8 Polish & Observability (phases 33-37, 13 plans)
 
@@ -39,6 +39,14 @@ Progress: [##################..] 92% (108/117 estimated plans)
 ### Decisions
 
 Full decision log in PROJECT.md Key Decisions table.
+
+**Phase 41-01 decisions:**
+- Onboarding skill uses "Use when..." trigger format for skill discovery
+- Auto-executes MCP tools without requiring user CLI commands
+- Adaptive branching based on codebase type (web app, CLI, library, service)
+- Staleness threshold of 7 days for suggesting reindex
+- Optional CODEBASE_OVERVIEW.md with date and index version for freshness tracking
+- Conversational tone like senior developer walkthrough (not documentation-style)
 
 **Phase 40-02 decisions:**
 - Removed pre-v1.2 graceful degradation - metadata columns now required
@@ -78,5 +86,5 @@ None — ready for phase planning.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Phase 40 complete and verified (9/9 must-haves). Ready for Phase 41.
+Stopped at: Completed 41-01-PLAN.md (onboarding workflow skill)
 Resume file: None
