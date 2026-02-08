@@ -35,13 +35,17 @@ htmlcov
 # Documentation
 docs
 *.md
-!README.md
 
 # Local development
 .claude
 docker-compose.yml
 dev-setup.sh
 cocosearch.yaml
+
+# Source code (not needed in infrastructure-only image)
+src
+pyproject.toml
+uv.lock
 
 # OS files
 .DS_Store

@@ -1,9 +1,9 @@
-# CocoSearch All-in-One Docker Image
-# Bundles PostgreSQL, Ollama (with pre-baked nomic-embed-text), and MCP server
+# CocoSearch Infrastructure Docker Image
+# Bundles PostgreSQL+pgvector and Ollama with pre-baked nomic-embed-text model
 # Uses s6-overlay for process supervision
 #
 # Build: docker build -t cocosearch -f docker/Dockerfile .
-# Run:   docker run -v /path/to/code:/mnt/repos:ro -v cocosearch-data:/data -p 3000:3000 cocosearch
+# Run:   docker run -v cocosearch-data:/data -p 5432:5432 -p 11434:11434 cocosearch
 
 # =============================================================================
 # Stage 1: Download Ollama model during build (not at runtime)
@@ -18,30 +18,12 @@ RUN ollama serve & \
     pkill ollama
 
 # =============================================================================
-# Stage 2: Build the Python application with UV
+# Stage 2: Final runtime image
 # =============================================================================
-FROM python:3.11-slim AS python-builder
+FROM debian:bookworm-slim
 
-# Install UV for fast Python package management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-WORKDIR /build
-
-# Copy project files for installation
-COPY pyproject.toml uv.lock README.md ./
-COPY src/ ./src/
-
-# Create virtual environment and install the package
-RUN uv venv /app/.venv && \
-    uv pip install --python /app/.venv/bin/python .
-
-# =============================================================================
-# Stage 3: Final runtime image
-# =============================================================================
-FROM python:3.11-slim
-
-LABEL org.opencontainers.image.title="CocoSearch"
-LABEL org.opencontainers.image.description="Local-first semantic code search with PostgreSQL, Ollama, and MCP"
+LABEL org.opencontainers.image.title="CocoSearch Infrastructure"
+LABEL org.opencontainers.image.description="PostgreSQL+pgvector and Ollama for CocoSearch"
 LABEL org.opencontainers.image.source="https://github.com/VioletCranberry/coco-s"
 
 # Build arguments
@@ -66,22 +48,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl xz-utils c
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
-# Install PostgreSQL 16 and runtime dependencies
+# Install PostgreSQL 17 and runtime dependencies
 # =============================================================================
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gnupg2 \
         lsb-release \
         curl \
-        ca-certificates \
-        git && \
+        ca-certificates && \
     # Add PostgreSQL APT repository
     echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        postgresql-16 \
-        postgresql-16-pgvector && \
+        postgresql-17 \
+        postgresql-17-pgvector && \
     # Clean up
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -92,15 +73,8 @@ RUN apt-get update && \
 # Copy Ollama binary from the model-downloader stage (already has correct arch)
 COPY --from=model-downloader /bin/ollama /usr/local/bin/ollama
 
-# =============================================================================
-# Copy Python application from builder
-# =============================================================================
-COPY --from=python-builder /app/.venv /app/.venv
-COPY --from=python-builder /build/src /app/src
-
-# Add Python and PostgreSQL to PATH
-ENV PATH="/app/.venv/bin:/usr/lib/postgresql/16/bin:$PATH"
-ENV PYTHONPATH="/app/src"
+# Add PostgreSQL to PATH
+ENV PATH="/usr/lib/postgresql/17/bin:$PATH"
 # Set HOME for Ollama (required by envconfig)
 ENV HOME="/root"
 
@@ -114,17 +88,14 @@ COPY --from=model-downloader /root/.ollama/models /data/ollama_models
 # =============================================================================
 # Create directory structure
 # =============================================================================
-RUN mkdir -p /data/pg_data /data/ollama_models /data/cocosearch /mnt/repos
+RUN mkdir -p /data/pg_data /data/ollama_models /data/cocosearch
 
 # =============================================================================
 # Environment variables (from CONTEXT.md decisions)
 # =============================================================================
-ENV COCOSEARCH_MCP_PORT=3000 \
-    COCOSEARCH_PG_PORT=5432 \
+ENV COCOSEARCH_PG_PORT=5432 \
     COCOSEARCH_OLLAMA_PORT=11434 \
     COCOSEARCH_EMBED_MODEL=nomic-embed-text \
-    COCOSEARCH_MCP_TRANSPORT=http \
-    COCOSEARCH_LOG_LEVEL=warn \
     # Ollama configuration
     OLLAMA_HOST=0.0.0.0:11434 \
     OLLAMA_MODELS=/data/ollama_models \
@@ -144,7 +115,7 @@ COPY docker/rootfs/ /
 # =============================================================================
 # Expose ports
 # =============================================================================
-EXPOSE 3000 5432 11434
+EXPOSE 5432 11434
 
 # =============================================================================
 # Health check - all services must be ready
