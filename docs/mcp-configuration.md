@@ -2,6 +2,21 @@
 
 CocoSearch provides an MCP (Model Context Protocol) server for semantic code search integration with LLM clients. When configured, your AI assistant can search your codebase using natural language.
 
+### Prerequisites
+
+CocoSearch requires PostgreSQL (with pgvector) and Ollama running locally. The simplest setup:
+
+```bash
+# Option A: Docker Compose (recommended)
+docker compose up -d
+
+# Option B: All-in-one Docker image
+docker build -t cocosearch -f docker/Dockerfile .
+docker run -v cocosearch-data:/data -p 5432:5432 -p 11434:11434 cocosearch
+```
+
+With infrastructure running, configure your MCP client below. The database connection defaults to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch` -- no environment variables needed when using Docker.
+
 **Available MCP tools:**
 
 - `index_codebase` - Index a directory for semantic search
@@ -77,6 +92,8 @@ claude mcp add --transport stdio --scope user \
 
 Replace `/absolute/path/to/cocosearch` with the actual path where you cloned the repository. Use `pwd` in the cocosearch directory to get the absolute path.
 
+> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
+
 **Verify CLI setup:**
 
 ```bash
@@ -108,6 +125,8 @@ Add to `~/.claude.json`:
 ```
 
 > **Important:** JSON does not expand `~` paths. Always use absolute paths like `/Users/yourname/cocosearch` or `/home/yourname/cocosearch`.
+
+> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
 
 **Verification:**
 
@@ -144,6 +163,8 @@ Add to `~/.claude.json`:
   }
 }
 ```
+
+> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
 
 **Verification:**
 
@@ -190,6 +211,8 @@ Add to `~/.claude.json`:
 > - `command` is an array (not separate command/args)
 > - Uses `"environment"` (not `"env"`)
 > - Has explicit `"enabled": true`
+
+> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
 
 **Verification:**
 
