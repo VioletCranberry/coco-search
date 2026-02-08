@@ -2,7 +2,7 @@
 set -e
 
 # Add PostgreSQL binaries to PATH
-export PATH="/usr/lib/postgresql/16/bin:$PATH"
+export PATH="/usr/lib/postgresql/17/bin:$PATH"
 
 # Initialize PostgreSQL data directory if needed
 if [ ! -f /data/pg_data/PG_VERSION ]; then

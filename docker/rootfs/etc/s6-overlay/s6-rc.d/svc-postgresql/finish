@@ -1,6 +1,6 @@
 #!/bin/sh
 # Add PostgreSQL binaries to PATH
-export PATH="/usr/lib/postgresql/16/bin:$PATH"
+export PATH="/usr/lib/postgresql/17/bin:$PATH"
 
 echo "Stopping PostgreSQL gracefully..."
 su postgres -c "pg_ctl stop -D /data/pg_data -m fast" || true

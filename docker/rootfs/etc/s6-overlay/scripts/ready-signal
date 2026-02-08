@@ -1,15 +1,12 @@
 #!/bin/sh
 # Print ready marker to stdout for scripting integration
-# This runs AFTER all services are ready (depends on svc-mcp which depends on everything)
+# This runs AFTER all infrastructure services are ready
 
-# Print service status summary
 echo "=========================================="
-echo "CocoSearch container ready"
+echo "CocoSearch infrastructure ready"
 echo "=========================================="
 echo "PostgreSQL:  localhost:${COCOSEARCH_PG_PORT:-5432}"
 echo "Ollama:      localhost:${COCOSEARCH_OLLAMA_PORT:-11434}"
-echo "MCP Server:  localhost:${COCOSEARCH_MCP_PORT:-3000}"
-echo "Transport:   ${COCOSEARCH_MCP_TRANSPORT:-http}"
 echo "=========================================="
 echo ""
 echo "COCOSEARCH_READY"
