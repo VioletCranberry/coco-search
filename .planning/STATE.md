@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 
 ## Current Position
 
-Phase: 46 of 47 (Parse Failure Tracking) — VERIFIED COMPLETE
-Plan: Ready for phase 47
-Status: Phase 46 verified and complete (4/4 must-haves passed)
-Last activity: 2026-02-08 -- Phase 46 verified and complete
+Phase: 47 of 47 (Documentation Update)
+Plan: 01 of ~2 in phase 47
+Status: In progress -- completed 47-01 (README & MCP Configuration)
+Last activity: 2026-02-08 -- Completed 47-01-PLAN.md
 
-Progress: [##########..........] 50% (10/~20 plans across v1.10)
+Progress: [###########.........] 55% (11/~20 plans across v1.10)
 
 ## Performance Metrics
 
@@ -27,12 +27,12 @@ Progress: [##########..........] 50% (10/~20 plans across v1.10)
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 10/~20 | In progress   |
+| v1.10 Infrastructure & Protocol | 43-47 | 11/~20 | In progress   |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 46-03 completion*
+*Updated: 2026-02-08 after 47-01 completion*
 
 ## Accumulated Context
 
@@ -73,10 +73,14 @@ Recent decisions affecting current work:
 - Top-level import for get_parse_failures in server.py (consistent with get_comprehensive_stats import style)
 - MCP index_stats upgraded from get_stats() to get_comprehensive_stats() for richer response data
 - include_failures defaults to false on both MCP tool and HTTP endpoints
+- All uvx examples use git+https://github.com/VioletCranberry/coco-s pattern
+- README leads with MCP registration, CLI is secondary
+- COCOSEARCH_DATABASE_URL only in Custom Database Connection section of mcp-configuration.md
+- Project detection priority chain documented: Roots > cwd > env > fallback
 
 ### Pending Todos
 
-None -- ready for phase 47 planning.
+None -- continue with 47-02 (reference docs update).
 
 ### Blockers/Concerns
 
@@ -86,5 +90,5 @@ None -- ready for phase 47 planning.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Phase 46 verified complete. Ready for `/gsd:discuss-phase 47`.
+Stopped at: Completed 47-01-PLAN.md (README & MCP Configuration rewrite)
 Resume file: None
