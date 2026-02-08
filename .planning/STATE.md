@@ -5,34 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** Phase 47 - Documentation Update
+**Current focus:** Phase 47 - Documentation Update -- COMPLETE
 
 ## Current Position
 
-Phase: 47 of 47 (Documentation Update)
-Plan: 01 of ~2 in phase 47
-Status: In progress -- completed 47-01 (README & MCP Configuration)
-Last activity: 2026-02-08 -- Completed 47-01-PLAN.md
+Phase: 47 of 47 (Documentation Update) -- COMPLETE
+Plan: 02 of 2 in phase 47 -- COMPLETE
+Status: Phase 47 complete. v1.10 milestone complete (12/12 plans).
+Last activity: 2026-02-08 -- Completed 47-02-PLAN.md
 
-Progress: [###########.........] 55% (11/~20 plans across v1.10)
+Progress: [####################] 100% (12/12 plans across v1.10)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 122 (across v1.0-v1.10)
-- Milestones shipped: 10 (v1.0-v1.9)
-- Last milestone: v1.9 Multi-Repo & Polish (phases 38-42, 11 plans)
+- Total plans completed: 124 (across v1.0-v1.10)
+- Milestones shipped: 10 (v1.0-v1.9), v1.10 complete
+- Last milestone: v1.10 Infrastructure & Protocol (phases 43-47, 12 plans)
 
 **By Recent Milestone:**
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 11/~20 | In progress   |
+| v1.10 Infrastructure & Protocol | 43-47 | 12 | 2026-02-08 |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 47-01 completion*
+*Updated: 2026-02-08 after 47-02 completion*
 
 ## Accumulated Context
 
@@ -77,10 +77,13 @@ Recent decisions affecting current work:
 - README leads with MCP registration, CLI is secondary
 - COCOSEARCH_DATABASE_URL only in Custom Database Connection section of mcp-configuration.md
 - Project detection priority chain documented: Roots > cwd > env > fallback
+- All reference docs use uvx cocosearch (not uv run or bare cocosearch)
+- Output blocks removed from all reference docs (commands only, per CONTEXT.md)
+- --json flag kept in cli-reference for stats and languages commands (verified in source)
 
 ### Pending Todos
 
-None -- continue with 47-02 (reference docs update).
+None -- v1.10 milestone complete.
 
 ### Blockers/Concerns
 
@@ -90,5 +93,5 @@ None -- continue with 47-02 (reference docs update).
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 47-01-PLAN.md (README & MCP Configuration rewrite)
+Stopped at: Completed 47-02-PLAN.md (Reference Docs Update). Phase 47 and v1.10 milestone complete.
 Resume file: None
