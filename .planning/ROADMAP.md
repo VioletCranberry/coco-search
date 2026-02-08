@@ -88,14 +88,15 @@ Plans:
 **Depends on**: Phases 43-46 (all feature work complete)
 **Requirements**: DOC-01, DOC-02, DOC-03, DOC-04
 **Success Criteria** (what must be TRUE):
-  1. Each reference doc in docs/ has a table of contents with navigable links
+  1. Each reference doc has clear section headers for GitHub sidebar navigation (relying on GitHub auto-ToC)
   2. Docker documentation describes the infra-only model (docker-compose for PostgreSQL+Ollama, native CocoSearch)
   3. README reflects the new usage model: `docker compose up` for infrastructure, `uvx cocosearch` for the tool
   4. MCP configuration docs show default DATABASE_URL and explain when env vars are optional
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 47-01: TBD
+- [ ] 47-01-PLAN.md -- Rewrite README.md and docs/mcp-configuration.md for infra-only Docker model and simplified MCP setup
+- [ ] 47-02-PLAN.md -- Update 6 reference docs with parse health features, Roots capability, uvx commands, remove output blocks
 
 ## Progress
 
@@ -108,7 +109,7 @@ Phases execute in numeric order: 43 -> 44 -> 45 -> 46 -> 47
 | 44. Docker Image Simplification | 2/2 | Complete | 2026-02-08 |
 | 45. MCP Protocol Enhancements | 3/3 | Complete | 2026-02-08 |
 | 46. Parse Failure Tracking | 3/3 | Complete | 2026-02-08 |
-| 47. Documentation Update | 0/TBD | Not started | - |
+| 47. Documentation Update | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-08*
