@@ -9,13 +9,13 @@ Requirements for v1.10 milestone. Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **FIX-01**: Fix `language` → `language_id` parameter in `extract_devops_metadata` transform call (flow.py:93)
+- [x] **FIX-01**: Fix `language` → `language_id` parameter in `extract_devops_metadata` transform call (flow.py:93)
 
 ### Infrastructure Defaults
 
-- [ ] **INFRA-01**: Default `COCOSEARCH_DATABASE_URL` to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch`
-- [ ] **INFRA-02**: Align docker-compose.yml credentials from `cocoindex:cocoindex` to `cocosearch:cocosearch`
-- [ ] **INFRA-03**: Update `config check` to show "default" source instead of error when DATABASE_URL uses default
+- [x] **INFRA-01**: Default `COCOSEARCH_DATABASE_URL` to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch`
+- [x] **INFRA-02**: Align docker-compose.yml credentials from `cocoindex:cocoindex` to `cocosearch:cocosearch`
+- [x] **INFRA-03**: Update `config check` to show "default" source instead of error when DATABASE_URL uses default
 
 ### Docker Simplification
 
@@ -79,10 +79,10 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 43 | Pending |
-| INFRA-01 | Phase 43 | Pending |
-| INFRA-02 | Phase 43 | Pending |
-| INFRA-03 | Phase 43 | Pending |
+| FIX-01 | Phase 43 | Complete |
+| INFRA-01 | Phase 43 | Complete |
+| INFRA-02 | Phase 43 | Complete |
+| INFRA-03 | Phase 43 | Complete |
 | DOCK-01 | Phase 44 | Pending |
 | DOCK-02 | Phase 44 | Pending |
 | DOCK-03 | Phase 44 | Pending |
@@ -111,4 +111,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after initial definition*
+*Last updated: 2026-02-08 after Phase 43 completion*
