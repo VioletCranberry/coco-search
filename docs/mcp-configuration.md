@@ -1,48 +1,58 @@
 ## Configuring MCP
 
-CocoSearch provides an MCP (Model Context Protocol) server for semantic code search integration with LLM clients. When configured, your AI assistant can search your codebase using natural language.
+CocoSearch provides an MCP (Model Context Protocol) server for semantic code search integration with LLM clients. Once configured, your AI assistant can search your codebase using natural language, index new projects, and check index health -- all without leaving the conversation.
 
 ### Prerequisites
 
-CocoSearch requires PostgreSQL (with pgvector) and Ollama running locally. The simplest setup:
+Start the infrastructure services:
 
 ```bash
-# Option A: Docker Compose (recommended)
 docker compose up -d
-
-# Option B: All-in-one Docker image
-docker build -t cocosearch -f docker/Dockerfile .
-docker run -v cocosearch-data:/data -p 5432:5432 -p 11434:11434 cocosearch
 ```
 
-With infrastructure running, configure your MCP client below. The database connection defaults to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch` -- no environment variables needed when using Docker.
+This gives you PostgreSQL (with pgvector) on port `5432` and Ollama (with `nomic-embed-text`) on port `11434`. The database connection defaults to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch`, which matches the Docker credentials -- no environment variables needed.
 
-**Available MCP tools:**
+### Available MCP Tools
 
-- `index_codebase` - Index a directory for semantic search
-- `search_code` - Search indexed code with natural language queries
-- `list_indexes` - List all available indexes
-- `index_stats` - Get statistics for an index
-- `clear_index` - Remove an index from the database
+- `index_codebase` -- index a directory for semantic search
+- `search_code` -- search indexed code with natural language queries
+- `list_indexes` -- list all available indexes
+- `index_stats` -- get statistics and parse health for an index
+- `clear_index` -- remove an index from the database
 
 ### Single Registration (Recommended)
 
-Register CocoSearch once and use it across all your projects. The `--project-from-cwd` flag tells CocoSearch to detect the project from whichever directory you're working in.
-
-**For Claude Code:**
+Register CocoSearch once for all your projects using Claude Code:
 
 ```bash
-# Register once for all projects (user scope)
 claude mcp add --scope user cocosearch -- \
-  uvx --from /absolute/path/to/cocosearch cocosearch mcp --project-from-cwd
+  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+```
 
-# Verify registration
+**What these flags do:**
+
+- `--scope user` makes the registration available in all your projects, not just the current one
+- `--project-from-cwd` tells CocoSearch to detect the project from whichever directory you are working in
+
+Claude Code supports MCP Roots capability, so project detection is fully automatic -- CocoSearch receives the workspace root directly from the client.
+
+To verify:
+
+```bash
 claude mcp list
 ```
 
-**For Claude Desktop:**
+### Claude Desktop
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/Claude/claude_desktop_config.json` (Linux):
+Claude Desktop does not support MCP Roots, so it relies on `--project-from-cwd` for project detection.
+
+**Config file locations:**
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add CocoSearch to your config:
 
 ```json
 {
@@ -51,7 +61,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
       "command": "uvx",
       "args": [
         "--from",
-        "/absolute/path/to/cocosearch",
+        "git+https://github.com/VioletCranberry/coco-s",
         "cocosearch",
         "mcp",
         "--project-from-cwd"
@@ -61,126 +71,14 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 }
 ```
 
-**How it works:**
+After saving, restart Claude Desktop. You should see the hammer icon in the chat input area with CocoSearch tools listed.
 
-- `--scope user` makes the registration available in ALL projects (not just current)
-- `--project-from-cwd` tells CocoSearch to detect the project from whichever directory you're working in
-- Open any project, CocoSearch automatically searches that project's index
-- If the project isn't indexed yet, you'll get a prompt to index it
-
-**For uvx users (git+https pattern):**
-
-```bash
-# Register with uvx using git+https pattern
-claude mcp add --scope user cocosearch -- \
-  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
-```
-
-### Per-Project Registration (Alternative)
-
-Use per-project registration when you need project-specific configuration or are running in isolated environments (CI/CD, Docker).
-
-### Configuring Claude Code
-
-**Option A - CLI (recommended):**
-
-```bash
-claude mcp add --transport stdio --scope user \
-  --env COCOSEARCH_DATABASE_URL=postgresql://cocosearch:cocosearch@localhost:5432/cocosearch \
-  cocosearch -- uv run --directory /absolute/path/to/cocosearch cocosearch mcp
-```
-
-Replace `/absolute/path/to/cocosearch` with the actual path where you cloned the repository. Use `pwd` in the cocosearch directory to get the absolute path.
-
-> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
-
-**Verify CLI setup:**
-
-```bash
-claude mcp list
-```
-
-**Option B - JSON config:**
-
-Add to `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "cocosearch": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "/absolute/path/to/cocosearch",
-        "cocosearch",
-        "mcp"
-      ],
-      "env": {
-        "COCOSEARCH_DATABASE_URL": "postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
-      }
-    }
-  }
-}
-```
-
-> **Important:** JSON does not expand `~` paths. Always use absolute paths like `/Users/yourname/cocosearch` or `/home/yourname/cocosearch`.
-
-> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
-
-**Verification:**
-
-1. Restart Claude Code (or run `/mcp` command to refresh)
-2. Run `/mcp` - you should see `cocosearch` listed with status "connected"
-3. Ask Claude: "Search for authentication logic in my codebase"
-
-### Configuring Claude Desktop
-
-**Config file locations:**
-
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux:** `~/.config/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
-**Config content:**
-
-```json
-{
-  "mcpServers": {
-    "cocosearch": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "/absolute/path/to/cocosearch",
-        "cocosearch",
-        "mcp"
-      ],
-      "env": {
-        "COCOSEARCH_DATABASE_URL": "postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
-      }
-    }
-  }
-}
-```
-
-> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
-
-**Verification:**
-
-1. Restart Claude Desktop completely (quit and reopen the application)
-2. Look for the hammer icon in the chat input area
-3. Click the hammer to see "cocosearch" tools listed
-4. Start a new conversation and ask Claude to search your codebase
-
-### Configuring OpenCode
+### OpenCode
 
 **Config file locations:**
 
 - **Global:** `~/.config/opencode/opencode.json`
 - **Project:** `opencode.json` in project root
-
-**Config content:**
 
 ```json
 {
@@ -189,37 +87,55 @@ Add to `~/.claude.json`:
     "cocosearch": {
       "type": "local",
       "command": [
-        "uv",
-        "run",
-        "--directory",
-        "/absolute/path/to/cocosearch",
+        "uvx",
+        "--from",
+        "git+https://github.com/VioletCranberry/coco-s",
         "cocosearch",
-        "mcp"
+        "mcp",
+        "--project-from-cwd"
       ],
-      "enabled": true,
-      "environment": {
-        "COCOSEARCH_DATABASE_URL": "postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
-      }
+      "enabled": true
     }
   }
 }
 ```
 
-> **Note:** OpenCode config differs from Claude configs:
->
-> - Uses `"type": "local"` (not implicit)
-> - `command` is an array (not separate command/args)
-> - Uses `"environment"` (not `"env"`)
-> - Has explicit `"enabled": true`
+OpenCode config differs from Claude configs: it uses `"type": "local"`, `command` is an array (not separate command/args), and it requires an explicit `"enabled": true`.
 
-> **Note:** The `COCOSEARCH_DATABASE_URL` above is optional when using Docker. It matches the default -- you can omit it if using docker compose or the all-in-one image.
+### Custom Database Connection
 
-**Verification:**
+By default, CocoSearch connects to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch`. This matches the Docker Compose credentials, so no configuration is needed for the standard setup.
 
-1. Restart OpenCode
-2. Check MCP status in OpenCode settings/status
-3. Verify cocosearch tools are available
+If you are connecting to a different PostgreSQL instance, set `COCOSEARCH_DATABASE_URL`:
 
----
+**Claude Code:**
 
-**Remember:** Replace `/absolute/path/to/cocosearch` in all configs with the actual path where you cloned the repository.
+```bash
+claude mcp add --scope user \
+  --env COCOSEARCH_DATABASE_URL=postgresql://user:pass@host:5432/dbname \
+  cocosearch -- \
+  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+```
+
+**Claude Desktop / OpenCode (JSON config):**
+
+Add an `"env"` block (or `"environment"` for OpenCode) to your server config:
+
+```json
+{
+  "env": {
+    "COCOSEARCH_DATABASE_URL": "postgresql://user:pass@host:5432/dbname"
+  }
+}
+```
+
+### Project Detection
+
+CocoSearch determines which project to search using the following priority chain:
+
+1. **MCP Roots** -- if the client supports Roots capability (Claude Code does), the workspace root is received directly from the client. This is the most reliable method.
+2. **`--project-from-cwd`** -- detects the project from the current working directory. Used by clients that do not support Roots (Claude Desktop, OpenCode).
+3. **Environment variable** -- falls back to the configured project path if set.
+4. **Current working directory** -- unconditional fallback.
+
+For programmatic use via HTTP transport, you can pass the project as a query parameter: `?project=/path/to/project`.
