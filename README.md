@@ -52,12 +52,22 @@ CocoSearch indexes 31 programming languages via Tree-sitter. Symbol extraction (
 
 ## Getting Started
 
-**Option #1**: The all-in-one Docker image bundles PostgreSQL (with pgvector), Ollama (with pre-baked nomic-embed-text model), and the CocoSearch MCP server. No separate setup required.
+**Option #1**: The Docker image bundles PostgreSQL (with pgvector) and Ollama (with pre-baked nomic-embed-text model) as infrastructure services. CocoSearch runs natively.
 
 ```bash
 docker build -t cocosearch -f docker/Dockerfile .
 # Build from the repository root.
 # The build takes 5-10 minutes (downloads and bakes the Ollama model).
+```
+
+```bash
+docker run -v cocosearch-data:/data -p 5432:5432 -p 11434:11434 cocosearch
+# Starts PostgreSQL on port 5432 and Ollama on port 11434.
+```
+
+```bash
+# Install and run CocoSearch natively
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch --help
 ```
 
 **Option #2**: Run components using docker compose and install cocosearch.
@@ -66,10 +76,13 @@ docker build -t cocosearch -f docker/Dockerfile .
 docker compose up -d
 # Uses docker-compose.yml from this repository
 # This creates a container cocosearch-db on port 5432 with pgvector pre-installed and cocosearch-ollama on port 11434.
-# PostgreSQL connection URL (optional, this is the default when using docker compose).
-export COCOSEARCH_DATABASE_URL="postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
 # Set Ollama API URL for embeddings.
 export COCOSEARCH_OLLAMA_URL="http://localhost:11434"
+```
+
+```bash
+# Install and run CocoSearch natively
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch --help
 ```
 
 **Option #3**: Setup full development environment.
