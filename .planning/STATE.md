@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Semantic code search that runs entirely locally -- no data leaves your machine.
-**Current focus:** Phase 46 - Parse Failure Tracking
+**Current focus:** Phase 46 complete - Parse Failure Tracking
 
 ## Current Position
 
 Phase: 46 of 47 (Parse Failure Tracking)
-Plan: 02 of 03 complete
-Status: In progress
-Last activity: 2026-02-08 -- Completed 46-02-PLAN.md (stats display)
+Plan: 03 of 03 complete
+Status: Phase complete
+Last activity: 2026-02-08 -- Completed 46-03-PLAN.md (test suite + endpoint integration)
 
-Progress: [#########...........] 45% (9/~20 plans across v1.10)
+Progress: [##########..........] 50% (10/~20 plans across v1.10)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 121 (across v1.0-v1.10)
+- Total plans completed: 122 (across v1.0-v1.10)
 - Milestones shipped: 10 (v1.0-v1.9)
 - Last milestone: v1.9 Multi-Repo & Polish (phases 38-42, 11 plans)
 
@@ -27,12 +27,12 @@ Progress: [#########...........] 45% (9/~20 plans across v1.10)
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 9/~20 | In progress   |
+| v1.10 Infrastructure & Protocol | 43-47 | 10/~20 | In progress   |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 46-02 completion*
+*Updated: 2026-02-08 after 46-03 completion*
 
 ## Accumulated Context
 
@@ -70,10 +70,13 @@ Recent decisions affecting current work:
 - Parse tracking is non-fatal: wrapped in try/except in run_index()
 - Post-flow tracking pattern: query chunks table for DISTINCT filenames, read from disk, process independently
 - Parse health shown by default (not gated by --verbose); failure details require --show-failures flag
+- Top-level import for get_parse_failures in server.py (consistent with get_comprehensive_stats import style)
+- MCP index_stats upgraded from get_stats() to get_comprehensive_stats() for richer response data
+- include_failures defaults to false on both MCP tool and HTTP endpoints
 
 ### Pending Todos
 
-None -- ready for 46-03 (test suite).
+None -- phase 46 complete.
 
 ### Blockers/Concerns
 
@@ -83,5 +86,5 @@ None -- ready for 46-03 (test suite).
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 46-02-PLAN.md. Ready for 46-03 (test suite).
+Stopped at: Completed 46-03-PLAN.md. Phase 46 (Parse Failure Tracking) complete. Ready for phase 47.
 Resume file: None
