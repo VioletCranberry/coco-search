@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 45 of 47 (MCP Protocol Enhancements)
-Plan: 01 of ~4 (project detection module)
+Plan: 02 of ~4 (server integration)
 Status: In progress
-Last activity: 2026-02-08 -- Completed 45-01-PLAN.md
+Last activity: 2026-02-08 -- Completed 45-02-PLAN.md
 
-Progress: [#####...............] 25% (5/~20 plans across v1.10)
+Progress: [######..............] 30% (6/~20 plans across v1.10)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 118 (across v1.0-v1.10)
+- Total plans completed: 119 (across v1.0-v1.10)
 - Milestones shipped: 10 (v1.0-v1.9)
 - Last milestone: v1.9 Multi-Repo & Polish (phases 38-42, 11 plans)
 
@@ -27,12 +27,12 @@ Progress: [#####...............] 25% (5/~20 plans across v1.10)
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 5/~20 | In progress |
+| v1.10 Infrastructure & Protocol | 43-47 | 6/~20 | In progress |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 45-01 execution*
+*Updated: 2026-02-08 after 45-02 execution*
 
 ## Accumulated Context
 
@@ -58,10 +58,14 @@ Recent decisions affecting current work:
 - file:// URI parsing uses urlparse+unquote (FileUrl.path does NOT percent-decode)
 - No caching in _detect_project -- re-detect fresh each tool call
 - Low-level server notification_handlers dict used for roots change (no FastMCP public API)
+- Local import `from cocosearch.management.context import find_project_root` inside search_code body (exact mock target for tests)
+- No None guard on _detect_project return -- cwd is unconditional fallback
+- Hint for non-roots clients appended on every env/cwd detection call (no one-time suppression)
+- Only search_code is async; other tools remain sync (no Context needed)
 
 ### Pending Todos
 
-None -- ready for 45-02.
+None -- ready for 45-03.
 
 ### Blockers/Concerns
 
@@ -73,5 +77,5 @@ None -- ready for 45-02.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 45-01-PLAN.md (project detection module). Ready for 45-02.
+Stopped at: Completed 45-02-PLAN.md (server integration). Ready for 45-03.
 Resume file: None
