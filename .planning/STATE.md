@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 44 of 47 (Docker Image Simplification)
-Plan: 01 of 01 (complete)
+Plan: 02 of 02 (complete)
 Status: Phase 44 complete
-Last activity: 2026-02-08 -- Completed 44-01-PLAN.md (Docker image simplification)
+Last activity: 2026-02-08 -- Completed 44-02-PLAN.md (Documentation update for infra-only Docker model)
 
-Progress: [###.................] 15% (3/~20 plans across v1.10)
+Progress: [####................] 20% (4/~20 plans across v1.10)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 117 (across v1.0-v1.10)
+- Total plans completed: 118 (across v1.0-v1.10)
 - Milestones shipped: 10 (v1.0-v1.9)
 - Last milestone: v1.9 Multi-Repo & Polish (phases 38-42, 11 plans)
 
@@ -27,12 +27,12 @@ Progress: [###.................] 15% (3/~20 plans across v1.10)
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 3/~20 | In progress |
+| v1.10 Infrastructure & Protocol | 43-47 | 4/~20 | In progress |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 44-01 execution*
+*Updated: 2026-02-08 after 44-02 execution*
 
 ## Accumulated Context
 
@@ -51,6 +51,9 @@ Recent decisions affecting current work:
 - get_database_url() bridges COCOSEARCH_DATABASE_URL to COCOINDEX_DATABASE_URL as side-effect
 - validate_required_env_vars() returns empty list (no required env vars remain)
 - All DATABASE_URL callsites centralized through get_database_url()
+- README Option #1 describes infra-only Docker (ports 5432+11434 only, no 3000)
+- MCP docs note DATABASE_URL is optional when using Docker
+- Documentation model: Docker = infrastructure, uvx = application
 
 ### Pending Todos
 
@@ -66,5 +69,5 @@ None -- phase 44 complete. Ready for phase 45.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 44-01-PLAN.md. Phase 44 complete.
+Stopped at: Completed 44-02-PLAN.md. Phase 44 fully complete (both plans).
 Resume file: None
