@@ -69,8 +69,10 @@ class TestClearIndex:
         ):
             clear_index("myproject")
 
-        # Find the DROP TABLE query and verify table name is included
+        # Find the DROP TABLE queries and verify table names are included
         drop_queries = [q for q, _ in cursor.calls if "DROP TABLE" in q]
-        assert len(drop_queries) == 1
-        # Table name should contain the index name pattern
+        assert len(drop_queries) == 2
+        # Chunks table drop
         assert "codeindex_" in drop_queries[0] or "myproject" in drop_queries[0]
+        # Parse results table drop
+        assert "cocosearch_parse_results_myproject" in drop_queries[1]
