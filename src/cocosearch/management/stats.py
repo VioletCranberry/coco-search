@@ -209,6 +209,7 @@ class IndexStats:
     languages: list[dict]
     symbols: dict[str, int]
     warnings: list[str]
+    parse_stats: dict  # Parse failure breakdown per language (empty dict for pre-v46 indexes)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization.
@@ -225,6 +226,138 @@ class IndexStats:
         if data["updated_at"] is not None:
             data["updated_at"] = data["updated_at"].isoformat()
         return data
+
+
+def get_parse_stats(index_name: str) -> dict:
+    """Get aggregated parse statistics per language for an index.
+
+    Queries the parse_results table (created by phase 46) for per-language
+    parse status counts. Gracefully returns empty dict for pre-v46 indexes
+    that lack the parse_results table.
+
+    Args:
+        index_name: The name of the index.
+
+    Returns:
+        Dict with keys:
+        - by_language: Per-language breakdown with ok/partial/error/unsupported counts
+        - parse_health_pct: Percentage of files that parsed cleanly
+        - total_files: Total files tracked
+        - total_ok: Total files with ok status
+
+        Empty dict {} if parse_results table does not exist.
+    """
+    pool = get_connection_pool()
+    table_name = f"cocosearch_parse_results_{index_name}"
+
+    # Check if parse_results table exists (pre-v46 indexes won't have it)
+    check_query = """
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = %s
+        )
+    """
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(check_query, (table_name,))
+            (exists,) = cur.fetchone()
+
+            if not exists:
+                return {}
+
+            # Aggregate parse status counts per language
+            agg_query = f"""
+                SELECT language, parse_status, COUNT(*)
+                FROM {table_name}
+                GROUP BY language, parse_status
+                ORDER BY language, parse_status
+            """
+            cur.execute(agg_query)
+            rows = cur.fetchall()
+
+    # Build by_language dict
+    by_language: dict[str, dict[str, int]] = {}
+    total_files = 0
+    total_ok = 0
+
+    for language, parse_status, count in rows:
+        if language not in by_language:
+            by_language[language] = {"files": 0, "ok": 0, "partial": 0, "error": 0, "unsupported": 0}
+        by_language[language][parse_status] += count
+        by_language[language]["files"] += count
+        total_files += count
+        if parse_status == "ok":
+            total_ok += count
+
+    parse_health_pct = round((total_ok / total_files * 100), 1) if total_files > 0 else 100.0
+
+    return {
+        "by_language": by_language,
+        "parse_health_pct": parse_health_pct,
+        "total_files": total_files,
+        "total_ok": total_ok,
+    }
+
+
+def get_parse_failures(index_name: str, status_filter: list[str] | None = None) -> list[dict]:
+    """Get individual file parse failure details for an index.
+
+    Returns details for files with non-ok parse statuses, useful for
+    the --show-failures CLI flag and MCP/HTTP optional detail.
+
+    Args:
+        index_name: The name of the index.
+        status_filter: List of parse statuses to include.
+            Default: ["partial", "error", "unsupported"] (all non-ok).
+
+    Returns:
+        List of dicts with keys: file_path, language, parse_status, error_message.
+        Empty list [] if parse_results table does not exist.
+    """
+    if status_filter is None:
+        status_filter = ["partial", "error", "unsupported"]
+
+    pool = get_connection_pool()
+    table_name = f"cocosearch_parse_results_{index_name}"
+
+    # Check if parse_results table exists
+    check_query = """
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = %s
+        )
+    """
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(check_query, (table_name,))
+            (exists,) = cur.fetchone()
+
+            if not exists:
+                return []
+
+            # Query individual file failures
+            failures_query = f"""
+                SELECT file_path, language, parse_status, error_message
+                FROM {table_name}
+                WHERE parse_status = ANY(%s)
+                ORDER BY language, parse_status, file_path
+            """
+            cur.execute(failures_query, (status_filter,))
+            rows = cur.fetchall()
+
+    return [
+        {
+            "file_path": row[0],
+            "language": row[1],
+            "parse_status": row[2],
+            "error_message": row[3],
+        }
+        for row in rows
+    ]
 
 
 def check_staleness(index_name: str, threshold_days: int = 7) -> tuple[bool, int]:
@@ -404,6 +537,9 @@ def get_comprehensive_stats(index_name: str, staleness_threshold: int = 7) -> In
     # Get symbol stats
     symbols = get_symbol_stats(index_name)
 
+    # Get parse failure stats
+    parse_stats = get_parse_stats(index_name)
+
     # Check staleness
     is_stale, staleness_days = check_staleness(index_name, staleness_threshold)
 
@@ -444,4 +580,5 @@ def get_comprehensive_stats(index_name: str, staleness_threshold: int = 7) -> In
         languages=languages,
         symbols=symbols,
         warnings=warnings,
+        parse_stats=parse_stats,
     )
