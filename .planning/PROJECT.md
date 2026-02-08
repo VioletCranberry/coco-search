@@ -103,19 +103,20 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 - ✓ Multi-step workflow skills: onboarding, debugging, refactoring — v1.9
 - ✓ Retrieval logic documentation (indexing + search pipelines, RRF) — v1.9
 - ✓ MCP tools reference with complete parameter docs and examples — v1.9
+- ✓ Fix indexing bug: `language` → `language_id` parameter in DevOps metadata extraction — v1.10
+- ✓ Default COCOSEARCH_DATABASE_URL to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch` — v1.10
+- ✓ Align docker-compose.yml credentials to cocosearch:cocosearch — v1.10
+- ✓ Simplify Docker image to infra-only (PostgreSQL+pgvector, Ollama+model — no CocoSearch) — v1.10
+- ✓ Document both usage paths: docker-compose for dev, uvx for MCP — v1.10
+- ✓ MCP Roots capability support (protocol-correct project detection) — v1.10
+- ✓ HTTP transport project context via query params — v1.10
+- ✓ Parse failure tracking in stats output (per-language counts) — v1.10
+- ✓ Add section headers to reference documentation files — v1.10
+- ✓ Update Docker documentation for infra-only model — v1.10
 
 ### Active
 
-- [ ] Fix indexing bug: `language` → `language_id` parameter in DevOps metadata extraction
-- [ ] Default COCOSEARCH_DATABASE_URL to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch`
-- [ ] Align docker-compose.yml credentials to cocosearch:cocosearch
-- [ ] Simplify Docker image to infra-only (PostgreSQL+pgvector, Ollama+model — no CocoSearch)
-- [ ] Document both usage paths: docker-compose for dev, uvx for MCP
-- [ ] MCP Roots capability support (protocol-correct project detection)
-- [ ] HTTP transport project context via query params
-- [ ] Parse failure tracking in stats output (per-language counts)
-- [ ] Add table of contents to reference documentation files
-- [ ] Update Docker documentation for infra-only model
+(None — start next milestone with `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -129,20 +130,21 @@ Semantic code search that runs entirely locally — no data leaves your machine.
 
 ## Current State
 
-Shipped v1.9 with 9,012 LOC Python (src/).
+Shipped v1.10 with 9,715 LOC Python (src/).
 Tech stack: CocoIndex, PostgreSQL + pgvector, Ollama, FastMCP, tree-sitter, tree-sitter-language-pack.
 Primary use case: onboarding to unfamiliar codebases via hybrid search.
 Language support: 31 languages (28 standard + 3 DevOps) with symbol extraction for 10.
 Search features: Hybrid search (RRF), context expansion, symbol filtering, query caching, definition boost.
-Multi-repo: Single MCP registration via --project-from-cwd with staleness warnings.
-Observability: CLI stats, HTTP API, terminal dashboard, web UI with Chart.js.
-Test coverage: 1022 unit tests + integration tests with real PostgreSQL and Ollama.
-Documentation: Architecture overview, retrieval logic docs, MCP tools reference, workflow skills, CLI reference, search features guide.
+Multi-repo: Single MCP registration with Roots-based project detection (roots > query_param > env > cwd).
+Observability: CLI stats with parse health, HTTP API, terminal dashboard, web UI with Chart.js.
+Test coverage: 1022+ unit tests + integration tests with real PostgreSQL and Ollama.
+Documentation: Architecture overview, retrieval logic docs, MCP tools reference, workflow skills, CLI reference, search features guide — all updated for infra-only Docker model.
 Configuration: YAML config with env var substitution, 4-level precedence, config check command.
 Developer setup: One-command bootstrap via dev-setup.sh with Docker Compose.
-Docker: Infra-only image (PostgreSQL+pgvector, Ollama+model) with s6-overlay; CocoSearch runs natively.
-Auto-detect: Project detection from working directory with collision handling.
-Environment: COCOSEARCH_DATABASE_URL (default: cocosearch@localhost), COCOSEARCH_OLLAMA_URL (optional).
+Docker: Infra-only image (PostgreSQL+pgvector, Ollama+model) with s6-overlay; CocoSearch runs natively via uvx.
+Auto-detect: MCP Roots capability for protocol-correct project detection, with env/cwd fallback.
+Environment: COCOSEARCH_DATABASE_URL (default: cocosearch@localhost — optional with Docker), COCOSEARCH_OLLAMA_URL (optional).
+Parse health: Per-file tree-sitter parse status tracking with per-language aggregation in CLI/MCP/HTTP.
 
 ## Constraints
 
@@ -217,9 +219,12 @@ Environment: COCOSEARCH_DATABASE_URL (default: cocosearch@localhost), COCOSEARCH
 | Skills auto-execute MCP tools | No manual CLI commands needed in workflows | ✓ Good |
 | Text-only architecture docs | No diagrams, cross-reference detailed docs | ✓ Good |
 | Actual values in docs | k=60, TTL=24h, chunk_size=1000 from source code | ✓ Good |
-| Docker = infra only | CocoSearch runs natively; Docker provides PostgreSQL+Ollama only | — Pending |
-| Default DATABASE_URL | Match Docker image creds, reduce setup friction | — Pending |
-| Standardize cocosearch:cocosearch creds | One set of credentials everywhere | — Pending |
+| Docker = infra only | CocoSearch runs natively; Docker provides PostgreSQL+Ollama only | ✓ Good |
+| Default DATABASE_URL | Match Docker image creds, reduce setup friction | ✓ Good |
+| Standardize cocosearch:cocosearch creds | One set of credentials everywhere | ✓ Good |
+| MCP Roots for project detection | Protocol-standard, graceful fallback for unsupported clients | ✓ Good |
+| Post-flow parse tracking | Non-fatal, independent of CocoIndex pipeline | ✓ Good |
+| include_failures opt-in | Default false on MCP/HTTP, keeps response lean | ✓ Good |
 
 ---
-*Last updated: 2026-02-08 after v1.10 milestone start*
+*Last updated: 2026-02-08 after v1.10 milestone*

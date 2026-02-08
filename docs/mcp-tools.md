@@ -401,4 +401,4 @@ All tools are implemented in `src/cocosearch/mcp/server.py` using the FastMCP fr
 **Core search engine:** `src/cocosearch/search/query.py`
 **Index management:** `src/cocosearch/management/__init__.py`
 **Statistics:** `src/cocosearch/management/stats.py`
-**Parse tracking:** `src/cocosearch/management/parse_tracking.py`
+**Parse tracking:** `src/cocosearch/indexer/parse_tracking.py`

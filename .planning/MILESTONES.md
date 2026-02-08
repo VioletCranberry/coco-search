@@ -1,5 +1,32 @@
 # Project Milestones: CocoSearch
 
+## v1.10 Infrastructure & Protocol (Shipped: 2026-02-08)
+
+**Delivered:** Zero-config database defaults matching Docker credentials, infra-only Docker image (PostgreSQL+Ollama only), MCP Roots capability for protocol-correct project detection, parse failure tracking for index health observability, and complete documentation rewrite for the new architecture.
+
+**Phases completed:** 43-47 (12 plans total)
+
+**Key accomplishments:**
+
+- Zero-config database setup: default credentials (cocosearch:cocosearch) match Docker Compose, eliminating required environment variables
+- Infra-only Docker image: stripped application code, leaving only PostgreSQL+pgvector and Ollama+model; CocoSearch runs natively via uvx
+- MCP Roots capability: protocol-standard project detection with priority chain (roots > query_param > env > cwd) and graceful fallback
+- Parse failure tracking: per-file tree-sitter parse status stored in DB, surfaced in CLI stats, MCP index_stats, and HTTP /api/stats
+- Complete documentation rewrite: README with 3-step quick-start, all 6 reference docs updated for infra-only model and new features
+
+**Stats:**
+
+- 90 files created/modified
+- +9,771 / -812 lines (9,715 Python LOC in src/)
+- 5 phases, 12 plans
+- 1 day (2026-02-08)
+
+**Git range:** `docs(43)` → `docs(47)`
+
+**What's next:** Planning next milestone
+
+---
+
 ## v1.9 Multi-Repo & Polish (Shipped: 2026-02-06)
 
 **Delivered:** Single MCP registration for all projects via --project-from-cwd, codebase cleanup removing 237+ LOC of deprecated code, three adaptive workflow skills (onboarding, debugging, refactoring), and comprehensive technical documentation covering architecture, retrieval logic, and MCP tools reference.
