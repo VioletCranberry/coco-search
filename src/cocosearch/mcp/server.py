@@ -40,7 +40,7 @@ from cocosearch.management import (
     register_index_path,
 )
 from cocosearch.mcp.project_detection import _detect_project, register_roots_notification
-from cocosearch.management.stats import check_staleness, get_comprehensive_stats
+from cocosearch.management.stats import check_staleness, get_comprehensive_stats, get_parse_failures
 from cocosearch.search import byte_to_line, read_chunk_content, search
 from cocosearch.search.context_expander import ContextExpander
 
@@ -73,12 +73,17 @@ async def api_stats(request):
 
     index_name = request.query_params.get("index")
 
+    include_failures = request.query_params.get("include_failures", "").lower() == "true"
+
     if index_name:
         # Single index stats
         try:
             stats = get_comprehensive_stats(index_name)
+            result = stats.to_dict()
+            if include_failures:
+                result["parse_failures"] = get_parse_failures(index_name)
             return JSONResponse(
-                stats.to_dict(),
+                result,
                 headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
             )
         except ValueError as e:
@@ -90,7 +95,10 @@ async def api_stats(request):
         for idx in indexes:
             try:
                 stats = get_comprehensive_stats(idx["name"])
-                all_stats.append(stats.to_dict())
+                result = stats.to_dict()
+                if include_failures:
+                    result["parse_failures"] = get_parse_failures(idx["name"])
+                all_stats.append(result)
             except ValueError:
                 continue
         return JSONResponse(
@@ -106,10 +114,14 @@ async def api_stats_single(request):
     cocoindex.init()
 
     index_name = request.path_params["index_name"]
+    include_failures = request.query_params.get("include_failures", "").lower() == "true"
     try:
         stats = get_comprehensive_stats(index_name)
+        result = stats.to_dict()
+        if include_failures:
+            result["parse_failures"] = get_parse_failures(index_name)
         return JSONResponse(
-            stats.to_dict(),
+            result,
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
     except ValueError as e:
@@ -412,28 +424,45 @@ def index_stats(
         str | None,
         Field(description="Name of the index (omit for all indexes)"),
     ] = None,
+    include_failures: Annotated[
+        bool,
+        Field(
+            description="Include individual file parse failure details. "
+            "When True, adds a 'parse_failures' list with file paths, languages, statuses, and error messages."
+        ),
+    ] = False,
 ) -> dict | list[dict]:
-    """Get statistics for code indexes.
+    """Get statistics for code indexes including parse health.
 
-    Returns file count, chunk count, and storage size.
+    Returns file count, chunk count, storage size, language distribution,
+    symbol counts, and parse failure breakdown per language.
     If index_name is provided, returns stats for that index only.
     Otherwise, returns stats for all indexes.
     """
+    # Initialize CocoIndex (required for database connection)
+    cocoindex.init()
+
     try:
         if index_name:
-            return get_stats(index_name)
+            stats = get_comprehensive_stats(index_name)
+            result = stats.to_dict()
+            if include_failures:
+                result["parse_failures"] = get_parse_failures(index_name)
+            return result
         else:
             # Get stats for all indexes
             indexes = mgmt_list_indexes()
-            stats = []
+            all_stats = []
             for idx in indexes:
                 try:
-                    idx_stats = get_stats(idx["name"])
-                    stats.append(idx_stats)
+                    stats = get_comprehensive_stats(idx["name"])
+                    result = stats.to_dict()
+                    if include_failures:
+                        result["parse_failures"] = get_parse_failures(idx["name"])
+                    all_stats.append(result)
                 except ValueError:
-                    # Skip indexes that fail (shouldn't happen normally)
                     pass
-            return stats
+            return all_stats
     except ValueError as e:
         return {"success": False, "error": str(e)}
 
