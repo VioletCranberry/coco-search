@@ -49,6 +49,14 @@ def clear_index(index_name: str) -> dict:
             cur.execute(f"DROP TABLE {table_name}")
             conn.commit()
 
+            # Drop parse results table if it exists (non-critical)
+            parse_table = f"cocosearch_parse_results_{index_name}"
+            try:
+                cur.execute(f"DROP TABLE IF EXISTS {parse_table}")
+                conn.commit()
+            except Exception:
+                pass  # Table may not exist for pre-v46 indexes
+
     # Clear path-to-index metadata (non-critical, log but don't fail)
     try:
         from cocosearch.management.metadata import clear_index_path

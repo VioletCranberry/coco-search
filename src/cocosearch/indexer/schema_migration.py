@@ -1,8 +1,9 @@
-"""Schema migration for hybrid search columns.
+"""Schema migration for hybrid search and parse tracking tables.
 
-Adds PostgreSQL-specific columns and indexes that CocoIndex doesn't support natively:
+Adds PostgreSQL-specific columns, indexes, and tables that CocoIndex doesn't support natively:
 - content_tsv: TSVECTOR generated column from content_tsv_input
 - GIN index on content_tsv for fast keyword search
+- cocosearch_parse_results_{index}: Per-file parse status tracking table
 """
 
 import logging
@@ -185,3 +186,45 @@ def verify_symbol_columns(conn: psycopg.Connection, table_name: str) -> bool:
         """, (table_name,))
         existing = {row[0] for row in cur.fetchall()}
         return len(existing) == 3
+
+
+def ensure_parse_results_table(conn: psycopg.Connection, index_name: str) -> dict[str, Any]:
+    """Create parse_results table if it doesn't exist.
+
+    This is idempotent - safe to call multiple times.
+    Stores per-file parse status for an index.
+
+    Table: cocosearch_parse_results_{index_name}
+    Columns:
+    - file_path TEXT NOT NULL (PRIMARY KEY)
+    - language TEXT NOT NULL
+    - parse_status TEXT NOT NULL
+    - error_message TEXT
+
+    Args:
+        conn: PostgreSQL connection
+        index_name: Index name (used in table name)
+
+    Returns:
+        Dict with migration result: {"table_created": table_name}
+    """
+    table_name = f"cocosearch_parse_results_{index_name}"
+
+    with conn.cursor() as cur:
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                file_path TEXT NOT NULL,
+                language TEXT NOT NULL,
+                parse_status TEXT NOT NULL,
+                error_message TEXT,
+                PRIMARY KEY (file_path)
+            )
+        """)
+        cur.execute(f"""
+            CREATE INDEX IF NOT EXISTS idx_cocosearch_parse_results_{index_name}_lang_status
+            ON {table_name} (language, parse_status)
+        """)
+
+    conn.commit()
+    logger.info(f"Parse results table ensured: {table_name}")
+    return {"table_created": table_name}

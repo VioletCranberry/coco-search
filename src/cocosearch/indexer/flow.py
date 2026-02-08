@@ -21,7 +21,8 @@ from cocosearch.indexer.tsvector import text_to_tsvector_sql
 from cocosearch.handlers import get_custom_languages, extract_devops_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
 from cocosearch.indexer.symbols import extract_symbol_metadata
-from cocosearch.indexer.schema_migration import ensure_symbol_columns
+from cocosearch.indexer.schema_migration import ensure_symbol_columns, ensure_parse_results_table
+from cocosearch.indexer.parse_tracking import track_parse_results
 from cocosearch.search.cache import invalidate_index_cache
 
 logger = logging.getLogger(__name__)
@@ -207,8 +208,17 @@ def run_index(
 
     with psycopg.connect(db_url) as conn:
         ensure_symbol_columns(conn, table_name)
+        ensure_parse_results_table(conn, index_name)
 
     # Run indexing and return statistics
     update_info = flow.update()
+
+    # Track parse status for all indexed files
+    try:
+        with psycopg.connect(db_url) as conn:
+            parse_summary = track_parse_results(conn, index_name, codebase_path, table_name)
+            logger.info(f"Parse tracking complete: {parse_summary}")
+    except Exception as e:
+        logger.warning(f"Parse tracking failed (non-fatal): {e}")
 
     return update_info
