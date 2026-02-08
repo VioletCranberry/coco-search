@@ -44,10 +44,10 @@ Requirements for v1.10 milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOC-01**: Add simple link list TOC to each reference doc file in docs/
-- [ ] **DOC-02**: Rewrite Docker documentation for infra-only model
-- [ ] **DOC-03**: Update README for new usage model (docker-compose + native CocoSearch)
-- [ ] **DOC-04**: Update MCP configuration docs with new default DATABASE_URL
+- [x] **DOC-01**: Add simple link list TOC to each reference doc file in docs/
+- [x] **DOC-02**: Rewrite Docker documentation for infra-only model
+- [x] **DOC-03**: Update README for new usage model (docker-compose + native CocoSearch)
+- [x] **DOC-04**: Update MCP configuration docs with new default DATABASE_URL
 
 ## v2 Requirements
 
@@ -99,10 +99,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | OBS-02 | Phase 46 | Complete |
 | OBS-03 | Phase 46 | Complete |
 | OBS-04 | Phase 46 | Complete |
-| DOC-01 | Phase 47 | Pending |
-| DOC-02 | Phase 47 | Pending |
-| DOC-03 | Phase 47 | Pending |
-| DOC-04 | Phase 47 | Pending |
+| DOC-01 | Phase 47 | Complete |
+| DOC-02 | Phase 47 | Complete |
+| DOC-03 | Phase 47 | Complete |
+| DOC-04 | Phase 47 | Complete |
 
 **Coverage:**
 - v1 requirements: 24 total
@@ -111,4 +111,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after Phase 46 completion*
+*Last updated: 2026-02-08 after Phase 47 completion*

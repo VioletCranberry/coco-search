@@ -7,7 +7,7 @@ v1.10 is a refinement milestone that standardizes credentials, simplifies the Do
 ## Milestones
 
 - v1.0-v1.9: See .planning/MILESTONES.md (shipped)
-- v1.10 Infrastructure & Protocol: Phases 43-47 (in progress)
+- v1.10 Infrastructure & Protocol: Phases 43-47 (complete)
 
 ## Phases
 
@@ -15,7 +15,7 @@ v1.10 is a refinement milestone that standardizes credentials, simplifies the Do
 - [x] **Phase 44: Docker Image Simplification** - Strip CocoSearch from Docker image, making it infra-only (PostgreSQL+pgvector, Ollama+model)
 - [x] **Phase 45: MCP Protocol Enhancements** - Add Roots capability for protocol-correct project detection with HTTP query param fallback
 - [x] **Phase 46: Parse Failure Tracking** - Track and surface tree-sitter parse failures per language in stats output
-- [ ] **Phase 47: Documentation Update** - Update all documentation for infra-only Docker model and new defaults
+- [x] **Phase 47: Documentation Update** - Update all documentation for infra-only Docker model and new defaults
 
 ## Phase Details
 
@@ -95,8 +95,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 47-01-PLAN.md -- Rewrite README.md and docs/mcp-configuration.md for infra-only Docker model and simplified MCP setup
-- [ ] 47-02-PLAN.md -- Update 6 reference docs with parse health features, Roots capability, uvx commands, remove output blocks
+- [x] 47-01-PLAN.md -- Rewrite README.md and docs/mcp-configuration.md for infra-only Docker model and simplified MCP setup
+- [x] 47-02-PLAN.md -- Update 6 reference docs with parse health features, Roots capability, uvx commands, remove output blocks
 
 ## Progress
 
@@ -109,7 +109,7 @@ Phases execute in numeric order: 43 -> 44 -> 45 -> 46 -> 47
 | 44. Docker Image Simplification | 2/2 | Complete | 2026-02-08 |
 | 45. MCP Protocol Enhancements | 3/3 | Complete | 2026-02-08 |
 | 46. Parse Failure Tracking | 3/3 | Complete | 2026-02-08 |
-| 47. Documentation Update | 0/2 | Not started | - |
+| 47. Documentation Update | 2/2 | Complete | 2026-02-08 |
 
 ---
 *Roadmap created: 2026-02-08*
