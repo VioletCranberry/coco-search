@@ -16,17 +16,19 @@ from cocosearch.search.db import get_connection_pool, get_table_name
 class TestGetConnectionPool:
     """Tests for get_connection_pool function."""
 
-    def test_raises_without_env_var(self):
-        """Should raise ValueError when COCOSEARCH_DATABASE_URL not set."""
-        # Reset pool singleton to force new pool creation
+    def test_uses_default_when_env_var_not_set(self):
+        """Should use default DATABASE_URL when COCOSEARCH_DATABASE_URL not set."""
         db_module._pool = None
 
-        # Clear environment and verify error
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError) as exc_info:
-                get_connection_pool()
+            with patch("cocosearch.search.db.ConnectionPool") as mock_pool_cls:
+                mock_pool_cls.return_value = MagicMock()
+                pool = get_connection_pool()
 
-            assert "COCOSEARCH_DATABASE_URL" in str(exc_info.value)
+        # Verify ConnectionPool was called with the default URL
+        mock_pool_cls.assert_called_once()
+        call_kwargs = mock_pool_cls.call_args
+        assert "cocosearch:cocosearch" in call_kwargs.kwargs.get("conninfo", call_kwargs.args[0] if call_kwargs.args else "")
 
 
 class TestGetTableName:

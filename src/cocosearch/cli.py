@@ -953,7 +953,7 @@ def config_check_command(args: argparse.Namespace) -> int:
     """
     from rich.table import Table
 
-    from cocosearch.config import mask_password, validate_required_env_vars
+    from cocosearch.config import mask_password, validate_required_env_vars, get_database_url, DEFAULT_DATABASE_URL
 
     console = Console()
 
@@ -976,13 +976,12 @@ def config_check_command(args: argparse.Namespace) -> int:
     table.add_column("Value", style="white")
     table.add_column("Source", style="dim")
 
-    # DATABASE_URL (required)
-    db_url = os.getenv("COCOSEARCH_DATABASE_URL")
-    table.add_row(
-        "COCOSEARCH_DATABASE_URL",
-        mask_password(db_url),
-        "environment"
-    )
+    # DATABASE_URL (has default)
+    db_url_env = os.getenv("COCOSEARCH_DATABASE_URL")
+    if db_url_env:
+        table.add_row("COCOSEARCH_DATABASE_URL", mask_password(db_url_env), "environment")
+    else:
+        table.add_row("COCOSEARCH_DATABASE_URL", mask_password(DEFAULT_DATABASE_URL), "default")
 
     # OLLAMA_URL (optional with default)
     ollama_url = os.getenv("COCOSEARCH_OLLAMA_URL")
@@ -1371,6 +1370,10 @@ def main() -> None:
 
     # Parse args
     args = parser.parse_args()
+
+    # Ensure database URL default and CocoIndex bridge are set early
+    from cocosearch.config.env_validation import get_database_url
+    get_database_url()
 
     if args.command == "index":
         sys.exit(index_command(args))
