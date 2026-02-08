@@ -8,7 +8,7 @@ CocoSearch provides 5 Model Context Protocol (MCP) tools for semantic code searc
 
 ## search_code
 
-Search indexed code using natural language queries. Returns code chunks ranked by semantic similarity, with optional context expansion to enclosing function/class boundaries.
+Search indexed code using natural language queries. Returns code chunks ranked by semantic similarity, with optional context expansion to enclosing function/class boundaries. Performs automatic project detection using MCP Roots when available, falling back to the `index_name` parameter or the working directory.
 
 ### Parameters
 
@@ -119,13 +119,14 @@ Get all indexed codebases to see what's available for searching.
 
 ## index_stats
 
-Get statistics for code indexes. Returns file count, chunk count, storage size, language distribution, symbol counts, and staleness information.
+Get statistics for code indexes. Returns file count, chunk count, storage size, language distribution, symbol counts, parse health, and staleness information.
 
 ### Parameters
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | index_name | string \| null | No | null | Name of the index (omit for all indexes) |
+| include_failures | boolean | No | false | Include per-language parse failure details in response |
 
 ### Natural Language Example
 
@@ -178,7 +179,43 @@ Check how many files and chunks are indexed in "my-api-server" and when it was l
     "method": 320,
     "interface": 25
   },
+  "parse_stats": {
+    "parse_health_pct": 95.2,
+    "total_files": 342,
+    "total_ok": 325,
+    "by_language": {
+      "python": {
+        "files": 180,
+        "ok": 175,
+        "partial": 3,
+        "error": 2,
+        "unsupported": 0
+      },
+      "typescript": {
+        "files": 120,
+        "ok": 115,
+        "partial": 3,
+        "error": 2,
+        "unsupported": 0
+      }
+    }
+  },
   "warnings": []
+}
+```
+
+When `include_failures` is true, the response includes a `parse_failures` array with file paths and error details for each failed parse:
+
+```json
+{
+  "parse_failures": [
+    {
+      "file_path": "src/legacy/parser.py",
+      "language": "python",
+      "parse_status": "error",
+      "error_message": "tree-sitter parse failed"
+    }
+  ]
 }
 ```
 
@@ -214,6 +251,12 @@ Check how many files and chunks are indexed in "my-api-server" and when it was l
       "function": 450,
       "class": 85
     },
+    "parse_stats": {
+      "parse_health_pct": 97.8,
+      "total_files": 180,
+      "total_ok": 176,
+      "by_language": {}
+    },
     "warnings": []
   },
   {
@@ -238,6 +281,12 @@ Check how many files and chunks are indexed in "my-api-server" and when it was l
       "function": 320,
       "interface": 45
     },
+    "parse_stats": {
+      "parse_health_pct": 99.0,
+      "total_files": 200,
+      "total_ok": 198,
+      "by_language": {}
+    },
     "warnings": [
       "Index is stale (9 days since last update)"
     ]
@@ -251,7 +300,7 @@ Check how many files and chunks are indexed in "my-api-server" and when it was l
 
 ## clear_index
 
-Clear (delete) a code index. Permanently deletes all indexed data for a codebase. This operation cannot be undone.
+Clear (delete) a code index. Permanently deletes all indexed data for a codebase, including the associated parse results tracking table. This operation cannot be undone.
 
 **WARNING:** This is a destructive operation.
 
@@ -352,3 +401,4 @@ All tools are implemented in `src/cocosearch/mcp/server.py` using the FastMCP fr
 **Core search engine:** `src/cocosearch/search/query.py`
 **Index management:** `src/cocosearch/management/__init__.py`
 **Statistics:** `src/cocosearch/management/stats.py`
+**Parse tracking:** `src/cocosearch/management/parse_tracking.py`

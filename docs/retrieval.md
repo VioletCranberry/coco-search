@@ -133,6 +133,24 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 - Schema migration: `src/cocosearch/indexer/schema_migration.py`
 - Cache invalidation: `src/cocosearch/indexer/flow.py` — `run_index()`, lines 165-172
 
+### 8. Parse Tracking
+
+**What It Does:** Records tree-sitter parse health for each unique file in the index, providing observability into how well source files were parsed.
+
+**How It Works:**
+- After CocoIndex completes the indexing flow, CocoSearch runs a post-flow parse tracking pass
+- For each unique file in the index (queried from the chunks table via DISTINCT filenames), tree-sitter attempts to parse the file content read from disk
+- Each file receives a parse status:
+  - `ok` — Clean parse with no errors
+  - `partial` — Parse completed but with error nodes in the tree
+  - `error` — Parse failed completely
+  - `unsupported` — No tree-sitter grammar available for the file's language
+- Results are stored in a per-index `parse_results` table (`cocosearch_parse_results_{index_name}`) with columns: file_path, language, parse_status, error_count, error_message, created_at
+- This tracking is non-fatal — parse failures do not block indexing
+- The parse results table is dropped when an index is cleared via `clear_index`
+
+**Implementation:** `src/cocosearch/management/parse_tracking.py`
+
 ## Search Pipeline
 
 The search pipeline retrieves relevant code chunks for a query through vector similarity, keyword matching, and intelligent fusion. Here's the complete end-to-end flow:
@@ -362,7 +380,7 @@ The result in both lists scores nearly **2x higher**, naturally boosting double-
 
 CocoSearch's retrieval logic combines semantic understanding (vector search) with exact matching (keyword search) to deliver highly relevant code search results:
 
-- **Indexing:** 7-stage pipeline transforms code into searchable chunks with embeddings, metadata, and full-text indexes
+- **Indexing:** 8-stage pipeline transforms code into searchable chunks with embeddings, metadata, full-text indexes, and parse tracking
 - **Search:** 9-stage pipeline retrieves results through caching, vector similarity, keyword matching, RRF fusion, definition boosting, and smart context expansion
 - **Key parameters:** chunk_size=1000, chunk_overlap=300, RRF k=60, definition boost=2.0x, cache TTL=24h, semantic threshold=0.95
 
