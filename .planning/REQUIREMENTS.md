@@ -37,10 +37,10 @@ Requirements for v1.10 milestone. Each maps to roadmap phases.
 
 ### Observability
 
-- [ ] **OBS-01**: Add `parse_status` field to symbol extraction return (ok/error/unsupported)
-- [ ] **OBS-02**: Add `parse_status` column via schema migration (additive, same pattern as symbol columns)
-- [ ] **OBS-03**: Aggregate parse failure counts per language in stats queries
-- [ ] **OBS-04**: Surface parse failure stats in CLI stats, MCP index_stats, and HTTP /api/stats
+- [x] **OBS-01**: Add `parse_status` field to symbol extraction return (ok/error/unsupported)
+- [x] **OBS-02**: Add `parse_status` column via schema migration (additive, same pattern as symbol columns)
+- [x] **OBS-03**: Aggregate parse failure counts per language in stats queries
+- [x] **OBS-04**: Surface parse failure stats in CLI stats, MCP index_stats, and HTTP /api/stats
 
 ### Documentation
 
@@ -95,10 +95,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | PROTO-04 | Phase 45 | Complete |
 | PROTO-05 | Phase 45 | Complete |
 | PROTO-06 | Phase 45 | Complete |
-| OBS-01 | Phase 46 | Pending |
-| OBS-02 | Phase 46 | Pending |
-| OBS-03 | Phase 46 | Pending |
-| OBS-04 | Phase 46 | Pending |
+| OBS-01 | Phase 46 | Complete |
+| OBS-02 | Phase 46 | Complete |
+| OBS-03 | Phase 46 | Complete |
+| OBS-04 | Phase 46 | Complete |
 | DOC-01 | Phase 47 | Pending |
 | DOC-02 | Phase 47 | Pending |
 | DOC-03 | Phase 47 | Pending |
@@ -111,4 +111,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after Phase 45 completion*
+*Last updated: 2026-02-08 after Phase 46 completion*

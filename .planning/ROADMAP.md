@@ -14,7 +14,7 @@ v1.10 is a refinement milestone that standardizes credentials, simplifies the Do
 - [x] **Phase 43: Bug Fix & Credential Defaults** - Fix DevOps metadata bug and standardize database credentials for zero-config setup
 - [x] **Phase 44: Docker Image Simplification** - Strip CocoSearch from Docker image, making it infra-only (PostgreSQL+pgvector, Ollama+model)
 - [x] **Phase 45: MCP Protocol Enhancements** - Add Roots capability for protocol-correct project detection with HTTP query param fallback
-- [ ] **Phase 46: Parse Failure Tracking** - Track and surface tree-sitter parse failures per language in stats output
+- [x] **Phase 46: Parse Failure Tracking** - Track and surface tree-sitter parse failures per language in stats output
 - [ ] **Phase 47: Documentation Update** - Update all documentation for infra-only Docker model and new defaults
 
 ## Phase Details
@@ -79,9 +79,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 46-01-PLAN.md -- Create parse_tracking module, schema migration, integrate into flow.py and clear.py
-- [ ] 46-02-PLAN.md -- Add parse stats queries, extend IndexStats, update CLI with parse health display and --show-failures
-- [ ] 46-03-PLAN.md -- Surface parse stats in MCP/HTTP endpoints, add comprehensive tests
+- [x] 46-01-PLAN.md -- Create parse_tracking module, schema migration, integrate into flow.py and clear.py
+- [x] 46-02-PLAN.md -- Add parse stats queries, extend IndexStats, update CLI with parse health display and --show-failures
+- [x] 46-03-PLAN.md -- Surface parse stats in MCP/HTTP endpoints, add comprehensive tests
 
 ### Phase 47: Documentation Update
 **Goal**: All documentation accurately reflects the infra-only Docker model, new defaults, and protocol enhancements
@@ -107,7 +107,7 @@ Phases execute in numeric order: 43 -> 44 -> 45 -> 46 -> 47
 | 43. Bug Fix & Credential Defaults | 2/2 | Complete | 2026-02-08 |
 | 44. Docker Image Simplification | 2/2 | Complete | 2026-02-08 |
 | 45. MCP Protocol Enhancements | 3/3 | Complete | 2026-02-08 |
-| 46. Parse Failure Tracking | 0/3 | Not started | - |
+| 46. Parse Failure Tracking | 3/3 | Complete | 2026-02-08 |
 | 47. Documentation Update | 0/TBD | Not started | - |
 
 ---
