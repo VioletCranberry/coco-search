@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 46 of 47 (Parse Failure Tracking)
-Plan: 01 of 03 complete
+Plan: 02 of 03 complete
 Status: In progress
-Last activity: 2026-02-08 -- Completed 46-01-PLAN.md (parse tracking foundation)
+Last activity: 2026-02-08 -- Completed 46-02-PLAN.md (stats display)
 
-Progress: [########............] 40% (8/~20 plans across v1.10)
+Progress: [#########...........] 45% (9/~20 plans across v1.10)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 120 (across v1.0-v1.10)
+- Total plans completed: 121 (across v1.0-v1.10)
 - Milestones shipped: 10 (v1.0-v1.9)
 - Last milestone: v1.9 Multi-Repo & Polish (phases 38-42, 11 plans)
 
@@ -27,12 +27,12 @@ Progress: [########............] 40% (8/~20 plans across v1.10)
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 8/~20 | In progress   |
+| v1.10 Infrastructure & Protocol | 43-47 | 9/~20 | In progress   |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 46-01 completion*
+*Updated: 2026-02-08 after 46-02 completion*
 
 ## Accumulated Context
 
@@ -69,10 +69,11 @@ Recent decisions affecting current work:
 - Store tree-sitter language name (e.g., "python") in parse_results.language, not file extension
 - Parse tracking is non-fatal: wrapped in try/except in run_index()
 - Post-flow tracking pattern: query chunks table for DISTINCT filenames, read from disk, process independently
+- Parse health shown by default (not gated by --verbose); failure details require --show-failures flag
 
 ### Pending Todos
 
-None -- ready for 46-02 (stats display).
+None -- ready for 46-03 (test suite).
 
 ### Blockers/Concerns
 
@@ -82,5 +83,5 @@ None -- ready for 46-02 (stats display).
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 46-01-PLAN.md. Ready for 46-02 (stats display).
+Stopped at: Completed 46-02-PLAN.md. Ready for 46-03 (test suite).
 Resume file: None
