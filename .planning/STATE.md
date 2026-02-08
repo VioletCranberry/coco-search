@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 45 of 47 (MCP Protocol Enhancements)
-Plan: Ready to plan
-Status: Phase 44 verified and complete
-Last activity: 2026-02-08 -- Phase 44 verified (5/5 must-haves passed)
+Plan: 01 of ~4 (project detection module)
+Status: In progress
+Last activity: 2026-02-08 -- Completed 45-01-PLAN.md
 
-Progress: [####................] 20% (4/~20 plans across v1.10)
+Progress: [#####...............] 25% (5/~20 plans across v1.10)
 
 ## Performance Metrics
 
@@ -27,12 +27,12 @@ Progress: [####................] 20% (4/~20 plans across v1.10)
 
 | Milestone | Phases | Plans | Shipped |
 |-----------|--------|-------|---------|
-| v1.10 Infrastructure & Protocol | 43-47 | 4/~20 | In progress |
+| v1.10 Infrastructure & Protocol | 43-47 | 5/~20 | In progress |
 | v1.9 Multi-Repo & Polish | 38-42 | 11 | 2026-02-06 |
 | v1.8 Polish & Observability | 33-37 | 13 | 2026-02-05 |
 | v1.7 Search Enhancement | 27-32 | 21 | 2026-02-03 |
 
-*Updated: 2026-02-08 after 44-02 execution*
+*Updated: 2026-02-08 after 45-01 execution*
 
 ## Accumulated Context
 
@@ -54,10 +54,14 @@ Recent decisions affecting current work:
 - README Option #1 describes infra-only Docker (ports 5432+11434 only, no 3000)
 - MCP docs note DATABASE_URL is optional when using Docker
 - Documentation model: Docker = infrastructure, uvx = application
+- _detect_project() returns tuple[Path, str] (never None) -- cwd is unconditional fallback
+- file:// URI parsing uses urlparse+unquote (FileUrl.path does NOT percent-decode)
+- No caching in _detect_project -- re-detect fresh each tool call
+- Low-level server notification_handlers dict used for roots change (no FastMCP public API)
 
 ### Pending Todos
 
-None -- ready for phase 45 planning.
+None -- ready for 45-02.
 
 ### Blockers/Concerns
 
@@ -69,5 +73,5 @@ None -- ready for phase 45 planning.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Phase 44 complete and verified. Ready for `/gsd:plan-phase 45`.
+Stopped at: Completed 45-01-PLAN.md (project detection module). Ready for 45-02.
 Resume file: None
