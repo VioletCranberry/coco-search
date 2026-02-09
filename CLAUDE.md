@@ -60,9 +60,9 @@ uv run cocosearch mcp --project-from-cwd
 **Module structure:**
 
 - **`cli.py`** — Argparse CLI orchestrating all subcommands
-- **`mcp/server.py`** — MCP server exposing tools (search_code, index_codebase, etc.) + web dashboard
+- **`mcp/server.py`** — MCP server exposing tools (search_code, index_codebase, etc.) + web dashboard with custom HTTP routes (`/api/stats`, `/api/reindex`)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
-- **`indexer/`** — CocoIndex pipeline: file filtering, Tree-sitter symbol extraction (10 languages), Ollama embedding, tsvector generation, parse health tracking, schema migration
+- **`indexer/`** — CocoIndex pipeline: file filtering, Tree-sitter symbol extraction (11 languages), Ollama embedding, tsvector generation, parse health tracking, schema migration
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
 - **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, LRU query cache (exact + semantic similarity), context expansion via Tree-sitter boundaries, symbol/language filtering
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
@@ -78,6 +78,8 @@ uv run cocosearch mcp --project-from-cwd
 - Singleton DB connection pool via `search.db` — reset between tests with `reset_db_pool()` autouse fixture in `tests/conftest.py`
 - Handler autodiscovery: any `handlers/*.py` (not prefixed with `_`) implementing `LanguageHandler` protocol is auto-registered
 - CocoIndex framework orchestrates the indexing pipeline in `indexer/flow.py`
+- **CocoIndex table naming:** `codeindex_{index_name}__{index_name}_chunks` (flow name `CodeIndex_{name}` is lowercased by CocoIndex). Parse results go to `cocosearch_parse_results_{index_name}`.
+- Parse status categories: `ok`, `partial`, `error`, `no_grammar`. Text-only formats (md, yaml, json, etc.) are skipped from parse tracking entirely via `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py`.
 
 ## Testing
 
@@ -99,4 +101,4 @@ Shared fixtures live in `tests/fixtures/`.
 
 ## Configuration
 
-Project config via `cocosearch.yaml` (no leading dot) in project root. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). See `.env.example` for available options.
+Project config via `cocosearch.yaml` (no leading dot) in project root. The `indexName` field sets the index name used by all commands. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). Config keys map to env vars via camelCase→UPPER_SNAKE conversion (e.g., `indexName` → `COCOSEARCH_INDEX_NAME`). See `.env.example` for available options.
