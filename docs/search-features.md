@@ -11,14 +11,14 @@ CocoSearch introduces advanced search capabilities: hybrid search for better ide
 **Without hybrid search:**
 
 ```bash
-uvx cocosearch search "getUserById" --pretty
+uv run cocosearch search "getUserById" --pretty
 # May return: getUserByEmail, fetchUser, getProfile (semantically similar but not exact)
 ```
 
 **With hybrid search:**
 
 ```bash
-uvx cocosearch search "getUserById" --hybrid --pretty
+uv run cocosearch search "getUserById" --hybrid --pretty
 # Returns: getUserById exact match boosted to top, then semantically similar results
 ```
 
@@ -40,26 +40,26 @@ uvx cocosearch search "getUserById" --hybrid --pretty
 
 ```bash
 # Find all functions matching "auth"
-uvx cocosearch search "auth" --symbol-type function --pretty
+uv run cocosearch search "auth" --symbol-type function --pretty
 
 # Find classes matching "User"
-uvx cocosearch search "User" --symbol-type class --pretty
+uv run cocosearch search "User" --symbol-type class --pretty
 
 # Find both functions and methods (OR logic)
-uvx cocosearch search "handler" --symbol-type function --symbol-type method --pretty
+uv run cocosearch search "handler" --symbol-type function --symbol-type method --pretty
 ```
 
 **Filter by name pattern:**
 
 ```bash
 # Find symbols starting with "get"
-uvx cocosearch search "database operations" --symbol-name "get*" --pretty
+uv run cocosearch search "database operations" --symbol-name "get*" --pretty
 
 # Find symbols ending with "Handler"
-uvx cocosearch search "request processing" --symbol-name "*Handler" --pretty
+uv run cocosearch search "request processing" --symbol-name "*Handler" --pretty
 
 # Combine type and name filters (AND logic)
-uvx cocosearch search "validation" --symbol-type function --symbol-name "validate*" --pretty
+uv run cocosearch search "validation" --symbol-type function --symbol-name "validate*" --pretty
 ```
 
 **Available symbol types:**
@@ -84,13 +84,13 @@ uvx cocosearch search "validation" --symbol-type function --symbol-name "validat
 
 ```bash
 # Show 5 lines before and after each match
-uvx cocosearch search "database connection" -C 5 --pretty
+uv run cocosearch search "database connection" -C 5 --pretty
 
 # Show 10 lines after (like grep -A)
-uvx cocosearch search "error handling" -A 10 --pretty
+uv run cocosearch search "error handling" -A 10 --pretty
 
 # Show 3 lines before (like grep -B)
-uvx cocosearch search "config parsing" -B 3 --pretty
+uv run cocosearch search "config parsing" -B 3 --pretty
 ```
 
 **Smart context (default):**
@@ -99,11 +99,11 @@ By default, CocoSearch expands context to include the enclosing function or clas
 
 ```bash
 # Smart context enabled by default
-uvx cocosearch search "parse config" --pretty
+uv run cocosearch search "parse config" --pretty
 # Shows entire function containing the match
 
 # Disable smart context for fixed line counts only
-uvx cocosearch search "parse config" -C 5 --no-smart --pretty
+uv run cocosearch search "parse config" -C 5 --no-smart --pretty
 ```
 
 **How smart context works:**

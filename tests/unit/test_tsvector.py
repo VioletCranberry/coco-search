@@ -1,7 +1,5 @@
 """Unit tests for tsvector generation module."""
 
-import pytest
-
 from cocosearch.indexer.tsvector import (
     split_code_identifier,
     preprocess_code_for_tsvector,

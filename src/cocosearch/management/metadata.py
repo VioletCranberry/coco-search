@@ -30,8 +30,13 @@ def ensure_metadata_table() -> None:
                     index_name TEXT PRIMARY KEY,
                     canonical_path TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT NOW(),
-                    updated_at TIMESTAMP DEFAULT NOW()
+                    updated_at TIMESTAMP DEFAULT NOW(),
+                    status TEXT DEFAULT 'indexed'
                 )
+            """)
+            cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'indexed'
             """)
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_cocosearch_metadata_path
@@ -47,29 +52,34 @@ def get_index_metadata(index_name: str) -> dict | None:
         index_name: The name of the index to look up.
 
     Returns:
-        Dict with keys: index_name, canonical_path, created_at, updated_at
-        or None if not found.
+        Dict with keys: index_name, canonical_path, created_at, updated_at, status
+        or None if not found (including when metadata table doesn't exist yet).
     """
     pool = get_connection_pool()
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT index_name, canonical_path, created_at, updated_at
-                FROM cocosearch_index_metadata
-                WHERE index_name = %s
-                """,
-                (index_name,)
-            )
-            row = cur.fetchone()
-            if row is None:
-                return None
-            return {
-                "index_name": row[0],
-                "canonical_path": row[1],
-                "created_at": row[2],
-                "updated_at": row[3],
-            }
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT index_name, canonical_path, created_at, updated_at, status
+                    FROM cocosearch_index_metadata
+                    WHERE index_name = %s
+                    """,
+                    (index_name,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return None
+                return {
+                    "index_name": row[0],
+                    "canonical_path": row[1],
+                    "created_at": row[2],
+                    "updated_at": row[3],
+                    "status": row[4] if len(row) > 4 else "indexed",
+                }
+    except Exception:
+        # Table doesn't exist yet (fresh database, never indexed)
+        return None
 
 
 @lru_cache(maxsize=128)
@@ -82,23 +92,28 @@ def get_index_for_path(canonical_path: str) -> str | None:
         canonical_path: Absolute, symlink-resolved path as string
 
     Returns:
-        Index name if mapping exists, None otherwise
+        Index name if mapping exists, None otherwise (including when
+        metadata table doesn't exist yet on fresh database).
     """
     pool = get_connection_pool()
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT index_name
-                FROM cocosearch_index_metadata
-                WHERE canonical_path = %s
-                """,
-                (canonical_path,)
-            )
-            row = cur.fetchone()
-            if row is None:
-                return None
-            return row[0]
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT index_name
+                    FROM cocosearch_index_metadata
+                    WHERE canonical_path = %s
+                    """,
+                    (canonical_path,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    return None
+                return row[0]
+    except Exception:
+        # Table doesn't exist yet (fresh database, never indexed)
+        return None
 
 
 def register_index_path(index_name: str, project_path: str | Path) -> None:
@@ -135,13 +150,14 @@ def register_index_path(index_name: str, project_path: str | Path) -> None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO cocosearch_index_metadata (index_name, canonical_path, created_at, updated_at)
-                VALUES (%s, %s, NOW(), NOW())
+                INSERT INTO cocosearch_index_metadata (index_name, canonical_path, created_at, updated_at, status)
+                VALUES (%s, %s, NOW(), NOW(), 'indexed')
                 ON CONFLICT (index_name) DO UPDATE SET
                     canonical_path = EXCLUDED.canonical_path,
-                    updated_at = NOW()
+                    updated_at = NOW(),
+                    status = 'indexed'
                 """,
-                (index_name, canonical)
+                (index_name, canonical),
             )
         conn.commit()
 
@@ -156,22 +172,58 @@ def clear_index_path(index_name: str) -> bool:
         index_name: The name of the index to remove
 
     Returns:
-        True if a row was deleted, False if not found
+        True if a row was deleted, False if not found (including when
+        metadata table doesn't exist yet on fresh database).
     """
     pool = get_connection_pool()
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                DELETE FROM cocosearch_index_metadata
-                WHERE index_name = %s
-                """,
-                (index_name,)
-            )
-            deleted = cur.rowcount > 0
-        conn.commit()
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM cocosearch_index_metadata
+                    WHERE index_name = %s
+                    """,
+                    (index_name,),
+                )
+                deleted = cur.rowcount > 0
+            conn.commit()
 
-    # Clear cache since database changed
-    get_index_for_path.cache_clear()
+        # Clear cache since database changed
+        get_index_for_path.cache_clear()
 
-    return deleted
+        return deleted
+    except Exception:
+        # Table doesn't exist yet (fresh database)
+        return False
+
+
+def set_index_status(index_name: str, status: str) -> bool:
+    """Set the status of an index.
+
+    Args:
+        index_name: The name of the index.
+        status: The status to set (e.g., 'indexing', 'indexed').
+
+    Returns:
+        True if a row was updated, False if not found (including when
+        metadata table doesn't exist yet on fresh database).
+    """
+    pool = get_connection_pool()
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE cocosearch_index_metadata
+                    SET status = %s, updated_at = NOW()
+                    WHERE index_name = %s
+                    """,
+                    (status, index_name),
+                )
+                updated = cur.rowcount > 0
+            conn.commit()
+        return updated
+    except Exception:
+        # Table doesn't exist yet (fresh database)
+        return False

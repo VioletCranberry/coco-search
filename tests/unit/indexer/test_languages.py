@@ -49,7 +49,9 @@ class TestHclLanguage:
             "check",
         ]
         for keyword in expected_keywords:
-            assert keyword in level1, f"Missing HCL keyword '{keyword}' in Level 1 separator"
+            assert keyword in level1, (
+                f"Missing HCL keyword '{keyword}' in Level 1 separator"
+            )
 
     def test_no_lookaheads_in_separators(self):
         """HCL separators must not contain lookahead or lookbehind patterns."""
@@ -85,7 +87,9 @@ class TestDockerfileLanguage:
                 instructions_index = i
         assert from_index is not None, "FROM separator not found"
         assert instructions_index is not None, "Instructions separator not found"
-        assert from_index < instructions_index, "FROM should be higher priority (lower index) than instructions"
+        assert from_index < instructions_index, (
+            "FROM should be higher priority (lower index) than instructions"
+        )
 
     def test_no_lookaheads_in_separators(self):
         """Dockerfile separators must not contain lookahead or lookbehind patterns."""
@@ -167,6 +171,4 @@ class TestAllSeparatorsNoLookaheads:
                 try:
                     re.compile(sep)
                 except re.error as e:
-                    pytest.fail(
-                        f"Invalid regex in {lang.language_name}: {sep!r} - {e}"
-                    )
+                    pytest.fail(f"Invalid regex in {lang.language_name}: {sep!r} - {e}")

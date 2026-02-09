@@ -1,6 +1,5 @@
 """Tests for cocosearch.indexer.config module."""
 
-import pytest
 import yaml
 
 from cocosearch.indexer.config import IndexingConfig, load_config

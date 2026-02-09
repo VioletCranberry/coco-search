@@ -10,8 +10,6 @@ These tests require Docker and are marked with @pytest.mark.integration.
 The marker is auto-applied by tests/integration/conftest.py.
 """
 
-import pytest
-
 
 class TestPgvectorExtension:
     """Tests for pgvector extension functionality."""
@@ -219,4 +217,6 @@ class TestConnectionPool:
                 # Query a vector literal - should return numpy array
                 cur.execute("SELECT '[1,2,3]'::vector")
                 result = cur.fetchone()[0]
-                assert isinstance(result, np.ndarray), "pgvector type handler not registered"
+                assert isinstance(result, np.ndarray), (
+                    "pgvector type handler not registered"
+                )

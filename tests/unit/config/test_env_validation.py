@@ -23,7 +23,9 @@ class TestGetDatabaseUrl:
     def test_returns_env_var_when_set(self):
         """Should return env var value when COCOSEARCH_DATABASE_URL is set."""
         custom_url = "postgresql://custom:pass@host:5432/mydb"
-        with patch.dict(os.environ, {"COCOSEARCH_DATABASE_URL": custom_url}, clear=True):
+        with patch.dict(
+            os.environ, {"COCOSEARCH_DATABASE_URL": custom_url}, clear=True
+        ):
             result = get_database_url()
         assert result == custom_url
 
@@ -52,6 +54,10 @@ class TestValidateRequiredEnvVars:
 
     def test_no_errors_with_database_url(self):
         """Should return no errors when DATABASE_URL is set."""
-        with patch.dict(os.environ, {"COCOSEARCH_DATABASE_URL": "postgresql://x:x@localhost/db"}, clear=True):
+        with patch.dict(
+            os.environ,
+            {"COCOSEARCH_DATABASE_URL": "postgresql://x:x@localhost/db"},
+            clear=True,
+        ):
             errors = validate_required_env_vars()
         assert len(errors) == 0

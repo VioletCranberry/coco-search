@@ -48,7 +48,9 @@ def detect_parse_status(file_content: str, language_ext: str) -> tuple[str, str 
 
         # Collect ERROR node locations for diagnostics
         error_lines = _collect_error_lines(tree.root_node)
-        error_msg = f"ERROR nodes at lines: {', '.join(str(line) for line in error_lines[:10])}"
+        error_msg = (
+            f"ERROR nodes at lines: {', '.join(str(line) for line in error_lines[:10])}"
+        )
         if len(error_lines) > 10:
             error_msg += f" (+{len(error_lines) - 10} more)"
 
@@ -113,12 +115,14 @@ def track_parse_results(
             file_content = file_path.read_text(encoding="utf-8", errors="replace")
         except Exception as e:
             # File unreadable -- record as error rather than failing entire tracking
-            results.append({
-                "file_path": filename,
-                "language": language_id,
-                "parse_status": "error",
-                "error_message": f"FileNotFoundError: {e}",
-            })
+            results.append(
+                {
+                    "file_path": filename,
+                    "language": language_id,
+                    "parse_status": "error",
+                    "error_message": f"FileNotFoundError: {e}",
+                }
+            )
             summary["error"] += 1
             continue
 
@@ -129,12 +133,14 @@ def track_parse_results(
         # For unsupported languages, store the language_id as-is
         ts_language = LANGUAGE_MAP.get(language_id, language_id)
 
-        results.append({
-            "file_path": filename,
-            "language": ts_language,
-            "parse_status": status,
-            "error_message": error_message,
-        })
+        results.append(
+            {
+                "file_path": filename,
+                "language": ts_language,
+                "parse_status": status,
+                "error_message": error_message,
+            }
+        )
         summary[status] += 1
 
     # Persist results
@@ -177,7 +183,12 @@ def rebuild_parse_results(
                 f"INSERT INTO {parse_table} (file_path, language, parse_status, error_message) "
                 f"VALUES (%s, %s, %s, %s)",
                 [
-                    (r["file_path"], r["language"], r["parse_status"], r["error_message"])
+                    (
+                        r["file_path"],
+                        r["language"],
+                        r["parse_status"],
+                        r["error_message"],
+                    )
                     for r in results
                 ],
             )

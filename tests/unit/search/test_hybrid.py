@@ -1,7 +1,5 @@
 """Tests for hybrid search definition boost functionality."""
 
-import pytest
-
 from cocosearch.search.hybrid import (
     HybridSearchResult,
     _is_definition_chunk,

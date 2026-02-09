@@ -12,9 +12,7 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
-from pathlib import Path
 
 import pytest
 
@@ -103,15 +101,15 @@ def large_python_file(tmp_path):
 
     Used to test the 50-line hard limit enforcement.
     """
-    content_lines = ['def large_function(data):']
+    content_lines = ["def large_function(data):"]
     content_lines.append('    """A function that exceeds 50 lines."""')
     for i in range(60):
-        content_lines.append(f'    line_{i} = process_item({i})')
-    content_lines.append('    return result')
-    content_lines.append('')
+        content_lines.append(f"    line_{i} = process_item({i})")
+    content_lines.append("    return result")
+    content_lines.append("")
 
     large_py = tmp_path / "large.py"
-    large_py.write_text('\n'.join(content_lines))
+    large_py.write_text("\n".join(content_lines))
     return large_py
 
 
@@ -130,8 +128,15 @@ def indexed_context_fixtures(initialized_db, warmed_ollama, sample_python_projec
 
     # Index the fixtures
     result = subprocess.run(
-        [sys.executable, "-m", "cocosearch", "index", str(sample_python_project),
-         "--name", index_name],
+        [
+            sys.executable,
+            "-m",
+            "cocosearch",
+            "index",
+            str(sample_python_project),
+            "--name",
+            index_name,
+        ],
         capture_output=True,
         text=True,
         env=env,
@@ -145,7 +150,9 @@ def indexed_context_fixtures(initialized_db, warmed_ollama, sample_python_projec
     # Cleanup handled by clean_tables autouse fixture
 
 
-def search_cli(query: str, index_name: str, env: dict, extra_args: list | None = None) -> subprocess.CompletedProcess:
+def search_cli(
+    query: str, index_name: str, env: dict, extra_args: list | None = None
+) -> subprocess.CompletedProcess:
     """Run CLI search command.
 
     Args:
@@ -211,7 +218,9 @@ class TestCLIContextFlags:
         if context_after:
             # Should have up to 3 lines after the match
             after_lines = context_after.split("\n")
-            assert len(after_lines) <= 3, f"Should have at most 3 after lines, got {len(after_lines)}"
+            assert len(after_lines) <= 3, (
+                f"Should have at most 3 after lines, got {len(after_lines)}"
+            )
 
     def test_before_context_flag(self, indexed_context_fixtures):
         """Test -B flag shows lines before each match."""
@@ -280,8 +289,9 @@ class TestCLIContextFlags:
         # : for context lines, > for match lines
         output = result.stdout
         # Should contain the query target
-        assert "get_user" in output.lower() or "user" in output.lower(), \
+        assert "get_user" in output.lower() or "user" in output.lower(), (
             "Pretty output should contain search results"
+        )
 
 
 # ============================================================================
@@ -313,12 +323,14 @@ class TestSmartBoundaryDetection:
         line_nums = [ln for ln, _ in all_lines]
 
         # Should include function definition "def process_data(items):"
-        assert any(ln <= 18 for ln in line_nums), \
+        assert any(ln <= 18 for ln in line_nums), (
             f"Should include function start, got lines {line_nums}"
+        )
 
         # Should include "return result" at end
-        assert any(ln >= 22 for ln in line_nums), \
+        assert any(ln >= 22 for ln in line_nums), (
             f"Should include function end, got lines {line_nums}"
+        )
 
         expander.clear_cache()
 
@@ -446,7 +458,9 @@ class TestPerformanceCaching:
 
         # Should have only 1 cache miss (first read)
         cache_info = expander._read_file_cached.cache_info()
-        assert cache_info.misses == 1, f"Should only read file once, had {cache_info.misses} misses"
+        assert cache_info.misses == 1, (
+            f"Should only read file once, had {cache_info.misses} misses"
+        )
 
         expander.clear_cache()
 
@@ -547,7 +561,9 @@ class TestEdgeCases:
         # Check that long line was truncated
         if match:
             line_num, line_text = match[0]
-            assert len(line_text) <= 200, f"Line should be truncated to 200 chars, got {len(line_text)}"
+            assert len(line_text) <= 200, (
+                f"Line should be truncated to 200 chars, got {len(line_text)}"
+            )
             assert line_text.endswith("..."), "Truncated line should end with ..."
 
         expander.clear_cache()
@@ -585,7 +601,9 @@ class TestMCPContextParameters:
         )
 
         # Should have up to 3 lines before
-        assert len(before) <= 3, f"Should have at most 3 before lines, got {len(before)}"
+        assert len(before) <= 3, (
+            f"Should have at most 3 before lines, got {len(before)}"
+        )
         # Should have up to 5 lines after
         assert len(after) <= 5, f"Should have at most 5 after lines, got {len(after)}"
 
@@ -607,7 +625,9 @@ class TestMCPContextParameters:
             smart=False,
         )
 
-        assert before == [], "Should have no before lines with smart=False and 0 context"
+        assert before == [], (
+            "Should have no before lines with smart=False and 0 context"
+        )
         assert after == [], "Should have no after lines with smart=False and 0 context"
 
         expander.clear_cache()
@@ -643,9 +663,13 @@ class TestFullIntegrationFlow:
 
             # Context should be strings (not lists)
             if "context_before" in r:
-                assert isinstance(r["context_before"], str), "context_before should be string"
+                assert isinstance(r["context_before"], str), (
+                    "context_before should be string"
+                )
             if "context_after" in r:
-                assert isinstance(r["context_after"], str), "context_after should be string"
+                assert isinstance(r["context_after"], str), (
+                    "context_after should be string"
+                )
 
     def test_json_output_format_with_context(self, indexed_context_fixtures):
         """Test JSON output format with -A and -B flags."""
@@ -667,10 +691,12 @@ class TestFullIntegrationFlow:
         if results:
             r = results[0]
             # Verify context_before and context_after are present
-            assert "context_before" in r or not r.get("context_before"), \
+            assert "context_before" in r or not r.get("context_before"), (
                 "Should have context_before (possibly empty)"
-            assert "context_after" in r or not r.get("context_after"), \
+            )
+            assert "context_after" in r or not r.get("context_after"), (
                 "Should have context_after (possibly empty)"
+            )
 
     def test_smart_vs_explicit_context(self, indexed_context_fixtures):
         """Test that smart context differs from explicit context."""
@@ -681,7 +707,9 @@ class TestFullIntegrationFlow:
         results_smart = parse_json_output(result_smart)
 
         # Search with explicit -C 3 (overrides smart)
-        result_explicit = search_cli("get_user", index_name, env, ["-C", "3", "--no-smart"])
+        result_explicit = search_cli(
+            "get_user", index_name, env, ["-C", "3", "--no-smart"]
+        )
         results_explicit = parse_json_output(result_explicit)
 
         # Both should return results
@@ -701,7 +729,9 @@ class TestBatchedIOOptimization:
         index_name, env, project_path = indexed_context_fixtures
 
         # Search with low threshold to get multiple results
-        result = search_cli("user", index_name, env, ["-C", "5", "--min-score", "0.1", "-l", "20"])
+        result = search_cli(
+            "user", index_name, env, ["-C", "5", "--min-score", "0.1", "-l", "20"]
+        )
 
         assert result.returncode == 0, f"Search failed: {result.stderr}"
         results = parse_json_output(result)

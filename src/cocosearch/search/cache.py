@@ -309,9 +309,7 @@ class QueryCache:
         """Remove a single entry from the embedding index."""
         if index_name in self._embedding_index:
             self._embedding_index[index_name] = [
-                (k, e)
-                for k, e in self._embedding_index[index_name]
-                if k != cache_key
+                (k, e) for k, e in self._embedding_index[index_name] if k != cache_key
             ]
 
     def clear(self) -> None:

@@ -27,9 +27,9 @@ def mock_code_to_embedding():
     mock = MagicMock()
     mock.eval = lambda text: deterministic_embedding(text)
 
-    with patch('cocosearch.indexer.embedder.code_to_embedding', mock):
+    with patch("cocosearch.indexer.embedder.code_to_embedding", mock):
         # Also patch in search.query where it's imported
-        with patch('cocosearch.search.query.code_to_embedding', mock):
+        with patch("cocosearch.search.query.code_to_embedding", mock):
             yield mock
 
 

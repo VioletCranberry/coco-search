@@ -1,11 +1,2 @@
 # CocoSearch using CocoSearch - dogfooding configuration
-indexName: self
-
-indexing:
-  includePatterns:
-    - "*.py"
-    - "*.sh"
-    - "*.bash"
-    - "Dockerfile*"
-    - "docker-compose*.yml"
-    - "*.md"
+indexName: cocosearch

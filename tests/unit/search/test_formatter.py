@@ -7,15 +7,12 @@ import io
 import json
 from unittest.mock import patch
 
-import pytest
 from rich.console import Console
 
 from cocosearch.search.formatter import (
     format_json,
     format_pretty,
     EXTENSION_LANG_MAP,
-    _get_display_language,
-    _get_annotation,
 )
 
 
@@ -27,8 +24,13 @@ class TestFormatJson:
         results = [make_search_result(filename="/test/file.py", score=0.85)]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         # Should parse without error
@@ -41,8 +43,13 @@ class TestFormatJson:
         results = [make_search_result(filename="/test/file.py", score=0.85)]
 
         with patch("cocosearch.search.formatter.byte_to_line", side_effect=[10, 20]):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -59,8 +66,14 @@ class TestFormatJson:
         code_content = "def hello():\n    return 'world'"
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value=code_content):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value=code_content,
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results, include_content=True)
 
         parsed = json.loads(output)
@@ -71,7 +84,9 @@ class TestFormatJson:
         results = [make_search_result()]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 output = format_json(results, include_content=False)
 
         parsed = json.loads(output)
@@ -88,12 +103,18 @@ class TestFormatJson:
             [(3, "# Line before 1"), (4, "# Line before 2")],  # before
             [(5, "code")],  # match
             [(6, "# Line after 1")],  # after
-            False, False
+            False,
+            False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=5):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="code",
+                ):
                     output = format_json(results, context_lines=2)
 
         parsed = json.loads(output)
@@ -111,9 +132,14 @@ class TestFormatJson:
         mock_expander = MagicMock()
         mock_expander.get_context_lines.return_value = ([], [], [], False, False)
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="code",
+                ):
                     # With smart_context=False and context=0, minimal context
                     output = format_json(results, context_lines=0, smart_context=False)
 
@@ -125,8 +151,13 @@ class TestFormatJson:
     def test_multiple_results(self, sample_search_results):
         """Should handle multiple results."""
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(sample_search_results)
 
         parsed = json.loads(output)
@@ -143,8 +174,13 @@ class TestFormatJson:
         results = [make_search_result(score=0.85678901234)]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -166,7 +202,10 @@ class TestFormatPretty:
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="def hello(): pass"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value="def hello(): pass",
+            ):
                 # format_pretty should not raise
                 format_pretty(results, console=console)
 
@@ -183,7 +222,9 @@ class TestFormatPretty:
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -196,7 +237,9 @@ class TestFormatPretty:
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -208,7 +251,9 @@ class TestFormatPretty:
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", side_effect=[10, 25]):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -228,13 +273,19 @@ class TestFormatPretty:
     def test_groups_by_file(self, make_search_result):
         """Results from same file should be grouped together."""
         results = [
-            make_search_result(filename="/project/auth.py", start_byte=0, end_byte=50, score=0.9),
-            make_search_result(filename="/project/auth.py", start_byte=100, end_byte=150, score=0.7),
+            make_search_result(
+                filename="/project/auth.py", start_byte=0, end_byte=50, score=0.9
+            ),
+            make_search_result(
+                filename="/project/auth.py", start_byte=100, end_byte=150, score=0.7
+            ),
         ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -246,7 +297,9 @@ class TestFormatPretty:
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(sample_search_results, console=console)
 
         captured = output.getvalue()
@@ -287,17 +340,25 @@ class TestFormatJsonMetadata:
 
     def test_json_includes_metadata_fields(self, make_search_result):
         """JSON output should include block_type, hierarchy, language_id for DevOps results."""
-        results = [make_search_result(
-            filename="/infra/main.tf",
-            score=0.9,
-            block_type="resource",
-            hierarchy="resource.aws_s3_bucket.data",
-            language_id="hcl",
-        )]
+        results = [
+            make_search_result(
+                filename="/infra/main.tf",
+                score=0.9,
+                block_type="resource",
+                hierarchy="resource.aws_s3_bucket.data",
+                language_id="hcl",
+            )
+        ]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="resource {}"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value="resource {}",
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -311,8 +372,13 @@ class TestFormatJsonMetadata:
         results = [make_search_result(filename="/test/file.py", score=0.85)]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -332,8 +398,13 @@ class TestFormatJsonMetadata:
         non_devops_result = make_search_result(filename="/test/file.py")
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     devops_output = format_json([devops_result])
                     non_devops_output = format_json([non_devops_result])
 
@@ -353,15 +424,20 @@ class TestFormatPrettyAnnotation:
 
     def test_shows_language_annotation(self, make_search_result):
         """Pretty output should show [language] hierarchy annotation."""
-        results = [make_search_result(
-            filename="/infra/main.tf",
-            language_id="hcl",
-            hierarchy="resource.aws_s3_bucket.data",
-        )]
+        results = [
+            make_search_result(
+                filename="/infra/main.tf",
+                language_id="hcl",
+                hierarchy="resource.aws_s3_bucket.data",
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="resource {}"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value="resource {}",
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -369,15 +445,19 @@ class TestFormatPrettyAnnotation:
 
     def test_shows_language_only_without_hierarchy(self, make_search_result):
         """When hierarchy is empty, show only [language] annotation."""
-        results = [make_search_result(
-            filename="/infra/main.tf",
-            language_id="hcl",
-            hierarchy="",
-        )]
+        results = [
+            make_search_result(
+                filename="/infra/main.tf",
+                language_id="hcl",
+                hierarchy="",
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -390,7 +470,10 @@ class TestFormatPrettyAnnotation:
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="def test(): pass"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value="def test(): pass",
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -398,14 +481,19 @@ class TestFormatPrettyAnnotation:
 
     def test_dockerfile_syntax_highlighting_uses_docker_lexer(self, make_search_result):
         """Dockerfile with language_id should render without error (uses docker lexer)."""
-        results = [make_search_result(
-            filename="/app/Dockerfile",
-            language_id="dockerfile",
-        )]
+        results = [
+            make_search_result(
+                filename="/app/Dockerfile",
+                language_id="dockerfile",
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="FROM ubuntu:22.04"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value="FROM ubuntu:22.04",
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -429,17 +517,24 @@ class TestFormatJsonHybridFields:
 
     def test_format_json_includes_match_type(self, make_search_result):
         """JSON output should include match_type when set."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-            match_type="both",
-            vector_score=0.82,
-            keyword_score=0.45,
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+                match_type="both",
+                vector_score=0.82,
+                keyword_score=0.45,
+            )
+        ]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -448,17 +543,24 @@ class TestFormatJsonHybridFields:
 
     def test_format_json_includes_score_breakdown(self, make_search_result):
         """JSON output should include vector_score and keyword_score when set."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-            match_type="both",
-            vector_score=0.82345678,
-            keyword_score=0.45678901,
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+                match_type="both",
+                vector_score=0.82345678,
+                keyword_score=0.45678901,
+            )
+        ]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -469,15 +571,22 @@ class TestFormatJsonHybridFields:
 
     def test_format_json_omits_none_scores(self, make_search_result):
         """JSON output should omit vector_score and keyword_score when None."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-            # match_type and scores left at defaults (empty string, None)
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+                # match_type and scores left at defaults (empty string, None)
+            )
+        ]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -489,17 +598,25 @@ class TestFormatJsonHybridFields:
 
     def test_format_json_backward_compat_no_hybrid_fields(self, make_search_result):
         """JSON output should maintain backward compatible structure for non-hybrid results."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-            block_type="function",
-            hierarchy="module.function",
-            language_id="python",
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+                block_type="function",
+                hierarchy="module.function",
+                language_id="python",
+            )
+        ]
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="def test(): pass"):
-                with patch("cocosearch.search.formatter.get_context_lines", return_value=([], [])):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content",
+                return_value="def test(): pass",
+            ):
+                with patch(
+                    "cocosearch.search.formatter.get_context_lines",
+                    return_value=([], []),
+                ):
                     output = format_json(results)
 
         parsed = json.loads(output)
@@ -529,15 +646,19 @@ class TestFormatPrettyHybridMatchType:
 
     def test_format_pretty_semantic_match_type(self, make_search_result):
         """Pretty output should show [semantic] indicator in cyan for vector-only matches."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-            match_type="semantic",
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+                match_type="semantic",
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -546,15 +667,19 @@ class TestFormatPrettyHybridMatchType:
 
     def test_format_pretty_keyword_match_type(self, make_search_result):
         """Pretty output should show [keyword] indicator in green for keyword-only matches."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-            match_type="keyword",
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+                match_type="keyword",
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -563,15 +688,19 @@ class TestFormatPrettyHybridMatchType:
 
     def test_format_pretty_both_match_type(self, make_search_result):
         """Pretty output should show [both] indicator in yellow for double matches."""
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.90,
-            match_type="both",
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.90,
+                match_type="both",
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()
@@ -581,14 +710,18 @@ class TestFormatPrettyHybridMatchType:
     def test_format_pretty_no_match_type_backward_compat(self, make_search_result):
         """Pretty output should not show match indicator for non-hybrid results."""
         # Default match_type is empty string (backward compat)
-        results = [make_search_result(
-            filename="/test/file.py",
-            score=0.85,
-        )]
+        results = [
+            make_search_result(
+                filename="/test/file.py",
+                score=0.85,
+            )
+        ]
         console, output = self._make_console()
 
         with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-            with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+            with patch(
+                "cocosearch.search.formatter.read_chunk_content", return_value="code"
+            ):
                 format_pretty(results, console=console)
 
         captured = output.getvalue()

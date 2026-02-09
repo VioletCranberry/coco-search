@@ -60,10 +60,14 @@ def clear_index(index_name: str) -> dict:
     # Clear path-to-index metadata (non-critical, log but don't fail)
     try:
         from cocosearch.management.metadata import clear_index_path
+
         clear_index_path(index_name)
     except Exception as e:
         import logging
-        logging.getLogger(__name__).warning(f"Failed to clear path metadata for '{index_name}': {e}")
+
+        logging.getLogger(__name__).warning(
+            f"Failed to clear path metadata for '{index_name}': {e}"
+        )
 
     return {
         "success": True,

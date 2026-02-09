@@ -32,22 +32,52 @@ class TestSearchCodeAutoDetect:
         from cocosearch.mcp.server import search_code
 
         mock_root = Path("/path/to/project")
-        mock_indexes = [{"name": "project", "table_name": "codeindex_project__project_chunks"}]
+        mock_indexes = [
+            {"name": "project", "table_name": "codeindex_project__project_chunks"}
+        ]
 
-        pool, cursor, conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9, "", "", ""),
-        ])
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("/test/file.py", 0, 100, 0.9, "", "", ""),
+            ]
+        )
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=mock_indexes):
-                        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes",
+                        return_value=mock_indexes,
+                    ):
+                        with patch(
+                            "cocosearch.mcp.server.get_index_metadata",
+                            return_value=None,
+                        ):
                             with patch("cocoindex.init"):
-                                with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-                                    with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                                        with patch("cocosearch.mcp.server.read_chunk_content", return_value="def test(): pass"):
-                                            result = await search_code(query="test query", ctx=_make_mock_ctx())
+                                with patch(
+                                    "cocosearch.search.query.get_connection_pool",
+                                    return_value=pool,
+                                ):
+                                    with patch(
+                                        "cocosearch.mcp.server.byte_to_line",
+                                        return_value=1,
+                                    ):
+                                        with patch(
+                                            "cocosearch.mcp.server.read_chunk_content",
+                                            return_value="def test(): pass",
+                                        ):
+                                            result = await search_code(
+                                                query="test query", ctx=_make_mock_ctx()
+                                            )
 
         # Should return search results (header + result)
         assert isinstance(result, list)
@@ -61,11 +91,25 @@ class TestSearchCodeAutoDetect:
         # _detect_project returns cwd, find_project_root finds no git root
         mock_detected = Path("/some/random/dir")
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_detected, "cwd")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(None, None)):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="random_dir"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
-                        result = await search_code(query="test query", ctx=_make_mock_ctx())
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_detected, "cwd"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(None, None),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name",
+                    return_value="random_dir",
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes", return_value=[]
+                    ):
+                        result = await search_code(
+                            query="test query", ctx=_make_mock_ctx()
+                        )
 
         assert len(result) == 1
         assert result[0]["error"] == "Index not found"
@@ -78,16 +122,32 @@ class TestSearchCodeAutoDetect:
 
         mock_root = Path("/path/to/project")
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
-                        result = await search_code(query="test query", ctx=_make_mock_ctx())
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes", return_value=[]
+                    ):
+                        result = await search_code(
+                            query="test query", ctx=_make_mock_ctx()
+                        )
 
         assert len(result) == 1
         assert result[0]["error"] == "Index not found"
         assert "not indexed" in result[0]["message"]
-        assert "cocosearch index" in result[0]["message"] or "index_codebase" in result[0]["message"]
+        assert (
+            "cocosearch index" in result[0]["message"]
+            or "index_codebase" in result[0]["message"]
+        )
 
     @pytest.mark.asyncio
     async def test_returns_collision_error(self):
@@ -95,68 +155,135 @@ class TestSearchCodeAutoDetect:
         from cocosearch.mcp.server import search_code
 
         mock_root = Path("/path/to/new_project")
-        mock_indexes = [{"name": "project", "table_name": "codeindex_project__project_chunks"}]
+        mock_indexes = [
+            {"name": "project", "table_name": "codeindex_project__project_chunks"}
+        ]
         mock_metadata = {
             "index_name": "project",
             "canonical_path": "/path/to/old_project",  # Different path!
         }
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=mock_indexes):
-                        with patch("cocosearch.mcp.server.get_index_metadata", return_value=mock_metadata):
-                            result = await search_code(query="test query", ctx=_make_mock_ctx())
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes",
+                        return_value=mock_indexes,
+                    ):
+                        with patch(
+                            "cocosearch.mcp.server.get_index_metadata",
+                            return_value=mock_metadata,
+                        ):
+                            result = await search_code(
+                                query="test query", ctx=_make_mock_ctx()
+                            )
 
         assert len(result) == 1
         assert result[0]["error"] == "Index name collision"
-        assert "different project" in result[0]["message"] or "different" in result[0]["message"].lower()
+        assert (
+            "different project" in result[0]["message"]
+            or "different" in result[0]["message"].lower()
+        )
 
     @pytest.mark.asyncio
     async def test_uses_explicit_index_name(self, mock_code_to_embedding, mock_db_pool):
         """search_code uses explicit index_name when provided -- _detect_project not called."""
         from cocosearch.mcp.server import search_code
 
-        pool, cursor, conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9, "", "", ""),
-        ])
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("/test/file.py", 0, 100, 0.9, "", "", ""),
+            ]
+        )
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock) as mock_detect:
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock
+        ) as mock_detect:
             with patch("cocoindex.init"):
-                with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+                with patch(
+                    "cocosearch.search.query.get_connection_pool", return_value=pool
+                ):
                     with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                        with patch("cocosearch.mcp.server.read_chunk_content", return_value="code"):
-                            result = await search_code(query="test query", ctx=_make_mock_ctx(), index_name="explicit_index")
+                        with patch(
+                            "cocosearch.mcp.server.read_chunk_content",
+                            return_value="code",
+                        ):
+                            await search_code(
+                                query="test query",
+                                ctx=_make_mock_ctx(),
+                                index_name="explicit_index",
+                            )
 
         # Should NOT call _detect_project when index_name is explicit
         mock_detect.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_no_collision_when_paths_match(self, mock_code_to_embedding, mock_db_pool):
+    async def test_no_collision_when_paths_match(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """search_code proceeds when metadata path matches current path."""
         from cocosearch.mcp.server import search_code
 
         mock_root = Path("/path/to/project")
-        mock_indexes = [{"name": "project", "table_name": "codeindex_project__project_chunks"}]
+        mock_indexes = [
+            {"name": "project", "table_name": "codeindex_project__project_chunks"}
+        ]
         mock_metadata = {
             "index_name": "project",
             "canonical_path": str(mock_root.resolve()),  # Same path
         }
 
-        pool, cursor, conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9, "", "", ""),
-        ])
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("/test/file.py", 0, 100, 0.9, "", "", ""),
+            ]
+        )
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=mock_indexes):
-                        with patch("cocosearch.mcp.server.get_index_metadata", return_value=mock_metadata):
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes",
+                        return_value=mock_indexes,
+                    ):
+                        with patch(
+                            "cocosearch.mcp.server.get_index_metadata",
+                            return_value=mock_metadata,
+                        ):
                             with patch("cocoindex.init"):
-                                with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-                                    with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                                        with patch("cocosearch.mcp.server.read_chunk_content", return_value="code"):
-                                            result = await search_code(query="test query", ctx=_make_mock_ctx())
+                                with patch(
+                                    "cocosearch.search.query.get_connection_pool",
+                                    return_value=pool,
+                                ):
+                                    with patch(
+                                        "cocosearch.mcp.server.byte_to_line",
+                                        return_value=1,
+                                    ):
+                                        with patch(
+                                            "cocosearch.mcp.server.read_chunk_content",
+                                            return_value="code",
+                                        ):
+                                            result = await search_code(
+                                                query="test query", ctx=_make_mock_ctx()
+                                            )
 
         # Should proceed to search, not return collision error
         assert isinstance(result, list)
@@ -172,17 +299,38 @@ class TestSearchCodeAutoDetect:
         from cocosearch.mcp.server import search_code
 
         mock_root = Path("/path/to/project")
-        mock_indexes = [{"name": "project", "table_name": "codeindex_project__project_chunks"}]
+        mock_indexes = [
+            {"name": "project", "table_name": "codeindex_project__project_chunks"}
+        ]
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=mock_indexes):
-                        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes",
+                        return_value=mock_indexes,
+                    ):
+                        with patch(
+                            "cocosearch.mcp.server.get_index_metadata",
+                            return_value=None,
+                        ):
                             with patch("cocosearch.mcp.server.logger") as mock_logger:
                                 with patch("cocoindex.init"):
-                                    with patch("cocosearch.mcp.server.search", return_value=[]):
-                                        await search_code(query="test query", ctx=_make_mock_ctx())
+                                    with patch(
+                                        "cocosearch.mcp.server.search", return_value=[]
+                                    ):
+                                        await search_code(
+                                            query="test query", ctx=_make_mock_ctx()
+                                        )
 
         # Should log auto-detection
         mock_logger.info.assert_called()
@@ -200,11 +348,19 @@ class TestIndexCodebasePathRegistration:
         with patch("cocoindex.init"):
             with patch("cocosearch.mcp.server.run_index") as mock_run:
                 mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server.register_index_path") as mock_register:
-                    result = index_codebase(path=str(tmp_codebase), index_name="myindex")
+                with patch(
+                    "cocosearch.mcp.server.register_index_path"
+                ) as mock_register:
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                            result = index_codebase(
+                                path=str(tmp_codebase), index_name="myindex"
+                            )
 
         assert result["success"] is True
-        mock_register.assert_called_once_with("myindex", str(tmp_codebase))
+        # Called twice: once before indexing (status tracking) and once after
+        assert mock_register.call_count == 2
+        mock_register.assert_any_call("myindex", str(tmp_codebase))
 
     def test_handles_collision_during_indexing(self, tmp_codebase):
         """index_codebase logs warning on collision but doesn't fail."""
@@ -213,10 +369,14 @@ class TestIndexCodebasePathRegistration:
         with patch("cocoindex.init"):
             with patch("cocosearch.mcp.server.run_index") as mock_run:
                 mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server.register_index_path") as mock_register:
+                with patch(
+                    "cocosearch.mcp.server.register_index_path"
+                ) as mock_register:
                     mock_register.side_effect = ValueError("Collision!")
                     with patch("cocosearch.mcp.server.logger") as mock_logger:
-                        result = index_codebase(path=str(tmp_codebase), index_name="myindex")
+                        result = index_codebase(
+                            path=str(tmp_codebase), index_name="myindex"
+                        )
 
         # Should succeed (indexing worked)
         assert result["success"] is True
@@ -230,12 +390,18 @@ class TestIndexCodebasePathRegistration:
         with patch("cocoindex.init"):
             with patch("cocosearch.mcp.server.run_index") as mock_run:
                 mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server.register_index_path") as mock_register:
-                    result = index_codebase(path=str(tmp_codebase), index_name=None)
+                with patch(
+                    "cocosearch.mcp.server.register_index_path"
+                ) as mock_register:
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                            result = index_codebase(
+                                path=str(tmp_codebase), index_name=None
+                            )
 
         assert result["success"] is True
-        # Should register with derived name
-        mock_register.assert_called_once()
+        # Called twice: once before indexing (status tracking) and once after
+        assert mock_register.call_count == 2
         call_args = mock_register.call_args[0]
         assert call_args[1] == str(tmp_codebase)
 
@@ -278,10 +444,21 @@ class TestAutoDetectErrorResponses:
 
         mock_detected = Path("/some/dir")
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_detected, "cwd")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(None, None)):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="some_dir"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_detected, "cwd"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(None, None),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="some_dir"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes", return_value=[]
+                    ):
                         result = await search_code(query="test", ctx=_make_mock_ctx())
 
         assert len(result) == 1
@@ -298,10 +475,21 @@ class TestAutoDetectErrorResponses:
 
         mock_root = Path("/path/to/project")
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes", return_value=[]
+                    ):
                         result = await search_code(query="test", ctx=_make_mock_ctx())
 
         error_response = result[0]
@@ -317,21 +505,44 @@ class TestAutoDetectErrorResponses:
         from cocosearch.mcp.server import search_code
 
         mock_root = Path("/path/to/new_project")
-        mock_indexes = [{"name": "project", "table_name": "codeindex_project__project_chunks"}]
+        mock_indexes = [
+            {"name": "project", "table_name": "codeindex_project__project_chunks"}
+        ]
         mock_metadata = {
             "index_name": "project",
             "canonical_path": "/path/to/old_project",
         }
 
-        with patch("cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock, return_value=(mock_root, "roots")):
-            with patch("cocosearch.management.context.find_project_root", return_value=(mock_root, "git")):
-                with patch("cocosearch.mcp.server.resolve_index_name", return_value="project"):
-                    with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=mock_indexes):
-                        with patch("cocosearch.mcp.server.get_index_metadata", return_value=mock_metadata):
-                            result = await search_code(query="test", ctx=_make_mock_ctx())
+        with patch(
+            "cocosearch.mcp.project_detection._detect_project",
+            new_callable=AsyncMock,
+            return_value=(mock_root, "roots"),
+        ):
+            with patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(mock_root, "git"),
+            ):
+                with patch(
+                    "cocosearch.mcp.server.resolve_index_name", return_value="project"
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.mgmt_list_indexes",
+                        return_value=mock_indexes,
+                    ):
+                        with patch(
+                            "cocosearch.mcp.server.get_index_metadata",
+                            return_value=mock_metadata,
+                        ):
+                            result = await search_code(
+                                query="test", ctx=_make_mock_ctx()
+                            )
 
         error_response = result[0]
         message = error_response["message"]
 
         # Should include resolution guidance
-        assert "cocosearch.yaml" in message or "indexName" in message or "index_name" in message
+        assert (
+            "cocosearch.yaml" in message
+            or "indexName" in message
+            or "index_name" in message
+        )

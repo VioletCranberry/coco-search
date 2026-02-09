@@ -1,7 +1,5 @@
 """Unit tests for query analyzer module."""
 
-import pytest
-
 from cocosearch.search.query_analyzer import (
     has_identifier_pattern,
     normalize_query_for_keyword,

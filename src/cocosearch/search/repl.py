@@ -103,7 +103,9 @@ class SearchREPL(cmd.Cmd):
                 min_score=self.min_score,
                 language_filter=lang,
             )
-            format_pretty(results, context_lines=self.context_lines, console=self.console)
+            format_pretty(
+                results, context_lines=self.context_lines, console=self.console
+            )
         except Exception as e:
             self.console.print(f"[bold red]Error:[/bold red] {e}")
 
@@ -133,7 +135,9 @@ class SearchREPL(cmd.Cmd):
         elif cmd_name == "context":
             try:
                 self.context_lines = int(value)
-                self.console.print(f"[dim]Context lines set to {self.context_lines}[/dim]")
+                self.console.print(
+                    f"[dim]Context lines set to {self.context_lines}[/dim]"
+                )
             except ValueError:
                 self.console.print("[red]Usage: :context N[/red]")
 

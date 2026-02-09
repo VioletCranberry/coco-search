@@ -1,6 +1,5 @@
 """Tests to verify Ollama mocking and data fixture infrastructure."""
 
-import pytest
 from tests.mocks.ollama import deterministic_embedding, similar_embedding
 
 

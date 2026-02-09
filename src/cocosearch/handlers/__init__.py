@@ -45,6 +45,15 @@ class Chunk:
     metadata: dict
 
 
+@dataclasses.dataclass
+class DevOpsMetadata:
+    """Metadata extracted from a DevOps code chunk."""
+
+    block_type: str
+    hierarchy: str
+    language_id: str
+
+
 class LanguageHandler(Protocol):
     """Protocol for language-specific chunking handlers.
 
@@ -110,9 +119,7 @@ def _discover_handlers() -> dict[str, LanguageHandler]:
         # Find handler classes (implements LanguageHandler protocol)
         for name, obj in inspect.getmembers(module, inspect.isclass):
             # Check if class has required protocol attributes (duck typing)
-            if not (
-                hasattr(obj, "EXTENSIONS") and hasattr(obj, "extract_metadata")
-            ):
+            if not (hasattr(obj, "EXTENSIONS") and hasattr(obj, "extract_metadata")):
                 continue
 
             # Instantiate handler
@@ -178,7 +185,7 @@ def get_custom_languages() -> list[cocoindex.functions.CustomLanguageSpec]:
 
 
 @cocoindex.op.function()
-def extract_devops_metadata(text: str, language_id: str) -> dict:
+def extract_devops_metadata(text: str, language_id: str) -> DevOpsMetadata:
     """Extract metadata from code chunk using appropriate handler.
 
     This is a CocoIndex transform function that dispatches to the
@@ -189,7 +196,7 @@ def extract_devops_metadata(text: str, language_id: str) -> dict:
         language_id: Language identifier (e.g., "tf", "dockerfile", "sh")
 
     Returns:
-        Dict with metadata fields (block_type, hierarchy, language_id)
+        DevOpsMetadata with fields: block_type, hierarchy, language_id
     """
     # Map language_id to extension (handlers register by extension)
     # This is a simple mapping - could be enhanced if needed
@@ -206,13 +213,18 @@ def extract_devops_metadata(text: str, language_id: str) -> dict:
 
     extension = extension_map.get(language_id, f".{language_id}")
     handler = get_handler(extension)
-    return handler.extract_metadata(text)
+    metadata = handler.extract_metadata(text)
+    # Preserve original language_id when handler returns empty (non-DevOps files)
+    if not metadata.get("language_id"):
+        metadata["language_id"] = language_id
+    return DevOpsMetadata(**metadata)
 
 
 __all__ = [
     "LanguageHandler",
     "ChunkConfig",
     "Chunk",
+    "DevOpsMetadata",
     "get_handler",
     "get_custom_languages",
     "extract_devops_metadata",

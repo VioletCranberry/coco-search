@@ -1,3 +1,0 @@
-#!/bin/sh
-# Check if Ollama API is responding
-curl -sf http://localhost:11434/api/tags > /dev/null 2>&1

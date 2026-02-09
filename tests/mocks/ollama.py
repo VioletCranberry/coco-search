@@ -24,7 +24,7 @@ def deterministic_embedding(text: str, dimensions: int = 768) -> list[float]:
         List of floats representing the fake embedding vector.
     """
     # Create a hash of the input text
-    hash_bytes = hashlib.sha256(text.encode('utf-8')).digest()
+    hash_bytes = hashlib.sha256(text.encode("utf-8")).digest()
 
     # Expand hash to fill dimensions
     embedding = []
@@ -38,7 +38,9 @@ def deterministic_embedding(text: str, dimensions: int = 768) -> list[float]:
     return embedding
 
 
-def similar_embedding(base_embedding: list[float], similarity: float = 0.9) -> list[float]:
+def similar_embedding(
+    base_embedding: list[float], similarity: float = 0.9
+) -> list[float]:
     """Create an embedding that has a specific similarity to the base.
 
     Useful for testing similarity thresholds and ranking.

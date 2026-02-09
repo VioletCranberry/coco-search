@@ -55,7 +55,7 @@ def test_full_indexing_flow(initialized_db, warmed_ollama, e2e_fixtures_path):
     env["COCOSEARCH_OLLAMA_URL"] = warmed_ollama
 
     # Debug: print environment
-    print(f"\n=== Environment ===")
+    print("\n=== Environment ===")
     print(f"COCOSEARCH_DATABASE_URL: {env['COCOSEARCH_DATABASE_URL']}")
     print(f"COCOSEARCH_OLLAMA_URL: {env['COCOSEARCH_OLLAMA_URL']}")
 
@@ -68,9 +68,7 @@ def test_full_indexing_flow(initialized_db, warmed_ollama, e2e_fixtures_path):
 
     # Verify CLI succeeded
     assert result.returncode == 0, (
-        f"Indexing failed:\n"
-        f"STDOUT: {result.stdout}\n"
-        f"STDERR: {result.stderr}"
+        f"Indexing failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
     )
 
     # Debug: print CLI output
@@ -81,9 +79,7 @@ def test_full_indexing_flow(initialized_db, warmed_ollama, e2e_fixtures_path):
     with psycopg.connect(initialized_db) as conn:
         with conn.cursor() as cur:
             # Check files table
-            cur.execute(
-                f"SELECT COUNT(*) FROM cocoindex_{index_name}_files"
-            )
+            cur.execute(f"SELECT COUNT(*) FROM cocoindex_{index_name}_files")
             file_count = cur.fetchone()[0]
 
             # Should have indexed 5 files (auth.py, main.tf, Dockerfile, deploy.sh, utils.js)
@@ -91,9 +87,7 @@ def test_full_indexing_flow(initialized_db, warmed_ollama, e2e_fixtures_path):
             assert file_count >= 5, f"Expected >= 5 files, got {file_count}"
 
             # Check chunks table
-            cur.execute(
-                f"SELECT COUNT(*) FROM cocoindex_{index_name}_chunks"
-            )
+            cur.execute(f"SELECT COUNT(*) FROM cocoindex_{index_name}_chunks")
             chunk_count = cur.fetchone()[0]
 
             # Should have at least one chunk per file
@@ -117,7 +111,9 @@ def test_full_indexing_flow(initialized_db, warmed_ollama, e2e_fixtures_path):
             auth_file = cur.fetchone()
 
             assert auth_file is not None, "auth.py should be indexed"
-            assert auth_file[1] == "python", f"auth.py language should be python, got {auth_file[1]}"
+            assert auth_file[1] == "python", (
+                f"auth.py language should be python, got {auth_file[1]}"
+            )
 
 
 def test_incremental_indexing(initialized_db, warmed_ollama, tmp_path):
@@ -178,8 +174,9 @@ def test_incremental_indexing(initialized_db, warmed_ollama, tmp_path):
 
             # Should have same or similar number of chunks (incremental update)
             # The exact count may vary slightly based on chunking
-            assert final_chunk_count >= initial_chunk_count - 2, \
+            assert final_chunk_count >= initial_chunk_count - 2, (
                 "Incremental indexing should maintain similar chunk count"
+            )
 
 
 def test_index_nonexistent_path(initialized_db, warmed_ollama):
@@ -204,5 +201,7 @@ def test_index_nonexistent_path(initialized_db, warmed_ollama):
 
     # Should provide helpful error message
     error_output = result.stdout + result.stderr
-    assert "does not exist" in error_output.lower() or "not a directory" in error_output.lower(), \
-        f"Error message should mention path issue: {error_output}"
+    assert (
+        "does not exist" in error_output.lower()
+        or "not a directory" in error_output.lower()
+    ), f"Error message should mention path issue: {error_output}"

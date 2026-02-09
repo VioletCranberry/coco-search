@@ -43,8 +43,15 @@ def indexed_e2e_fixtures(initialized_db, warmed_ollama, e2e_fixtures_path):
 
     # Index the fixtures
     result = subprocess.run(
-        [sys.executable, "-m", "cocosearch", "index", str(e2e_fixtures_path),
-         "--name", index_name],
+        [
+            sys.executable,
+            "-m",
+            "cocosearch",
+            "index",
+            str(e2e_fixtures_path),
+            "--name",
+            index_name,
+        ],
         capture_output=True,
         text=True,
         env=env,
@@ -57,7 +64,9 @@ def indexed_e2e_fixtures(initialized_db, warmed_ollama, e2e_fixtures_path):
     # Cleanup handled by clean_tables autouse fixture
 
 
-def search_and_parse(query: str, index_name: str, env: dict, extra_args: list = None) -> tuple[int, list, str]:
+def search_and_parse(
+    query: str, index_name: str, env: dict, extra_args: list = None
+) -> tuple[int, list, str]:
     """Run search command and parse JSON output.
 
     Key pattern from 14-RESEARCH.md: Check returncode before JSON parsing.
@@ -114,8 +123,9 @@ def test_full_search_flow(indexed_e2e_fixtures):
 
     # Verify results contain auth.py
     result_files = [r["file_path"] for r in results]
-    assert any("auth.py" in f for f in result_files), \
+    assert any("auth.py" in f for f in result_files), (
         f"Results should contain auth.py, got: {result_files}"
+    )
 
 
 def test_search_result_structure(indexed_e2e_fixtures):
@@ -156,10 +166,15 @@ def test_search_result_structure(indexed_e2e_fixtures):
 
     # Value validation
     assert len(result["file_path"]) > 0, "file_path should not be empty"
-    assert result["start_line"] >= 0, f"start_line should be >= 0, got {result['start_line']}"
-    assert result["end_line"] >= result["start_line"], \
+    assert result["start_line"] >= 0, (
+        f"start_line should be >= 0, got {result['start_line']}"
+    )
+    assert result["end_line"] >= result["start_line"], (
         f"end_line ({result['end_line']}) should be >= start_line ({result['start_line']})"
-    assert 0.0 <= result["score"] <= 1.0, f"score should be in [0, 1], got {result['score']}"
+    )
+    assert 0.0 <= result["score"] <= 1.0, (
+        f"score should be in [0, 1], got {result['score']}"
+    )
     # Note: content may be empty for some results
     assert isinstance(result["content"], str), "content should be string"
 
@@ -190,8 +205,9 @@ def test_search_returns_correct_file(indexed_e2e_fixtures, e2e_fixtures_path):
 
     # Verify results contain main.tf
     result_files = [r["file_path"] for r in results]
-    assert any("main.tf" in f for f in result_files), \
+    assert any("main.tf" in f for f in result_files), (
         f"Results should contain main.tf for terraform content, got: {result_files}"
+    )
 
     # Search for "docker build deploy" (bash script) with lower threshold
     returncode, results, stderr = search_and_parse(
@@ -203,8 +219,9 @@ def test_search_returns_correct_file(indexed_e2e_fixtures, e2e_fixtures_path):
 
     # Verify results contain deploy.sh
     result_files = [r["file_path"] for r in results]
-    assert any("deploy.sh" in f for f in result_files), \
+    assert any("deploy.sh" in f for f in result_files), (
         f"Results should contain deploy.sh for bash script content, got: {result_files}"
+    )
 
 
 def test_language_filtering(indexed_e2e_fixtures):
@@ -227,31 +244,43 @@ def test_language_filtering(indexed_e2e_fixtures):
 
     # Search for "format currency" with --lang javascript - should only find JavaScript
     returncode, results_js, stderr = search_and_parse(
-        "format currency", index_name, env, extra_args=["--lang", "javascript", "--min-score", "0.2"]
+        "format currency",
+        index_name,
+        env,
+        extra_args=["--lang", "javascript", "--min-score", "0.2"],
     )
 
-    assert returncode == 0, f"Search with --lang javascript should succeed. stderr: {stderr}"
+    assert returncode == 0, (
+        f"Search with --lang javascript should succeed. stderr: {stderr}"
+    )
     assert len(results_js) > 0, "Should find JavaScript results"
 
     # Verify all results are JavaScript files
     for result in results_js:
         file_path = result["file_path"]
-        assert file_path.endswith(".js"), \
+        assert file_path.endswith(".js"), (
             f"With --lang javascript, should only find .js files, got: {file_path}"
+        )
 
     # Search with --lang python - should find Python files
     returncode, results_py, stderr = search_and_parse(
-        "authenticate", index_name, env, extra_args=["--lang", "python", "--min-score", "0.2"]
+        "authenticate",
+        index_name,
+        env,
+        extra_args=["--lang", "python", "--min-score", "0.2"],
     )
 
-    assert returncode == 0, f"Search with --lang python should succeed. stderr: {stderr}"
+    assert returncode == 0, (
+        f"Search with --lang python should succeed. stderr: {stderr}"
+    )
     assert len(results_py) > 0, "Should find Python results"
 
     # Verify all results are Python files
     for result in results_py:
         file_path = result["file_path"]
-        assert file_path.endswith(".py"), \
+        assert file_path.endswith(".py"), (
             f"With --lang python, should only find .py files, got: {file_path}"
+        )
 
 
 def test_search_empty_results(indexed_e2e_fixtures):
@@ -272,10 +301,14 @@ def test_search_empty_results(indexed_e2e_fixtures):
     )
 
     # Should succeed, even with no or minimal results
-    assert returncode == 0, f"Search with high threshold should succeed. stderr: {stderr}"
+    assert returncode == 0, (
+        f"Search with high threshold should succeed. stderr: {stderr}"
+    )
     assert isinstance(results, list), "Should return a list"
     # With high threshold, expect 0 or very few results
-    assert len(results) <= 2, f"Should return few/no results with high threshold, got {len(results)}"
+    assert len(results) <= 2, (
+        f"Should return few/no results with high threshold, got {len(results)}"
+    )
 
 
 def test_search_missing_index(warmed_ollama, initialized_db):
@@ -294,8 +327,15 @@ def test_search_missing_index(warmed_ollama, initialized_db):
 
     # Search against non-existent index
     result = subprocess.run(
-        [sys.executable, "-m", "cocosearch", "search", "test query",
-         "--index", "nonexistent_index_12345"],
+        [
+            sys.executable,
+            "-m",
+            "cocosearch",
+            "search",
+            "test query",
+            "--index",
+            "nonexistent_index_12345",
+        ],
         capture_output=True,
         text=True,
         env=env,
@@ -306,5 +346,6 @@ def test_search_missing_index(warmed_ollama, initialized_db):
 
     # Should provide helpful error message
     error_output = result.stdout + result.stderr
-    assert "index" in error_output.lower() or "not found" in error_output.lower(), \
+    assert "index" in error_output.lower() or "not found" in error_output.lower(), (
         f"Error message should mention index issue: {error_output}"
+    )

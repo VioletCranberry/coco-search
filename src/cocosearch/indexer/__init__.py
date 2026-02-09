@@ -1,7 +1,11 @@
 """Indexer module for cocosearch."""
 
 from cocosearch.indexer.config import IndexingConfig, load_config
-from cocosearch.indexer.embedder import code_to_embedding, extract_extension, extract_language
+from cocosearch.indexer.embedder import (
+    code_to_embedding,
+    extract_extension,
+    extract_language,
+)
 from cocosearch.handlers import extract_devops_metadata
 from cocosearch.indexer.file_filter import (
     DEFAULT_EXCLUDES,

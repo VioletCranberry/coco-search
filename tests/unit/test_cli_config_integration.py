@@ -1,9 +1,6 @@
 """Tests for CLI config integration and precedence."""
 
-import os
 import sys
-from io import StringIO
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -139,7 +136,9 @@ class TestHelpText:
 
         captured = capsys.readouterr()
         # Help text may wrap, so check for key components
-        output = captured.out.replace("\n", " ")  # Remove line breaks for easier matching
+        output = captured.out.replace(
+            "\n", " "
+        )  # Remove line breaks for easier matching
         assert "[config: indexName]" in output
         assert "COCOSEARCH_INDEX_NAME" in output
         assert "[config: indexing.includePatterns]" in output
@@ -170,7 +169,9 @@ class TestPrecedenceIntegration:
 
     @patch("cocosearch.cli.run_index")
     @patch("cocosearch.cli.IndexingProgress")
-    def test_index_cli_overrides_env(self, mock_progress, mock_run_index, tmp_path, monkeypatch):
+    def test_index_cli_overrides_env(
+        self, mock_progress, mock_run_index, tmp_path, monkeypatch
+    ):
         """Test that CLI flag overrides environment variable."""
         # Set env var
         monkeypatch.setenv("COCOSEARCH_INDEX_NAME", "from-env")
@@ -182,7 +183,9 @@ class TestPrecedenceIntegration:
         # Mock run_index return value
         mock_run_index.return_value = MagicMock(stats={})
 
-        with patch.object(sys, "argv", ["cocosearch", "index", str(test_dir), "--name", "from-cli"]):
+        with patch.object(
+            sys, "argv", ["cocosearch", "index", str(test_dir), "--name", "from-cli"]
+        ):
             with patch("cocosearch.cli.find_config_file", return_value=None):
                 try:
                     main()
@@ -195,7 +198,9 @@ class TestPrecedenceIntegration:
 
     @patch("cocosearch.cli.run_index")
     @patch("cocosearch.cli.IndexingProgress")
-    def test_index_env_overrides_config(self, mock_progress, mock_run_index, tmp_path, monkeypatch):
+    def test_index_env_overrides_config(
+        self, mock_progress, mock_run_index, tmp_path, monkeypatch
+    ):
         """Test that environment variable overrides config file."""
         # Set env var
         monkeypatch.setenv("COCOSEARCH_INDEX_NAME", "from-env")
@@ -224,7 +229,9 @@ class TestPrecedenceIntegration:
 
     @patch("cocosearch.cli.run_index")
     @patch("cocosearch.cli.IndexingProgress")
-    def test_index_config_overrides_default(self, mock_progress, mock_run_index, tmp_path):
+    def test_index_config_overrides_default(
+        self, mock_progress, mock_run_index, tmp_path
+    ):
         """Test that config file overrides default."""
         # Create test config
         config_file = tmp_path / "cocosearch.yaml"
@@ -250,7 +257,9 @@ class TestPrecedenceIntegration:
 
     @patch("cocoindex.init")
     @patch("cocosearch.cli.search")
-    def test_search_limit_precedence(self, mock_search, mock_cocoindex_init, tmp_path, monkeypatch):
+    def test_search_limit_precedence(
+        self, mock_search, mock_cocoindex_init, tmp_path, monkeypatch
+    ):
         """Test search limit precedence chain."""
         # Set env var
         monkeypatch.setenv("COCOSEARCH_SEARCH_RESULT_LIMIT", "30")
@@ -266,7 +275,9 @@ search:
         mock_search.return_value = []
 
         # Test CLI override
-        with patch.object(sys, "argv", ["cocosearch", "search", "--limit", "40", "test query"]):
+        with patch.object(
+            sys, "argv", ["cocosearch", "search", "--limit", "40", "test query"]
+        ):
             with patch("cocosearch.cli.find_config_file", return_value=config_file):
                 try:
                     main()
@@ -294,7 +305,9 @@ search:
 
     @patch("cocoindex.init")
     @patch("cocosearch.cli.search")
-    def test_search_min_score_precedence(self, mock_search, mock_cocoindex_init, tmp_path, monkeypatch):
+    def test_search_min_score_precedence(
+        self, mock_search, mock_cocoindex_init, tmp_path, monkeypatch
+    ):
         """Test search min_score precedence chain."""
         # Set env var
         monkeypatch.setenv("COCOSEARCH_SEARCH_MIN_SCORE", "0.6")

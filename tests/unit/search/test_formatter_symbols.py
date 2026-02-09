@@ -111,7 +111,11 @@ class TestFormatJsonSymbols:
     @patch("cocosearch.search.formatter.byte_to_line")
     @patch("cocosearch.search.formatter.read_chunk_content")
     def test_json_mixed_results(
-        self, mock_content, mock_byte_to_line, mock_result_with_symbol, mock_result_without_symbol
+        self,
+        mock_content,
+        mock_byte_to_line,
+        mock_result_with_symbol,
+        mock_result_without_symbol,
     ):
         """Verify JSON output handles mixed results (some with symbols, some without)."""
         mock_byte_to_line.return_value = 10

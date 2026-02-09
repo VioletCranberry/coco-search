@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Variables
 CLEANUP_NEEDED=false
 export COCOSEARCH_DATABASE_URL="postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
+export COCOSEARCH_OLLAMA_URL="http://localhost:11434"
 
 # Trap handlers
 cleanup_on_exit() {

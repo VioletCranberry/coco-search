@@ -127,9 +127,10 @@ def warmed_ollama(ollama_service):
             # If warmup fails, log but don't skip - tests can still proceed
             # The first test request will just be slower
             import warnings
+
             warnings.warn(
                 f"Ollama warmup failed (first test request will be slower): {warmup_error}",
-                UserWarning
+                UserWarning,
             )
 
     except Exception as e:

@@ -1,7 +1,7 @@
 """Tests for cocosearch CLI."""
+
 import argparse
 import json
-import pytest
 from unittest.mock import patch, MagicMock
 
 from cocosearch.cli import (
@@ -73,6 +73,7 @@ class TestIndexCommand:
             include=None,
             exclude=None,
             no_gitignore=False,
+            fresh=False,
         )
         result = index_command(args)
         assert result == 1
@@ -85,14 +86,16 @@ class TestIndexCommand:
         with patch("cocosearch.cli.run_index") as mock_run:
             mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
             with patch("cocosearch.cli.IndexingProgress"):
-                args = argparse.Namespace(
-                    path=str(tmp_codebase),
-                    name="testindex",
-                    include=None,
-                    exclude=None,
-                    no_gitignore=False,
-                )
-                result = index_command(args)
+                with patch("cocosearch.cli.register_index_path"):
+                    args = argparse.Namespace(
+                        path=str(tmp_codebase),
+                        name="testindex",
+                        include=None,
+                        exclude=None,
+                        no_gitignore=False,
+                        fresh=False,
+                    )
+                    result = index_command(args)
         assert result == 0
 
 
@@ -128,7 +131,9 @@ class TestSearchCommand:
         """Search returns parseable JSON."""
         # Create mock search results
         mock_results = [
-            make_search_result(filename="/test/file.py", start_byte=0, end_byte=100, score=0.9),
+            make_search_result(
+                filename="/test/file.py", start_byte=0, end_byte=100, score=0.9
+            ),
         ]
 
         with patch("cocoindex.init"):
@@ -164,7 +169,10 @@ class TestListCommand:
     def test_json_output(self, capsys):
         """Returns JSON list of indexes."""
         mock_indexes = [
-            {"name": "myproject", "table_name": "codeindex_myproject__myproject_chunks"},
+            {
+                "name": "myproject",
+                "table_name": "codeindex_myproject__myproject_chunks",
+            },
         ]
 
         with patch("cocoindex.init"):
@@ -201,10 +209,15 @@ class TestStatsCommand:
             symbols={},
             warnings=[],
             parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
         )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.cli.get_comprehensive_stats", return_value=mock_stats):
+            with patch(
+                "cocosearch.cli.get_comprehensive_stats", return_value=mock_stats
+            ):
                 args = argparse.Namespace(
                     index="testindex",
                     pretty=False,
@@ -228,7 +241,10 @@ class TestStatsCommand:
     def test_nonexistent_index_error(self, capsys):
         """Returns error for nonexistent index."""
         with patch("cocoindex.init"):
-            with patch("cocosearch.cli.get_comprehensive_stats", side_effect=ValueError("Index not found")):
+            with patch(
+                "cocosearch.cli.get_comprehensive_stats",
+                side_effect=ValueError("Index not found"),
+            ):
                 args = argparse.Namespace(
                     index="missing",
                     pretty=False,
@@ -264,7 +280,9 @@ class TestClearCommand:
         with patch("cocoindex.init"):
             with patch("cocosearch.cli.get_stats", return_value=mock_stats):
                 with patch("cocosearch.cli.clear_index", return_value=mock_result):
-                    args = argparse.Namespace(index="testindex", force=True, pretty=False)
+                    args = argparse.Namespace(
+                        index="testindex", force=True, pretty=False
+                    )
                     result = clear_command(args)
 
         assert result == 0
@@ -275,7 +293,9 @@ class TestClearCommand:
     def test_nonexistent_index_error(self, capsys):
         """Returns error for nonexistent index."""
         with patch("cocoindex.init"):
-            with patch("cocosearch.cli.get_stats", side_effect=ValueError("Index not found")):
+            with patch(
+                "cocosearch.cli.get_stats", side_effect=ValueError("Index not found")
+            ):
                 args = argparse.Namespace(index="missing", force=True, pretty=False)
                 result = clear_command(args)
 
@@ -323,8 +343,6 @@ class TestSymbolFilterArguments:
 
     def test_symbol_type_single(self):
         """Single --symbol-type flag parses correctly."""
-        from cocosearch.cli import main
-        import sys
 
         # Test by inspecting search_parser behavior via argparse directly
         parser = argparse.ArgumentParser()
@@ -348,11 +366,9 @@ class TestSymbolFilterArguments:
             dest="symbol_type",
         )
 
-        args = parser.parse_args([
-            "query",
-            "--symbol-type", "function",
-            "--symbol-type", "method"
-        ])
+        args = parser.parse_args(
+            ["query", "--symbol-type", "function", "--symbol-type", "method"]
+        )
         assert args.symbol_type == ["function", "method"]
 
     def test_symbol_name_pattern(self):
@@ -373,13 +389,18 @@ class TestSymbolFilterArguments:
         parser.add_argument("--lang")
         parser.add_argument("--hybrid", action="store_true", default=None)
 
-        args = parser.parse_args([
-            "query",
-            "--symbol-type", "function",
-            "--symbol-name", "fetch*",
-            "--lang", "python",
-            "--hybrid"
-        ])
+        args = parser.parse_args(
+            [
+                "query",
+                "--symbol-type",
+                "function",
+                "--symbol-name",
+                "fetch*",
+                "--lang",
+                "python",
+                "--hybrid",
+            ]
+        )
         assert args.symbol_type == ["function"]
         assert args.symbol_name == "fetch*"
         assert args.lang == "python"
@@ -391,13 +412,19 @@ class TestSymbolFilterArguments:
         parser.add_argument("query", nargs="?")
         parser.add_argument("--symbol-type", action="append", dest="symbol_type")
 
-        args = parser.parse_args([
-            "query",
-            "--symbol-type", "function",
-            "--symbol-type", "class",
-            "--symbol-type", "method",
-            "--symbol-type", "interface"
-        ])
+        args = parser.parse_args(
+            [
+                "query",
+                "--symbol-type",
+                "function",
+                "--symbol-type",
+                "class",
+                "--symbol-type",
+                "method",
+                "--symbol-type",
+                "interface",
+            ]
+        )
         assert args.symbol_type == ["function", "class", "method", "interface"]
 
     def test_symbol_name_complex_patterns(self):
@@ -439,6 +466,7 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport=None,
                 port=None,
@@ -455,6 +483,7 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport="sse",
                 port=None,
@@ -470,6 +499,7 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport=None,
                 port=None,
@@ -484,6 +514,7 @@ class TestMCPCommand:
         monkeypatch.setenv("MCP_TRANSPORT", "invalid")
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         from cocosearch.cli import mcp_command
+
         args = argparse.Namespace(
             transport=None,
             port=None,
@@ -499,6 +530,7 @@ class TestMCPCommand:
         monkeypatch.delenv("MCP_TRANSPORT", raising=False)
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         from cocosearch.cli import mcp_command
+
         args = argparse.Namespace(
             transport="websocket",
             port=None,
@@ -515,6 +547,7 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport="sse",
                 port=8080,
@@ -530,6 +563,7 @@ class TestMCPCommand:
         monkeypatch.setenv("COCOSEARCH_MCP_PORT", "9000")
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport="sse",
                 port=None,
@@ -545,6 +579,7 @@ class TestMCPCommand:
         monkeypatch.setenv("COCOSEARCH_MCP_PORT", "9000")
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport="sse",
                 port=8080,
@@ -559,6 +594,7 @@ class TestMCPCommand:
         monkeypatch.delenv("MCP_TRANSPORT", raising=False)
         monkeypatch.setenv("COCOSEARCH_MCP_PORT", "not-a-number")
         from cocosearch.cli import mcp_command
+
         args = argparse.Namespace(
             transport="sse",
             port=None,
@@ -575,6 +611,7 @@ class TestMCPCommand:
         monkeypatch.delenv("COCOSEARCH_MCP_PORT", raising=False)
         with patch("cocosearch.mcp.run_server") as mock_run:
             from cocosearch.cli import mcp_command
+
             args = argparse.Namespace(
                 transport="sse",
                 port=None,

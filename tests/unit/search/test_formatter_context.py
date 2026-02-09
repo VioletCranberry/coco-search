@@ -7,7 +7,6 @@ import io
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from rich.console import Console
 
 from cocosearch.search.formatter import (
@@ -33,9 +32,14 @@ class TestFormatJsonContext:
             False,  # is_eof
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=10):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="def func():\n    pass"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="def func():\n    pass",
+                ):
                     output = format_json(results, context_before=2, context_after=1)
 
         parsed = json.loads(output)
@@ -59,9 +63,14 @@ class TestFormatJsonContext:
             False,  # is_eof
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=7):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="x = 1"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="x = 1",
+                ):
                     format_json(results, smart_context=True)
 
         # Verify smart=True was passed (when no explicit context values)
@@ -76,10 +85,17 @@ class TestFormatJsonContext:
         mock_expander = MagicMock()
         mock_expander.get_context_lines.return_value = ([], [], [], False, False)
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=10):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                    format_json(results, context_before=5, context_after=3, smart_context=True)
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="code",
+                ):
+                    format_json(
+                        results, context_before=5, context_after=3, smart_context=True
+                    )
 
         # Verify smart=False when explicit context values provided
         call_kwargs = mock_expander.get_context_lines.call_args[1]
@@ -94,10 +110,17 @@ class TestFormatJsonContext:
         mock_expander = MagicMock()
         mock_expander.get_context_lines.return_value = ([], [], [], False, False)
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=10):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
-                    format_json(results, smart_context=False, context_before=3, context_after=3)
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="code",
+                ):
+                    format_json(
+                        results, smart_context=False, context_before=3, context_after=3
+                    )
 
         call_kwargs = mock_expander.get_context_lines.call_args[1]
         assert call_kwargs["smart"] is False
@@ -115,9 +138,14 @@ class TestFormatJsonContext:
             False,  # is_eof
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=4):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="match"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="match",
+                ):
                     output = format_json(results, context_before=3, context_after=2)
 
         parsed = json.loads(output)
@@ -147,12 +175,17 @@ class TestFormatPrettyContext:
             [(8, "# before context")],  # before
             [(9, "matched line")],  # match
             [(10, "# after context")],  # after
-            False, False
+            False,
+            False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=9):
-                format_pretty(results, context_before=1, context_after=1, console=console)
+                format_pretty(
+                    results, context_before=1, context_after=1, console=console
+                )
 
         captured = output.getvalue()
         # Context lines use colon marker
@@ -169,12 +202,17 @@ class TestFormatPrettyContext:
             [(8, "before")],
             [(9, "matched line"), (10, "also matched")],  # multiple match lines
             [(11, "after")],
-            False, False
+            False,
+            False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=9):
-                format_pretty(results, context_before=1, context_after=1, console=console)
+                format_pretty(
+                    results, context_before=1, context_after=1, console=console
+                )
 
         captured = output.getvalue()
         # Match lines use > marker
@@ -191,12 +229,17 @@ class TestFormatPrettyContext:
             [(100, "context")],
             [(101, "match")],
             [(102, "after")],
-            False, False
+            False,
+            False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=101):
-                format_pretty(results, context_before=1, context_after=1, console=console)
+                format_pretty(
+                    results, context_before=1, context_after=1, console=console
+                )
 
         captured = output.getvalue()
         assert "100:" in captured
@@ -217,7 +260,9 @@ class TestFormatPrettyContext:
             False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=2):
                 format_pretty(results, context_before=5, console=console)
 
@@ -238,7 +283,9 @@ class TestFormatPrettyContext:
             True,  # is_eof
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=99):
                 format_pretty(results, context_after=5, console=console)
 
@@ -259,7 +306,9 @@ class TestFormatPrettyContext:
             False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=51):
                 format_pretty(results, context_before=1, console=console)
 
@@ -279,12 +328,18 @@ class TestBackwardCompatibility:
             [(1, "before")],
             [(2, "match")],
             [(3, "after")],
-            False, False
+            False,
+            False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=2):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="match"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="match",
+                ):
                     format_json(results, context_lines=5)
 
         call_kwargs = mock_expander.get_context_lines.call_args[1]
@@ -298,9 +353,14 @@ class TestBackwardCompatibility:
         mock_expander = MagicMock()
         mock_expander.get_context_lines.return_value = ([], [], [], False, False)
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="code",
+                ):
                     # Should not raise
                     output = format_json(results)
 
@@ -310,7 +370,10 @@ class TestBackwardCompatibility:
     def test_format_pretty_without_context_params(self, make_search_result):
         """format_pretty without context params should use smart expansion."""
         results = [make_search_result(filename="/test/file.py", score=0.85)]
-        console, output_buffer = Console(file=io.StringIO(), no_color=True, width=100), io.StringIO()
+        console, output_buffer = (
+            Console(file=io.StringIO(), no_color=True, width=100),
+            io.StringIO(),
+        )
         console = Console(file=output_buffer, no_color=True, width=100)
 
         mock_expander = MagicMock()
@@ -318,10 +381,13 @@ class TestBackwardCompatibility:
             [(1, "context")],
             [(2, "match")],
             [],
-            True, False
+            True,
+            False,
         )
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=2):
                 format_pretty(results, console=console)
 
@@ -378,9 +444,14 @@ class TestFormatterCacheManagement:
         mock_expander = MagicMock()
         mock_expander.get_context_lines.return_value = ([], [], [], False, False)
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
-                with patch("cocosearch.search.formatter.read_chunk_content", return_value="code"):
+                with patch(
+                    "cocosearch.search.formatter.read_chunk_content",
+                    return_value="code",
+                ):
                     format_json(results, context_before=3)
 
         mock_expander.clear_cache.assert_called_once()
@@ -393,7 +464,9 @@ class TestFormatterCacheManagement:
         mock_expander = MagicMock()
         mock_expander.get_context_lines.return_value = ([], [], [], False, False)
 
-        with patch("cocosearch.search.formatter.ContextExpander", return_value=mock_expander):
+        with patch(
+            "cocosearch.search.formatter.ContextExpander", return_value=mock_expander
+        ):
             with patch("cocosearch.search.formatter.byte_to_line", return_value=1):
                 format_pretty(results, context_before=3, console=console)
 

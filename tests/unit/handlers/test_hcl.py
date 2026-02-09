@@ -12,9 +12,9 @@ class TestHclHandlerExtensions:
     def test_extensions_contains_tf_hcl_tfvars(self):
         """EXTENSIONS should contain .tf, .hcl, and .tfvars."""
         handler = HclHandler()
-        assert '.tf' in handler.EXTENSIONS
-        assert '.hcl' in handler.EXTENSIONS
-        assert '.tfvars' in handler.EXTENSIONS
+        assert ".tf" in handler.EXTENSIONS
+        assert ".hcl" in handler.EXTENSIONS
+        assert ".tfvars" in handler.EXTENSIONS
         assert len(handler.EXTENSIONS) == 3
 
 
@@ -56,7 +56,9 @@ class TestHclHandlerSeparatorSpec:
             "check",
         ]
         for keyword in expected_keywords:
-            assert keyword in level1, f"Missing HCL keyword '{keyword}' in Level 1 separator"
+            assert keyword in level1, (
+                f"Missing HCL keyword '{keyword}' in Level 1 separator"
+            )
 
     def test_no_lookaheads_in_separators(self):
         """HCL separators must not contain lookahead or lookbehind patterns."""
@@ -65,7 +67,9 @@ class TestHclHandlerSeparatorSpec:
             assert "(?=" not in sep, f"Lookahead found in HCL separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in HCL separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found in HCL separator: {sep}"
-            assert "(?<!" not in sep, f"Negative lookbehind found in HCL separator: {sep}"
+            assert "(?<!" not in sep, (
+                f"Negative lookbehind found in HCL separator: {sep}"
+            )
 
 
 @pytest.mark.unit
@@ -171,7 +175,9 @@ class TestHclHandlerExtractMetadata:
     def test_comment_before_block(self):
         """Comment line before block keyword is correctly skipped."""
         handler = HclHandler()
-        m = handler.extract_metadata('# This resource\nresource "aws_s3_bucket" "data" {')
+        m = handler.extract_metadata(
+            '# This resource\nresource "aws_s3_bucket" "data" {'
+        )
         assert m["block_type"] == "resource"
         assert m["hierarchy"] == "resource.aws_s3_bucket.data"
         assert m["language_id"] == "hcl"
@@ -179,7 +185,9 @@ class TestHclHandlerExtractMetadata:
     def test_inline_comment_before_block(self):
         """HCL // comment before block is correctly skipped."""
         handler = HclHandler()
-        m = handler.extract_metadata('// resource declaration\nresource "type" "name" {')
+        m = handler.extract_metadata(
+            '// resource declaration\nresource "type" "name" {'
+        )
         assert m["block_type"] == "resource"
         assert m["hierarchy"] == "resource.type.name"
         assert m["language_id"] == "hcl"

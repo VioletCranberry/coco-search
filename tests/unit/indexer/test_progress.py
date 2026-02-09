@@ -1,7 +1,6 @@
 """Tests for cocosearch.indexer.progress module."""
 
 import io
-import pytest
 from rich.console import Console
 
 from cocosearch.indexer.progress import IndexingProgress, print_summary
@@ -67,7 +66,9 @@ class TestIndexingProgress:
 
         with IndexingProgress(console=custom_console) as progress:
             progress.start_indexing("/test")
-            progress.complete({"files_added": 1, "files_removed": 0, "files_updated": 0})
+            progress.complete(
+                {"files_added": 1, "files_removed": 0, "files_updated": 0}
+            )
 
         # Output should go to custom console
         assert custom_output.getvalue()  # Not empty

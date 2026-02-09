@@ -16,6 +16,7 @@ def make_search_result():
         def test_formatter(make_search_result):
             result = make_search_result(filename="/test/file.py", score=0.95)
     """
+
     def _make(
         filename: str = "/test/project/main.py",
         start_byte: int = 0,
@@ -54,9 +55,15 @@ def sample_search_result(make_search_result):
 def sample_search_results(make_search_result):
     """List of sample SearchResults for testing formatters and displays."""
     return [
-        make_search_result(filename="/project/auth.py", start_byte=0, end_byte=150, score=0.92),
-        make_search_result(filename="/project/utils.py", start_byte=50, end_byte=200, score=0.85),
-        make_search_result(filename="/project/main.py", start_byte=100, end_byte=300, score=0.78),
+        make_search_result(
+            filename="/project/auth.py", start_byte=0, end_byte=150, score=0.92
+        ),
+        make_search_result(
+            filename="/project/utils.py", start_byte=50, end_byte=200, score=0.85
+        ),
+        make_search_result(
+            filename="/project/main.py", start_byte=100, end_byte=300, score=0.78
+        ),
     ]
 
 
@@ -80,7 +87,7 @@ def sample_code_content():
         "content": code,
         "filename": "/project/auth.py",
         "start_byte": 0,
-        "end_byte": len(code.encode('utf-8')),
+        "end_byte": len(code.encode("utf-8")),
     }
 
 
@@ -92,6 +99,7 @@ def make_config_dict():
         def test_config(make_config_dict):
             config = make_config_dict(include=["*.py", "*.js"])
     """
+
     def _make(
         include: list[str] | None = None,
         exclude: list[str] | None = None,

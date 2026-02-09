@@ -10,7 +10,6 @@ The marker is auto-applied by tests/integration/conftest.py.
 """
 
 import numpy as np
-import pytest
 
 import cocoindex
 

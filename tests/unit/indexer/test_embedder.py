@@ -1,7 +1,5 @@
 """Tests for cocosearch.indexer.embedder module."""
 
-import pytest
-
 
 class TestCodeToEmbedding:
     """Tests for code_to_embedding function.

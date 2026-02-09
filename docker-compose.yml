@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: cocosearch
       POSTGRES_DB: cocosearch
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ./docker_data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cocosearch -d cocosearch"]
       interval: 10s
@@ -24,7 +24,7 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ./ollama_data:/root/.ollama
+      - ./docker_data/ollama:/root/.ollama
     entrypoint: /bin/sh
     command: -c "ollama serve & sleep 5 && ollama pull nomic-embed-text && wait"
     healthcheck:

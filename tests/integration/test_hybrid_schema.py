@@ -63,9 +63,7 @@ class TestHybridSearchSchema:
         assert result["gin_index_added"] is True
         assert result["already_exists"] is False
 
-    def test_ensure_hybrid_search_schema_is_idempotent(
-        self, db_connection, test_table
-    ):
+    def test_ensure_hybrid_search_schema_is_idempotent(self, db_connection, test_table):
         """Test that migration is safe to run multiple times."""
         # First run
         ensure_hybrid_search_schema(db_connection, test_table)
@@ -101,4 +99,4 @@ class TestHybridSearchSchema:
             # Should use index scan, not sequential scan
             # Note: Small tables may still use seq scan due to planner
             # For real verification, insert more rows
-            assert 'index' in plan_str or 'bitmap' in plan_str or 'scan' in plan_str
+            assert "index" in plan_str or "bitmap" in plan_str or "scan" in plan_str

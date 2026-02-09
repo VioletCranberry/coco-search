@@ -23,12 +23,14 @@ class TestGetConnectionPool:
         with patch.dict(os.environ, {}, clear=True):
             with patch("cocosearch.search.db.ConnectionPool") as mock_pool_cls:
                 mock_pool_cls.return_value = MagicMock()
-                pool = get_connection_pool()
+                get_connection_pool()
 
         # Verify ConnectionPool was called with the default URL
         mock_pool_cls.assert_called_once()
         call_kwargs = mock_pool_cls.call_args
-        assert "cocosearch:cocosearch" in call_kwargs.kwargs.get("conninfo", call_kwargs.args[0] if call_kwargs.args else "")
+        assert "cocosearch:cocosearch" in call_kwargs.kwargs.get(
+            "conninfo", call_kwargs.args[0] if call_kwargs.args else ""
+        )
 
 
 class TestGetTableName:

@@ -22,32 +22,20 @@ class TestCacheKey:
 
     def test_same_params_same_key(self):
         """Identical parameters produce identical keys."""
-        key1 = _compute_cache_key(
-            "query", "index", 10, 0.0, None, None, None, None
-        )
-        key2 = _compute_cache_key(
-            "query", "index", 10, 0.0, None, None, None, None
-        )
+        key1 = _compute_cache_key("query", "index", 10, 0.0, None, None, None, None)
+        key2 = _compute_cache_key("query", "index", 10, 0.0, None, None, None, None)
         assert key1 == key2
 
     def test_different_query_different_key(self):
         """Different queries produce different keys."""
-        key1 = _compute_cache_key(
-            "query1", "index", 10, 0.0, None, None, None, None
-        )
-        key2 = _compute_cache_key(
-            "query2", "index", 10, 0.0, None, None, None, None
-        )
+        key1 = _compute_cache_key("query1", "index", 10, 0.0, None, None, None, None)
+        key2 = _compute_cache_key("query2", "index", 10, 0.0, None, None, None, None)
         assert key1 != key2
 
     def test_different_index_different_key(self):
         """Different indexes produce different keys."""
-        key1 = _compute_cache_key(
-            "query", "index1", 10, 0.0, None, None, None, None
-        )
-        key2 = _compute_cache_key(
-            "query", "index2", 10, 0.0, None, None, None, None
-        )
+        key1 = _compute_cache_key("query", "index1", 10, 0.0, None, None, None, None)
+        key2 = _compute_cache_key("query", "index2", 10, 0.0, None, None, None, None)
         assert key1 != key2
 
     def test_symbol_type_list_normalized(self):
@@ -62,22 +50,14 @@ class TestCacheKey:
 
     def test_different_limit_different_key(self):
         """Different limits produce different keys."""
-        key1 = _compute_cache_key(
-            "query", "index", 10, 0.0, None, None, None, None
-        )
-        key2 = _compute_cache_key(
-            "query", "index", 20, 0.0, None, None, None, None
-        )
+        key1 = _compute_cache_key("query", "index", 10, 0.0, None, None, None, None)
+        key2 = _compute_cache_key("query", "index", 20, 0.0, None, None, None, None)
         assert key1 != key2
 
     def test_different_min_score_different_key(self):
         """Different min scores produce different keys."""
-        key1 = _compute_cache_key(
-            "query", "index", 10, 0.0, None, None, None, None
-        )
-        key2 = _compute_cache_key(
-            "query", "index", 10, 0.5, None, None, None, None
-        )
+        key1 = _compute_cache_key("query", "index", 10, 0.0, None, None, None, None)
+        key2 = _compute_cache_key("query", "index", 10, 0.5, None, None, None, None)
         assert key1 != key2
 
 

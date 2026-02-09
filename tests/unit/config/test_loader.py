@@ -1,11 +1,9 @@
 """Unit tests for config file loading."""
 
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-import yaml
 
 from cocosearch.config import ConfigError, CocoSearchConfig, load_config
 from cocosearch.config.loader import find_config_file
@@ -340,7 +338,9 @@ embedding:
 
         assert config.embedding.model == "mxbai-embed-large"
 
-    def test_raises_config_error_on_missing_required_env_var(self, tmp_path, monkeypatch):
+    def test_raises_config_error_on_missing_required_env_var(
+        self, tmp_path, monkeypatch
+    ):
         """Test that missing required env var raises ConfigError with clear message."""
         monkeypatch.delenv("MISSING_VAR", raising=False)
         config_file = tmp_path / "cocosearch.yaml"

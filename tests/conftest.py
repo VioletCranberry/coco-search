@@ -11,12 +11,17 @@ import pytest
 
 # Built-in markers to ignore when checking for custom markers
 BUILTIN_MARKERS = {
-    'parametrize', 'skip', 'skipif', 'xfail', 'usefixtures',
-    'filterwarnings', 'asyncio'
+    "parametrize",
+    "skip",
+    "skipif",
+    "xfail",
+    "usefixtures",
+    "filterwarnings",
+    "asyncio",
 }
 
 # Required custom markers - tests must have at least one
-REQUIRED_MARKERS = {'unit', 'integration'}
+REQUIRED_MARKERS = {"unit", "integration"}
 
 
 def pytest_collection_modifyitems(items):
@@ -35,14 +40,17 @@ def pytest_collection_modifyitems(items):
             warnings.warn(
                 f"Test '{item.nodeid}' has no @pytest.mark.unit or "
                 f"@pytest.mark.integration marker",
-                UserWarning
+                UserWarning,
             )
+
 
 # Register fixtures from fixtures directory (added by subsequent plans)
 pytest_plugins = [
     "tests.fixtures.db",  # Added by Plan 02
     "tests.fixtures.ollama",  # Added by Plan 03
     "tests.fixtures.data",  # Added by Plan 03
+    "tests.fixtures.containers",  # Integration: PostgreSQL testcontainer
+    "tests.fixtures.ollama_integration",  # Integration: Ollama testcontainer
 ]
 
 

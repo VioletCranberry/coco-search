@@ -67,7 +67,7 @@ def another_function():
 @pytest.fixture
 def sample_javascript_file(tmp_path):
     """Create sample JavaScript file with function and class."""
-    content = '''// JavaScript sample file
+    content = """// JavaScript sample file
 
 function processData(input) {
     const result = input.map(x => x * 2);
@@ -85,7 +85,7 @@ class DataProcessor {
 }
 
 const arrowFunc = (a, b) => a + b;
-'''
+"""
     filepath = tmp_path / "sample.js"
     filepath.write_text(content)
     return str(filepath)
@@ -94,7 +94,7 @@ const arrowFunc = (a, b) => a + b;
 @pytest.fixture
 def sample_json_file(tmp_path):
     """Create sample non-code JSON file."""
-    content = '''{
+    content = """{
     "name": "test",
     "version": "1.0.0",
     "description": "A test file",
@@ -102,7 +102,7 @@ def sample_json_file(tmp_path):
         "lodash": "^4.17.0"
     }
 }
-'''
+"""
     filepath = tmp_path / "package.json"
     filepath.write_text(content)
     return str(filepath)
@@ -111,16 +111,16 @@ def sample_json_file(tmp_path):
 @pytest.fixture
 def large_python_function(tmp_path):
     """Create Python file with function larger than 50 lines."""
-    lines = ['def large_function():']
+    lines = ["def large_function():"]
     lines.append('    """A very long function."""')
     # Add 60 lines of code to exceed 50-line limit
     for i in range(60):
-        lines.append(f'    x_{i} = {i}')
-    lines.append('    return x_0')
-    lines.append('')
+        lines.append(f"    x_{i} = {i}")
+    lines.append("    return x_0")
+    lines.append("")
 
     filepath = tmp_path / "large.py"
-    filepath.write_text('\n'.join(lines))
+    filepath.write_text("\n".join(lines))
     return str(filepath)
 
 
@@ -210,38 +210,32 @@ class TestFindEnclosingScope:
     def test_function_boundary_detection_python(self, expander, sample_python_file):
         """Should find enclosing function in Python."""
         # Line 6 is inside standalone_function (def is on line 4)
-        start, end = expander.find_enclosing_scope(
-            sample_python_file, 6, 6, "python"
-        )
+        start, end = expander.find_enclosing_scope(sample_python_file, 6, 6, "python")
         # Should expand to include entire function
         assert start <= 4  # Function def line
-        assert end >= 7    # Return statement line
+        assert end >= 7  # Return statement line
 
     def test_class_boundary_detection_python(self, expander, sample_python_file):
         """Should find enclosing class in Python."""
         # Line 11 is class docstring (class def is on line 10)
-        start, end = expander.find_enclosing_scope(
-            sample_python_file, 11, 11, "python"
-        )
+        start, end = expander.find_enclosing_scope(sample_python_file, 11, 11, "python")
         # Should expand to include class boundaries
         assert start <= 10  # Class def line
 
     def test_method_inside_class(self, expander, sample_python_file):
         """Should find method or class boundary for method code."""
         # Line 18 is inside method_one
-        start, end = expander.find_enclosing_scope(
-            sample_python_file, 18, 18, "python"
-        )
+        start, end = expander.find_enclosing_scope(sample_python_file, 18, 18, "python")
         # Should find some enclosing scope (method or class)
         assert start <= 18
         assert end >= 18
 
     def test_top_level_code_returns_original(self, expander, tmp_path):
         """Top-level code should return original range."""
-        content = '''x = 1
+        content = """x = 1
 y = 2
 z = x + y
-'''
+"""
         filepath = tmp_path / "top_level.py"
         filepath.write_text(content)
 
@@ -267,9 +261,9 @@ z = x + y
 
     def test_parse_error_returns_original(self, expander, tmp_path):
         """File with syntax errors should return original range."""
-        content = '''def broken(
+        content = """def broken(
     # Missing closing paren and colon
-'''
+"""
         filepath = tmp_path / "broken.py"
         filepath.write_text(content)
 

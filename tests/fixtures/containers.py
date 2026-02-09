@@ -97,7 +97,7 @@ def clean_tables(initialized_db, request):
 
             if tables:
                 # Quote table names for safety, CASCADE for foreign keys
-                quoted = ', '.join(f'"{t}"' for t in tables)
+                quoted = ", ".join(f'"{t}"' for t in tables)
                 cur.execute(f"TRUNCATE TABLE {quoted} CASCADE")
 
         conn.commit()
@@ -110,6 +110,7 @@ def integration_db_pool(initialized_db):
     Function scope: fresh pool per test.
     Registers pgvector type handler for vector operations.
     """
+
     def configure(conn):
         register_vector(conn)
 

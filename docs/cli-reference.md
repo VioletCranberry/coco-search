@@ -4,7 +4,7 @@ CocoSearch provides a command-line interface for indexing and searching code. Ou
 
 ### Indexing Commands
 
-`uvx cocosearch index <path> [options]`
+`uv run cocosearch index <path> [options]`
 
 Index a codebase for semantic search.
 
@@ -18,13 +18,13 @@ Index a codebase for semantic search.
 **Example:**
 
 ```bash
-uvx cocosearch index ./my-project --name myproject
+uv run cocosearch index ./my-project --name myproject
 ```
 
 ### Searching Commands
 
-`uvx cocosearch search <query> [options]`
-`uvx cocosearch search --interactive`
+`uv run cocosearch search <query> [options]`
+`uv run cocosearch search --interactive`
 
 Search indexed code using natural language.
 
@@ -49,78 +49,78 @@ Search indexed code using natural language.
 
 ```bash
 # Basic search
-uvx cocosearch search "authentication logic" --pretty
+uv run cocosearch search "authentication logic" --pretty
 
 # Filter by language
-uvx cocosearch search "error handling" --lang python
+uv run cocosearch search "error handling" --lang python
 
 # Inline language filter
-uvx cocosearch search "database connection lang:go"
+uv run cocosearch search "database connection lang:go"
 
 # Interactive mode
-uvx cocosearch search --interactive
+uv run cocosearch search --interactive
 ```
 
 ### Managing Indexes
 
-**List indexes:** `uvx cocosearch list [--pretty]`
+**List indexes:** `uv run cocosearch list [--pretty]`
 
 Show all available indexes.
 
 ```bash
-uvx cocosearch list --pretty
+uv run cocosearch list --pretty
 ```
 
-**Index statistics:** `uvx cocosearch stats [index] [--pretty]`
+**Index statistics:** `uv run cocosearch stats [index] [--pretty]`
 
 Show statistics for one or all indexes. Includes file count, chunk count, size, language distribution, and parse health.
 
 ```bash
-uvx cocosearch stats myproject --pretty
+uv run cocosearch stats myproject --pretty
 ```
 
-| Flag                    | Description                            | Default |
-| ----------------------- | -------------------------------------- | ------- |
-| `--pretty`              | Human-readable output                  | JSON    |
-| `--json`                | Machine-readable JSON output           | Off     |
-| `-v, --verbose`         | Show symbol type breakdown             | Off     |
-| `--all`                 | Show stats for all indexes             | Off     |
-| `--show-failures`       | Show individual file parse failure details | Off |
-| `--staleness-threshold` | Days before staleness warning          | 7       |
-| `--live`                | Terminal dashboard (multi-pane layout) | Off     |
-| `--watch`               | Auto-refresh dashboard (requires --live) | Off   |
-| `--refresh-interval`    | Refresh interval in seconds for --watch | 1.0    |
+| Flag                    | Description                                | Default |
+| ----------------------- | ------------------------------------------ | ------- |
+| `--pretty`              | Human-readable output                      | JSON    |
+| `--json`                | Machine-readable JSON output               | Off     |
+| `-v, --verbose`         | Show symbol type breakdown                 | Off     |
+| `--all`                 | Show stats for all indexes                 | Off     |
+| `--show-failures`       | Show individual file parse failure details | Off     |
+| `--staleness-threshold` | Days before staleness warning              | 7       |
+| `--live`                | Terminal dashboard (multi-pane layout)     | Off     |
+| `--watch`               | Auto-refresh dashboard (requires --live)   | Off     |
+| `--refresh-interval`    | Refresh interval in seconds for --watch    | 1.0     |
 
 **Parse health** is shown by default when available. It displays a percentage of files that parsed cleanly along with a per-language breakdown (ok, partial, error, unsupported).
 
 To see individual file failure details (file paths and error types), use the `--show-failures` flag:
 
 ```bash
-uvx cocosearch stats myproject --pretty --show-failures
+uv run cocosearch stats myproject --pretty --show-failures
 ```
 
-**Clear index:** `uvx cocosearch clear <index> [--force] [--pretty]`
+**Clear index:** `uv run cocosearch clear <index> [--force] [--pretty]`
 
 Delete an index and all its data (including the associated parse results table). Prompts for confirmation unless `--force`.
 
 ```bash
-uvx cocosearch clear myproject --force
+uv run cocosearch clear myproject --force
 ```
 
-**List supported languages:** `uvx cocosearch languages [--json]`
+**List supported languages:** `uv run cocosearch languages [--json]`
 
 Show all languages CocoSearch can index with extensions and symbol support.
 
 ```bash
-uvx cocosearch languages
+uv run cocosearch languages
 ```
 
-**Start MCP server:** `uvx cocosearch mcp`
+**Start MCP server:** `uv run cocosearch mcp`
 
 Start the MCP server for LLM integration. Typically invoked by MCP clients, not directly.
 
 ```bash
-uvx cocosearch mcp  # Runs until killed, used by Claude/OpenCode
+uv run cocosearch mcp  # Runs until killed, used by Claude/OpenCode
 ```
 
 ## Observability
@@ -130,7 +130,7 @@ Monitor index health, language distribution, symbol breakdown, and parse health.
 ### Index Statistics
 
 ```bash
-uvx cocosearch stats myproject --pretty
+uv run cocosearch stats myproject --pretty
 ```
 
 Shows file count, chunk count, size, staleness warnings, language distribution with bar charts, and parse health summary.
@@ -140,13 +140,13 @@ Shows file count, chunk count, size, staleness warnings, language distribution w
 Parse health tracks how well tree-sitter parsed each indexed file. It is displayed by default in the stats output:
 
 ```bash
-uvx cocosearch stats myproject --pretty
+uv run cocosearch stats myproject --pretty
 ```
 
 For detailed failure information including file paths and error types:
 
 ```bash
-uvx cocosearch stats myproject --pretty --show-failures
+uv run cocosearch stats myproject --pretty --show-failures
 ```
 
 ### JSON Output
@@ -154,7 +154,7 @@ uvx cocosearch stats myproject --pretty --show-failures
 Machine-readable stats for automation:
 
 ```bash
-uvx cocosearch stats myproject --json
+uv run cocosearch stats myproject --json
 ```
 
 ### Dashboard
@@ -162,7 +162,7 @@ uvx cocosearch stats myproject --json
 Web-based stats visualization:
 
 ```bash
-uvx cocosearch serve-dashboard
+uv run cocosearch serve-dashboard
 # Opens browser to http://localhost:8080
 ```
 

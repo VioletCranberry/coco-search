@@ -235,12 +235,17 @@
         <header>
             <h1>CocoSearch Dashboard</h1>
             <p class="subtitle">Real-time code index statistics and health monitoring</p>
+            <p id="repoUrl" style="font-size: 13px; margin-top: 4px; display: none;">
+                <a id="repoUrlLink" href="#" target="_blank" rel="noopener noreferrer"
+                   style="color: var(--accent-blue); text-decoration: none;"></a>
+            </p>
 
             <div class="index-selector">
                 <label for="indexSelect">Index:</label>
                 <select id="indexSelect">
                     <option value="">Loading...</option>
                 </select>
+                <span id="sourcePath" style="color: var(--text-muted); font-size: 13px; margin-left: 8px;"></span>
             </div>
         </header>
 
@@ -273,6 +278,16 @@
                     <h3>Last Updated</h3>
                     <div class="value" id="lastUpdated">-</div>
                     <div class="label" id="stalenessLabel">Index age</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Status</h3>
+                    <div class="value" id="indexStatus">-</div>
+                    <div class="label" id="statusLabel">Index status</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Parse Health</h3>
+                    <div class="value" id="parseHealth">-</div>
+                    <div class="label" id="parseHealthLabel">File parse quality</div>
                 </div>
             </div>
 
@@ -343,6 +358,60 @@
                 document.getElementById('stalenessLabel').textContent = `${stats.staleness_days} days old`;
             } else {
                 document.getElementById('stalenessLabel').textContent = 'Index age';
+            }
+
+            // Source path
+            const sourceEl = document.getElementById('sourcePath');
+            if (stats.source_path) {
+                sourceEl.textContent = stats.source_path;
+            } else {
+                sourceEl.textContent = '';
+            }
+
+            // Repo URL
+            const repoUrlEl = document.getElementById('repoUrl');
+            const repoUrlLink = document.getElementById('repoUrlLink');
+            if (stats.repo_url) {
+                repoUrlLink.href = stats.repo_url;
+                repoUrlLink.textContent = stats.repo_url;
+                repoUrlEl.style.display = 'block';
+            } else {
+                repoUrlEl.style.display = 'none';
+            }
+
+            // Status
+            const statusEl = document.getElementById('indexStatus');
+            const statusLabelEl = document.getElementById('statusLabel');
+            const status = stats.status || 'indexed';
+            if (status === 'indexing') {
+                statusEl.textContent = 'Indexing...';
+                statusEl.style.color = 'var(--accent-orange)';
+                statusLabelEl.textContent = 'In progress';
+            } else {
+                statusEl.textContent = 'Indexed';
+                statusEl.style.color = 'var(--accent-green)';
+                statusLabelEl.textContent = 'Ready to search';
+            }
+
+            // Parse Health
+            const parseHealthEl = document.getElementById('parseHealth');
+            const parseHealthLabelEl = document.getElementById('parseHealthLabel');
+            const parseStats = stats.parse_stats;
+            if (parseStats && parseStats.total_files > 0) {
+                const pct = parseStats.parse_health_pct;
+                parseHealthEl.textContent = pct + '%';
+                if (pct >= 95) {
+                    parseHealthEl.style.color = 'var(--accent-green)';
+                } else if (pct >= 80) {
+                    parseHealthEl.style.color = 'var(--accent-orange)';
+                } else {
+                    parseHealthEl.style.color = 'var(--accent-red)';
+                }
+                parseHealthLabelEl.textContent = `${parseStats.total_ok}/${parseStats.total_files} files clean`;
+            } else {
+                parseHealthEl.textContent = '-';
+                parseHealthEl.style.color = 'var(--text-muted)';
+                parseHealthLabelEl.textContent = 'No parse data';
             }
         }
 

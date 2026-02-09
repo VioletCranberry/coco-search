@@ -12,7 +12,7 @@ class TestDockerfileHandlerExtensions:
     def test_extensions_contains_dockerfile(self):
         """EXTENSIONS should contain .dockerfile."""
         handler = DockerfileHandler()
-        assert '.dockerfile' in handler.EXTENSIONS
+        assert ".dockerfile" in handler.EXTENSIONS
 
 
 @pytest.mark.unit
@@ -47,7 +47,9 @@ class TestDockerfileHandlerSeparatorSpec:
                 instructions_index = i
         assert from_index is not None, "FROM separator not found"
         assert instructions_index is not None, "Instructions separator not found"
-        assert from_index < instructions_index, "FROM should be higher priority (lower index) than instructions"
+        assert from_index < instructions_index, (
+            "FROM should be higher priority (lower index) than instructions"
+        )
 
     def test_no_lookaheads_in_separators(self):
         """Dockerfile separators must not contain lookahead or lookbehind patterns."""
@@ -55,8 +57,12 @@ class TestDockerfileHandlerSeparatorSpec:
         for sep in handler.SEPARATOR_SPEC.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Dockerfile separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Dockerfile separator: {sep}"
-            assert "(?!" not in sep, f"Negative lookahead found in Dockerfile separator: {sep}"
-            assert "(?<!" not in sep, f"Negative lookbehind found in Dockerfile separator: {sep}"
+            assert "(?!" not in sep, (
+                f"Negative lookahead found in Dockerfile separator: {sep}"
+            )
+            assert "(?<!" not in sep, (
+                f"Negative lookbehind found in Dockerfile separator: {sep}"
+            )
 
 
 @pytest.mark.unit

@@ -5,21 +5,15 @@ search function with mocked database and embedding calls,
 DevOps language filtering, alias resolution, and graceful degradation.
 """
 
-import logging
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-import cocosearch.search.query as query_module
 from cocosearch.search.query import (
     SearchResult,
     search,
     get_extension_patterns,
     validate_language_filter,
-    LANGUAGE_EXTENSIONS,
-    DEVOPS_LANGUAGES,
-    LANGUAGE_ALIASES,
-    ALL_LANGUAGES,
 )
 
 
@@ -164,9 +158,11 @@ class TestSearch:
 
     def test_returns_search_results(self, mock_code_to_embedding, mock_db_pool):
         """Should return list of SearchResult objects."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/file.py", 0, 100, 0.85, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/path/file.py", 0, 100, 0.85, "", "", ""),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             results = search(query="test query", index_name="testindex")
@@ -180,11 +176,13 @@ class TestSearch:
 
     def test_applies_limit(self, mock_code_to_embedding, mock_db_pool):
         """Should respect limit parameter in query."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/file1.py", 0, 100, 0.9, "", "", ""),
-            ("/path/file2.py", 0, 100, 0.8, "", "", ""),
-            ("/path/file3.py", 0, 100, 0.7, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/path/file1.py", 0, 100, 0.9, "", "", ""),
+                ("/path/file2.py", 0, 100, 0.8, "", "", ""),
+                ("/path/file3.py", 0, 100, 0.7, "", "", ""),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             results = search(query="test", index_name="testindex", limit=5)
@@ -196,11 +194,13 @@ class TestSearch:
 
     def test_applies_min_score(self, mock_code_to_embedding, mock_db_pool):
         """Should filter results below min_score."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/file1.py", 0, 100, 0.9, "", "", ""),
-            ("/path/file2.py", 0, 100, 0.6, "", "", ""),  # Below 0.7 threshold
-            ("/path/file3.py", 0, 100, 0.5, "", "", ""),  # Below 0.7 threshold
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/path/file1.py", 0, 100, 0.9, "", "", ""),
+                ("/path/file2.py", 0, 100, 0.6, "", "", ""),  # Below 0.7 threshold
+                ("/path/file3.py", 0, 100, 0.5, "", "", ""),  # Below 0.7 threshold
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             results = search(query="test", index_name="testindex", min_score=0.7)
@@ -212,9 +212,11 @@ class TestSearch:
 
     def test_applies_language_filter(self, mock_code_to_embedding, mock_db_pool):
         """Should filter by file extension when language specified."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/file.py", 0, 100, 0.85, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/path/file.py", 0, 100, 0.85, "", "", ""),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             results = search(
@@ -227,13 +229,17 @@ class TestSearch:
         cursor.assert_query_contains("LIKE")
         assert len(results) == 1
 
-    def test_multiple_results_ordered_by_score(self, mock_code_to_embedding, mock_db_pool):
+    def test_multiple_results_ordered_by_score(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """Results should maintain database order (by score)."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/high.py", 0, 100, 0.95, "", "", ""),
-            ("/path/medium.py", 0, 100, 0.75, "", "", ""),
-            ("/path/low.py", 0, 100, 0.55, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/path/high.py", 0, 100, 0.95, "", "", ""),
+                ("/path/medium.py", 0, 100, 0.75, "", "", ""),
+                ("/path/low.py", 0, 100, 0.55, "", "", ""),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             results = search(query="test", index_name="testindex")
@@ -275,9 +281,19 @@ class TestSearch:
 
     def test_metadata_populated_from_row(self, mock_code_to_embedding, mock_db_pool):
         """Should populate metadata fields from database rows."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/main.tf", 0, 200, 0.90, "resource", "resource.aws_s3_bucket.data", "hcl"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/main.tf",
+                    0,
+                    200,
+                    0.90,
+                    "resource",
+                    "resource.aws_s3_bucket.data",
+                    "hcl",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             results = search(query="s3 bucket", index_name="testindex")
@@ -293,20 +309,42 @@ class TestDevOpsLanguageFilter:
 
     def test_hcl_filter_uses_language_id(self, mock_code_to_embedding, mock_db_pool):
         """HCL filter should use language_id column, not filename LIKE."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/main.tf", 0, 200, 0.90, "resource", "resource.aws_s3_bucket.data", "hcl"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/main.tf",
+                    0,
+                    200,
+                    0.90,
+                    "resource",
+                    "resource.aws_s3_bucket.data",
+                    "hcl",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             search(query="s3", index_name="testindex", language_filter="hcl")
 
         cursor.assert_query_contains("language_id")
 
-    def test_dockerfile_filter_uses_language_id(self, mock_code_to_embedding, mock_db_pool):
+    def test_dockerfile_filter_uses_language_id(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """Dockerfile filter should use language_id column."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/Dockerfile", 0, 100, 0.85, "FROM", "stage:builder", "dockerfile"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/Dockerfile",
+                    0,
+                    100,
+                    0.85,
+                    "FROM",
+                    "stage:builder",
+                    "dockerfile",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             search(query="build", index_name="testindex", language_filter="dockerfile")
@@ -315,10 +353,20 @@ class TestDevOpsLanguageFilter:
 
     def test_multi_language_filter(self, mock_code_to_embedding, mock_db_pool):
         """Multi-language filter should combine language_id and filename LIKE with OR."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/main.tf", 0, 200, 0.90, "resource", "resource.aws_s3_bucket.data", "hcl"),
-            ("/path/utils.py", 0, 150, 0.80, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/main.tf",
+                    0,
+                    200,
+                    0.90,
+                    "resource",
+                    "resource.aws_s3_bucket.data",
+                    "hcl",
+                ),
+                ("/path/utils.py", 0, 150, 0.80, "", "", ""),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             search(query="code", index_name="testindex", language_filter="hcl,python")
@@ -329,9 +377,19 @@ class TestDevOpsLanguageFilter:
 
     def test_alias_terraform_filters_as_hcl(self, mock_code_to_embedding, mock_db_pool):
         """Alias 'terraform' should filter by language_id = 'hcl'."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/main.tf", 0, 200, 0.90, "resource", "resource.aws_s3_bucket.data", "hcl"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/main.tf",
+                    0,
+                    200,
+                    0.90,
+                    "resource",
+                    "resource.aws_s3_bucket.data",
+                    "hcl",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             search(query="s3", index_name="testindex", language_filter="terraform")
@@ -346,12 +404,27 @@ class TestSymbolFilters:
     def test_search_symbol_type_filter(self, mock_code_to_embedding, mock_db_pool):
         """Symbol type filter should generate WHERE clause with symbol_type condition."""
         # Results with 10 columns: 7 metadata + 3 symbol columns
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "process_data", "def process_data()"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/utils.py",
+                    0,
+                    100,
+                    0.85,
+                    "",
+                    "",
+                    "",
+                    "function",
+                    "process_data",
+                    "def process_data()",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=True
+            ):
                 results = search(
                     query="test",
                     index_name="testindex",
@@ -366,13 +439,28 @@ class TestSymbolFilters:
 
     def test_search_symbol_name_filter(self, mock_code_to_embedding, mock_db_pool):
         """Symbol name filter should generate WHERE clause with ILIKE condition."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "get_user", "def get_user()"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/utils.py",
+                    0,
+                    100,
+                    0.85,
+                    "",
+                    "",
+                    "",
+                    "function",
+                    "get_user",
+                    "def get_user()",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
-                results = search(
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=True
+            ):
+                search(
                     query="test",
                     index_name="testindex",
                     symbol_name="get*",
@@ -383,13 +471,28 @@ class TestSymbolFilters:
 
     def test_search_symbol_filters_combined(self, mock_code_to_embedding, mock_db_pool):
         """Both symbol filters should combine with AND."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "get_user", "def get_user()"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/utils.py",
+                    0,
+                    100,
+                    0.85,
+                    "",
+                    "",
+                    "",
+                    "function",
+                    "get_user",
+                    "def get_user()",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
-                results = search(
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=True
+            ):
+                search(
                     query="test",
                     index_name="testindex",
                     symbol_type="function",
@@ -399,12 +502,16 @@ class TestSymbolFilters:
         cursor.assert_query_contains("symbol_type = %s")
         cursor.assert_query_contains("symbol_name ILIKE %s")
 
-    def test_search_symbol_filter_prv17_error(self, mock_code_to_embedding, mock_db_pool):
+    def test_search_symbol_filter_prv17_error(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """Symbol filter on pre-v1.7 index should raise helpful ValueError."""
         pool, cursor, _conn = mock_db_pool(results=[])
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=False):
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=False
+            ):
                 with pytest.raises(ValueError) as exc_info:
                     search(
                         query="test",
@@ -416,15 +523,31 @@ class TestSymbolFilters:
         assert "Re-index" in str(exc_info.value)
         assert "testindex" in str(exc_info.value)
 
-    def test_search_result_includes_symbol_fields(self, mock_code_to_embedding, mock_db_pool):
+    def test_search_result_includes_symbol_fields(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """SearchResult should include symbol_type, symbol_name, symbol_signature."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/utils.py", 0, 100, 0.85, "", "", "",
-             "method", "UserService.get_user", "def get_user(self, id: int)"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/utils.py",
+                    0,
+                    100,
+                    0.85,
+                    "",
+                    "",
+                    "",
+                    "method",
+                    "UserService.get_user",
+                    "def get_user(self, id: int)",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=True
+            ):
                 results = search(
                     query="test",
                     index_name="testindex",
@@ -436,15 +559,32 @@ class TestSymbolFilters:
         assert results[0].symbol_name == "UserService.get_user"
         assert results[0].symbol_signature == "def get_user(self, id: int)"
 
-    def test_search_symbol_filter_with_language_filter(self, mock_code_to_embedding, mock_db_pool):
+    def test_search_symbol_filter_with_language_filter(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """Symbol filter should combine with language filter via AND."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "process", "def process()"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/utils.py",
+                    0,
+                    100,
+                    0.85,
+                    "",
+                    "",
+                    "",
+                    "function",
+                    "process",
+                    "def process()",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
-                results = search(
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=True
+            ):
+                search(
                     query="test",
                     index_name="testindex",
                     language_filter="python",
@@ -457,13 +597,28 @@ class TestSymbolFilters:
 
     def test_search_multiple_symbol_types(self, mock_code_to_embedding, mock_db_pool):
         """Multiple symbol types should generate IN clause."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/utils.py", 0, 100, 0.85, "", "", "", "function", "process", "def process()"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/path/utils.py",
+                    0,
+                    100,
+                    0.85,
+                    "",
+                    "",
+                    "",
+                    "function",
+                    "process",
+                    "def process()",
+                ),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.query.check_symbol_columns_exist", return_value=True):
-                results = search(
+            with patch(
+                "cocosearch.search.query.check_symbol_columns_exist", return_value=True
+            ):
+                search(
                     query="test",
                     index_name="testindex",
                     symbol_type=["function", "method"],
@@ -483,14 +638,18 @@ class TestSymbolFilters:
         assert result.symbol_name is None
         assert result.symbol_signature is None
 
-    def test_search_without_symbol_filter_no_extra_columns(self, mock_code_to_embedding, mock_db_pool):
+    def test_search_without_symbol_filter_no_extra_columns(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """Search without symbol filter should not include symbol columns."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/path/file.py", 0, 100, 0.85, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/path/file.py", 0, 100, 0.85, "", "", ""),
+            ]
+        )
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
-            results = search(query="test", index_name="testindex")
+            search(query="test", index_name="testindex")
 
         # Should not query for symbol columns when not filtering
         last_query = cursor.calls[-1][0]

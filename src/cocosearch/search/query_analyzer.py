@@ -46,15 +46,15 @@ def has_identifier_pattern(query: str) -> bool:
     """
     # Pattern for camelCase: lowercase followed by uppercase
     # e.g., "getUser" has "tU" transition
-    camel_case_pattern = re.compile(r'[a-z][A-Z]')
+    camel_case_pattern = re.compile(r"[a-z][A-Z]")
 
     # Pattern for PascalCase with multiple words: Uppercase followed by
     # lowercase, then another uppercase (e.g., UserRepository)
-    pascal_case_pattern = re.compile(r'[A-Z][a-z]+[A-Z]')
+    pascal_case_pattern = re.compile(r"[A-Z][a-z]+[A-Z]")
 
     # Pattern for snake_case: word characters separated by underscore
     # Must have at least one underscore between alphanumeric parts
-    snake_case_pattern = re.compile(r'[a-zA-Z0-9]+_[a-zA-Z0-9]+')
+    snake_case_pattern = re.compile(r"[a-zA-Z0-9]+_[a-zA-Z0-9]+")
 
     # Check for any identifier pattern
     if camel_case_pattern.search(query):
@@ -90,7 +90,7 @@ def normalize_query_for_keyword(query: str) -> str:
     """
     # Find potential identifiers in the query
     # Matches: variable_name, functionName, ClassName, etc.
-    identifier_pattern = re.compile(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b')
+    identifier_pattern = re.compile(r"\b[a-zA-Z_][a-zA-Z0-9_]*\b")
 
     # Collect all tokens (original + split)
     all_tokens = []
@@ -101,7 +101,7 @@ def normalize_query_for_keyword(query: str) -> str:
     for match in identifier_pattern.finditer(query):
         # Add any text before this identifier
         if match.start() > last_end:
-            prefix = query[last_end:match.start()].strip()
+            prefix = query[last_end : match.start()].strip()
             if prefix:
                 all_tokens.append(prefix)
 
@@ -123,7 +123,7 @@ def normalize_query_for_keyword(query: str) -> str:
         if suffix:
             all_tokens.append(suffix)
 
-    return ' '.join(all_tokens)
+    return " ".join(all_tokens)
 
 
 def _should_split_identifier(identifier: str) -> bool:
@@ -144,19 +144,19 @@ def _should_split_identifier(identifier: str) -> bool:
         return False
 
     # Skip pure lowercase single words (no underscore)
-    if identifier.islower() and '_' not in identifier:
+    if identifier.islower() and "_" not in identifier:
         return False
 
     # Check for camelCase transition
-    if re.search(r'[a-z][A-Z]', identifier):
+    if re.search(r"[a-z][A-Z]", identifier):
         return True
 
     # Check for PascalCase (uppercase followed by lowercase, with another capital)
-    if re.search(r'[A-Z][a-z]+[A-Z]', identifier):
+    if re.search(r"[A-Z][a-z]+[A-Z]", identifier):
         return True
 
     # Check for snake_case
-    if '_' in identifier:
+    if "_" in identifier:
         return True
 
     return False

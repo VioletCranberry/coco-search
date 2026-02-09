@@ -238,7 +238,9 @@ class ContextExpander:
 
             # Log if parse has errors (still try to use partial tree)
             if tree.root_node.has_error:
-                logger.debug(f"Parse errors in {filepath}, using best-effort boundaries")
+                logger.debug(
+                    f"Parse errors in {filepath}, using best-effort boundaries"
+                )
 
             # Get file lines for byte offset calculation
             lines = self.get_file_lines(filepath)

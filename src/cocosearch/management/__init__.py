@@ -12,15 +12,22 @@ from cocosearch.management.context import (
     resolve_index_name,
 )
 from cocosearch.management.discovery import list_indexes
-from cocosearch.management.git import derive_index_from_git, get_git_root
+from cocosearch.management.git import derive_index_from_git, get_git_root, get_repo_url
 from cocosearch.management.metadata import (
     clear_index_path,
     ensure_metadata_table,
     get_index_for_path,
     get_index_metadata,
     register_index_path,
+    set_index_status,
 )
-from cocosearch.management.stats import get_comprehensive_stats, get_language_stats, get_parse_failures, get_parse_stats, get_stats
+from cocosearch.management.stats import (
+    get_comprehensive_stats,
+    get_language_stats,
+    get_parse_failures,
+    get_parse_stats,
+    get_stats,
+)
 
 __all__ = [
     "clear_index",
@@ -31,6 +38,7 @@ __all__ = [
     "get_canonical_path",
     "get_comprehensive_stats",
     "get_git_root",
+    "get_repo_url",
     "get_index_for_path",
     "get_index_metadata",
     "get_language_stats",
@@ -40,4 +48,5 @@ __all__ = [
     "list_indexes",
     "register_index_path",
     "resolve_index_name",
+    "set_index_status",
 ]

@@ -41,9 +41,9 @@ class TestFlowContentText:
 
         # Check for hybrid search comment (any case)
         has_hybrid_comment = (
-            "hybrid search" in source.lower() or
-            "keyword search" in source.lower() or
-            "bm25" in source.lower()
+            "hybrid search" in source.lower()
+            or "keyword search" in source.lower()
+            or "bm25" in source.lower()
         )
 
         assert has_hybrid_comment, (
@@ -56,13 +56,13 @@ class TestFlowContentText:
 
         # Required fields for semantic + keyword hybrid search
         required_fields = [
-            "filename=",      # File identification
-            "location=",      # Chunk location within file
-            "embedding=",     # Vector for semantic search
+            "filename=",  # File identification
+            "location=",  # Chunk location within file
+            "embedding=",  # Vector for semantic search
             "content_text=",  # Text for keyword search (v1.7)
-            "block_type=",    # DevOps metadata
-            "hierarchy=",     # DevOps metadata
-            "language_id=",   # Language classification
+            "block_type=",  # DevOps metadata
+            "hierarchy=",  # DevOps metadata
+            "language_id=",  # Language classification
         ]
 
         for field in required_fields:

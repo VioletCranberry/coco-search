@@ -4,8 +4,6 @@ Tests utility functions for byte offset to line conversion,
 chunk content reading, and context line extraction.
 """
 
-import pytest
-
 from cocosearch.search.utils import byte_to_line, read_chunk_content, get_context_lines
 
 

@@ -15,7 +15,7 @@ import cocoindex
 class DockerfileHandler:
     """Handler for Dockerfile files."""
 
-    EXTENSIONS = ['.dockerfile']
+    EXTENSIONS = [".dockerfile"]
 
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
         language_name="dockerfile",

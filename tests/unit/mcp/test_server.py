@@ -1,7 +1,9 @@
 """Tests for cocosearch MCP server tools."""
+
 import pytest
 from unittest.mock import patch, MagicMock
 
+from cocosearch.management.stats import IndexStats
 from cocosearch.mcp.server import (
     search_code,
     list_indexes,
@@ -26,14 +28,21 @@ class TestSearchCode:
     @pytest.mark.asyncio
     async def test_returns_result_list(self, mock_code_to_embedding, mock_db_pool):
         """Returns list of result dicts."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/test/file.py", 0, 100, 0.9, "", "", ""),
+            ]
+        )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.query.get_connection_pool", return_value=pool
+            ):
                 with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch("cocosearch.mcp.server.read_chunk_content", return_value="def test(): pass"):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content",
+                        return_value="def test(): pass",
+                    ):
                         result = await search_code(
                             query="test query",
                             ctx=_make_mock_ctx(),
@@ -50,15 +59,21 @@ class TestSearchCode:
     @pytest.mark.asyncio
     async def test_applies_limit(self, mock_code_to_embedding, mock_db_pool):
         """Respects limit parameter."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file1.py", 0, 100, 0.9, "", "", ""),
-            ("/test/file2.py", 0, 100, 0.8, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/test/file1.py", 0, 100, 0.9, "", "", ""),
+                ("/test/file2.py", 0, 100, 0.8, "", "", ""),
+            ]
+        )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.query.get_connection_pool", return_value=pool
+            ):
                 with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch("cocosearch.mcp.server.read_chunk_content", return_value="code"):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content", return_value="code"
+                    ):
                         result = await search_code(
                             query="test",
                             ctx=_make_mock_ctx(),
@@ -73,14 +88,20 @@ class TestSearchCode:
     @pytest.mark.asyncio
     async def test_language_filter(self, mock_code_to_embedding, mock_db_pool):
         """Applies language filter."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.9, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/test/file.py", 0, 100, 0.9, "", "", ""),
+            ]
+        )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.query.get_connection_pool", return_value=pool
+            ):
                 with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch("cocosearch.mcp.server.read_chunk_content", return_value="code"):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content", return_value="code"
+                    ):
                         result = await search_code(
                             query="test",
                             ctx=_make_mock_ctx(),
@@ -92,23 +113,42 @@ class TestSearchCode:
         assert isinstance(result, list)
         # Verify query contains language filter
         calls = cursor.calls
-        assert any("python" in str(call) or ".py" in str(call) for call in calls) or True
+        assert (
+            any("python" in str(call) or ".py" in str(call) for call in calls) or True
+        )
 
 
 class TestSearchCodeMetadata:
     """Tests for metadata fields in search_code MCP response."""
 
     @pytest.mark.asyncio
-    async def test_response_includes_metadata(self, mock_code_to_embedding, mock_db_pool):
+    async def test_response_includes_metadata(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """search_code result should include block_type, hierarchy, language_id."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/infra/main.tf", 0, 200, 0.92, "resource", "resource.aws_s3_bucket.data", "hcl"),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (
+                    "/infra/main.tf",
+                    0,
+                    200,
+                    0.92,
+                    "resource",
+                    "resource.aws_s3_bucket.data",
+                    "hcl",
+                ),
+            ]
+        )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.query.get_connection_pool", return_value=pool
+            ):
                 with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch("cocosearch.mcp.server.read_chunk_content", return_value="resource {}"):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content",
+                        return_value="resource {}",
+                    ):
                         result = await search_code(
                             query="s3 bucket",
                             ctx=_make_mock_ctx(),
@@ -123,16 +163,25 @@ class TestSearchCodeMetadata:
         assert item["language_id"] == "hcl"
 
     @pytest.mark.asyncio
-    async def test_response_empty_metadata_for_non_devops(self, mock_code_to_embedding, mock_db_pool):
+    async def test_response_empty_metadata_for_non_devops(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
         """Non-DevOps results should have empty string metadata fields."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("/test/file.py", 0, 100, 0.85, "", "", ""),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("/test/file.py", 0, 100, 0.85, "", "", ""),
+            ]
+        )
 
         with patch("cocoindex.init"):
-            with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.query.get_connection_pool", return_value=pool
+            ):
                 with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch("cocosearch.mcp.server.read_chunk_content", return_value="def test(): pass"):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content",
+                        return_value="def test(): pass",
+                    ):
                         result = await search_code(
                             query="test",
                             ctx=_make_mock_ctx(),
@@ -152,12 +201,16 @@ class TestListIndexes:
 
     def test_returns_index_list(self, mock_db_pool):
         """Returns list of index dicts."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("codeindex_myproject__myproject_chunks",),
-            ("codeindex_other__other_chunks",),
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("codeindex_myproject__myproject_chunks",),
+                ("codeindex_other__other_chunks",),
+            ]
+        )
 
-        with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
+        with patch(
+            "cocosearch.management.discovery.get_connection_pool", return_value=pool
+        ):
             result = list_indexes()
 
         assert isinstance(result, list)
@@ -168,7 +221,9 @@ class TestListIndexes:
         """Returns empty list when no indexes exist."""
         pool, cursor, _conn = mock_db_pool(results=[])
 
-        with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
+        with patch(
+            "cocosearch.management.discovery.get_connection_pool", return_value=pool
+        ):
             result = list_indexes()
 
         assert result == []
@@ -177,16 +232,32 @@ class TestListIndexes:
 class TestIndexStats:
     """Tests for index_stats MCP tool."""
 
-    def test_returns_stats_for_specific_index(self, mock_db_pool):
+    def test_returns_stats_for_specific_index(self):
         """Returns stats dict for named index."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            (True,),  # EXISTS check
-            (10, 50),  # file_count, chunk_count
-            (1024 * 1024,),  # storage_size
-        ])
+        mock_stats = IndexStats(
+            name="testindex",
+            file_count=10,
+            chunk_count=50,
+            storage_size=1024 * 1024,
+            storage_size_pretty="1.0 MB",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=-1,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
+        )
 
-        with patch("cocosearch.management.stats.get_connection_pool", return_value=pool):
-            result = index_stats(index_name="testindex")
+        with patch("cocoindex.init"):
+            with patch(
+                "cocosearch.mcp.server.get_comprehensive_stats", return_value=mock_stats
+            ):
+                result = index_stats(index_name="testindex")
 
         assert isinstance(result, dict)
         assert result["file_count"] == 10
@@ -197,7 +268,9 @@ class TestIndexStats:
         """Returns error dict for missing index."""
         pool, cursor, _conn = mock_db_pool(results=[(False,)])
 
-        with patch("cocosearch.management.stats.get_connection_pool", return_value=pool):
+        with patch(
+            "cocosearch.management.stats.get_connection_pool", return_value=pool
+        ):
             result = index_stats(index_name="missing")
 
         assert result["success"] is False
@@ -205,16 +278,40 @@ class TestIndexStats:
 
     def test_returns_all_indexes_when_no_name(self, mock_db_pool):
         """Returns list of stats for all indexes when no name provided."""
-        # First call: list_indexes
-        # Then: get_stats for each
-        pool, cursor, _conn = mock_db_pool(results=[
-            ("codeindex_proj1__proj1_chunks",),  # list_indexes
-        ])
+        mock_stats = IndexStats(
+            name="proj1",
+            file_count=5,
+            chunk_count=20,
+            storage_size=512,
+            storage_size_pretty="512 B",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=-1,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
+        )
 
-        with patch("cocosearch.management.discovery.get_connection_pool", return_value=pool):
-            with patch("cocosearch.mcp.server.get_stats") as mock_stats:
-                mock_stats.return_value = {"name": "proj1", "file_count": 5, "chunk_count": 20}
-                result = index_stats(index_name=None)
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("codeindex_proj1__proj1_chunks",),  # list_indexes
+            ]
+        )
+
+        with patch("cocoindex.init"):
+            with patch(
+                "cocosearch.management.discovery.get_connection_pool", return_value=pool
+            ):
+                with patch(
+                    "cocosearch.mcp.server.get_comprehensive_stats",
+                    return_value=mock_stats,
+                ):
+                    result = index_stats(index_name=None)
 
         assert isinstance(result, list)
 
@@ -224,11 +321,15 @@ class TestClearIndex:
 
     def test_returns_success_on_delete(self, mock_db_pool):
         """Returns success dict when index deleted."""
-        pool, cursor, _conn = mock_db_pool(results=[
-            (True,),  # EXISTS check
-        ])
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                (True,),  # EXISTS check
+            ]
+        )
 
-        with patch("cocosearch.management.clear.get_connection_pool", return_value=pool):
+        with patch(
+            "cocosearch.management.clear.get_connection_pool", return_value=pool
+        ):
             result = clear_index(index_name="testindex")
 
         assert result["success"] is True
@@ -238,7 +339,9 @@ class TestClearIndex:
         """Returns error dict for missing index."""
         pool, cursor, _conn = mock_db_pool(results=[(False,)])
 
-        with patch("cocosearch.management.clear.get_connection_pool", return_value=pool):
+        with patch(
+            "cocosearch.management.clear.get_connection_pool", return_value=pool
+        ):
             result = clear_index(index_name="missing")
 
         assert result["success"] is False
@@ -248,8 +351,13 @@ class TestClearIndex:
         """Returns error dict on unexpected exception."""
         pool, cursor, _conn = mock_db_pool(results=[(True,)])
 
-        with patch("cocosearch.management.clear.get_connection_pool", return_value=pool):
-            with patch("cocosearch.mcp.server.mgmt_clear_index", side_effect=RuntimeError("DB crashed")):
+        with patch(
+            "cocosearch.management.clear.get_connection_pool", return_value=pool
+        ):
+            with patch(
+                "cocosearch.mcp.server.mgmt_clear_index",
+                side_effect=RuntimeError("DB crashed"),
+            ):
                 result = clear_index(index_name="testindex")
 
         assert result["success"] is False
@@ -263,13 +371,15 @@ class TestIndexCodebase:
         """Returns success dict with stats."""
         with patch("cocoindex.init"):
             with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(stats={
-                    "files": {
-                        "num_insertions": 5,
-                        "num_deletions": 0,
-                        "num_updates": 2,
+                mock_run.return_value = MagicMock(
+                    stats={
+                        "files": {
+                            "num_insertions": 5,
+                            "num_deletions": 0,
+                            "num_updates": 2,
+                        }
                     }
-                })
+                )
                 with patch("cocosearch.mcp.server.register_index_path"):
                     result = index_codebase(
                         path=str(tmp_codebase),
@@ -297,7 +407,9 @@ class TestIndexCodebase:
     def test_returns_error_on_failure(self, tmp_codebase):
         """Returns error dict on indexing failure."""
         with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index", side_effect=ValueError("Flow error")):
+            with patch(
+                "cocosearch.mcp.server.run_index", side_effect=ValueError("Flow error")
+            ):
                 result = index_codebase(
                     path=str(tmp_codebase),
                     index_name="testindex",
@@ -307,18 +419,77 @@ class TestIndexCodebase:
         assert "error" in result
 
 
+class TestEmptyDatabase:
+    """Tests for graceful handling when database is empty (fresh install)."""
+
+    def test_list_indexes_returns_empty_on_connection_error(self):
+        """list_indexes returns empty list when DB connection fails."""
+        with patch(
+            "cocosearch.management.discovery.get_connection_pool",
+            side_effect=Exception("connection refused"),
+        ):
+            result = list_indexes()
+
+        assert result == []
+
+    def test_index_stats_returns_error_on_init_failure(self):
+        """index_stats returns error dict when cocoindex.init() fails."""
+        with patch(
+            "cocoindex.init",
+            side_effect=Exception('relation "cocoindex_setup_metadata" does not exist'),
+        ):
+            result = index_stats()
+
+        assert isinstance(result, dict)
+        assert result["success"] is False
+        assert (
+            "not initialized" in result["error"].lower()
+            or "index" in result["error"].lower()
+        )
+
+    @pytest.mark.asyncio
+    async def test_search_code_returns_error_on_init_failure(self, mock_db_pool):
+        """search_code returns error when cocoindex.init() fails on empty DB."""
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("codeindex_test__test_chunks",),  # list_indexes finds an index
+            ]
+        )
+
+        with patch(
+            "cocosearch.management.discovery.get_connection_pool", return_value=pool
+        ):
+            with patch(
+                "cocosearch.management.metadata.get_connection_pool", return_value=pool
+            ):
+                with patch(
+                    "cocoindex.init",
+                    side_effect=Exception("cocoindex_setup_metadata does not exist"),
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="test",
+                        limit=5,
+                    )
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert "error" in result[0]
+
+
 class TestMCPToolRegistration:
     """Tests for MCP tool registration."""
 
     def test_mcp_instance_exists(self):
         """FastMCP instance is created."""
         from cocosearch.mcp.server import mcp
+
         assert mcp is not None
         assert mcp.name == "cocosearch"
 
     def test_tools_are_registered(self):
         """All tools are registered with MCP."""
-        from cocosearch.mcp.server import mcp
         # FastMCP stores tools internally
         # Just verify the module imports without error
         from cocosearch.mcp.server import (
@@ -328,6 +499,7 @@ class TestMCPToolRegistration:
             clear_index,
             index_codebase,
         )
+
         assert callable(search_code)
         assert callable(list_indexes)
         assert callable(index_stats)
@@ -342,6 +514,7 @@ class TestRunServer:
         """run_server accepts transport, host, port parameters."""
         import inspect
         from cocosearch.mcp.server import run_server
+
         sig = inspect.signature(run_server)
         assert "transport" in sig.parameters
         assert "host" in sig.parameters
@@ -351,21 +524,25 @@ class TestRunServer:
         assert sig.parameters["host"].default == "0.0.0.0"
         assert sig.parameters["port"].default == 3000
 
-    def test_stdio_transport_calls_mcp_run_stdio(self):
+    def test_stdio_transport_calls_mcp_run_stdio(self, monkeypatch):
         """stdio transport calls mcp.run with transport='stdio'."""
+        monkeypatch.setenv("COCOSEARCH_NO_DASHBOARD", "1")
         with patch("cocosearch.mcp.server.mcp") as mock_mcp:
             from cocosearch.mcp.server import run_server
+
             run_server(transport="stdio")
             mock_mcp.run.assert_called_once_with(transport="stdio")
 
-    def test_sse_transport_configures_settings_and_calls_mcp_run(self):
+    def test_sse_transport_configures_settings_and_calls_mcp_run(self, monkeypatch):
         """sse transport sets mcp.settings and calls mcp.run."""
+        monkeypatch.setenv("COCOSEARCH_NO_DASHBOARD", "1")
         with patch("cocosearch.mcp.server.mcp") as mock_mcp:
             # Create mock settings object
             mock_settings = MagicMock()
             mock_mcp.settings = mock_settings
 
             from cocosearch.mcp.server import run_server
+
             run_server(transport="sse", host="127.0.0.1", port=8080)
 
             # Verify settings were configured
@@ -374,14 +551,18 @@ class TestRunServer:
             # Verify mcp.run called with sse transport
             mock_mcp.run.assert_called_once_with(transport="sse")
 
-    def test_http_transport_configures_settings_and_calls_streamable_http(self):
+    def test_http_transport_configures_settings_and_calls_streamable_http(
+        self, monkeypatch
+    ):
         """http transport sets mcp.settings and calls mcp.run with 'streamable-http'."""
+        monkeypatch.setenv("COCOSEARCH_NO_DASHBOARD", "1")
         with patch("cocosearch.mcp.server.mcp") as mock_mcp:
             # Create mock settings object
             mock_settings = MagicMock()
             mock_mcp.settings = mock_settings
 
             from cocosearch.mcp.server import run_server
+
             run_server(transport="http", host="0.0.0.0", port=3000)
 
             # Verify settings were configured
@@ -390,12 +571,41 @@ class TestRunServer:
             # Verify mcp.run called with streamable-http transport
             mock_mcp.run.assert_called_once_with(transport="streamable-http")
 
-    def test_invalid_transport_raises_valueerror(self):
+    def test_invalid_transport_raises_valueerror(self, monkeypatch):
         """Invalid transport raises ValueError."""
+        monkeypatch.setenv("COCOSEARCH_NO_DASHBOARD", "1")
         with patch("cocosearch.mcp.server.mcp"):
             from cocosearch.mcp.server import run_server
+
             with pytest.raises(ValueError, match="Invalid transport"):
                 run_server(transport="invalid")
+
+    def test_stdio_starts_dashboard_server(self, monkeypatch):
+        """stdio transport starts background dashboard server and opens browser."""
+        monkeypatch.delenv("COCOSEARCH_NO_DASHBOARD", raising=False)
+        with patch("cocosearch.mcp.server.mcp") as mock_mcp:
+            with patch(
+                "cocosearch.dashboard.server.start_dashboard_server",
+                return_value="http://127.0.0.1:8080/dashboard",
+            ) as mock_start:
+                with patch("cocosearch.mcp.server._open_browser") as mock_open:
+                    from cocosearch.mcp.server import run_server
+
+                    run_server(transport="stdio")
+                    mock_start.assert_called_once()
+                    mock_open.assert_called_once_with("http://127.0.0.1:8080/dashboard")
+            mock_mcp.run.assert_called_once_with(transport="stdio")
+
+    def test_no_dashboard_env_skips_dashboard(self, monkeypatch):
+        """COCOSEARCH_NO_DASHBOARD=1 skips dashboard and browser."""
+        monkeypatch.setenv("COCOSEARCH_NO_DASHBOARD", "1")
+        with patch("cocosearch.mcp.server.mcp") as mock_mcp:
+            with patch("cocosearch.mcp.server._open_browser") as mock_open:
+                from cocosearch.mcp.server import run_server
+
+                run_server(transport="stdio")
+                mock_open.assert_not_called()
+            mock_mcp.run.assert_called_once_with(transport="stdio")
 
 
 class TestHealthEndpoint:
@@ -404,22 +614,26 @@ class TestHealthEndpoint:
     def test_health_check_function_exists(self):
         """health_check endpoint is defined."""
         from cocosearch.mcp.server import health_check
+
         assert callable(health_check)
 
     def test_health_check_is_async(self):
         """health_check is an async function."""
         import asyncio
         from cocosearch.mcp.server import health_check
+
         assert asyncio.iscoroutinefunction(health_check)
 
     @pytest.mark.asyncio
     async def test_health_check_returns_ok_status(self):
         """health_check returns JSONResponse with status ok."""
         from cocosearch.mcp.server import health_check
+
         request = MagicMock()
         response = await health_check(request)
         assert response.status_code == 200
         # JSONResponse body is bytes, decode and check
         import json
+
         body = json.loads(response.body.decode())
         assert body["status"] == "ok"

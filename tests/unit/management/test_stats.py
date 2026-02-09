@@ -12,7 +12,6 @@ from cocosearch.management.stats import (
     check_staleness,
     collect_warnings,
     format_bytes,
-    get_comprehensive_stats,
     get_parse_failures,
     get_parse_stats,
     get_stats,
@@ -205,6 +204,9 @@ class TestIndexStats:
             symbols={"function": 25},
             warnings=[],
             parse_stats={},
+            source_path="/path/to/project",
+            status="indexed",
+            repo_url=None,
         )
         assert stats.name == "test"
         assert stats.file_count == 10
@@ -215,10 +217,14 @@ class TestIndexStats:
         assert stats.updated_at == now
         assert stats.is_stale is False
         assert stats.staleness_days == 1
-        assert stats.languages == [{"language": "python", "file_count": 10, "chunk_count": 50}]
+        assert stats.languages == [
+            {"language": "python", "file_count": 10, "chunk_count": 50}
+        ]
         assert stats.symbols == {"function": 25}
         assert stats.warnings == []
         assert stats.parse_stats == {}
+        assert stats.source_path == "/path/to/project"
+        assert stats.status == "indexed"
 
     def test_to_dict_serialization(self):
         """to_dict() returns dictionary suitable for JSON serialization."""
@@ -237,11 +243,16 @@ class TestIndexStats:
             symbols={},
             warnings=[],
             parse_stats={},
+            source_path="/path/to/project",
+            status="indexed",
+            repo_url=None,
         )
         result = stats.to_dict()
         assert result["name"] == "test"
         assert result["created_at"] == "2026-01-15T12:00:00+00:00"
         assert result["updated_at"] == "2026-01-15T12:00:00+00:00"
+        assert result["source_path"] == "/path/to/project"
+        assert result["status"] == "indexed"
 
     def test_to_dict_with_none_datetimes(self):
         """to_dict() handles None datetime fields."""
@@ -259,10 +270,15 @@ class TestIndexStats:
             symbols={},
             warnings=["No metadata found"],
             parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
         )
         result = stats.to_dict()
         assert result["created_at"] is None
         assert result["updated_at"] is None
+        assert result["source_path"] is None
+        assert result["status"] is None
 
 
 class TestCheckStaleness:
@@ -272,6 +288,7 @@ class TestCheckStaleness:
         """Returns (True, days) for index older than threshold."""
         # 10 days ago
         from datetime import timedelta
+
         old_date = datetime.now(timezone.utc) - timedelta(days=10)
 
         pool, cursor, conn = mock_db_pool(results=[(old_date,)])
@@ -288,6 +305,7 @@ class TestCheckStaleness:
         """Returns (False, days) for index updated within threshold."""
         # 2 days ago
         from datetime import timedelta
+
         recent_date = datetime.now(timezone.utc) - timedelta(days=2)
 
         pool, cursor, conn = mock_db_pool(results=[(recent_date,)])
@@ -303,6 +321,7 @@ class TestCheckStaleness:
     def test_threshold_boundary(self, mock_db_pool):
         """7 days exactly is considered stale with threshold=7."""
         from datetime import timedelta
+
         boundary_date = datetime.now(timezone.utc) - timedelta(days=7)
 
         pool, cursor, conn = mock_db_pool(results=[(boundary_date,)])
@@ -352,8 +371,8 @@ class TestGetSymbolStats:
             results=[
                 ("symbol_type",),  # Column exists (consumed by fetchone)
                 ("function", 150),  # First symbol count row
-                ("class", 25),     # Second symbol count row
-                ("method", 80),    # Third symbol count row
+                ("class", 25),  # Second symbol count row
+                ("method", 80),  # Third symbol count row
             ]
         )
 
@@ -583,7 +602,23 @@ class TestIndexStatsWithParseStats:
             languages=[],
             symbols={},
             warnings=[],
-            parse_stats={"by_language": {"python": {"files": 10, "ok": 9, "partial": 1, "error": 0, "unsupported": 0}}, "parse_health_pct": 90.0, "total_files": 10, "total_ok": 9},
+            parse_stats={
+                "by_language": {
+                    "python": {
+                        "files": 10,
+                        "ok": 9,
+                        "partial": 1,
+                        "error": 0,
+                        "unsupported": 0,
+                    }
+                },
+                "parse_health_pct": 90.0,
+                "total_files": 10,
+                "total_ok": 9,
+            },
+            source_path=None,
+            status=None,
+            repo_url=None,
         )
         d = stats.to_dict()
         assert "parse_stats" in d
@@ -605,6 +640,9 @@ class TestIndexStatsWithParseStats:
             symbols={},
             warnings=[],
             parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
         )
         d = stats.to_dict()
         assert d["parse_stats"] == {}

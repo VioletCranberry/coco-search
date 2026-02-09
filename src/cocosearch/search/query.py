@@ -49,7 +49,9 @@ class SearchResult:
     block_type: str = ""
     hierarchy: str = ""
     language_id: str = ""
-    match_type: str = ""  # "" for backward compat, "semantic"/"keyword"/"both" for hybrid
+    match_type: str = (
+        ""  # "" for backward compat, "semantic"/"keyword"/"both" for hybrid
+    )
     vector_score: float | None = None
     keyword_score: float | None = None
     symbol_type: str | None = None
@@ -262,12 +264,16 @@ def search(
             should_use_hybrid = True
         else:
             # Fall back to vector-only silently (already warned above)
-            logger.debug("Hybrid search requested but content_text column missing, using vector-only")
+            logger.debug(
+                "Hybrid search requested but content_text column missing, using vector-only"
+            )
     elif use_hybrid is None:
         # Auto-detect: use hybrid if query has identifier patterns AND column exists
         if _has_content_text_column and has_identifier_pattern(query):
             should_use_hybrid = True
-            logger.debug(f"Auto-detected identifier pattern in query, using hybrid search")
+            logger.debug(
+                "Auto-detected identifier pattern in query, using hybrid search"
+            )
     # use_hybrid is False: always use vector-only (no action needed)
 
     # Execute hybrid search if applicable
@@ -357,7 +363,9 @@ def search(
 
     # Build WHERE clause for symbol filter (combines with language filter via AND)
     if include_symbol_columns:
-        symbol_where, symbol_params = build_symbol_where_clause(symbol_type, symbol_name)
+        symbol_where, symbol_params = build_symbol_where_clause(
+            symbol_type, symbol_name
+        )
         if symbol_where:
             where_parts.append(symbol_where)
             filter_params.extend(symbol_params)

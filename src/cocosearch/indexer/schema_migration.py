@@ -14,7 +14,9 @@ import psycopg
 logger = logging.getLogger(__name__)
 
 
-def ensure_hybrid_search_schema(conn: psycopg.Connection, table_name: str) -> dict[str, Any]:
+def ensure_hybrid_search_schema(
+    conn: psycopg.Connection, table_name: str
+) -> dict[str, Any]:
     """Ensure hybrid search columns and indexes exist on a table.
 
     This is idempotent - safe to call multiple times.
@@ -37,20 +39,26 @@ def ensure_hybrid_search_schema(conn: psycopg.Connection, table_name: str) -> di
 
     with conn.cursor() as cur:
         # Check if content_tsv column exists
-        cur.execute("""
+        cur.execute(
+            """
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = %s AND column_name = 'content_tsv'
-        """, (table_name,))
+        """,
+            (table_name,),
+        )
         tsvector_exists = cur.fetchone() is not None
 
         # Check if GIN index exists
         index_name = f"idx_{table_name}_content_tsv"
-        cur.execute("""
+        cur.execute(
+            """
             SELECT indexname
             FROM pg_indexes
             WHERE tablename = %s AND indexname = %s
-        """, (table_name, index_name))
+        """,
+            (table_name, index_name),
+        )
         gin_exists = cur.fetchone() is not None
 
         if tsvector_exists and gin_exists:
@@ -96,24 +104,30 @@ def verify_hybrid_search_schema(conn: psycopg.Connection, table_name: str) -> bo
     """
     with conn.cursor() as cur:
         # Verify tsvector column exists and is correct type
-        cur.execute("""
+        cur.execute(
+            """
             SELECT data_type
             FROM information_schema.columns
             WHERE table_name = %s AND column_name = 'content_tsv'
-        """, (table_name,))
+        """,
+            (table_name,),
+        )
         col = cur.fetchone()
-        if not col or col[0] != 'tsvector':
+        if not col or col[0] != "tsvector":
             return False
 
         # Verify GIN index exists
         index_name = f"idx_{table_name}_content_tsv"
-        cur.execute("""
+        cur.execute(
+            """
             SELECT indexdef
             FROM pg_indexes
             WHERE tablename = %s AND indexname = %s
-        """, (table_name, index_name))
+        """,
+            (table_name, index_name),
+        )
         idx = cur.fetchone()
-        if not idx or 'gin' not in idx[0].lower():
+        if not idx or "gin" not in idx[0].lower():
             return False
 
         return True
@@ -143,11 +157,14 @@ def ensure_symbol_columns(conn: psycopg.Connection, table_name: str) -> dict[str
 
     with conn.cursor() as cur:
         # Check which columns exist
-        cur.execute("""
+        cur.execute(
+            """
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = %s AND column_name = ANY(%s)
-        """, (table_name, symbol_columns))
+        """,
+            (table_name, symbol_columns),
+        )
         existing = {row[0] for row in cur.fetchall()}
 
         if len(existing) == len(symbol_columns):
@@ -179,16 +196,21 @@ def verify_symbol_columns(conn: psycopg.Connection, table_name: str) -> bool:
         True if all symbol columns exist
     """
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = %s AND column_name IN ('symbol_type', 'symbol_name', 'symbol_signature')
-        """, (table_name,))
+        """,
+            (table_name,),
+        )
         existing = {row[0] for row in cur.fetchall()}
         return len(existing) == 3
 
 
-def ensure_parse_results_table(conn: psycopg.Connection, index_name: str) -> dict[str, Any]:
+def ensure_parse_results_table(
+    conn: psycopg.Connection, index_name: str
+) -> dict[str, Any]:
     """Create parse_results table if it doesn't exist.
 
     This is idempotent - safe to call multiple times.

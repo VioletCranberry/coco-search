@@ -1,7 +1,5 @@
 """Tests for cocosearch.indexer.file_filter module."""
 
-import pytest
-
 from cocosearch.indexer.file_filter import (
     DEFAULT_EXCLUDES,
     build_exclude_patterns,
@@ -113,9 +111,7 @@ class TestBuildExcludePatterns:
         """Appends user-provided patterns."""
         user_patterns = ["my_custom_pattern/", "*.secret"]
 
-        patterns = build_exclude_patterns(
-            str(tmp_path), user_excludes=user_patterns
-        )
+        patterns = build_exclude_patterns(str(tmp_path), user_excludes=user_patterns)
 
         assert "my_custom_pattern/" in patterns
         assert "*.secret" in patterns
@@ -140,9 +136,7 @@ class TestBuildExcludePatterns:
         """Filters out empty strings from final pattern list."""
         user_patterns = ["valid/", "", "also_valid/"]
 
-        patterns = build_exclude_patterns(
-            str(tmp_path), user_excludes=user_patterns
-        )
+        patterns = build_exclude_patterns(str(tmp_path), user_excludes=user_patterns)
 
         assert "" not in patterns
         assert "valid/" in patterns

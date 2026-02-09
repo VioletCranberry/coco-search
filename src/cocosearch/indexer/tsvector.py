@@ -13,6 +13,8 @@ Uses PostgreSQL 'simple' text search config (no stemming) because:
 
 import re
 
+import cocoindex
+
 
 def split_code_identifier(identifier: str) -> list[str]:
     """Split a code identifier into searchable tokens.
@@ -34,13 +36,15 @@ def split_code_identifier(identifier: str) -> list[str]:
     tokens = [identifier]  # Always include original
 
     # Split camelCase/PascalCase
-    camel_parts = re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+', identifier)
+    camel_parts = re.findall(
+        r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\W|$)|\d+", identifier
+    )
     if camel_parts and len(camel_parts) > 1:
         tokens.extend(camel_parts)
 
     # Split snake_case/kebab-case
-    if '_' in identifier or '-' in identifier:
-        snake_parts = re.split(r'[_-]', identifier)
+    if "_" in identifier or "-" in identifier:
+        snake_parts = re.split(r"[_-]", identifier)
         snake_parts = [p for p in snake_parts if p]
         if len(snake_parts) > 1:
             tokens.extend(snake_parts)
@@ -62,7 +66,7 @@ def preprocess_code_for_tsvector(content: str) -> str:
     """
     # Extract potential identifiers (alphanumeric sequences with underscores)
     # This pattern matches: variable_name, functionName, ClassName, etc.
-    identifier_pattern = r'\b[a-zA-Z_][a-zA-Z0-9_]*\b'
+    identifier_pattern = r"\b[a-zA-Z_][a-zA-Z0-9_]*\b"
     identifiers = re.findall(identifier_pattern, content)
 
     # Split each identifier and collect all tokens
@@ -74,13 +78,14 @@ def preprocess_code_for_tsvector(content: str) -> str:
 
     # Also include raw words for natural language in comments
     # (to_tsvector will handle deduplication)
-    words = re.findall(r'\b\w+\b', content.lower())
+    words = re.findall(r"\b\w+\b", content.lower())
     all_tokens.extend(words)
 
     # Join with spaces for to_tsvector input
-    return ' '.join(all_tokens)
+    return " ".join(all_tokens)
 
 
+@cocoindex.op.function()
 def text_to_tsvector_sql(content: str) -> str:
     """Generate SQL expression for creating tsvector from content.
 

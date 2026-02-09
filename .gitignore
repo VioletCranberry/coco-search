@@ -55,9 +55,7 @@ dmypy.json
 # Ruff
 .ruff_cache/
 
-# Docker data directory (repo-local volume storage)
-.cocosearch-data/
-
 # Docker ollama and postgresql directories
-postgres_data/**
-ollama_data/**
+docker_data/**
+
+.claude/**

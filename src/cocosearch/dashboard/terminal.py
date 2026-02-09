@@ -14,7 +14,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from cocosearch.management.stats import get_comprehensive_stats, IndexStats
-from cocosearch.management import list_indexes
 
 
 def create_layout() -> Layout:
@@ -50,9 +49,13 @@ def format_header(stats: IndexStats, last_refresh: datetime) -> Panel:
         lines.append("")
 
     # Title and refresh time
-    lines.append(f"[bold]Index: {stats.name}[/bold]  |  Last refresh: {last_refresh.strftime('%H:%M:%S')}")
+    lines.append(
+        f"[bold]Index: {stats.name}[/bold]  |  Last refresh: {last_refresh.strftime('%H:%M:%S')}"
+    )
 
-    return Panel("\n".join(lines), title="[bold]Stats Dashboard[/bold]", border_style="blue")
+    return Panel(
+        "\n".join(lines), title="[bold]Stats Dashboard[/bold]", border_style="blue"
+    )
 
 
 def format_summary_panel(stats: IndexStats) -> Panel:
@@ -64,6 +67,21 @@ def format_summary_panel(stats: IndexStats) -> Panel:
     table.add_row("Files", f"{stats.file_count:,}")
     table.add_row("Chunks", f"{stats.chunk_count:,}")
     table.add_row("Size", stats.storage_size_pretty)
+    if stats.source_path:
+        table.add_row("Source", stats.source_path)
+    if stats.status:
+        if stats.status == "indexing":
+            table.add_row("Status", "[yellow]Indexing...[/yellow]")
+        else:
+            table.add_row("Status", f"[dim]{stats.status.title()}[/dim]")
+    if stats.parse_stats:
+        pct = stats.parse_stats.get("parse_health_pct", 100.0)
+        total_ok = stats.parse_stats.get("total_ok", 0)
+        total_files = stats.parse_stats.get("total_files", 0)
+        color = "green" if pct >= 95 else "yellow" if pct >= 80 else "red"
+        table.add_row(
+            "Parse Health", f"[{color}]{pct}% ({total_ok}/{total_files})[/{color}]"
+        )
     table.add_row("", "")
 
     # Timestamps
@@ -85,7 +103,7 @@ def format_details_panel(stats: IndexStats) -> Panel:
     lang_table.add_column("Chunks", justify="right", width=7)
     lang_table.add_column("Distribution", width=20)
 
-    max_chunks = max((l["chunk_count"] for l in stats.languages), default=1)
+    max_chunks = max((lang["chunk_count"] for lang in stats.languages), default=1)
     for lang in stats.languages[:10]:  # Top 10
         ratio = lang["chunk_count"] / max_chunks if max_chunks > 0 else 0
         bar = Bar(size=20, begin=0, end=ratio * 20)
@@ -93,7 +111,7 @@ def format_details_panel(stats: IndexStats) -> Panel:
             lang["language"][:10],
             str(lang["file_count"]),
             str(lang["chunk_count"]),
-            bar
+            bar,
         )
 
     # Symbol distribution (if available)
@@ -107,6 +125,7 @@ def format_details_panel(stats: IndexStats) -> Panel:
 
         # Combine tables vertically
         from rich.console import Group
+
         content = Group(lang_table, "", sym_table)
     else:
         content = lang_table
@@ -140,7 +159,7 @@ def run_terminal_dashboard(
 
     if watch:
         # Live updating mode
-        with Live(layout, console=console, refresh_per_second=4, screen=True) as live:
+        with Live(layout, console=console, refresh_per_second=4, screen=True):
             try:
                 while True:
                     # Update layout
@@ -167,4 +186,6 @@ def run_terminal_dashboard(
 
         # Display once and return
         console.print(layout)
-        console.print("\n[dim]Press Ctrl+C to exit. Use --watch for auto-refresh.[/dim]")
+        console.print(
+            "\n[dim]Press Ctrl+C to exit. Use --watch for auto-refresh.[/dim]"
+        )

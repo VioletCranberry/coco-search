@@ -23,6 +23,7 @@ Features:
 - Graceful error handling (returns NULL fields on parse errors)
 """
 
+import dataclasses
 import logging
 import importlib.resources
 from pathlib import Path
@@ -31,6 +32,16 @@ from tree_sitter_language_pack import get_parser as pack_get_parser, get_languag
 import cocoindex
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class SymbolMetadata:
+    """Metadata extracted from a code symbol."""
+
+    symbol_type: str | None
+    symbol_name: str | None
+    symbol_signature: str | None
+
 
 # ============================================================================
 # Language Mapping (file extension to tree-sitter language name)
@@ -129,7 +140,11 @@ def resolve_query_file(language: str, project_path: Path | None = None) -> str |
 
     # Priority 3: Built-in queries
     try:
-        return importlib.resources.files("cocosearch.indexer.queries").joinpath(query_name).read_text()
+        return (
+            importlib.resources.files("cocosearch.indexer.queries")
+            .joinpath(query_name)
+            .read_text()
+        )
     except FileNotFoundError:
         return None
 
@@ -151,7 +166,7 @@ def _get_node_text(source_text: str, node) -> str:
     """
     if node is None:
         return ""
-    return source_text[node.start_byte:node.end_byte]
+    return source_text[node.start_byte : node.end_byte]
 
 
 def _map_symbol_type(raw_type: str) -> str:
@@ -228,7 +243,9 @@ def _build_qualified_name(node, name: str, chunk_text: str, language: str) -> st
                                 # Extract type_identifier from pointer_type
                                 for ptr_child in type_child.children:
                                     if ptr_child.type == "type_identifier":
-                                        receiver_type = _get_node_text(chunk_text, ptr_child)
+                                        receiver_type = _get_node_text(
+                                            chunk_text, ptr_child
+                                        )
                                         return f"{receiver_type}.{name}"
                             elif type_child.type == "type_identifier":
                                 receiver_type = _get_node_text(chunk_text, type_child)
@@ -293,12 +310,12 @@ def _build_signature(node, chunk_text: str, language: str, symbol_type: str) -> 
         colon_newline = node_text.find(":\n")
         if colon_newline != -1:
             # Found definition-ending colon followed by newline
-            signature = node_text[:colon_newline + 1].strip()
+            signature = node_text[: colon_newline + 1].strip()
         else:
             # Single-line or no body - find last colon before end
             colon_pos = node_text.rfind(":")
             if colon_pos != -1:
-                signature = node_text[:colon_pos + 1].strip()
+                signature = node_text[: colon_pos + 1].strip()
             else:
                 # No colon found (shouldn't happen for valid Python)
                 lines = node_text.split("\n")
@@ -325,7 +342,9 @@ def _build_signature(node, chunk_text: str, language: str, symbol_type: str) -> 
 # ============================================================================
 
 
-def _extract_symbols_with_query(chunk_text: str, language: str, query_text: str) -> list[dict]:
+def _extract_symbols_with_query(
+    chunk_text: str, language: str, query_text: str
+) -> list[dict]:
     """Extract symbols using tree-sitter query.
 
     Args:
@@ -364,7 +383,7 @@ def _extract_symbols_with_query(chunk_text: str, language: str, query_text: str)
                 parent = node.parent
                 while parent:
                     if parent.id in definitions:
-                        names[parent.id] = chunk_text[node.start_byte:node.end_byte]
+                        names[parent.id] = chunk_text[node.start_byte : node.end_byte]
                         break
                     parent = parent.parent
 
@@ -375,11 +394,13 @@ def _extract_symbols_with_query(chunk_text: str, language: str, query_text: str)
             qualified_name = _build_qualified_name(node, name, chunk_text, language)
             signature = _build_signature(node, chunk_text, language, symbol_type)
 
-            symbols.append({
-                "symbol_type": _map_symbol_type(symbol_type),
-                "symbol_name": qualified_name,
-                "symbol_signature": signature,
-            })
+            symbols.append(
+                {
+                    "symbol_type": _map_symbol_type(symbol_type),
+                    "symbol_name": qualified_name,
+                    "symbol_signature": signature,
+                }
+            )
 
     return symbols
 
@@ -390,7 +411,7 @@ def _extract_symbols_with_query(chunk_text: str, language: str, query_text: str)
 
 
 @cocoindex.op.function()
-def extract_symbol_metadata(text: str, language: str) -> dict:
+def extract_symbol_metadata(text: str, language: str) -> SymbolMetadata:
     """Extract symbol metadata from code chunk.
 
     This is a CocoIndex transform function that extracts symbol information
@@ -417,40 +438,40 @@ def extract_symbol_metadata(text: str, language: str) -> dict:
 
     # Return NULL fields for unsupported languages
     if ts_language is None:
-        return {
-            "symbol_type": None,
-            "symbol_name": None,
-            "symbol_signature": None,
-        }
+        return SymbolMetadata(
+            symbol_type=None,
+            symbol_name=None,
+            symbol_signature=None,
+        )
 
     try:
         query_text = resolve_query_file(ts_language)
         if query_text is None:
             # No query file for this language - index without symbols
-            return {
-                "symbol_type": None,
-                "symbol_name": None,
-                "symbol_signature": None,
-            }
+            return SymbolMetadata(
+                symbol_type=None,
+                symbol_name=None,
+                symbol_signature=None,
+            )
 
         symbols = _extract_symbols_with_query(text, ts_language, query_text)
 
         if symbols:
-            return symbols[0]
-        return {
-            "symbol_type": None,
-            "symbol_name": None,
-            "symbol_signature": None,
-        }
+            return SymbolMetadata(**symbols[0])
+        return SymbolMetadata(
+            symbol_type=None,
+            symbol_name=None,
+            symbol_signature=None,
+        )
 
     except Exception as e:
         # Catastrophic failure - log and return NULLs
         logger.error(f"Symbol extraction failed: {e}", exc_info=True)
-        return {
-            "symbol_type": None,
-            "symbol_name": None,
-            "symbol_signature": None,
-        }
+        return SymbolMetadata(
+            symbol_type=None,
+            symbol_name=None,
+            symbol_signature=None,
+        )
 
 
-__all__ = ["extract_symbol_metadata", "LANGUAGE_MAP"]
+__all__ = ["extract_symbol_metadata", "SymbolMetadata", "LANGUAGE_MAP"]

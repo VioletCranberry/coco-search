@@ -1,6 +1,5 @@
 """Tests for parse failure tracking module."""
 
-import pytest
 from cocosearch.indexer.parse_tracking import detect_parse_status, _collect_error_lines
 
 
@@ -83,6 +82,7 @@ class TestCollectErrorLines:
     def test_returns_empty_for_valid_tree(self):
         """Returns empty list when tree has no error nodes."""
         from tree_sitter_language_pack import get_parser
+
         parser = get_parser("python")
         tree = parser.parse(b"x = 1")
         lines = _collect_error_lines(tree.root_node)
@@ -91,9 +91,10 @@ class TestCollectErrorLines:
     def test_returns_line_numbers_for_errors(self):
         """Returns line numbers of ERROR nodes."""
         from tree_sitter_language_pack import get_parser
+
         parser = get_parser("python")
         tree = parser.parse(b"def foo(:\n    pass")
         lines = _collect_error_lines(tree.root_node)
         assert len(lines) > 0
         # All lines should be positive integers (1-indexed)
-        assert all(isinstance(l, int) and l >= 1 for l in lines)
+        assert all(isinstance(line, int) and line >= 1 for line in lines)

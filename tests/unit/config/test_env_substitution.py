@@ -1,7 +1,5 @@
 """Unit tests for environment variable substitution in config."""
 
-import pytest
-
 from cocosearch.config.env_substitution import substitute_env_vars
 
 

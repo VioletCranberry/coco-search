@@ -14,7 +14,7 @@ import cocoindex
 class HclHandler:
     """Handler for HCL/Terraform files."""
 
-    EXTENSIONS = ['.tf', '.hcl', '.tfvars']
+    EXTENSIONS = [".tf", ".hcl", ".tfvars"]
 
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
         language_name="hcl",

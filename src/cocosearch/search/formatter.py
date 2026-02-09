@@ -13,7 +13,7 @@ from rich.syntax import Syntax
 
 from cocosearch.search.context_expander import ContextExpander
 from cocosearch.search.query import SearchResult
-from cocosearch.search.utils import byte_to_line, get_context_lines, read_chunk_content
+from cocosearch.search.utils import byte_to_line, read_chunk_content
 
 
 def format_json(
@@ -92,7 +92,9 @@ def format_json(
                     end_line,
                     context_before=context_before or 0,
                     context_after=context_after or 0,
-                    smart=smart_context and context_before is None and context_after is None,
+                    smart=smart_context
+                    and context_before is None
+                    and context_after is None,
                     language=_get_tree_sitter_language(r.filename),
                 )
                 # Format as newline-separated strings
@@ -292,7 +294,9 @@ def format_pretty(
                     match_indicator = " [yellow]\\[both][/yellow]"
 
             # Score and line info
-            score_color = "green" if r.score > 0.7 else "yellow" if r.score > 0.5 else "red"
+            score_color = (
+                "green" if r.score > 0.7 else "yellow" if r.score > 0.5 else "red"
+            )
             console.print(
                 f"  [{score_color}]{r.score:.2f}[/{score_color}] "
                 f"Lines {start_line}-{end_line}{match_indicator}"
@@ -321,14 +325,18 @@ def format_pretty(
 
             # Get context lines if context expansion is enabled
             if should_expand_context and expander is not None:
-                before_lines, match_lines, after_lines, is_bof, is_eof = expander.get_context_lines(
-                    r.filename,
-                    start_line,
-                    end_line,
-                    context_before=context_before or 0,
-                    context_after=context_after or 0,
-                    smart=smart_context and context_before is None and context_after is None,
-                    language=_get_tree_sitter_language(r.filename),
+                before_lines, match_lines, after_lines, is_bof, is_eof = (
+                    expander.get_context_lines(
+                        r.filename,
+                        start_line,
+                        end_line,
+                        context_before=context_before or 0,
+                        context_after=context_after or 0,
+                        smart=smart_context
+                        and context_before is None
+                        and context_after is None,
+                        language=_get_tree_sitter_language(r.filename),
+                    )
                 )
 
                 # Show BOF marker if at file start

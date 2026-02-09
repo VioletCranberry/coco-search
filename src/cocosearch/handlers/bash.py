@@ -14,7 +14,7 @@ import cocoindex
 class BashHandler:
     """Handler for Bash/Shell script files."""
 
-    EXTENSIONS = ['.sh', '.bash', '.zsh']
+    EXTENSIONS = [".sh", ".bash", ".zsh"]
 
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
         language_name="bash",

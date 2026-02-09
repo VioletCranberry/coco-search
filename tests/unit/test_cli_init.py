@@ -1,11 +1,7 @@
 """Tests for CLI init command."""
 
 import argparse
-import os
-from pathlib import Path
-from unittest.mock import MagicMock
 
-import pytest
 
 from cocosearch.cli import init_command
 

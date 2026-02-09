@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pytest
 from pydantic import ValidationError
 
 from cocosearch.config.errors import format_validation_errors, suggest_field_name
@@ -89,9 +88,7 @@ class TestFormatValidationErrors:
     def test_format_validation_errors_type_error(self):
         """Test that type errors are properly formatted."""
         try:
-            CocoSearchConfig.model_validate(
-                {"indexing": {"chunkSize": "not a number"}}
-            )
+            CocoSearchConfig.model_validate({"indexing": {"chunkSize": "not a number"}})
         except ValidationError as e:
             result = format_validation_errors(e)
             assert "indexing.chunkSize" in result
@@ -119,7 +116,9 @@ class TestFormatValidationErrors:
             assert "chunkSize" in result
 
             # Count number of error lines (lines starting with "  - ")
-            error_lines = [line for line in result.split("\n") if line.startswith("  - ")]
+            error_lines = [
+                line for line in result.split("\n") if line.startswith("  - ")
+            ]
             assert len(error_lines) >= 3
 
     def test_format_validation_errors_nested_path(self):
@@ -159,4 +158,7 @@ class TestFormatValidationErrors:
             result = format_validation_errors(e)
             assert "indexing.chunkSize" in result
             # Should mention the constraint violation
-            assert "greater than 0" in result.lower() or "Input should be greater than 0" in result
+            assert (
+                "greater than 0" in result.lower()
+                or "Input should be greater than 0" in result
+            )

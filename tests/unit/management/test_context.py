@@ -4,9 +4,7 @@ Tests get_canonical_path, find_project_root, and resolve_index_name functions
 for the auto-detect feature.
 """
 
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 from cocosearch.management.context import (
     find_project_root,

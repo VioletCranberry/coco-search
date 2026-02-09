@@ -39,7 +39,7 @@ class MockCursor:
 
     def fetchall(self) -> list[tuple]:
         """Return all remaining results."""
-        remaining = self.results[self._fetch_index:]
+        remaining = self.results[self._fetch_index :]
         self._fetch_index = len(self.results)
         return remaining
 

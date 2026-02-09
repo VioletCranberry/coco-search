@@ -26,37 +26,39 @@ class TestHandlerRegistryDiscovery:
         """_template.py should be excluded from discovery."""
         # No extension starting with underscore should be in registry
         for ext in _HANDLER_REGISTRY.keys():
-            assert not ext.startswith("_"), f"Template extension {ext} should not be registered"
+            assert not ext.startswith("_"), (
+                f"Template extension {ext} should not be registered"
+            )
 
     def test_hcl_extensions_registered(self):
         """.tf, .hcl, and .tfvars should be in registry."""
-        assert '.tf' in _HANDLER_REGISTRY
-        assert '.hcl' in _HANDLER_REGISTRY
-        assert '.tfvars' in _HANDLER_REGISTRY
+        assert ".tf" in _HANDLER_REGISTRY
+        assert ".hcl" in _HANDLER_REGISTRY
+        assert ".tfvars" in _HANDLER_REGISTRY
 
     def test_dockerfile_extension_registered(self):
         """.dockerfile should be in registry."""
-        assert '.dockerfile' in _HANDLER_REGISTRY
+        assert ".dockerfile" in _HANDLER_REGISTRY
 
     def test_bash_extensions_registered(self):
         """.sh, .bash, and .zsh should be in registry."""
-        assert '.sh' in _HANDLER_REGISTRY
-        assert '.bash' in _HANDLER_REGISTRY
-        assert '.zsh' in _HANDLER_REGISTRY
+        assert ".sh" in _HANDLER_REGISTRY
+        assert ".bash" in _HANDLER_REGISTRY
+        assert ".zsh" in _HANDLER_REGISTRY
 
     def test_all_hcl_extensions_map_to_same_handler(self):
         """All HCL extensions should map to the same handler instance."""
-        handler_tf = _HANDLER_REGISTRY['.tf']
-        handler_hcl = _HANDLER_REGISTRY['.hcl']
-        handler_tfvars = _HANDLER_REGISTRY['.tfvars']
+        handler_tf = _HANDLER_REGISTRY[".tf"]
+        handler_hcl = _HANDLER_REGISTRY[".hcl"]
+        handler_tfvars = _HANDLER_REGISTRY[".tfvars"]
         assert handler_tf is handler_hcl
         assert handler_hcl is handler_tfvars
 
     def test_all_bash_extensions_map_to_same_handler(self):
         """All Bash extensions should map to the same handler instance."""
-        handler_sh = _HANDLER_REGISTRY['.sh']
-        handler_bash = _HANDLER_REGISTRY['.bash']
-        handler_zsh = _HANDLER_REGISTRY['.zsh']
+        handler_sh = _HANDLER_REGISTRY[".sh"]
+        handler_bash = _HANDLER_REGISTRY[".bash"]
+        handler_zsh = _HANDLER_REGISTRY[".zsh"]
         assert handler_sh is handler_bash
         assert handler_bash is handler_zsh
 
@@ -67,52 +69,52 @@ class TestGetHandler:
 
     def test_get_handler_tf_returns_hcl_handler(self):
         """get_handler('.tf') should return HclHandler."""
-        handler = get_handler('.tf')
+        handler = get_handler(".tf")
         assert isinstance(handler, HclHandler)
 
     def test_get_handler_hcl_returns_hcl_handler(self):
         """get_handler('.hcl') should return HclHandler."""
-        handler = get_handler('.hcl')
+        handler = get_handler(".hcl")
         assert isinstance(handler, HclHandler)
 
     def test_get_handler_tfvars_returns_hcl_handler(self):
         """get_handler('.tfvars') should return HclHandler."""
-        handler = get_handler('.tfvars')
+        handler = get_handler(".tfvars")
         assert isinstance(handler, HclHandler)
 
     def test_get_handler_dockerfile_returns_dockerfile_handler(self):
         """get_handler('.dockerfile') should return DockerfileHandler."""
-        handler = get_handler('.dockerfile')
+        handler = get_handler(".dockerfile")
         assert isinstance(handler, DockerfileHandler)
 
     def test_get_handler_sh_returns_bash_handler(self):
         """get_handler('.sh') should return BashHandler."""
-        handler = get_handler('.sh')
+        handler = get_handler(".sh")
         assert isinstance(handler, BashHandler)
 
     def test_get_handler_bash_returns_bash_handler(self):
         """get_handler('.bash') should return BashHandler."""
-        handler = get_handler('.bash')
+        handler = get_handler(".bash")
         assert isinstance(handler, BashHandler)
 
     def test_get_handler_zsh_returns_bash_handler(self):
         """get_handler('.zsh') should return BashHandler."""
-        handler = get_handler('.zsh')
+        handler = get_handler(".zsh")
         assert isinstance(handler, BashHandler)
 
     def test_get_handler_unknown_returns_text_handler(self):
         """get_handler() with unknown extension should return TextHandler."""
-        handler = get_handler('.unknown')
+        handler = get_handler(".unknown")
         assert isinstance(handler, TextHandler)
 
     def test_get_handler_py_returns_text_handler(self):
         """get_handler('.py') should return TextHandler (not a DevOps language)."""
-        handler = get_handler('.py')
+        handler = get_handler(".py")
         assert isinstance(handler, TextHandler)
 
     def test_get_handler_js_returns_text_handler(self):
         """get_handler('.js') should return TextHandler (not a DevOps language)."""
-        handler = get_handler('.js')
+        handler = get_handler(".js")
         assert isinstance(handler, TextHandler)
 
 
@@ -134,16 +136,16 @@ class TestGetCustomLanguages:
         """All specs should have language_name attribute."""
         specs = get_custom_languages()
         for spec in specs:
-            assert hasattr(spec, 'language_name')
+            assert hasattr(spec, "language_name")
             assert spec.language_name != ""
 
     def test_spec_language_names(self):
         """Specs should include hcl, dockerfile, and bash language names."""
         specs = get_custom_languages()
         language_names = {spec.language_name for spec in specs}
-        assert 'hcl' in language_names
-        assert 'dockerfile' in language_names
-        assert 'bash' in language_names
+        assert "hcl" in language_names
+        assert "dockerfile" in language_names
+        assert "bash" in language_names
 
     def test_no_duplicate_specs(self):
         """get_custom_languages() should not return duplicate specs."""
@@ -172,5 +174,5 @@ class TestTextHandlerNotInRegistry:
 
     def test_text_handler_used_as_fallback(self):
         """TextHandler should be used as fallback via get_handler()."""
-        handler = get_handler('.unknown')
+        handler = get_handler(".unknown")
         assert isinstance(handler, TextHandler)

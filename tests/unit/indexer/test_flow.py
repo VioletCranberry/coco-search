@@ -29,6 +29,11 @@ class TestCreateCodeIndexFlow:
 class TestRunIndex:
     """Tests for run_index function."""
 
+    @pytest.fixture(autouse=True)
+    def _skip_preflight(self):
+        with patch("cocosearch.indexer.flow.check_infrastructure"):
+            yield
+
     def test_returns_update_info(self, tmp_path):
         """run_index returns object with stats attribute."""
         from cocosearch.indexer.flow import run_index
@@ -49,11 +54,16 @@ class TestRunIndex:
 
         with patch("cocosearch.indexer.flow.cocoindex.init"):
             with patch(
-                "cocosearch.indexer.flow.create_code_index_flow",
-                return_value=mock_flow
+                "cocosearch.indexer.flow.create_code_index_flow", return_value=mock_flow
             ):
-                with patch("cocosearch.indexer.flow.os.getenv", return_value="postgresql://localhost/test"):
-                    with patch("cocosearch.indexer.flow.psycopg.connect", return_value=mock_conn):
+                with patch(
+                    "cocosearch.indexer.flow.os.getenv",
+                    return_value="postgresql://localhost/test",
+                ):
+                    with patch(
+                        "cocosearch.indexer.flow.psycopg.connect",
+                        return_value=mock_conn,
+                    ):
                         with patch("cocosearch.indexer.flow.ensure_symbol_columns"):
                             result = run_index(
                                 index_name="testindex",
@@ -84,11 +94,16 @@ class TestRunIndex:
 
         with patch("cocosearch.indexer.flow.cocoindex.init"):
             with patch(
-                "cocosearch.indexer.flow.create_code_index_flow",
-                return_value=mock_flow
+                "cocosearch.indexer.flow.create_code_index_flow", return_value=mock_flow
             ) as mock_create_flow:
-                with patch("cocosearch.indexer.flow.os.getenv", return_value="postgresql://localhost/test"):
-                    with patch("cocosearch.indexer.flow.psycopg.connect", return_value=mock_conn):
+                with patch(
+                    "cocosearch.indexer.flow.os.getenv",
+                    return_value="postgresql://localhost/test",
+                ):
+                    with patch(
+                        "cocosearch.indexer.flow.psycopg.connect",
+                        return_value=mock_conn,
+                    ):
                         with patch("cocosearch.indexer.flow.ensure_symbol_columns"):
                             run_index(
                                 index_name="testindex",
@@ -115,11 +130,16 @@ class TestRunIndex:
 
         with patch("cocosearch.indexer.flow.cocoindex.init"):
             with patch(
-                "cocosearch.indexer.flow.create_code_index_flow",
-                return_value=mock_flow
+                "cocosearch.indexer.flow.create_code_index_flow", return_value=mock_flow
             ) as mock_create_flow:
-                with patch("cocosearch.indexer.flow.os.getenv", return_value="postgresql://localhost/test"):
-                    with patch("cocosearch.indexer.flow.psycopg.connect", return_value=mock_conn):
+                with patch(
+                    "cocosearch.indexer.flow.os.getenv",
+                    return_value="postgresql://localhost/test",
+                ):
+                    with patch(
+                        "cocosearch.indexer.flow.psycopg.connect",
+                        return_value=mock_conn,
+                    ):
                         with patch("cocosearch.indexer.flow.ensure_symbol_columns"):
                             run_index(
                                 index_name="testindex",
@@ -146,11 +166,16 @@ class TestRunIndex:
 
         with patch("cocosearch.indexer.flow.cocoindex.init"):
             with patch(
-                "cocosearch.indexer.flow.create_code_index_flow",
-                return_value=mock_flow
+                "cocosearch.indexer.flow.create_code_index_flow", return_value=mock_flow
             ) as mock_create_flow:
-                with patch("cocosearch.indexer.flow.os.getenv", return_value="postgresql://localhost/test"):
-                    with patch("cocosearch.indexer.flow.psycopg.connect", return_value=mock_conn):
+                with patch(
+                    "cocosearch.indexer.flow.os.getenv",
+                    return_value="postgresql://localhost/test",
+                ):
+                    with patch(
+                        "cocosearch.indexer.flow.psycopg.connect",
+                        return_value=mock_conn,
+                    ):
                         with patch("cocosearch.indexer.flow.ensure_symbol_columns"):
                             run_index(
                                 index_name="testindex",
@@ -175,11 +200,16 @@ class TestRunIndex:
 
         with patch("cocosearch.indexer.flow.cocoindex.init"):
             with patch(
-                "cocosearch.indexer.flow.create_code_index_flow",
-                return_value=mock_flow
+                "cocosearch.indexer.flow.create_code_index_flow", return_value=mock_flow
             ) as mock_create_flow:
-                with patch("cocosearch.indexer.flow.os.getenv", return_value="postgresql://localhost/test"):
-                    with patch("cocosearch.indexer.flow.psycopg.connect", return_value=mock_conn):
+                with patch(
+                    "cocosearch.indexer.flow.os.getenv",
+                    return_value="postgresql://localhost/test",
+                ):
+                    with patch(
+                        "cocosearch.indexer.flow.psycopg.connect",
+                        return_value=mock_conn,
+                    ):
                         with patch("cocosearch.indexer.flow.ensure_symbol_columns"):
                             run_index(
                                 index_name="testindex",
@@ -203,11 +233,16 @@ class TestRunIndex:
 
         with patch("cocosearch.indexer.flow.cocoindex.init") as mock_init:
             with patch(
-                "cocosearch.indexer.flow.create_code_index_flow",
-                return_value=mock_flow
+                "cocosearch.indexer.flow.create_code_index_flow", return_value=mock_flow
             ):
-                with patch("cocosearch.indexer.flow.os.getenv", return_value="postgresql://localhost/test"):
-                    with patch("cocosearch.indexer.flow.psycopg.connect", return_value=mock_conn):
+                with patch(
+                    "cocosearch.indexer.flow.os.getenv",
+                    return_value="postgresql://localhost/test",
+                ):
+                    with patch(
+                        "cocosearch.indexer.flow.psycopg.connect",
+                        return_value=mock_conn,
+                    ):
                         with patch("cocosearch.indexer.flow.ensure_symbol_columns"):
                             run_index(
                                 index_name="testindex",
@@ -244,13 +279,13 @@ class TestCustomLanguageIntegration:
         """flow module successfully imports get_custom_languages from handlers."""
         import cocosearch.indexer.flow as flow_module
 
-        assert hasattr(flow_module, 'get_custom_languages')
+        assert hasattr(flow_module, "get_custom_languages")
 
     def test_flow_module_imports_extract_language(self):
         """flow module successfully imports extract_language."""
         import cocosearch.indexer.flow as flow_module
 
-        assert hasattr(flow_module, 'extract_language')
+        assert hasattr(flow_module, "extract_language")
 
     def test_create_code_index_flow_with_custom_languages(self):
         """create_code_index_flow creates flow without errors."""
@@ -273,19 +308,19 @@ class TestMetadataIntegration:
         """flow module successfully imports extract_devops_metadata."""
         import cocosearch.indexer.flow as flow_module
 
-        assert hasattr(flow_module, 'extract_devops_metadata')
+        assert hasattr(flow_module, "extract_devops_metadata")
 
     def test_extract_devops_metadata_is_cocoindex_op(self):
-        """extract_devops_metadata is a callable that returns dict with metadata fields."""
-        from cocosearch.handlers import extract_devops_metadata
+        """extract_devops_metadata is a callable that returns DevOpsMetadata."""
+        from cocosearch.handlers import extract_devops_metadata, DevOpsMetadata
 
         assert callable(extract_devops_metadata)
-        # Verify the function works and returns dict with expected keys
+        # Verify the function works and returns DevOpsMetadata with expected fields
         result = extract_devops_metadata("some text", "py")
-        assert isinstance(result, dict)
-        assert "block_type" in result
-        assert "hierarchy" in result
-        assert "language_id" in result
+        assert isinstance(result, DevOpsMetadata)
+        assert hasattr(result, "block_type")
+        assert hasattr(result, "hierarchy")
+        assert hasattr(result, "language_id")
 
     def test_flow_source_has_metadata_import(self):
         """flow module source contains the handlers import statement."""
@@ -301,7 +336,7 @@ class TestMetadataIntegration:
 
         source = inspect.getsource(flow_module)
         assert 'chunk["metadata"]' in source
-        assert 'extract_devops_metadata' in source
+        assert "extract_devops_metadata" in source
         assert 'language=file["extension"]' in source
 
     def test_flow_source_collects_metadata_fields(self):
@@ -341,13 +376,13 @@ class TestSymbolIntegration:
         """flow module successfully imports extract_symbol_metadata."""
         import cocosearch.indexer.flow as flow_module
 
-        assert hasattr(flow_module, 'extract_symbol_metadata')
+        assert hasattr(flow_module, "extract_symbol_metadata")
 
     def test_ensure_symbol_columns_importable_from_flow(self):
         """flow module successfully imports ensure_symbol_columns."""
         import cocosearch.indexer.flow as flow_module
 
-        assert hasattr(flow_module, 'ensure_symbol_columns')
+        assert hasattr(flow_module, "ensure_symbol_columns")
 
     def test_flow_source_has_symbol_import(self):
         """flow module source contains the symbols import statement."""
@@ -371,7 +406,7 @@ class TestSymbolIntegration:
 
         source = inspect.getsource(flow_module)
         assert 'chunk["symbol_metadata"]' in source
-        assert 'extract_symbol_metadata' in source
+        assert "extract_symbol_metadata" in source
         assert 'language=file["extension"]' in source
 
     def test_flow_source_collects_symbol_fields(self):
@@ -389,7 +424,7 @@ class TestSymbolIntegration:
 
         source = inspect.getsource(flow_module)
         # Should call ensure_symbol_columns in run_index
-        assert 'ensure_symbol_columns(conn, table_name)' in source
+        assert "ensure_symbol_columns(conn, table_name)" in source
 
     def test_create_code_index_flow_with_symbols_succeeds(self):
         """create_code_index_flow builds flow without errors after symbol wiring."""

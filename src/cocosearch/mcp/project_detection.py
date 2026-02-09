@@ -68,9 +68,7 @@ async def _detect_project(ctx: Context) -> tuple[Path, str]:
     # Step 1 -- Try MCP Roots capability
     try:
         session = ctx.session
-        if session.check_client_capability(
-            ClientCapabilities(roots=RootsCapability())
-        ):
+        if session.check_client_capability(ClientCapabilities(roots=RootsCapability())):
             logger.debug("Client supports Roots capability, listing roots...")
             result = await session.list_roots()
             logger.debug("Roots returned: %d root(s)", len(result.roots))
@@ -84,9 +82,7 @@ async def _detect_project(ctx: Context) -> tuple[Path, str]:
                     )
                     return path, "roots"
                 elif path:
-                    logger.debug(
-                        "Root path does not exist on disk, skipping: %s", path
-                    )
+                    logger.debug("Root path does not exist on disk, skipping: %s", path)
         else:
             logger.debug("Client does not support Roots capability")
     except McpError as exc:
@@ -107,9 +103,7 @@ async def _detect_project(ctx: Context) -> tuple[Path, str]:
                         project_path,
                     )
                 elif path.exists():
-                    logger.info(
-                        "Project detected via query_param: %s", path
-                    )
+                    logger.info("Project detected via query_param: %s", path)
                     return path, "query_param"
                 else:
                     logger.debug(

@@ -2,9 +2,6 @@
 
 import pytest
 
-# Register container fixtures for integration tests
-pytest_plugins = ["tests.fixtures.containers", "tests.fixtures.ollama_integration"]
-
 
 def pytest_configure(config):
     """Check Docker availability at test session start.

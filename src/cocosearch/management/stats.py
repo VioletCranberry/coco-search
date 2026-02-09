@@ -7,6 +7,7 @@ for indexed codebases.
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
+from cocosearch.management.metadata import get_index_metadata
 from cocosearch.search.db import get_connection_pool, get_table_name
 
 
@@ -209,7 +210,12 @@ class IndexStats:
     languages: list[dict]
     symbols: dict[str, int]
     warnings: list[str]
-    parse_stats: dict  # Parse failure breakdown per language (empty dict for pre-v46 indexes)
+    parse_stats: (
+        dict  # Parse failure breakdown per language (empty dict for pre-v46 indexes)
+    )
+    source_path: str | None  # Canonical path where index was created from
+    status: str | None  # Index status: 'indexed', 'indexing', etc.
+    repo_url: str | None  # Browsable HTTPS URL for the git remote origin
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization.
@@ -284,14 +290,22 @@ def get_parse_stats(index_name: str) -> dict:
 
     for language, parse_status, count in rows:
         if language not in by_language:
-            by_language[language] = {"files": 0, "ok": 0, "partial": 0, "error": 0, "unsupported": 0}
+            by_language[language] = {
+                "files": 0,
+                "ok": 0,
+                "partial": 0,
+                "error": 0,
+                "unsupported": 0,
+            }
         by_language[language][parse_status] += count
         by_language[language]["files"] += count
         total_files += count
         if parse_status == "ok":
             total_ok += count
 
-    parse_health_pct = round((total_ok / total_files * 100), 1) if total_files > 0 else 100.0
+    parse_health_pct = (
+        round((total_ok / total_files * 100), 1) if total_files > 0 else 100.0
+    )
 
     return {
         "by_language": by_language,
@@ -301,7 +315,9 @@ def get_parse_stats(index_name: str) -> dict:
     }
 
 
-def get_parse_failures(index_name: str, status_filter: list[str] | None = None) -> list[dict]:
+def get_parse_failures(
+    index_name: str, status_filter: list[str] | None = None
+) -> list[dict]:
     """Get individual file parse failure details for an index.
 
     Returns details for files with non-ok parse statuses, useful for
@@ -402,6 +418,7 @@ def check_staleness(index_name: str, threshold_days: int = 7) -> tuple[bool, int
                 if updated_at.tzinfo is None:
                     # Assume UTC if naive
                     from datetime import timezone
+
                     updated_at = updated_at.replace(tzinfo=timezone.utc)
 
                 delta = now - updated_at
@@ -490,7 +507,7 @@ def collect_warnings(index_name: str, is_stale: bool, staleness_days: int) -> li
                 SELECT COUNT(DISTINCT filename) FROM {table_name}
             """
             cur.execute(file_count_query)
-            total_files = cur.fetchone()[0]
+            cur.fetchone()[0]
 
             # Count files with at least one chunk
             files_with_chunks_query = f"""
@@ -499,7 +516,7 @@ def collect_warnings(index_name: str, is_stale: bool, staleness_days: int) -> li
                 WHERE 1=1
             """
             cur.execute(files_with_chunks_query)
-            files_with_chunks = cur.fetchone()[0]
+            cur.fetchone()[0]
 
             # If there's a discrepancy, it would show in the metadata
             # For now, we skip this check as it requires joining with metadata
@@ -508,7 +525,9 @@ def collect_warnings(index_name: str, is_stale: bool, staleness_days: int) -> li
     return warnings
 
 
-def get_comprehensive_stats(index_name: str, staleness_threshold: int = 7) -> IndexStats:
+def get_comprehensive_stats(
+    index_name: str, staleness_threshold: int = 7
+) -> IndexStats:
     """Get comprehensive statistics for an index.
 
     Combines all available statistics into a single IndexStats object:
@@ -543,26 +562,17 @@ def get_comprehensive_stats(index_name: str, staleness_threshold: int = 7) -> In
     # Check staleness
     is_stale, staleness_days = check_staleness(index_name, staleness_threshold)
 
-    # Get metadata timestamps
-    pool = get_connection_pool()
-    created_at = None
-    updated_at = None
+    # Get metadata (timestamps, source path, status)
+    metadata = get_index_metadata(index_name)
+    created_at = metadata["created_at"] if metadata else None
+    updated_at = metadata["updated_at"] if metadata else None
+    source_path = metadata.get("canonical_path") if metadata else None
+    status = metadata.get("status", "indexed") if metadata else None
 
-    try:
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                metadata_query = """
-                    SELECT created_at, updated_at
-                    FROM cocosearch_index_metadata
-                    WHERE index_name = %s
-                """
-                cur.execute(metadata_query, (index_name,))
-                row = cur.fetchone()
-                if row:
-                    created_at, updated_at = row
-    except Exception:
-        # Table doesn't exist - timestamps remain None
-        pass
+    # Derive repo URL from source path
+    from cocosearch.management.git import get_repo_url
+
+    repo_url = get_repo_url(source_path) if source_path else None
 
     # Collect warnings
     warnings = collect_warnings(index_name, is_stale, staleness_days)
@@ -581,4 +591,7 @@ def get_comprehensive_stats(index_name: str, staleness_threshold: int = 7) -> In
         symbols=symbols,
         warnings=warnings,
         parse_stats=parse_stats,
+        source_path=source_path,
+        status=status,
+        repo_url=repo_url,
     )

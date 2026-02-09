@@ -13,12 +13,13 @@ Before we start exploring, let me check if we have a CocoSearch index for this c
 
 **I'll run:**
 
-- `list_indexes()` - Check what indexes exist
-- `index_stats()` - Check index health and freshness
+1. **Check for project config first:** Look for `cocosearch.yaml` in the project root. If it exists and has an `indexName` field, use that as the index name for all subsequent operations. **This is critical** — the MCP `index_codebase` tool auto-derives names from the directory path if `index_name` is not specified, which may not match the configured name. A mismatch causes "Index not found" errors from the CLI.
+2. `list_indexes()` - Check what indexes exist
+3. `index_stats(index_name="<configured-name>")` - Check index health and freshness
 
 **What to look for:**
 
-- **No index found:** I'll offer to run `index_codebase(path)` to create one before we start
+- **No index found:** I'll offer to run `index_codebase(path, index_name="<configured-name>")` to create one before we start. **Always pass `index_name` explicitly** to match the project config.
 - **Index exists but stale (>7 days):** I'll mention the index might be outdated and ask if you want to reindex for the freshest results
 - **Index fresh:** Great! We can start exploring immediately
 

@@ -16,12 +16,16 @@ import logging
 
 from cocosearch.config.env_validation import get_database_url
 from cocosearch.indexer.config import IndexingConfig
+from cocosearch.indexer.preflight import check_infrastructure
 from cocosearch.indexer.embedder import code_to_embedding, extract_language
 from cocosearch.indexer.tsvector import text_to_tsvector_sql
 from cocosearch.handlers import get_custom_languages, extract_devops_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
 from cocosearch.indexer.symbols import extract_symbol_metadata
-from cocosearch.indexer.schema_migration import ensure_symbol_columns, ensure_parse_results_table
+from cocosearch.indexer.schema_migration import (
+    ensure_symbol_columns,
+    ensure_parse_results_table,
+)
 from cocosearch.indexer.parse_tracking import track_parse_results
 from cocosearch.search.cache import invalidate_index_cache
 
@@ -104,7 +108,9 @@ def create_code_index_flow(
                 # v1.7 Hybrid Search: Store chunk text and tsvector for keyword search
                 # content_text: Raw text for storage and potential future use
                 # content_tsv_input: Preprocessed text for PostgreSQL to_tsvector()
-                chunk["content_tsv_input"] = chunk["text"].transform(text_to_tsvector_sql)
+                chunk["content_tsv_input"] = chunk["text"].transform(
+                    text_to_tsvector_sql
+                )
 
                 # Collect with metadata (includes hybrid search and symbol columns)
                 code_embeddings.collect(
@@ -112,7 +118,9 @@ def create_code_index_flow(
                     location=chunk["location"],
                     embedding=chunk["embedding"],
                     content_text=chunk["text"],  # Raw text for hybrid search
-                    content_tsv_input=chunk["content_tsv_input"],  # Preprocessed for tsvector
+                    content_tsv_input=chunk[
+                        "content_tsv_input"
+                    ],  # Preprocessed for tsvector
                     block_type=chunk["metadata"]["block_type"],
                     hierarchy=chunk["metadata"]["hierarchy"],
                     language_id=chunk["metadata"]["language_id"],
@@ -142,6 +150,7 @@ def run_index(
     codebase_path: str,
     config: IndexingConfig | None = None,
     respect_gitignore: bool = True,
+    fresh: bool = False,
 ):
     """Run indexing for a codebase.
 
@@ -156,6 +165,7 @@ def run_index(
         codebase_path: Path to the codebase root directory.
         config: Optional indexing configuration (uses defaults if not provided).
         respect_gitignore: Whether to respect .gitignore patterns (default True).
+        fresh: If True, drop and recreate the flow's persistent backends.
 
     Returns:
         IndexUpdateInfo with statistics about the indexing run.
@@ -164,12 +174,20 @@ def run_index(
     if config is None:
         config = IndexingConfig()
 
+    # Preflight: verify infrastructure is reachable before any CocoIndex work
+    check_infrastructure(
+        db_url=get_database_url(),
+        ollama_url=os.environ.get("COCOSEARCH_OLLAMA_URL"),
+    )
+
     # Invalidate query cache for this index before reindexing
     # This ensures stale results aren't served during/after reindex
     try:
         removed = invalidate_index_cache(index_name)
         if removed > 0:
-            logger.info(f"Invalidated {removed} cached queries for index '{index_name}'")
+            logger.info(
+                f"Invalidated {removed} cached queries for index '{index_name}'"
+            )
     except Exception as e:
         logger.warning(f"Cache invalidation failed (non-fatal): {e}")
 
@@ -192,6 +210,28 @@ def run_index(
         chunk_size=config.chunk_size,
         chunk_overlap=config.chunk_overlap,
     )
+
+    # Drop and recreate if --fresh (cleans up both table and CocoIndex metadata)
+    if fresh:
+        flow.drop()
+        # Also clean up non-CocoIndex tables (parse results) and path metadata
+        db_url = get_database_url()
+        try:
+            with psycopg.connect(db_url) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"DROP TABLE IF EXISTS cocosearch_parse_results_{index_name}"
+                    )
+                conn.commit()
+        except Exception:
+            pass  # Non-critical cleanup
+        try:
+            from cocosearch.management.metadata import clear_index_path
+
+            clear_index_path(index_name)
+        except Exception:
+            pass  # Non-critical cleanup
+        logger.info(f"Dropped flow for index '{index_name}' (--fresh)")
 
     # Setup flow (creates tables if needed)
     flow.setup()
@@ -216,7 +256,9 @@ def run_index(
     # Track parse status for all indexed files
     try:
         with psycopg.connect(db_url) as conn:
-            parse_summary = track_parse_results(conn, index_name, codebase_path, table_name)
+            parse_summary = track_parse_results(
+                conn, index_name, codebase_path, table_name
+            )
             logger.info(f"Parse tracking complete: {parse_summary}")
     except Exception as e:
         logger.warning(f"Parse tracking failed (non-fatal): {e}")

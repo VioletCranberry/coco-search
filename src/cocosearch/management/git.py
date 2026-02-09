@@ -28,6 +28,43 @@ def get_git_root() -> Path | None:
         return None
 
 
+def get_repo_url(path: str | Path | None = None) -> str | None:
+    """Get a browsable HTTPS URL for the git remote origin.
+
+    Handles both SSH (git@github.com:user/repo.git) and HTTPS URLs,
+    stripping the .git suffix.
+
+    Args:
+        path: Directory to check. Defaults to current directory.
+
+    Returns:
+        HTTPS URL (e.g., "https://github.com/user/repo"), or None
+        if not a git repo or no origin remote.
+    """
+    cmd = ["git", "remote", "get-url", "origin"]
+    if path:
+        cmd = ["git", "-C", str(path), "remote", "get-url", "origin"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        url = result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+    if not url:
+        return None
+
+    # Convert SSH to HTTPS: git@github.com:user/repo.git -> https://github.com/user/repo
+    if url.startswith("git@"):
+        url = url.replace(":", "/", 1).replace("git@", "https://", 1)
+
+    # Strip .git suffix
+    if url.endswith(".git"):
+        url = url[:-4]
+
+    return url
+
+
 def derive_index_from_git() -> str | None:
     """Derive an index name from the current git repository.
 

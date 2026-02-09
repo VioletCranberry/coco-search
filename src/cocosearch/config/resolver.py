@@ -33,7 +33,7 @@ def config_key_to_env_var(config_key: str) -> str:
     snake_parts = []
     for part in parts:
         # Insert underscore before uppercase letters
-        snake = re.sub(r'(?<!^)(?=[A-Z])', '_', part)
+        snake = re.sub(r"(?<!^)(?=[A-Z])", "_", part)
         snake_parts.append(snake.upper())
 
     # Join with underscores and add prefix
@@ -63,7 +63,7 @@ def parse_env_value(raw: str, field_type: type) -> Any:
         return None
 
     # Get the origin type for generic types like list[str]
-    origin = getattr(field_type, '__origin__', field_type)
+    origin = getattr(field_type, "__origin__", field_type)
 
     # Handle bool specially (before int, since bool is subclass of int)
     if field_type is bool:
@@ -120,10 +120,7 @@ class ConfigResolver:
         self.config_path = config_path
 
     def resolve(
-        self,
-        field_path: str,
-        cli_value: Any | None,
-        env_var: str
+        self, field_path: str, cli_value: Any | None, env_var: str
     ) -> tuple[Any, str]:
         """Resolve config value through precedence chain.
 
@@ -268,7 +265,9 @@ class ConfigResolver:
         # Add root-level fields
         for field_name, field_info in CocoSearchConfig.model_fields.items():
             # Check if this is a nested model
-            if isinstance(field_info.annotation, type) and issubclass(field_info.annotation, BaseModel):
+            if isinstance(field_info.annotation, type) and issubclass(
+                field_info.annotation, BaseModel
+            ):
                 # Add nested fields
                 nested_model = field_info.annotation
                 for nested_field_name in nested_model.model_fields.keys():

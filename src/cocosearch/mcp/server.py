@@ -21,28 +21,37 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from pathlib import Path
-from typing import Annotated
+from pathlib import Path  # noqa: E402
+from typing import Annotated  # noqa: E402
 
-import cocoindex
-from mcp.server.fastmcp import Context, FastMCP
-from pydantic import Field
-from starlette.responses import HTMLResponse, JSONResponse
+import cocoindex  # noqa: E402
+from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
+from pydantic import Field  # noqa: E402
+from starlette.responses import HTMLResponse, JSONResponse  # noqa: E402
 
-from cocosearch.cli import derive_index_name
-from cocosearch.dashboard.web import get_dashboard_html
-from cocosearch.indexer import IndexingConfig, run_index
-from cocosearch.management import clear_index as mgmt_clear_index
-from cocosearch.management import get_stats, list_indexes as mgmt_list_indexes
-from cocosearch.management import (
+from cocosearch.cli import derive_index_name  # noqa: E402
+from cocosearch.dashboard.web import get_dashboard_html  # noqa: E402
+from cocosearch.indexer import IndexingConfig, run_index  # noqa: E402
+from cocosearch.management import clear_index as mgmt_clear_index  # noqa: E402
+from cocosearch.management import list_indexes as mgmt_list_indexes  # noqa: E402
+from cocosearch.management import (  # noqa: E402
     resolve_index_name,
     get_index_metadata,
+    ensure_metadata_table,
     register_index_path,
+    set_index_status,
 )
-from cocosearch.mcp.project_detection import _detect_project, register_roots_notification
-from cocosearch.management.stats import check_staleness, get_comprehensive_stats, get_parse_failures
-from cocosearch.search import byte_to_line, read_chunk_content, search
-from cocosearch.search.context_expander import ContextExpander
+from cocosearch.mcp.project_detection import (
+    _detect_project,
+    register_roots_notification,
+)  # noqa: E402
+from cocosearch.management.stats import (
+    check_staleness,
+    get_comprehensive_stats,
+    get_parse_failures,
+)  # noqa: E402
+from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
+from cocosearch.search.context_expander import ContextExpander  # noqa: E402
 
 # Create FastMCP server instance
 mcp = FastMCP("cocosearch")
@@ -69,11 +78,20 @@ async def serve_dashboard(request):
 async def api_stats(request):
     """Stats API endpoint for web dashboard and programmatic access."""
     # Initialize CocoIndex (required for database connection)
-    cocoindex.init()
+    try:
+        cocoindex.init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed: {e}")
+        return JSONResponse(
+            {"error": "Database not initialized. Index a codebase first."},
+            status_code=503,
+        )
 
     index_name = request.query_params.get("index")
 
-    include_failures = request.query_params.get("include_failures", "").lower() == "true"
+    include_failures = (
+        request.query_params.get("include_failures", "").lower() == "true"
+    )
 
     if index_name:
         # Single index stats
@@ -83,8 +101,7 @@ async def api_stats(request):
             if include_failures:
                 result["parse_failures"] = get_parse_failures(index_name)
             return JSONResponse(
-                result,
-                headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+                result, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
             )
         except ValueError as e:
             return JSONResponse({"error": str(e)}, status_code=404)
@@ -102,8 +119,7 @@ async def api_stats(request):
             except ValueError:
                 continue
         return JSONResponse(
-            all_stats,
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+            all_stats, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
 
 
@@ -111,18 +127,26 @@ async def api_stats(request):
 async def api_stats_single(request):
     """Stats for a single index by name."""
     # Initialize CocoIndex (required for database connection)
-    cocoindex.init()
+    try:
+        cocoindex.init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed: {e}")
+        return JSONResponse(
+            {"error": "Database not initialized. Index a codebase first."},
+            status_code=503,
+        )
 
     index_name = request.path_params["index_name"]
-    include_failures = request.query_params.get("include_failures", "").lower() == "true"
+    include_failures = (
+        request.query_params.get("include_failures", "").lower() == "true"
+    )
     try:
         stats = get_comprehensive_stats(index_name)
         result = stats.to_dict()
         if include_failures:
             result["parse_failures"] = get_parse_failures(index_name)
         return JSONResponse(
-            result,
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+            result, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=404)
@@ -234,13 +258,18 @@ async def search_code(
 
         # Use find_project_root to walk up to actual git/config root from detected path
         from cocosearch.management.context import find_project_root
+
         project_root, detection_method = find_project_root(detected_path)
         if project_root is not None:
             root_path = project_root
 
         # Resolve index name using priority chain
-        index_name = resolve_index_name(root_path, detection_method if project_root else None)
-        logger.info(f"Auto-detected index: {index_name} from {root_path} (source: {source})")
+        index_name = resolve_index_name(
+            root_path, detection_method if project_root else None
+        )
+        logger.info(
+            f"Auto-detected index: {index_name} from {root_path} (source: {source})"
+        )
 
         # Check if index exists
         indexes = mgmt_list_indexes()
@@ -248,18 +277,20 @@ async def search_code(
 
         if index_name not in index_names:
             # Project detected but not indexed
-            return [{
-                "error": "Index not found",
-                "message": (
-                    f"Project detected at {root_path} but not indexed. "
-                    f"Index this project first using:\n"
-                    f"  CLI: cocosearch index {root_path}\n"
-                    f"  MCP: index_codebase(path='{root_path}')"
-                ),
-                "detected_path": str(root_path),
-                "suggested_index_name": index_name,
-                "results": []
-            }]
+            return [
+                {
+                    "error": "Index not found",
+                    "message": (
+                        f"Project detected at {root_path} but not indexed. "
+                        f"Index this project first using:\n"
+                        f"  CLI: cocosearch index {root_path}\n"
+                        f"  MCP: index_codebase(path='{root_path}')"
+                    ),
+                    "detected_path": str(root_path),
+                    "suggested_index_name": index_name,
+                    "results": [],
+                }
+            ]
 
         # Check for collision (same index name, different path in metadata)
         metadata = get_index_metadata(index_name)
@@ -268,21 +299,33 @@ async def search_code(
             stored_path = metadata.get("canonical_path", "")
             if stored_path and stored_path != canonical_cwd:
                 # Collision detected
-                return [{
-                    "error": "Index name collision",
-                    "message": (
-                        f"Index '{index_name}' is already mapped to a different project:\n"
-                        f"  Stored: {stored_path}\n"
-                        f"  Current: {canonical_cwd}\n\n"
-                        f"To resolve:\n"
-                        f"  1. Set explicit indexName in cocosearch.yaml, or\n"
-                        f"  2. Specify index_name parameter explicitly"
-                    ),
-                    "results": []
-                }]
+                return [
+                    {
+                        "error": "Index name collision",
+                        "message": (
+                            f"Index '{index_name}' is already mapped to a different project:\n"
+                            f"  Stored: {stored_path}\n"
+                            f"  Current: {canonical_cwd}\n\n"
+                            f"To resolve:\n"
+                            f"  1. Set explicit indexName in cocosearch.yaml, or\n"
+                            f"  2. Specify index_name parameter explicitly"
+                        ),
+                        "results": [],
+                    }
+                ]
 
     # Initialize CocoIndex (required for embedding generation)
-    cocoindex.init()
+    try:
+        cocoindex.init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed: {e}")
+        return [
+            {
+                "error": "Database not initialized",
+                "message": "Index a codebase first using index_codebase(path='.')",
+                "results": [],
+            }
+        ]
 
     # Execute search
     try:
@@ -297,11 +340,7 @@ async def search_code(
         )
     except ValueError as e:
         # Symbol filter errors (invalid type or pre-v1.7 index)
-        return [{
-            "error": "Symbol filter error",
-            "message": str(e),
-            "results": []
-        }]
+        return [{"error": "Symbol filter error", "message": str(e), "results": []}]
 
     # Create context expander for file caching
     expander = ContextExpander()
@@ -331,14 +370,17 @@ async def search_code(
             ext = os.path.splitext(r.filename)[1].lstrip(".")
             language_name = _get_treesitter_language(ext)
 
-            before_lines, _match_lines, after_lines, _is_bof, _is_eof = expander.get_context_lines(
-                r.filename,
-                start_line,
-                end_line,
-                context_before=context_before or 0,
-                context_after=context_after or 0,
-                smart=smart_context and (context_before is None and context_after is None),
-                language=language_name,
+            before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
+                expander.get_context_lines(
+                    r.filename,
+                    start_line,
+                    end_line,
+                    context_before=context_before or 0,
+                    context_after=context_after or 0,
+                    smart=smart_context
+                    and (context_before is None and context_after is None),
+                    language=language_name,
+                )
             )
 
             # Format context as strings (newline-separated)
@@ -381,10 +423,12 @@ async def search_code(
 
     # Add hint for clients without Roots support
     if auto_detected_source in ("env", "cwd"):
-        output.append({
-            "type": "hint",
-            "message": "Tip: Use Claude Code for automatic project detection via MCP Roots.",
-        })
+        output.append(
+            {
+                "type": "hint",
+                "message": "Tip: Use Claude Code for automatic project detection via MCP Roots.",
+            }
+        )
 
     # Check staleness and add footer warning if needed
     try:
@@ -395,16 +439,18 @@ async def search_code(
 
     if is_stale and staleness_days > 0:
         # Determine path for reindex command (use root_path if available)
-        reindex_path = str(root_path) if root_path else f"<path-to-project>"
-        output.append({
-            "type": "staleness_warning",
-            "warning": "Index may be stale",
-            "message": (
-                f"Index last updated {staleness_days} days ago. "
-                f"Run `cocosearch index {reindex_path}` to refresh."
-            ),
-            "staleness_days": staleness_days,
-        })
+        reindex_path = str(root_path) if root_path else "<path-to-project>"
+        output.append(
+            {
+                "type": "staleness_warning",
+                "warning": "Index may be stale",
+                "message": (
+                    f"Index last updated {staleness_days} days ago. "
+                    f"Run `cocosearch index {reindex_path}` to refresh."
+                ),
+                "staleness_days": staleness_days,
+            }
+        )
 
     return output
 
@@ -415,7 +461,11 @@ def list_indexes() -> list[dict]:
 
     Returns a list of indexes with their names and table names.
     """
-    return mgmt_list_indexes()
+    try:
+        return mgmt_list_indexes()
+    except Exception as e:
+        logger.warning(f"Failed to list indexes: {e}")
+        return []
 
 
 @mcp.tool()
@@ -440,7 +490,14 @@ def index_stats(
     Otherwise, returns stats for all indexes.
     """
     # Initialize CocoIndex (required for database connection)
-    cocoindex.init()
+    try:
+        cocoindex.init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed (fresh database?): {e}")
+        return {
+            "success": False,
+            "error": "Database not initialized. Index a codebase first: index_codebase(path='.')",
+        }
 
     try:
         if index_name:
@@ -491,7 +548,9 @@ def index_codebase(
     path: Annotated[str, Field(description="Path to the codebase directory to index")],
     index_name: Annotated[
         str | None,
-        Field(description="Name for the index (auto-derived from path if not provided)"),
+        Field(
+            description="Name for the index (auto-derived from path if not provided)"
+        ),
     ] = None,
 ) -> dict:
     """Index a codebase directory for semantic search.
@@ -506,6 +565,14 @@ def index_codebase(
         # Derive index name if not provided
         if not index_name:
             index_name = derive_index_name(path)
+
+        # Set status to 'indexing' before starting (best-effort)
+        try:
+            ensure_metadata_table()
+            register_index_path(index_name, path)
+            set_index_status(index_name, "indexing")
+        except Exception:
+            pass  # Best-effort — don't block indexing on metadata failures
 
         # Run indexing with default config
         update_info = run_index(
@@ -544,6 +611,25 @@ def index_codebase(
         return {"success": False, "error": f"Failed to index codebase: {e}"}
 
 
+def _open_browser(url: str, delay: float = 1.5):
+    """Open a browser to the given URL after a short delay.
+
+    Uses a daemon timer thread so it doesn't block shutdown.
+    """
+    import threading
+    import webbrowser
+
+    def _open():
+        try:
+            webbrowser.open(url)
+        except Exception:
+            logger.debug("Could not open browser", exc_info=True)
+
+    timer = threading.Timer(delay, _open)
+    timer.daemon = True
+    timer.start()
+
+
 def run_server(
     transport: str = "stdio",
     host: str = "0.0.0.0",
@@ -559,9 +645,21 @@ def run_server(
     # Log startup info (always to stderr)
     logger.info(f"Starting MCP server with transport: {transport}")
 
+    # Dashboard auto-open (opt-out via COCOSEARCH_NO_DASHBOARD=1)
+    no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
+
     if transport == "stdio":
         if port != 3000:  # Non-default port specified
             logger.warning("--port is ignored with stdio transport")
+
+        # Start background dashboard server for stdio mode
+        if not no_dashboard:
+            from cocosearch.dashboard.server import start_dashboard_server
+
+            dashboard_url = start_dashboard_server()
+            if dashboard_url:
+                _open_browser(dashboard_url)
+
         mcp.run(transport="stdio")
     elif transport == "sse":
         # Configure host/port for network transport
@@ -569,6 +667,11 @@ def run_server(
         mcp.settings.port = port
         logger.info(f"Connect at http://{host}:{port}/sse")
         logger.info(f"Health check at http://{host}:{port}/health")
+
+        if not no_dashboard:
+            dashboard_url = f"http://127.0.0.1:{port}/dashboard"
+            _open_browser(dashboard_url)
+
         mcp.run(transport="sse")
     elif transport == "http":
         # Configure host/port for network transport
@@ -576,6 +679,11 @@ def run_server(
         mcp.settings.port = port
         logger.info(f"Connect at http://{host}:{port}/mcp")
         logger.info(f"Health check at http://{host}:{port}/health")
+
+        if not no_dashboard:
+            dashboard_url = f"http://127.0.0.1:{port}/dashboard"
+            _open_browser(dashboard_url)
+
         mcp.run(transport="streamable-http")
     else:
         # Should not reach here if CLI validates

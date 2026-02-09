@@ -5,7 +5,7 @@ to ensure filters apply before RRF fusion and results include correct metadata.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import inspect
 
 from cocosearch.search.query import search

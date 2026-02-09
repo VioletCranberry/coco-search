@@ -13,7 +13,11 @@ import logging
 from dataclasses import dataclass
 
 from cocosearch.indexer.embedder import code_to_embedding
-from cocosearch.search.db import check_column_exists, get_connection_pool, get_table_name
+from cocosearch.search.db import (
+    check_column_exists,
+    get_connection_pool,
+    get_table_name,
+)
 from cocosearch.search.filters import build_symbol_where_clause
 from cocosearch.search.query_analyzer import normalize_query_for_keyword
 
@@ -173,7 +177,9 @@ def execute_keyword_search(
 
     # Check if hybrid search column exists
     if not check_column_exists(table_name, "content_tsv"):
-        logger.debug(f"Table {table_name} lacks content_tsv column, skipping keyword search")
+        logger.debug(
+            f"Table {table_name} lacks content_tsv column, skipping keyword search"
+        )
         return []
 
     # Normalize query to split identifiers
@@ -555,7 +561,9 @@ def hybrid_search(
 
     # Add symbol filter conditions
     if symbol_type is not None or symbol_name is not None:
-        symbol_where, symbol_params = build_symbol_where_clause(symbol_type, symbol_name)
+        symbol_where, symbol_params = build_symbol_where_clause(
+            symbol_type, symbol_name
+        )
         if symbol_where:
             where_parts.append(symbol_where)
             where_params.extend(symbol_params)
@@ -596,7 +604,11 @@ def hybrid_search(
         include_symbol_columns=include_symbol_cols,
     )
     keyword_results = execute_keyword_search(
-        query, table_name, keyword_limit, where_clause, where_params if where_params else None
+        query,
+        table_name,
+        keyword_limit,
+        where_clause,
+        where_params if where_params else None,
     )
 
     # If no keyword results, return vector-only with match_type="semantic"

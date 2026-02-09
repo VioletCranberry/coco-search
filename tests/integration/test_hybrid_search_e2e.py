@@ -216,22 +216,25 @@ def insert_test_chunk(
         content_tsv_input = preprocess_code_for_tsvector(content_text)
 
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             INSERT INTO {table_name}
             (filename, location, embedding, content_text, content_tsv_input,
              block_type, hierarchy, language_id)
             VALUES (%s, int4range(%s, %s), %s::vector, %s, %s, %s, %s, %s)
-        """, (
-            filename,
-            start_byte,
-            end_byte,
-            embedding,
-            content_text,
-            content_tsv_input,
-            block_type,
-            hierarchy,
-            language_id,
-        ))
+        """,
+            (
+                filename,
+                start_byte,
+                end_byte,
+                embedding,
+                content_text,
+                content_tsv_input,
+                block_type,
+                hierarchy,
+                language_id,
+            ),
+        )
         conn.commit()
 
 
@@ -248,19 +251,22 @@ def insert_pre_v17_chunk(
 ):
     """Insert a test chunk into pre-v1.7 table (no content_text column)."""
     with conn.cursor() as cur:
-        cur.execute(f"""
+        cur.execute(
+            f"""
             INSERT INTO {table_name}
             (filename, location, embedding, block_type, hierarchy, language_id)
             VALUES (%s, int4range(%s, %s), %s::vector, %s, %s, %s)
-        """, (
-            filename,
-            start_byte,
-            end_byte,
-            embedding,
-            block_type,
-            hierarchy,
-            language_id,
-        ))
+        """,
+            (
+                filename,
+                start_byte,
+                end_byte,
+                embedding,
+                block_type,
+                hierarchy,
+                language_id,
+            ),
+        )
         conn.commit()
 
 
@@ -317,7 +323,8 @@ def authenticate_user(username, password):
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/auth.py",
                 start_byte=0,
                 end_byte=len(content),
@@ -332,8 +339,9 @@ def authenticate_user(username, password):
         assert len(results) > 0, "Should find at least one result"
         assert results[0].filename == "/src/auth.py"
         # Semantic match should have match_type "semantic" or "both"
-        assert results[0].match_type in ("semantic", "both"), \
+        assert results[0].match_type in ("semantic", "both"), (
             f"Expected semantic or both match type, got {results[0].match_type}"
+        )
 
 
 class TestHybridSearchKeywordMatch:
@@ -357,7 +365,8 @@ function getUserById(userId) {
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/user.js",
                 start_byte=0,
                 end_byte=len(content),
@@ -372,11 +381,13 @@ function getUserById(userId) {
         assert len(results) > 0, "Should find at least one result"
         assert results[0].filename == "/src/user.js"
         # Should have keyword contribution
-        assert results[0].match_type in ("keyword", "both"), \
+        assert results[0].match_type in ("keyword", "both"), (
             f"Expected keyword or both match type, got {results[0].match_type}"
+        )
         # Should have keyword score populated
-        assert results[0].keyword_score is not None or results[0].match_type == "both", \
-            "Keyword match should have keyword_score"
+        assert (
+            results[0].keyword_score is not None or results[0].match_type == "both"
+        ), "Keyword match should have keyword_score"
 
 
 class TestRRFFusion:
@@ -415,7 +426,8 @@ def processUserData(userData):
             register_vector(conn)
             # Insert semantic-only match
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/transform.py",
                 start_byte=0,
                 end_byte=len(content_semantic_only),
@@ -424,7 +436,8 @@ def processUserData(userData):
             )
             # Insert double-match
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/user_processor.py",
                 start_byte=0,
                 end_byte=len(content_both),
@@ -451,8 +464,9 @@ def processUserData(userData):
         else:
             # If not first, verify it at least has both match types
             # (RRF might not always rank it first depending on exact scores)
-            assert user_processor_result.match_type in ("keyword", "both"), \
+            assert user_processor_result.match_type in ("keyword", "both"), (
                 "processUserData chunk should have keyword match component"
+            )
 
 
 class TestAutoDetection:
@@ -476,7 +490,8 @@ function processUserData(userData) {
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/processor.js",
                 start_byte=0,
                 end_byte=len(content),
@@ -490,8 +505,9 @@ function processUserData(userData) {
 
         assert len(results) > 0, "Should find at least one result"
         # Auto-detection should trigger hybrid, so match_type should be set
-        assert results[0].match_type in ("semantic", "keyword", "both"), \
+        assert results[0].match_type in ("semantic", "keyword", "both"), (
             f"Auto-detection should trigger hybrid search, got match_type={results[0].match_type}"
+        )
 
     def test_auto_hybrid_triggered_for_snake_case(self, hybrid_test_table):
         """Verify auto-detection triggers hybrid for snake_case queries."""
@@ -506,7 +522,8 @@ def get_user_by_id(user_id):
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/users.py",
                 start_byte=0,
                 end_byte=len(content),
@@ -520,8 +537,9 @@ def get_user_by_id(user_id):
 
         assert len(results) > 0, "Should find at least one result"
         assert results[0].filename == "/src/users.py"
-        assert results[0].match_type in ("keyword", "both"), \
+        assert results[0].match_type in ("keyword", "both"), (
             "snake_case query should trigger keyword matching"
+        )
 
     def test_auto_hybrid_not_triggered_for_plain_english(self, hybrid_test_table):
         """Verify auto-detection does NOT trigger hybrid for plain English.
@@ -544,7 +562,8 @@ def transform_data(records):
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_test_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/transform.py",
                 start_byte=0,
                 end_byte=len(content),
@@ -559,8 +578,9 @@ def transform_data(records):
         assert len(results) > 0, "Should find at least one result"
         # Plain English query should use vector-only, so match_type should be "semantic"
         # (or empty for backward compat, but with v1.7 schema it should be "semantic")
-        assert results[0].match_type in ("semantic", ""), \
+        assert results[0].match_type in ("semantic", ""), (
             f"Plain English should use vector-only search, got match_type={results[0].match_type}"
+        )
 
 
 class TestGracefulDegradation:
@@ -584,7 +604,8 @@ def authenticate_user(username, password):
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_pre_v17_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/auth.py",
                 start_byte=0,
                 end_byte=len(content),
@@ -594,15 +615,14 @@ def authenticate_user(username, password):
 
         # Search with explicit hybrid=True on pre-v1.7 schema
         # Should NOT raise an error, should fall back gracefully
-        results = search(
-            "authenticate user", TEST_INDEX_NAME, limit=5, use_hybrid=True
-        )
+        results = search("authenticate user", TEST_INDEX_NAME, limit=5, use_hybrid=True)
 
         assert len(results) > 0, "Should still return results via vector search"
         assert results[0].filename == "/src/auth.py"
         # Match type should be "semantic" since keyword search isn't available
-        assert results[0].match_type in ("semantic", ""), \
+        assert results[0].match_type in ("semantic", ""), (
             f"Pre-v1.7 should fall back to semantic-only, got {results[0].match_type}"
+        )
 
     def test_graceful_degradation_auto_mode(self, pre_v17_test_table):
         """Verify auto-detection works correctly on pre-v1.7 indexes.
@@ -621,7 +641,8 @@ function getUserById(id) {
         with psycopg.connect(db_url) as conn:
             register_vector(conn)
             insert_pre_v17_chunk(
-                conn, table_name,
+                conn,
+                table_name,
                 filename="/src/user.js",
                 start_byte=0,
                 end_byte=len(content),
@@ -635,5 +656,6 @@ function getUserById(id) {
         assert len(results) > 0, "Should still return results"
         assert results[0].filename == "/src/user.js"
         # Should fall back to semantic-only
-        assert results[0].match_type in ("semantic", ""), \
+        assert results[0].match_type in ("semantic", ""), (
             f"Pre-v1.7 should use semantic-only, got {results[0].match_type}"
+        )

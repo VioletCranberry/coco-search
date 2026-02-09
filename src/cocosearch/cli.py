@@ -10,7 +10,10 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rich.table import Table
 
 import cocoindex
 from rich.console import Console
@@ -25,17 +28,33 @@ from cocosearch.config import (
     load_config as load_project_config,
 )
 from cocosearch.dashboard import run_terminal_dashboard
-from cocosearch.indexer import IndexingConfig, load_config, run_index
+from cocosearch.indexer import IndexingConfig, run_index
 from cocosearch.indexer.progress import IndexingProgress
-from cocosearch.management import clear_index, derive_index_from_git, get_comprehensive_stats, get_language_stats, get_stats, list_indexes
-from cocosearch.management import register_index_path
+from cocosearch.management import (
+    clear_index,
+    derive_index_from_git,
+    get_comprehensive_stats,
+    get_stats,
+    list_indexes,
+)
+from cocosearch.management import (
+    ensure_metadata_table,
+    register_index_path,
+    set_index_status,
+)
 from cocosearch.search import search
 from cocosearch.search.formatter import format_json, format_pretty
-from cocosearch.search.query import DEVOPS_LANGUAGES, LANGUAGE_EXTENSIONS, SYMBOL_AWARE_LANGUAGES
+from cocosearch.search.query import (
+    DEVOPS_LANGUAGES,
+    LANGUAGE_EXTENSIONS,
+    SYMBOL_AWARE_LANGUAGES,
+)
 from cocosearch.search.repl import run_repl
 
 
-def add_config_arg(parser: argparse.ArgumentParser, *flags, config_key: str, help_text: str, **kwargs) -> None:
+def add_config_arg(
+    parser: argparse.ArgumentParser, *flags, config_key: str, help_text: str, **kwargs
+) -> None:
     """Add argument with config key and env var in help text.
 
     Args:
@@ -117,7 +136,9 @@ def index_command(args: argparse.Namespace) -> int:
     # Validate path exists
     codebase_path = os.path.abspath(args.path)
     if not os.path.isdir(codebase_path):
-        console.print(f"[bold red]Error:[/bold red] Path does not exist or is not a directory: {args.path}")
+        console.print(
+            f"[bold red]Error:[/bold red] Path does not exist or is not a directory: {args.path}"
+        )
         return 1
 
     # Load config from cocosearch.yaml if present
@@ -138,9 +159,7 @@ def index_command(args: argparse.Namespace) -> int:
 
     # Resolve index name with CLI > env > config > default precedence
     index_name, index_source = resolver.resolve(
-        "indexName",
-        cli_value=args.name,
-        env_var="COCOSEARCH_INDEX_NAME"
+        "indexName", cli_value=args.name, env_var="COCOSEARCH_INDEX_NAME"
     )
     if not index_name:
         index_name = derive_index_name(codebase_path)
@@ -181,9 +200,19 @@ def index_command(args: argparse.Namespace) -> int:
             chunk_overlap=config.chunk_overlap,
         )
 
+    # Set status to 'indexing' before starting (best-effort)
+    try:
+        ensure_metadata_table()
+        register_index_path(index_name, codebase_path)
+        set_index_status(index_name, "indexing")
+    except Exception:
+        pass  # Best-effort — don't block indexing on metadata failures
+
     # Run indexing with progress display
     try:
         with IndexingProgress(console) as progress:
+            if args.fresh:
+                console.print(f"[dim]Fresh index requested for '{index_name}'[/dim]")
             progress.start_indexing(codebase_path)
 
             # Run the indexing flow
@@ -194,6 +223,7 @@ def index_command(args: argparse.Namespace) -> int:
                 codebase_path=codebase_path,
                 config=config,
                 respect_gitignore=not args.no_gitignore,
+                fresh=args.fresh,
             )
 
             # Extract stats from update_info
@@ -220,7 +250,9 @@ def index_command(args: argparse.Namespace) -> int:
         except ValueError as collision_error:
             # Collision detected - show warning but indexing already succeeded
             console.print(f"[bold yellow]Warning:[/bold yellow] {collision_error}")
-            console.print("[dim]Index was created but path mapping was not updated.[/dim]")
+            console.print(
+                "[dim]Index was created but path mapping was not updated.[/dim]"
+            )
 
         return 0
 
@@ -262,8 +294,13 @@ def search_command(args: argparse.Namespace) -> int:
     """
     console = Console()
 
-    # Initialize CocoIndex
-    cocoindex.init()
+    # Initialize CocoIndex (required for embedding generation)
+    try:
+        cocoindex.init()
+    except Exception:
+        console.print("[dim]No indexes found. Index a codebase first:[/dim]")
+        console.print("  cocosearch index <path>")
+        return 1
 
     # Load config for search settings
     config_path = find_config_file()
@@ -280,9 +317,7 @@ def search_command(args: argparse.Namespace) -> int:
 
     # Resolve index name with CLI > env > config > default precedence
     index_name, _ = resolver.resolve(
-        "indexName",
-        cli_value=args.index,
-        env_var="COCOSEARCH_INDEX_NAME"
+        "indexName", cli_value=args.index, env_var="COCOSEARCH_INDEX_NAME"
     )
     if not index_name:
         # Auto-detect: try git root first, fall back to cwd
@@ -295,13 +330,17 @@ def search_command(args: argparse.Namespace) -> int:
     # Resolve search settings with precedence
     limit, _ = resolver.resolve(
         "search.resultLimit",
-        cli_value=args.limit if args.limit != 10 else None,  # Only use CLI if not default
-        env_var="COCOSEARCH_SEARCH_RESULT_LIMIT"
+        cli_value=args.limit
+        if args.limit != 10
+        else None,  # Only use CLI if not default
+        env_var="COCOSEARCH_SEARCH_RESULT_LIMIT",
     )
     min_score, _ = resolver.resolve(
         "search.minScore",
-        cli_value=args.min_score if args.min_score != 0.3 else None,  # Only use CLI if not default
-        env_var="COCOSEARCH_SEARCH_MIN_SCORE"
+        cli_value=args.min_score
+        if args.min_score != 0.3
+        else None,  # Only use CLI if not default
+        env_var="COCOSEARCH_SEARCH_MIN_SCORE",
     )
 
     # Always print "Using index:" hint (per CONTEXT.md requirement)
@@ -310,6 +349,7 @@ def search_command(args: argparse.Namespace) -> int:
     else:
         # For JSON mode, print to stderr to keep stdout clean
         import sys as _sys
+
         print(f"Using index: {index_name}", file=_sys.stderr)
 
     # Determine context parameters
@@ -334,7 +374,9 @@ def search_command(args: argparse.Namespace) -> int:
 
     # Require query for non-interactive mode
     if not args.query:
-        console.print("[bold red]Error:[/bold red] Query required (use --interactive for REPL mode)")
+        console.print(
+            "[bold red]Error:[/bold red] Query required (use --interactive for REPL mode)"
+        )
         return 1
 
     # Parse query for inline filters
@@ -348,7 +390,9 @@ def search_command(args: argparse.Namespace) -> int:
     use_hybrid = True if getattr(args, "hybrid", None) else None
 
     # Get symbol filters from args
-    symbol_type = getattr(args, "symbol_type", None)  # list[str] or None from action="append"
+    symbol_type = getattr(
+        args, "symbol_type", None
+    )  # list[str] or None from action="append"
     symbol_name = getattr(args, "symbol_name", None)  # str or None
 
     # Get cache bypass flag
@@ -384,12 +428,14 @@ def search_command(args: argparse.Namespace) -> int:
             console=console,
         )
     else:
-        print(format_json(
-            results,
-            context_before=context_before,
-            context_after=context_after,
-            smart_context=smart_context,
-        ))
+        print(
+            format_json(
+                results,
+                context_before=context_before,
+                context_after=context_after,
+                smart_context=smart_context,
+            )
+        )
 
     return 0
 
@@ -405,10 +451,13 @@ def list_command(args: argparse.Namespace) -> int:
     """
     console = Console()
 
-    # Initialize CocoIndex
-    cocoindex.init()
-
-    indexes = list_indexes()
+    try:
+        indexes = list_indexes()
+    except Exception:
+        # Database not reachable or not set up
+        console.print("[dim]No indexes found. Index a codebase first:[/dim]")
+        console.print("  cocosearch index <path>")
+        return 0
 
     if args.pretty:
         from rich.table import Table
@@ -442,11 +491,13 @@ def print_warnings(warnings: list[str], console: Console) -> None:
     from rich.panel import Panel
 
     warning_text = "\n".join(f"[yellow]! {w}[/yellow]" for w in warnings)
-    console.print(Panel(
-        warning_text,
-        title="[bold yellow]Warnings[/bold yellow]",
-        border_style="yellow"
-    ))
+    console.print(
+        Panel(
+            warning_text,
+            title="[bold yellow]Warnings[/bold yellow]",
+            border_style="yellow",
+        )
+    )
     console.print()  # Blank line after
 
 
@@ -469,15 +520,12 @@ def format_language_table(languages: list[dict], console_width: int = 80) -> "Ta
     table.add_column("Chunks", justify="right", width=8)
     table.add_column("Distribution", width=30)
 
-    max_chunks = max((l["chunk_count"] for l in languages), default=1)
+    max_chunks = max((lang["chunk_count"] for lang in languages), default=1)
     for lang in languages:
         ratio = lang["chunk_count"] / max_chunks if max_chunks > 0 else 0
         bar = Bar(size=30, begin=0, end=ratio * 30)
         table.add_row(
-            lang["language"],
-            str(lang["file_count"]),
-            str(lang["chunk_count"]),
-            bar
+            lang["language"], str(lang["file_count"]), str(lang["chunk_count"]), bar
         )
     return table
 
@@ -522,7 +570,9 @@ def format_parse_health(parse_stats: dict, console: Console) -> None:
 
     # Summary line with color coding
     color = "green" if pct >= 95 else "yellow" if pct >= 80 else "red"
-    console.print(f"\n[{color}]Parse health: {pct}% clean ({ok}/{total} files)[/{color}]")
+    console.print(
+        f"\n[{color}]Parse health: {pct}% clean ({ok}/{total} files)[/{color}]"
+    )
 
     # Per-language table
     from rich.table import Table
@@ -570,7 +620,13 @@ def format_parse_failures(failures: list[dict], console: Console) -> None:
     table.add_column("Error", style="red", max_width=60)
 
     for f in failures:
-        status_style = "red" if f["parse_status"] == "error" else "yellow" if f["parse_status"] == "partial" else "dim"
+        status_style = (
+            "red"
+            if f["parse_status"] == "error"
+            else "yellow"
+            if f["parse_status"] == "partial"
+            else "dim"
+        )
         table.add_row(
             f["file_path"],
             f["language"],
@@ -599,18 +655,34 @@ def stats_command(args: argparse.Namespace) -> int:
     # Handle --live mode (terminal dashboard)
     if args.live:
         # Initialize CocoIndex
-        cocoindex.init()
+        try:
+            cocoindex.init()
+        except Exception:
+            console.print("[dim]No indexes found. Index a codebase first:[/dim]")
+            console.print("  cocosearch index <path>")
+            return 1
 
-        # Dashboard requires a specific index
-        if not args.index:
-            # Auto-detect from cwd
+        # Resolve index name with config precedence (positional > env > config > auto)
+        config_path = find_config_file()
+        if config_path:
+            try:
+                project_config = load_project_config(config_path)
+            except ConfigLoadError:
+                project_config = CocoSearchConfig()
+        else:
+            project_config = CocoSearchConfig()
+        resolver = ConfigResolver(project_config, config_path)
+        index_name, _ = resolver.resolve(
+            "indexName",
+            cli_value=args.index,
+            env_var="COCOSEARCH_INDEX_NAME",
+        )
+        if not index_name:
             git_index = derive_index_from_git()
             if git_index:
                 index_name = git_index
             else:
                 index_name = derive_index_name(os.getcwd())
-        else:
-            index_name = args.index
 
         # Validate index exists before starting dashboard
         try:
@@ -627,8 +699,11 @@ def stats_command(args: argparse.Namespace) -> int:
         )
         return 0
 
-    # Initialize CocoIndex
-    cocoindex.init()
+    # Initialize CocoIndex (optional for stats — own pool used for queries)
+    try:
+        cocoindex.init()
+    except Exception:
+        pass  # Fresh database — stats queries use CocoSearch's own pool
 
     # Determine output mode: visual is default, --json enables JSON output
     json_output = args.json
@@ -641,7 +716,9 @@ def stats_command(args: argparse.Namespace) -> int:
 
         for idx in indexes:
             try:
-                stats = get_comprehensive_stats(idx["name"], staleness_threshold=args.staleness_threshold)
+                stats = get_comprehensive_stats(
+                    idx["name"], staleness_threshold=args.staleness_threshold
+                )
                 all_stats.append(stats)
             except ValueError:
                 # Skip indexes that can't be queried
@@ -653,7 +730,6 @@ def stats_command(args: argparse.Namespace) -> int:
             print(json.dumps(output, indent=2))
         else:
             # Pretty output for all indexes
-            from rich.table import Table
 
             if not all_stats:
                 console.print("[dim]No indexes found[/dim]")
@@ -667,7 +743,16 @@ def stats_command(args: argparse.Namespace) -> int:
 
                     # Summary header
                     console.print(f"[bold]Index:[/bold] {stats.name}")
-                    console.print(f"[dim]Files: {stats.file_count:,} | Chunks: {stats.chunk_count:,} | Size: {stats.storage_size_pretty}[/dim]")
+                    if stats.source_path:
+                        console.print(f"[dim]Source: {stats.source_path}[/dim]")
+                    if stats.status:
+                        if stats.status == "indexing":
+                            console.print("[yellow]Status: Indexing...[/yellow]")
+                        else:
+                            console.print(f"[dim]Status: {stats.status.title()}[/dim]")
+                    console.print(
+                        f"[dim]Files: {stats.file_count:,} | Chunks: {stats.chunk_count:,} | Size: {stats.storage_size_pretty}[/dim]"
+                    )
 
                     # Timestamps
                     if stats.created_at:
@@ -675,8 +760,14 @@ def stats_command(args: argparse.Namespace) -> int:
                         console.print(f"[dim]Created: {created_str}[/dim]")
                     if stats.updated_at:
                         updated_str = stats.updated_at.strftime("%Y-%m-%d")
-                        days_ago = f"{stats.staleness_days} days ago" if stats.staleness_days >= 0 else "unknown"
-                        console.print(f"[dim]Last Updated: {updated_str} ({days_ago})[/dim]")
+                        days_ago = (
+                            f"{stats.staleness_days} days ago"
+                            if stats.staleness_days >= 0
+                            else "unknown"
+                        )
+                        console.print(
+                            f"[dim]Last Updated: {updated_str} ({days_ago})[/dim]"
+                        )
                     console.print()
 
                     # Language distribution with bars
@@ -697,10 +788,22 @@ def stats_command(args: argparse.Namespace) -> int:
 
         return 0
 
-    # Single index mode
-    if args.index:
-        index_name = args.index
+    # Single index mode — resolve with config precedence (positional > env > config > auto)
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
     else:
+        project_config = CocoSearchConfig()
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = resolver.resolve(
+        "indexName",
+        cli_value=args.index,
+        env_var="COCOSEARCH_INDEX_NAME",
+    )
+    if not index_name:
         # Auto-detect from cwd (like search command)
         git_index = derive_index_from_git()
         if git_index:
@@ -710,7 +813,9 @@ def stats_command(args: argparse.Namespace) -> int:
 
     # Get comprehensive stats for the index
     try:
-        stats = get_comprehensive_stats(index_name, staleness_threshold=args.staleness_threshold)
+        stats = get_comprehensive_stats(
+            index_name, staleness_threshold=args.staleness_threshold
+        )
     except ValueError as e:
         if json_output:
             print(json.dumps({"error": str(e)}))
@@ -723,6 +828,7 @@ def stats_command(args: argparse.Namespace) -> int:
         data = stats.to_dict()
         if args.show_failures:
             from cocosearch.management.stats import get_parse_failures
+
             data["parse_failures"] = get_parse_failures(index_name)
         print(json.dumps(data, indent=2))
     else:
@@ -733,7 +839,16 @@ def stats_command(args: argparse.Namespace) -> int:
 
         # Summary header
         console.print(f"\n[bold]Index:[/bold] {stats.name}")
-        console.print(f"[dim]Files: {stats.file_count:,} | Chunks: {stats.chunk_count:,} | Size: {stats.storage_size_pretty}[/dim]")
+        if stats.source_path:
+            console.print(f"[dim]Source: {stats.source_path}[/dim]")
+        if stats.status:
+            if stats.status == "indexing":
+                console.print("[yellow]Status: Indexing...[/yellow]")
+            else:
+                console.print(f"[dim]Status: {stats.status.title()}[/dim]")
+        console.print(
+            f"[dim]Files: {stats.file_count:,} | Chunks: {stats.chunk_count:,} | Size: {stats.storage_size_pretty}[/dim]"
+        )
 
         # Timestamps
         if stats.created_at:
@@ -741,7 +856,11 @@ def stats_command(args: argparse.Namespace) -> int:
             console.print(f"[dim]Created: {created_str}[/dim]")
         if stats.updated_at:
             updated_str = stats.updated_at.strftime("%Y-%m-%d")
-            days_ago = f"{stats.staleness_days} days ago" if stats.staleness_days >= 0 else "unknown"
+            days_ago = (
+                f"{stats.staleness_days} days ago"
+                if stats.staleness_days >= 0
+                else "unknown"
+            )
             console.print(f"[dim]Last Updated: {updated_str} ({days_ago})[/dim]")
         console.print()
 
@@ -757,7 +876,9 @@ def stats_command(args: argparse.Namespace) -> int:
             if symbol_table:
                 console.print(symbol_table)
         elif args.verbose and not stats.symbols:
-            console.print("\n[dim]No symbol statistics available (requires v1.7+ index with symbol extraction)[/dim]")
+            console.print(
+                "\n[dim]No symbol statistics available (requires v1.7+ index with symbol extraction)[/dim]"
+            )
 
         # Parse health (always shown if available)
         if stats.parse_stats:
@@ -766,10 +887,13 @@ def stats_command(args: argparse.Namespace) -> int:
         # Parse failure details (only with --show-failures flag)
         if args.show_failures and stats.parse_stats:
             from cocosearch.management.stats import get_parse_failures
+
             failures = get_parse_failures(index_name)
             format_parse_failures(failures, console)
         elif args.show_failures and not stats.parse_stats:
-            console.print("\n[dim]No parse statistics available (requires re-indexing with v1.10+)[/dim]")
+            console.print(
+                "\n[dim]No parse statistics available (requires re-indexing with v1.10+)[/dim]"
+            )
 
     return 0
 
@@ -786,7 +910,11 @@ def clear_command(args: argparse.Namespace) -> int:
     console = Console()
 
     # Initialize CocoIndex
-    cocoindex.init()
+    try:
+        cocoindex.init()
+    except Exception:
+        console.print("[dim]No indexes found. Nothing to clear.[/dim]")
+        return 0
 
     index_name = args.index
 
@@ -859,24 +987,29 @@ def languages_command(args: argparse.Namespace) -> int:
         else:
             display_name = lang.title()
 
-        languages.append({
-            "name": display_name,
-            "extensions": ", ".join(exts),
-            "symbols": lang in SYMBOL_AWARE_LANGUAGES,
-        })
+        languages.append(
+            {
+                "name": display_name,
+                "extensions": ", ".join(exts),
+                "symbols": lang in SYMBOL_AWARE_LANGUAGES,
+            }
+        )
 
     # DevOps languages
     devops_display = {"hcl": "HCL", "dockerfile": "Dockerfile", "bash": "Bash"}
     for lang in sorted(DEVOPS_LANGUAGES.keys()):
         ext_display = f".{lang}" if lang != "dockerfile" else "Dockerfile"
-        languages.append({
-            "name": devops_display.get(lang, lang.title()),
-            "extensions": ext_display,
-            "symbols": False,
-        })
+        languages.append(
+            {
+                "name": devops_display.get(lang, lang.title()),
+                "extensions": ext_display,
+                "symbols": False,
+            }
+        )
 
     if args.json:
         import json as json_module
+
         print(json_module.dumps(languages, indent=2))
     else:
         from rich.table import Table
@@ -891,7 +1024,9 @@ def languages_command(args: argparse.Namespace) -> int:
             table.add_row(lang["name"], lang["extensions"], symbol_mark)
 
         console.print(table)
-        console.print("\n[dim]Symbol-aware languages support --symbol-type and --symbol-name filtering.[/dim]")
+        console.print(
+            "\n[dim]Symbol-aware languages support --symbol-type and --symbol-name filtering.[/dim]"
+        )
 
     return 0
 
@@ -935,7 +1070,10 @@ def mcp_command(args: argparse.Namespace) -> int:
     # Validate transport
     valid_transports = ("stdio", "sse", "http")
     if transport not in valid_transports:
-        print(f"Error: Invalid transport '{transport}'. Valid options: {', '.join(valid_transports)}", file=sys.stderr)
+        print(
+            f"Error: Invalid transport '{transport}'. Valid options: {', '.join(valid_transports)}",
+            file=sys.stderr,
+        )
         return 1
 
     # Resolve port: CLI > env > default
@@ -946,7 +1084,10 @@ def mcp_command(args: argparse.Namespace) -> int:
         try:
             port = int(port_env)
         except ValueError:
-            print(f"Error: Invalid port value in COCOSEARCH_MCP_PORT: '{port_env}'", file=sys.stderr)
+            print(
+                f"Error: Invalid port value in COCOSEARCH_MCP_PORT: '{port_env}'",
+                file=sys.stderr,
+            )
             return 1
 
     # Pass project path via environment variable if --project-from-cwd is set
@@ -1006,7 +1147,9 @@ def config_show_command(args: argparse.Namespace) -> int:
         if value is None:
             value_str = "[dim]null[/dim]"
         elif isinstance(value, list):
-            value_str = ", ".join(str(v) for v in value) if value else "[dim]empty[/dim]"
+            value_str = (
+                ", ".join(str(v) for v in value) if value else "[dim]empty[/dim]"
+            )
         else:
             value_str = str(value)
 
@@ -1050,7 +1193,11 @@ def config_check_command(args: argparse.Namespace) -> int:
     """
     from rich.table import Table
 
-    from cocosearch.config import mask_password, validate_required_env_vars, get_database_url, DEFAULT_DATABASE_URL
+    from cocosearch.config import (
+        mask_password,
+        validate_required_env_vars,
+        DEFAULT_DATABASE_URL,
+    )
 
     console = Console()
 
@@ -1076,20 +1223,20 @@ def config_check_command(args: argparse.Namespace) -> int:
     # DATABASE_URL (has default)
     db_url_env = os.getenv("COCOSEARCH_DATABASE_URL")
     if db_url_env:
-        table.add_row("COCOSEARCH_DATABASE_URL", mask_password(db_url_env), "environment")
+        table.add_row(
+            "COCOSEARCH_DATABASE_URL", mask_password(db_url_env), "environment"
+        )
     else:
-        table.add_row("COCOSEARCH_DATABASE_URL", mask_password(DEFAULT_DATABASE_URL), "default")
+        table.add_row(
+            "COCOSEARCH_DATABASE_URL", mask_password(DEFAULT_DATABASE_URL), "default"
+        )
 
     # OLLAMA_URL (optional with default)
     ollama_url = os.getenv("COCOSEARCH_OLLAMA_URL")
     if ollama_url:
         table.add_row("COCOSEARCH_OLLAMA_URL", ollama_url, "environment")
     else:
-        table.add_row(
-            "COCOSEARCH_OLLAMA_URL",
-            "http://localhost:11434",
-            "default"
-        )
+        table.add_row("COCOSEARCH_OLLAMA_URL", "http://localhost:11434", "default")
 
     console.print(table)
     return 0
@@ -1106,14 +1253,25 @@ def serve_dashboard_command(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for error).
     """
+    import threading
+    import webbrowser
+
     from cocosearch.mcp import run_server
 
     console = Console()
     console.print("[bold]Starting CocoSearch Dashboard[/bold]")
-    console.print(f"  Dashboard: http://{args.host}:{args.port}/dashboard")
+    dashboard_url = f"http://{args.host}:{args.port}/dashboard"
+    console.print(f"  Dashboard: {dashboard_url}")
     console.print(f"  API: http://{args.host}:{args.port}/api/stats")
     console.print()
     console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+    # Auto-open browser (opt-out via COCOSEARCH_NO_DASHBOARD=1)
+    no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
+    if not no_dashboard:
+        timer = threading.Timer(1.5, lambda: webbrowser.open(dashboard_url))
+        timer.daemon = True
+        timer.start()
 
     # Use MCP server with SSE transport (provides HTTP routes)
     try:
@@ -1124,7 +1282,13 @@ def serve_dashboard_command(args: argparse.Namespace) -> int:
         return 0
     except OSError as e:
         if "Address already in use" in str(e):
-            console.print(f"[bold red]Error:[/bold red] Port {args.port} is already in use")
+            console.print(
+                f"[bold red]Error:[/bold red] Port {args.port} is already in use"
+            )
+            console.print(
+                f"[dim]Hint: The MCP server may already be serving the dashboard. "
+                f"Check http://127.0.0.1:{args.port}/dashboard or use --port to pick a different port.[/dim]"
+            )
             return 1
         raise
 
@@ -1151,20 +1315,23 @@ def main() -> None:
     )
     add_config_arg(
         index_parser,
-        "-n", "--name",
+        "-n",
+        "--name",
         config_key="indexName",
         help_text="Index name (default: derived from directory name)",
     )
     add_config_arg(
         index_parser,
-        "-i", "--include",
+        "-i",
+        "--include",
         config_key="indexing.includePatterns",
         help_text="Additional file patterns to include (can be repeated)",
         action="append",
     )
     add_config_arg(
         index_parser,
-        "-e", "--exclude",
+        "-e",
+        "--exclude",
         config_key="indexing.excludePatterns",
         help_text="Additional file patterns to exclude (can be repeated)",
         action="append",
@@ -1173,6 +1340,11 @@ def main() -> None:
         "--no-gitignore",
         action="store_true",
         help="Disable .gitignore pattern respect",
+    )
+    index_parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Clear existing index before re-indexing (start from clean state)",
     )
 
     # Search subcommand (also works as default action)
@@ -1188,19 +1360,22 @@ def main() -> None:
         help="Natural language search query (not needed with --interactive)",
     )
     search_parser.add_argument(
-        "-i", "--interactive",
+        "-i",
+        "--interactive",
         action="store_true",
         help="Enter interactive search mode",
     )
     add_config_arg(
         search_parser,
-        "-n", "--index",
+        "-n",
+        "--index",
         config_key="indexName",
         help_text="Index name (default: auto-detect from cwd)",
     )
     add_config_arg(
         search_parser,
-        "-l", "--limit",
+        "-l",
+        "--limit",
         config_key="search.resultLimit",
         help_text="Maximum results (default: 10)",
         type=int,
@@ -1219,21 +1394,24 @@ def main() -> None:
         default=0.3,
     )
     search_parser.add_argument(
-        "-A", "--after-context",
+        "-A",
+        "--after-context",
         type=int,
         default=None,
         metavar="NUM",
         help="Show NUM lines after each match (overrides smart expansion)",
     )
     search_parser.add_argument(
-        "-B", "--before-context",
+        "-B",
+        "--before-context",
         type=int,
         default=None,
         metavar="NUM",
         help="Show NUM lines before each match (overrides smart expansion)",
     )
     search_parser.add_argument(
-        "-C", "--context",
+        "-C",
+        "--context",
         type=int,
         default=None,
         metavar="NUM",
@@ -1258,14 +1436,14 @@ def main() -> None:
     search_parser.add_argument(
         "--symbol-type",
         help="Filter by symbol type. Options: function, class, method, interface. "
-             "Can be specified multiple times for OR filtering (e.g., --symbol-type function --symbol-type method).",
+        "Can be specified multiple times for OR filtering (e.g., --symbol-type function --symbol-type method).",
         action="append",
         dest="symbol_type",
     )
     search_parser.add_argument(
         "--symbol-name",
         help="Filter by symbol name pattern (glob). "
-             "Examples: 'get*', 'User*Service', '*Handler'. Case-insensitive matching.",
+        "Examples: 'get*', 'User*Service', '*Handler'. Case-insensitive matching.",
     )
     search_parser.add_argument(
         "--no-cache",
@@ -1303,7 +1481,8 @@ def main() -> None:
         help="Human-readable output (default: JSON)",
     )
     stats_parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Show symbol type breakdown (verbose mode)",
     )
@@ -1393,13 +1572,15 @@ def main() -> None:
         description="Start the Model Context Protocol server for use with Claude and other LLM clients.",
     )
     mcp_parser.add_argument(
-        "--transport", "-t",
+        "--transport",
+        "-t",
         choices=["stdio", "sse", "http"],
         default=None,
         help="Transport protocol (default: stdio). [env: MCP_TRANSPORT]",
     )
     mcp_parser.add_argument(
-        "--port", "-p",
+        "--port",
+        "-p",
         type=int,
         default=None,
         help="Port for SSE/HTTP transports (default: 3000). [env: COCOSEARCH_MCP_PORT]",
@@ -1447,7 +1628,8 @@ def main() -> None:
         description="Start a web server to view the stats dashboard in a browser.",
     )
     serve_parser.add_argument(
-        "--port", "-p",
+        "--port",
+        "-p",
         type=int,
         default=8080,
         help="Port to serve dashboard on (default: 8080)",
@@ -1459,7 +1641,20 @@ def main() -> None:
     )
 
     # Known subcommands for routing
-    known_subcommands = ("index", "search", "list", "stats", "languages", "clear", "init", "mcp", "config", "serve-dashboard", "-h", "--help")
+    known_subcommands = (
+        "index",
+        "search",
+        "list",
+        "stats",
+        "languages",
+        "clear",
+        "init",
+        "mcp",
+        "config",
+        "serve-dashboard",
+        "-h",
+        "--help",
+    )
 
     # Handle default action (query without subcommand)
     # Check before parsing if first argument is not a known subcommand
@@ -1475,6 +1670,7 @@ def main() -> None:
 
     # Ensure database URL default and CocoIndex bridge are set early
     from cocosearch.config.env_validation import get_database_url
+
     get_database_url()
 
     if args.command == "index":

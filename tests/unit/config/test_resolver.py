@@ -1,9 +1,7 @@
 """Unit tests for config resolver precedence logic."""
 
-import os
 from pathlib import Path
 
-import pytest
 
 from cocosearch.config import CocoSearchConfig
 from cocosearch.config.resolver import (
@@ -22,16 +20,25 @@ class TestConfigKeyToEnvVar:
 
     def test_nested_field(self):
         """Test nested field with dot notation."""
-        assert config_key_to_env_var("indexing.chunkSize") == "COCOSEARCH_INDEXING_CHUNK_SIZE"
+        assert (
+            config_key_to_env_var("indexing.chunkSize")
+            == "COCOSEARCH_INDEXING_CHUNK_SIZE"
+        )
 
     def test_deeply_nested_field(self):
         """Test deeply nested field conversion."""
-        assert config_key_to_env_var("search.resultLimit") == "COCOSEARCH_SEARCH_RESULT_LIMIT"
+        assert (
+            config_key_to_env_var("search.resultLimit")
+            == "COCOSEARCH_SEARCH_RESULT_LIMIT"
+        )
 
     def test_camel_case_conversion(self):
         """Test camelCase to UPPER_SNAKE_CASE conversion."""
         assert config_key_to_env_var("includePatterns") == "COCOSEARCH_INCLUDE_PATTERNS"
-        assert config_key_to_env_var("indexing.excludePatterns") == "COCOSEARCH_INDEXING_EXCLUDE_PATTERNS"
+        assert (
+            config_key_to_env_var("indexing.excludePatterns")
+            == "COCOSEARCH_INDEXING_EXCLUDE_PATTERNS"
+        )
 
 
 class TestParseEnvValue:
@@ -102,9 +109,7 @@ class TestConfigResolver:
 
         # CLI value should win
         value, source = resolver.resolve(
-            "indexName",
-            cli_value="cli-value",
-            env_var="COCOSEARCH_INDEX_NAME"
+            "indexName", cli_value="cli-value", env_var="COCOSEARCH_INDEX_NAME"
         )
 
         assert value == "cli-value"
@@ -118,9 +123,7 @@ class TestConfigResolver:
         monkeypatch.setenv("COCOSEARCH_INDEX_NAME", "env-value")
 
         value, source = resolver.resolve(
-            "indexName",
-            cli_value=None,
-            env_var="COCOSEARCH_INDEX_NAME"
+            "indexName", cli_value=None, env_var="COCOSEARCH_INDEX_NAME"
         )
 
         assert value == "env-value"
@@ -132,9 +135,7 @@ class TestConfigResolver:
         resolver = ConfigResolver(config, config_path=Path("/path/to/config.yaml"))
 
         value, source = resolver.resolve(
-            "indexName",
-            cli_value=None,
-            env_var="COCOSEARCH_INDEX_NAME"
+            "indexName", cli_value=None, env_var="COCOSEARCH_INDEX_NAME"
         )
 
         assert value == "config-value"
@@ -146,9 +147,7 @@ class TestConfigResolver:
         resolver = ConfigResolver(config)
 
         value, source = resolver.resolve(
-            "indexName",
-            cli_value=None,
-            env_var="COCOSEARCH_INDEX_NAME"
+            "indexName", cli_value=None, env_var="COCOSEARCH_INDEX_NAME"
         )
 
         assert value is None  # Default for optional field
@@ -163,7 +162,7 @@ class TestConfigResolver:
         value, source = resolver.resolve(
             "indexing.chunkSize",
             cli_value=2000,
-            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE"
+            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE",
         )
 
         assert value == 2000
@@ -179,7 +178,7 @@ class TestConfigResolver:
         value, source = resolver.resolve(
             "indexing.chunkSize",
             cli_value=None,
-            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE"
+            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE",
         )
 
         assert value == 2500
@@ -195,7 +194,7 @@ class TestConfigResolver:
         value, source = resolver.resolve(
             "indexing.chunkSize",
             cli_value=None,
-            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE"
+            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE",
         )
 
         assert value == 1500
@@ -209,7 +208,7 @@ class TestConfigResolver:
         value, source = resolver.resolve(
             "indexing.chunkSize",
             cli_value=None,
-            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE"
+            env_var="COCOSEARCH_INDEXING_CHUNK_SIZE",
         )
 
         assert value == 1000  # Default from schema
@@ -225,7 +224,7 @@ class TestConfigResolver:
         value, source = resolver.resolve(
             "indexing.languages",
             cli_value=None,
-            env_var="COCOSEARCH_INDEXING_LANGUAGES"
+            env_var="COCOSEARCH_INDEXING_LANGUAGES",
         )
 
         assert value == ["rust", "python"]
@@ -239,9 +238,7 @@ class TestConfigResolver:
         monkeypatch.setenv("COCOSEARCH_SEARCH_MIN_SCORE", "0.7")
 
         value, source = resolver.resolve(
-            "search.minScore",
-            cli_value=None,
-            env_var="COCOSEARCH_SEARCH_MIN_SCORE"
+            "search.minScore", cli_value=None, env_var="COCOSEARCH_SEARCH_MIN_SCORE"
         )
 
         assert value == 0.7
@@ -254,9 +251,7 @@ class TestConfigResolver:
         resolver = ConfigResolver(config, config_path=Path("/custom/path/coco.yaml"))
 
         value, source = resolver.resolve(
-            "indexName",
-            cli_value=None,
-            env_var="COCOSEARCH_INDEX_NAME"
+            "indexName", cli_value=None, env_var="COCOSEARCH_INDEX_NAME"
         )
 
         assert source == "config:/custom/path/coco.yaml"
@@ -267,9 +262,7 @@ class TestConfigResolver:
         resolver = ConfigResolver(config)
 
         value, source = resolver.resolve(
-            "indexName",
-            cli_value=None,
-            env_var="COCOSEARCH_INDEX_NAME"
+            "indexName", cli_value=None, env_var="COCOSEARCH_INDEX_NAME"
         )
 
         assert source == "config"

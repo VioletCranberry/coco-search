@@ -4,7 +4,6 @@ Tests hybrid search column detection and backward compatibility
 for pre-v1.7 indexes that lack content_text column.
 """
 
-import pytest
 from unittest.mock import patch
 
 
@@ -66,9 +65,7 @@ class TestHybridSearchGracefulDegradation:
             query_module, "check_column_exists", return_value=False
         ) as mock_check:
             with patch.object(query_module, "logger") as mock_logger:
-                with patch.object(
-                    query_module, "code_to_embedding"
-                ) as mock_embedding:
+                with patch.object(query_module, "code_to_embedding") as mock_embedding:
                     mock_embedding.eval.return_value = [0.1] * 1024
 
                     # Setup mock pool for the search query
@@ -109,9 +106,7 @@ class TestHybridSearchGracefulDegradation:
             query_module, "check_column_exists", return_value=False
         ) as mock_check:
             with patch.object(query_module, "logger") as mock_logger:
-                with patch.object(
-                    query_module, "code_to_embedding"
-                ) as mock_embedding:
+                with patch.object(query_module, "code_to_embedding") as mock_embedding:
                     mock_embedding.eval.return_value = [0.1] * 1024
 
                     pool, cursor, conn = mock_db_pool(results=[])
@@ -146,9 +141,7 @@ class TestHybridSearchGracefulDegradation:
             query_module, "check_column_exists", return_value=True
         ) as mock_check:
             with patch.object(query_module, "logger") as mock_logger:
-                with patch.object(
-                    query_module, "code_to_embedding"
-                ) as mock_embedding:
+                with patch.object(query_module, "code_to_embedding") as mock_embedding:
                     mock_embedding.eval.return_value = [0.1] * 1024
 
                     pool, cursor, conn = mock_db_pool(results=[])
@@ -238,9 +231,7 @@ class TestHybridSearchModes:
             with patch.object(
                 query_module, "execute_hybrid_search", return_value=mock_hybrid_results
             ) as mock_hybrid:
-                with patch.object(
-                    query_module, "get_connection_pool"
-                ):
+                with patch.object(query_module, "get_connection_pool"):
                     with patch.object(
                         query_module, "get_table_name", return_value="test_table"
                     ):
@@ -360,9 +351,7 @@ class TestHybridSearchModes:
         pool, cursor, conn = mock_db_pool(results=vector_results)
 
         with patch.object(query_module, "check_column_exists", return_value=True):
-            with patch.object(
-                query_module, "execute_hybrid_search"
-            ) as mock_hybrid:
+            with patch.object(query_module, "execute_hybrid_search") as mock_hybrid:
                 with patch.object(query_module, "code_to_embedding") as mock_embedding:
                     mock_embedding.eval.return_value = [0.1] * 1024
                     with patch.object(
@@ -401,9 +390,7 @@ class TestHybridSearchModes:
         pool, cursor, conn = mock_db_pool(results=vector_results)
 
         with patch.object(query_module, "check_column_exists", return_value=False):
-            with patch.object(
-                query_module, "execute_hybrid_search"
-            ) as mock_hybrid:
+            with patch.object(query_module, "execute_hybrid_search") as mock_hybrid:
                 with patch.object(query_module, "code_to_embedding") as mock_embedding:
                     mock_embedding.eval.return_value = [0.1] * 1024
                     with patch.object(
@@ -440,9 +427,7 @@ class TestHybridSearchModes:
         pool, cursor, conn = mock_db_pool(results=vector_results)
 
         with patch.object(query_module, "check_column_exists", return_value=True):
-            with patch.object(
-                query_module, "execute_hybrid_search"
-            ) as mock_hybrid:
+            with patch.object(query_module, "execute_hybrid_search") as mock_hybrid:
                 with patch.object(query_module, "code_to_embedding") as mock_embedding:
                     mock_embedding.eval.return_value = [0.1] * 1024
                     with patch.object(

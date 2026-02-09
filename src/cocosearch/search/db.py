@@ -26,15 +26,25 @@ def get_connection_pool() -> ConnectionPool:
     The pool reads the database URL from COCOSEARCH_DATABASE_URL environment
     variable, falling back to the default if not set.
 
+    On fresh databases where the pgvector extension hasn't been created yet,
+    vector registration is skipped gracefully — non-vector queries (list,
+    stats, information_schema lookups) will still work.
+
     Returns:
-        ConnectionPool configured with pgvector support.
+        ConnectionPool configured with pgvector support (when available).
     """
     global _pool
     if _pool is None:
         conninfo = get_database_url()
 
         def configure(conn):
-            register_vector(conn)
+            try:
+                register_vector(conn)
+            except Exception:
+                # pgvector extension not installed yet (fresh database).
+                # Non-vector queries will still work; vector search will
+                # fail with a clear error when actually attempted.
+                pass
 
         _pool = ConnectionPool(
             conninfo=conninfo,

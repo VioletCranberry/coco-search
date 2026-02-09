@@ -1,7 +1,6 @@
 """Unit tests for hybrid search module."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from cocosearch.search.hybrid import (
     KeywordResult,
@@ -71,7 +70,9 @@ class TestRRFFusion:
         # Same file appears in both results
         vector_results = [
             VectorResult("/path/double_match.py", 0, 100, 0.90),
-            VectorResult("/path/vector_only.py", 0, 100, 0.95),  # Higher score but vector-only
+            VectorResult(
+                "/path/vector_only.py", 0, 100, 0.95
+            ),  # Higher score but vector-only
         ]
         keyword_results = [
             KeywordResult("/path/double_match.py", 0, 100, 0.7),
@@ -135,10 +136,13 @@ class TestRRFFusion:
         """Test that metadata (block_type, hierarchy, language_id) is preserved."""
         vector_results = [
             VectorResult(
-                "/path/file.py", 0, 100, 0.9,
+                "/path/file.py",
+                0,
+                100,
+                0.9,
                 block_type="function",
                 hierarchy="module.MyClass.my_method",
-                language_id="python"
+                language_id="python",
             ),
         ]
         keyword_results = []
@@ -189,13 +193,17 @@ class TestExecuteKeywordSearch:
 
     def test_keyword_search_uses_plainto_tsquery(self, mock_db_pool):
         """Test that keyword search uses plainto_tsquery for query building."""
-        pool, cursor, conn = mock_db_pool(results=[
-            ("/path/file.py", 0, 100, 0.5),
-        ])
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("/path/file.py", 0, 100, 0.5),
+            ]
+        )
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.hybrid.check_column_exists", return_value=True):
-                results = execute_keyword_search("getUserById", "test_table")
+            with patch(
+                "cocosearch.search.hybrid.check_column_exists", return_value=True
+            ):
+                execute_keyword_search("getUserById", "test_table")
 
         # Verify tsquery was used
         cursor.assert_query_contains("plainto_tsquery")
@@ -206,7 +214,9 @@ class TestExecuteKeywordSearch:
         pool, cursor, conn = mock_db_pool(results=[])
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
+            with patch(
+                "cocosearch.search.hybrid.check_column_exists", return_value=False
+            ):
                 results = execute_keyword_search("test query", "test_table")
 
         assert results == []
@@ -216,7 +226,9 @@ class TestExecuteKeywordSearch:
         pool, cursor, conn = mock_db_pool(results=[])
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
-            with patch("cocosearch.search.hybrid.check_column_exists", return_value=True):
+            with patch(
+                "cocosearch.search.hybrid.check_column_exists", return_value=True
+            ):
                 execute_keyword_search("getUserById", "test_table")
 
         # The normalized query should include split tokens
@@ -241,9 +253,16 @@ class TestHybridSearch:
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
             with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
-                with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
-                    with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
-                        with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
+                with patch(
+                    "cocosearch.search.hybrid.get_table_name", return_value="test_table"
+                ):
+                    with patch(
+                        "cocosearch.search.hybrid.check_column_exists",
+                        return_value=False,
+                    ):
+                        with patch(
+                            "cocosearch.search.hybrid.code_to_embedding"
+                        ) as mock_embed:
                             mock_embed.eval.return_value = [0.1] * 1024
                             results = hybrid_search("test query", "test_index")
 
@@ -274,9 +293,16 @@ class TestHybridSearch:
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
             with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
-                with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
-                    with patch("cocosearch.search.hybrid.check_column_exists", return_value=True):
-                        with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
+                with patch(
+                    "cocosearch.search.hybrid.get_table_name", return_value="test_table"
+                ):
+                    with patch(
+                        "cocosearch.search.hybrid.check_column_exists",
+                        return_value=True,
+                    ):
+                        with patch(
+                            "cocosearch.search.hybrid.code_to_embedding"
+                        ) as mock_embed:
                             mock_embed.eval.return_value = [0.1] * 1024
                             results = hybrid_search("getUserById", "test_index")
 
@@ -294,9 +320,16 @@ class TestHybridSearch:
 
         with patch("cocosearch.search.hybrid.get_connection_pool", return_value=pool):
             with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
-                with patch("cocosearch.search.hybrid.get_table_name", return_value="test_table"):
-                    with patch("cocosearch.search.hybrid.check_column_exists", return_value=False):
-                        with patch("cocosearch.search.hybrid.code_to_embedding") as mock_embed:
+                with patch(
+                    "cocosearch.search.hybrid.get_table_name", return_value="test_table"
+                ):
+                    with patch(
+                        "cocosearch.search.hybrid.check_column_exists",
+                        return_value=False,
+                    ):
+                        with patch(
+                            "cocosearch.search.hybrid.code_to_embedding"
+                        ) as mock_embed:
                             mock_embed.eval.return_value = [0.1] * 1024
                             results = hybrid_search("test", "test_index", limit=5)
 

@@ -1,7 +1,5 @@
 """Tests to verify database mocking infrastructure works correctly."""
 
-import pytest
-
 
 def test_mock_cursor_tracks_queries(mock_db_pool):
     """Verify MockCursor tracks executed queries."""
@@ -44,7 +42,7 @@ def test_mock_cursor_fetchone(mock_db_pool):
 
 def test_mock_pool_context_manager(mock_db_pool):
     """Verify MockConnectionPool works as context manager."""
-    pool, cursor, conn = mock_db_pool(results=[("test",)])
+    pool, cursor, _conn = mock_db_pool(results=[("test",)])
 
     with pool.connection() as conn:
         with conn.cursor() as cur:

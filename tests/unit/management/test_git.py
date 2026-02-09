@@ -5,7 +5,6 @@ using pytest-subprocess for git command mocking.
 """
 
 from pathlib import Path
-from unittest.mock import patch
 
 from cocosearch.management.git import get_git_root, derive_index_from_git
 

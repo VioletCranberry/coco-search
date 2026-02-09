@@ -41,8 +41,15 @@ def indexed_devops_fixtures(initialized_db, warmed_ollama, e2e_fixtures_path):
     index_name = "e2e_devops_tests"
 
     result = subprocess.run(
-        [sys.executable, "-m", "cocosearch", "index", str(e2e_fixtures_path),
-         "-n", index_name],
+        [
+            sys.executable,
+            "-m",
+            "cocosearch",
+            "index",
+            str(e2e_fixtures_path),
+            "-n",
+            index_name,
+        ],
         capture_output=True,
         text=True,
         env=env,
@@ -53,7 +60,9 @@ def indexed_devops_fixtures(initialized_db, warmed_ollama, e2e_fixtures_path):
     yield index_name, env
 
 
-def run_search(query: str, env: dict, index_name: str, lang: str | None = None) -> subprocess.CompletedProcess:
+def run_search(
+    query: str, env: dict, index_name: str, lang: str | None = None
+) -> subprocess.CompletedProcess:
     """Run cocosearch search with given query and optional language filter.
 
     Args:
@@ -105,12 +114,15 @@ def test_terraform_indexing(indexed_devops_fixtures):
     assert len(results) > 0, "Should find Terraform content"
 
     file_paths = [r["file_path"] for r in results]
-    assert any("main.tf" in path for path in file_paths), \
+    assert any("main.tf" in path for path in file_paths), (
         f"Should find main.tf in results: {file_paths}"
+    )
 
     # Test HCL alias
     result_hcl = run_search("aws_instance", env, index_name, lang="hcl")
-    assert result_hcl.returncode == 0, f"Search with --lang hcl failed: {result_hcl.stderr}"
+    assert result_hcl.returncode == 0, (
+        f"Search with --lang hcl failed: {result_hcl.stderr}"
+    )
 
     output_hcl = json.loads(result_hcl.stdout)
     results_hcl = output_hcl.get("results", [])
@@ -145,8 +157,9 @@ def test_dockerfile_indexing(indexed_devops_fixtures):
     assert len(results) > 0, "Should find Dockerfile content"
 
     file_paths = [r["file_path"] for r in results]
-    assert any("Dockerfile" in path for path in file_paths), \
+    assert any("Dockerfile" in path for path in file_paths), (
         f"Should find Dockerfile in results: {file_paths}"
+    )
 
 
 def test_bash_indexing(indexed_devops_fixtures):
@@ -176,12 +189,15 @@ def test_bash_indexing(indexed_devops_fixtures):
     assert len(results) > 0, "Should find Bash content"
 
     file_paths = [r["file_path"] for r in results]
-    assert any("deploy.sh" in path for path in file_paths), \
+    assert any("deploy.sh" in path for path in file_paths), (
         f"Should find deploy.sh in results: {file_paths}"
+    )
 
     # Test shell alias
     result_shell = run_search("docker build", env, index_name, lang="shell")
-    assert result_shell.returncode == 0, f"Search with --lang shell failed: {result_shell.stderr}"
+    assert result_shell.returncode == 0, (
+        f"Search with --lang shell failed: {result_shell.stderr}"
+    )
 
     output_shell = json.loads(result_shell.stdout)
     results_shell = output_shell.get("results", [])
@@ -205,7 +221,9 @@ def test_devops_language_aliases(indexed_devops_fixtures):
 
     # Test tf alias (should find main.tf)
     result_tf = run_search("aws_instance", env, index_name, lang="tf")
-    assert result_tf.returncode == 0, f"Search with --lang tf failed: {result_tf.stderr}"
+    assert result_tf.returncode == 0, (
+        f"Search with --lang tf failed: {result_tf.stderr}"
+    )
 
     output_tf = json.loads(result_tf.stdout)
     results_tf = output_tf.get("results", [])
@@ -213,7 +231,9 @@ def test_devops_language_aliases(indexed_devops_fixtures):
 
     # Test docker alias (should find Dockerfile)
     result_docker = run_search("FROM python", env, index_name, lang="docker")
-    assert result_docker.returncode == 0, f"Search with --lang docker failed: {result_docker.stderr}"
+    assert result_docker.returncode == 0, (
+        f"Search with --lang docker failed: {result_docker.stderr}"
+    )
 
     output_docker = json.loads(result_docker.stdout)
     results_docker = output_docker.get("results", [])
@@ -221,7 +241,9 @@ def test_devops_language_aliases(indexed_devops_fixtures):
 
     # Test sh alias (should find shell scripts)
     result_sh = run_search("docker build", env, index_name, lang="sh")
-    assert result_sh.returncode == 0, f"Search with --lang sh failed: {result_sh.stderr}"
+    assert result_sh.returncode == 0, (
+        f"Search with --lang sh failed: {result_sh.stderr}"
+    )
 
     output_sh = json.loads(result_sh.stdout)
     results_sh = output_sh.get("results", [])
@@ -257,12 +279,15 @@ def test_devops_metadata_presence(indexed_devops_fixtures):
 
         # Language should be hcl for Terraform files
         if "main.tf" in result["file_path"]:
-            assert result["language"] == "hcl", \
+            assert result["language"] == "hcl", (
                 f"main.tf should have language=hcl, got {result['language']}"
+            )
 
     # Search for Dockerfile and check metadata
     result_docker = run_search("FROM python", env, index_name, lang="dockerfile")
-    assert result_docker.returncode == 0, f"Dockerfile search failed: {result_docker.stderr}"
+    assert result_docker.returncode == 0, (
+        f"Dockerfile search failed: {result_docker.stderr}"
+    )
 
     output_docker = json.loads(result_docker.stdout)
     results_docker = output_docker.get("results", [])
@@ -271,8 +296,9 @@ def test_devops_metadata_presence(indexed_devops_fixtures):
     # Check Dockerfile metadata
     for result in results_docker:
         if "Dockerfile" in result["file_path"]:
-            assert result["language"] == "dockerfile", \
+            assert result["language"] == "dockerfile", (
                 f"Dockerfile should have language=dockerfile, got {result['language']}"
+            )
 
     # Search for Bash and check metadata
     result_bash = run_search("docker build", env, index_name, lang="bash")
@@ -285,8 +311,9 @@ def test_devops_metadata_presence(indexed_devops_fixtures):
     # Check Bash metadata
     for result in results_bash:
         if "deploy.sh" in result["file_path"]:
-            assert result["language"] == "bash", \
+            assert result["language"] == "bash", (
                 f"deploy.sh should have language=bash, got {result['language']}"
+            )
 
 
 def test_devops_vs_regular_filtering(indexed_devops_fixtures):
@@ -305,17 +332,21 @@ def test_devops_vs_regular_filtering(indexed_devops_fixtures):
     # Search for generic term that might appear in multiple file types
     # "app" appears in both auth.py and Dockerfile
     result_unfiltered = run_search("app", env, index_name)
-    assert result_unfiltered.returncode == 0, f"Unfiltered search failed: {result_unfiltered.stderr}"
+    assert result_unfiltered.returncode == 0, (
+        f"Unfiltered search failed: {result_unfiltered.stderr}"
+    )
 
     output_unfiltered = json.loads(result_unfiltered.stdout)
     results_unfiltered = output_unfiltered.get("results", [])
 
     # Get unique languages from unfiltered results
-    languages_unfiltered = set(r["language"] for r in results_unfiltered)
+    set(r["language"] for r in results_unfiltered)
 
     # Search with Python filter - should only return Python files
     result_python = run_search("app", env, index_name, lang="python")
-    assert result_python.returncode == 0, f"Python search failed: {result_python.stderr}"
+    assert result_python.returncode == 0, (
+        f"Python search failed: {result_python.stderr}"
+    )
 
     output_python = json.loads(result_python.stdout)
     results_python = output_python.get("results", [])
@@ -323,12 +354,15 @@ def test_devops_vs_regular_filtering(indexed_devops_fixtures):
     if len(results_python) > 0:
         # All results should be Python
         languages_python = set(r["language"] for r in results_python)
-        assert languages_python == {"python"}, \
+        assert languages_python == {"python"}, (
             f"Python filter should only return python files, got {languages_python}"
+        )
 
     # Search with Terraform filter - should only return Terraform files
     result_terraform = run_search("production", env, index_name, lang="terraform")
-    assert result_terraform.returncode == 0, f"Terraform search failed: {result_terraform.stderr}"
+    assert result_terraform.returncode == 0, (
+        f"Terraform search failed: {result_terraform.stderr}"
+    )
 
     output_terraform = json.loads(result_terraform.stdout)
     results_terraform = output_terraform.get("results", [])
@@ -336,5 +370,6 @@ def test_devops_vs_regular_filtering(indexed_devops_fixtures):
     if len(results_terraform) > 0:
         # All results should be HCL/Terraform
         languages_terraform = set(r["language"] for r in results_terraform)
-        assert languages_terraform == {"hcl"}, \
+        assert languages_terraform == {"hcl"}, (
             f"Terraform filter should only return hcl files, got {languages_terraform}"
+        )

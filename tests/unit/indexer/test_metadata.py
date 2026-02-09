@@ -12,6 +12,7 @@ from cocosearch.handlers.bash import BashHandler
 @dataclass
 class DevOpsMetadata:
     """Metadata dataclass for testing."""
+
     block_type: str
     hierarchy: str
     language_id: str
@@ -110,19 +111,19 @@ class TestStripLeadingComments:
 
     def test_strips_hash_comments(self):
         """Text starting with '# comment\\nresource' returns text from 'resource' onward."""
-        text = "# comment\nresource \"aws_s3_bucket\" \"data\" {"
+        text = '# comment\nresource "aws_s3_bucket" "data" {'
         result = _strip_leading_comments(text, _HCL_COMMENT_LINE)
         assert result.startswith("resource")
 
     def test_strips_blank_lines(self):
         """Text starting with blank lines returns text from first non-blank line."""
-        text = "\n\n\nresource \"aws_s3_bucket\" \"data\" {"
+        text = '\n\n\nresource "aws_s3_bucket" "data" {'
         result = _strip_leading_comments(text, _HCL_COMMENT_LINE)
         assert result.startswith("resource")
 
     def test_preserves_non_comment_text(self):
         """Text starting with non-comment content is returned unchanged (after lstrip)."""
-        text = "resource \"aws_s3_bucket\" \"data\" {"
+        text = 'resource "aws_s3_bucket" "data" {'
         result = _strip_leading_comments(text, _HCL_COMMENT_LINE)
         assert result == text
 
@@ -134,7 +135,7 @@ class TestStripLeadingComments:
 
     def test_strips_leading_whitespace(self):
         """Text starting with whitespace then comments then content is handled."""
-        text = "   \n# comment\nresource \"type\" \"name\" {"
+        text = '   \n# comment\nresource "type" "name" {'
         result = _strip_leading_comments(text, _HCL_COMMENT_LINE)
         assert result.startswith("resource")
 

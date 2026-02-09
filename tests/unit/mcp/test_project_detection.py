@@ -4,10 +4,9 @@ Comprehensive unit tests for file_uri_to_path, _detect_project,
 and register_roots_notification.
 """
 
-import os
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from mcp.shared.exceptions import McpError
 from mcp.types import ErrorData, Root, ListRootsResult, RootsListChangedNotification
@@ -216,7 +215,9 @@ class TestDetectProjectEnvVar:
     """Tests for env priority (third)."""
 
     @pytest.mark.asyncio
-    async def test_returns_path_from_cocosearch_project_path_env(self, tmp_path, monkeypatch):
+    async def test_returns_path_from_cocosearch_project_path_env(
+        self, tmp_path, monkeypatch
+    ):
         """COCOSEARCH_PROJECT_PATH env var returns (path, 'env')."""
         project_dir = tmp_path / "env_project"
         project_dir.mkdir()
@@ -230,7 +231,9 @@ class TestDetectProjectEnvVar:
         assert source == "env"
 
     @pytest.mark.asyncio
-    async def test_returns_path_from_cocosearch_project_env(self, tmp_path, monkeypatch):
+    async def test_returns_path_from_cocosearch_project_env(
+        self, tmp_path, monkeypatch
+    ):
         """COCOSEARCH_PROJECT env var returns (path, 'env')."""
         project_dir = tmp_path / "env_project2"
         project_dir.mkdir()
@@ -244,7 +247,9 @@ class TestDetectProjectEnvVar:
         assert source == "env"
 
     @pytest.mark.asyncio
-    async def test_cocosearch_project_path_takes_precedence(self, tmp_path, monkeypatch):
+    async def test_cocosearch_project_path_takes_precedence(
+        self, tmp_path, monkeypatch
+    ):
         """COCOSEARCH_PROJECT_PATH takes precedence over COCOSEARCH_PROJECT."""
         dir_a = tmp_path / "dir_a"
         dir_a.mkdir()
@@ -352,6 +357,10 @@ class TestRegisterRootsNotification:
 
         register_roots_notification(mock_mcp)
 
-        assert RootsListChangedNotification in mock_mcp._mcp_server.notification_handlers
-        handler = mock_mcp._mcp_server.notification_handlers[RootsListChangedNotification]
+        assert (
+            RootsListChangedNotification in mock_mcp._mcp_server.notification_handlers
+        )
+        handler = mock_mcp._mcp_server.notification_handlers[
+            RootsListChangedNotification
+        ]
         assert callable(handler)

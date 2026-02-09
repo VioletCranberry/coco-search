@@ -1,6 +1,6 @@
 """Configuration schema for CocoSearch using Pydantic."""
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConfigError(Exception):
