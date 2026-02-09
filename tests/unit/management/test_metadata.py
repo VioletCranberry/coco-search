@@ -4,10 +4,13 @@ Tests ensure_metadata_table, get_index_metadata, get_index_for_path,
 register_index_path, and clear_index_path functions with mocked database.
 """
 
+from datetime import datetime, timedelta
+
 import pytest
 from unittest.mock import patch, MagicMock
 
 from cocosearch.management.metadata import (
+    STALE_INDEXING_TIMEOUT_SECONDS,
     ensure_metadata_table,
     get_index_metadata,
     get_index_for_path,
@@ -124,6 +127,105 @@ class TestGetIndexMetadata:
             get_index_metadata("testindex")
 
         cursor.assert_called_with_param("testindex")
+
+
+class TestStaleIndexingDetection:
+    """Tests for auto-recovery of stale 'indexing' status."""
+
+    def test_stale_indexing_recovered_to_error(self, mock_db_pool):
+        """get_index_metadata returns 'error' for stale 'indexing' status."""
+        stale_time = datetime.now() - timedelta(
+            seconds=STALE_INDEXING_TIMEOUT_SECONDS + 60
+        )
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = get_index_metadata("myindex")
+
+        assert result["status"] == "error"
+
+    def test_stale_indexing_issues_db_update(self, mock_db_pool):
+        """get_index_metadata writes 'error' back to DB for stale status."""
+        stale_time = datetime.now() - timedelta(
+            seconds=STALE_INDEXING_TIMEOUT_SECONDS + 60
+        )
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            get_index_metadata("myindex")
+
+        # Should have issued an UPDATE after the SELECT
+        assert len(cursor.calls) == 2
+        update_sql = cursor.calls[1][0]
+        assert "UPDATE" in update_sql
+        assert "status = 'error'" in update_sql
+
+    def test_fresh_indexing_not_recovered(self, mock_db_pool):
+        """get_index_metadata keeps 'indexing' status if within timeout."""
+        fresh_time = datetime.now() - timedelta(seconds=60)
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", fresh_time, "indexing")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = get_index_metadata("myindex")
+
+        assert result["status"] == "indexing"
+        # No UPDATE should be issued
+        assert len(cursor.calls) == 1
+
+    def test_indexed_status_not_affected(self, mock_db_pool):
+        """get_index_metadata leaves 'indexed' status untouched."""
+        old_time = datetime.now() - timedelta(hours=24)
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", old_time, "indexed")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = get_index_metadata("myindex")
+
+        assert result["status"] == "indexed"
+        assert len(cursor.calls) == 1
+
+    def test_stale_recovery_db_failure_still_returns_error(self, mock_db_pool):
+        """get_index_metadata returns 'error' even if DB update fails."""
+        stale_time = datetime.now() - timedelta(
+            seconds=STALE_INDEXING_TIMEOUT_SECONDS + 60
+        )
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        )
+        # Make the UPDATE fail
+        original_execute = cursor.execute
+        call_count = [0]
+
+        def execute_failing_on_second(query, params=None):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise RuntimeError("DB write failed")
+            return original_execute(query, params)
+
+        cursor.execute = execute_failing_on_second
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = get_index_metadata("myindex")
+
+        # Should still return "error" even though DB update failed
+        assert result["status"] == "error"
 
 
 class TestRegisterIndexPath:

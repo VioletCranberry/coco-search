@@ -5,11 +5,19 @@ with collision detection. Used by auto-detect feature to track
 which projects are indexed under which names.
 """
 
+import logging
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
 from cocosearch.management.context import get_canonical_path
 from cocosearch.search.db import get_connection_pool
+
+logger = logging.getLogger(__name__)
+
+# If status has been "indexing" for longer than this, assume the process
+# died (e.g. daemon thread killed, SIGKILL, server restart) and auto-recover.
+STALE_INDEXING_TIMEOUT_SECONDS = 900  # 15 minutes
 
 
 def ensure_metadata_table() -> None:
@@ -70,12 +78,48 @@ def get_index_metadata(index_name: str) -> dict | None:
                 row = cur.fetchone()
                 if row is None:
                     return None
+                status = row[4] if len(row) > 4 else "indexed"
+                updated_at = row[3]
+
+                # Auto-recover stale "indexing" status — the process likely
+                # died without running its finally block (daemon thread killed,
+                # SIGKILL, server restart, etc.)
+                if status == "indexing" and updated_at is not None:
+                    try:
+                        if not updated_at.tzinfo:
+                            now = datetime.now()
+                        else:
+                            now = datetime.now(timezone.utc)
+                        elapsed = (now - updated_at).total_seconds()
+                        if elapsed > STALE_INDEXING_TIMEOUT_SECONDS:
+                            logger.info(
+                                "Auto-recovering stale 'indexing' status for "
+                                "'%s' (stuck for %.0f seconds)",
+                                row[0],
+                                elapsed,
+                            )
+                            status = "error"
+                            # Best-effort DB update — don't fail the read
+                            try:
+                                cur.execute(
+                                    """
+                                    UPDATE cocosearch_index_metadata
+                                    SET status = 'error', updated_at = NOW()
+                                    WHERE index_name = %s AND status = 'indexing'
+                                    """,
+                                    (row[0],),
+                                )
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass  # Don't fail the read on stale detection errors
+
                 return {
                     "index_name": row[0],
                     "canonical_path": row[1],
                     "created_at": row[2],
-                    "updated_at": row[3],
-                    "status": row[4] if len(row) > 4 else "indexed",
+                    "updated_at": updated_at,
+                    "status": status,
                 }
     except Exception:
         # Table doesn't exist yet (fresh database, never indexed)
