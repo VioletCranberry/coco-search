@@ -52,10 +52,10 @@ claude mcp add --scope user cocosearch -- \
   uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
 ```
 
-Alternatively, use skills:
+Use skills:
 
 ```bash
-# Install coco skills. For global installation install them to ~/.claude/skills/
+# Clone this repository and install coco skills. For global installation install them to ~/.claude/skills/
 for skill in coco-onboarding coco-refactoring coco-debugging coco-quickstart coco-explain coco-new-feature coco-subway; do
     mkdir -p .claude/skills/$skill
     cp skills/$skill/SKILL.md .claude/skills/$skill/SKILL.md
@@ -141,10 +141,7 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search --int
 # View index stats with parse health
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --pretty
 
-Index: cocosearch
-Source: /GIT/coco-s
-Status: Indexed
-Files: 162 | Chunks: 1,576 | Size: 8.9 MB
+Files: 147 | Chunks: 1,537 | Size: 8.6 MB
 Created: 2026-02-09
 Last Updated: 2026-02-09 (0 days ago)
 
@@ -152,51 +149,32 @@ Last Updated: 2026-02-09 (0 days ago)
 ┏━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Language     ┃  Files ┃   Chunks ┃ Distribution                   ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ py           │    138 │     1388 │ ██████████████████████████████ │
-│ md           │     15 │      151 │ ███▎                           │
-│ html         │      1 │       23 │ ▍                              │
-│ bash         │      2 │        7 │ ▏                              │
+│ py           │    124 │     1281 │ ██████████████████████████████ │
+│ md           │     18 │      200 │ ████▋                          │
+│ html         │      1 │       46 │ █                              │
+│ bash         │      1 │        6 │ ▏                              │
 │ toml         │      1 │        2 │                                │
-│ yml          │      2 │        2 │                                │
-│ js           │      1 │        1 │                                │
-│ hcl          │      1 │        1 │                                │
 │ yaml         │      1 │        1 │                                │
+│ yml          │      1 │        1 │                                │
 └──────────────┴────────┴──────────┴────────────────────────────────┘
 
-Parse health: 98.6% clean (141/143 files)
-                  Parse Status by Language
-┏━━━━━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━┓
-┃ Language   ┃ Files ┃  OK ┃ Partial ┃ Error ┃ No Grammar ┃
-┡━━━━━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
-│ bash       │     2 │   2 │       0 │     0 │          0 │
-│ dockerfile │     1 │   0 │       0 │     0 │          1 │
-│ hcl        │     1 │   0 │       0 │     0 │          1 │
-│ javascript │     1 │   1 │       0 │     0 │          0 │
-│ python     │   138 │ 138 │       0 │     0 │          0 │
-└────────────┴───────┴─────┴─────────┴───────┴────────────┘
+Parse health: 100.0% clean (125/125 files)
+                Parse Status by Language
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
+┃ Language ┃ Files ┃  OK ┃ Partial ┃ Error ┃ No Grammar ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
+│ bash     │     1 │   1 │       0 │     0 │          0 │
+│ html     │     1 │   0 │       0 │     0 │          0 │
+│ md       │    18 │   0 │       0 │     0 │          0 │
+│ python   │   124 │ 124 │       0 │     0 │          0 │
+│ toml     │     1 │   0 │       0 │     0 │          0 │
+│ yaml     │     1 │   0 │       0 │     0 │          0 │
+│ yml      │     1 │   0 │       0 │     0 │          0 │
+└──────────┴───────┴─────┴─────────┴───────┴────────────┘
+
 
 # View index stats with parse health live
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --live
-
-╭─────────────────────────────────────────────────────── Stats Dashboard ───────────────────────────────────────────────────────╮
-│ Index: cocosearch  |  Last refresh: 14:43:50                                                                                  │
-│                                                                                                                               │
-│                                                                                                                               │
-╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────── Summary ────────────────╮╭───────────────────────────────────── Details ──────────────────────────────────────╮
-│  Files         162                      ││                                     Languages                                      │
-│  Chunks        1,576                    ││ ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ │
-│  Size          8.9 MB                   ││ ┃ Lang              ┃      Files ┃       Chunks ┃ Distribution                   ┃ │
-│  Source        /GIT/coco-s              ││ ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩ │
-│  Status        Indexed                  ││ │ py                │        138 │         1388 │ ██████████████████████████████ │ │
-│  Parse Health  98.6% (141/143)          ││ │ md                │         15 │          151 │ ███▎                           │ │
-│                                         ││ │ html              │          1 │           23 │ ▍                              │ │
-│  Created       2026-02-09               ││ │ bash              │          2 │            7 │ ▏                              │ │
-│  Updated       2026-02-09               ││ │ toml              │          1 │            2 │                                │ │
-│                (0d ago)                 ││ │ yml               │          2 │            2 │                                │ │
-│                                         ││ │ js                │          1 │            1 │                                │ │
-│                                         ││ │ hcl               │          1 │            1 │                                │ │
-╰─────────────────────────────────────────╯╰────────────────────────────────────────────────────────────────────────────────────╯
 
 ```
 

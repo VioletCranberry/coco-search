@@ -210,6 +210,115 @@ async def api_reindex(request):
     )
 
 
+@mcp.custom_route("/api/project", methods=["GET"])
+async def api_project(request):
+    """Return current project context based on COCOSEARCH_PROJECT_PATH."""
+    from cocosearch.management.context import find_project_root
+
+    env_path = os.environ.get("COCOSEARCH_PROJECT_PATH")
+    if not env_path:
+        return JSONResponse({"has_project": False})
+
+    project_root, detection_method = find_project_root(Path(env_path))
+    if project_root is None:
+        # Env var set but no project root found — use the path directly
+        project_root = Path(env_path).resolve()
+        detection_method = None
+
+    index_name = resolve_index_name(project_root, detection_method)
+
+    # Check if the index exists
+    is_indexed = False
+    path_collision = False
+    collision_message = None
+    try:
+        cocoindex.init()
+        indexes = mgmt_list_indexes()
+        index_names = {idx["name"] for idx in indexes}
+        is_indexed = index_name in index_names
+
+        if is_indexed:
+            metadata = get_index_metadata(index_name)
+            if metadata and metadata.get("canonical_path"):
+                canonical_cwd = str(project_root.resolve())
+                stored_path = metadata["canonical_path"]
+                if stored_path != canonical_cwd:
+                    path_collision = True
+                    collision_message = (
+                        f"Index '{index_name}' is mapped to {stored_path}, "
+                        f"but current project is at {canonical_cwd}"
+                    )
+    except Exception as e:
+        logger.warning(f"Failed to check index existence: {e}")
+
+    return JSONResponse(
+        {
+            "has_project": True,
+            "project_path": str(project_root),
+            "index_name": index_name,
+            "is_indexed": is_indexed,
+            "detection_method": detection_method,
+            "path_collision": path_collision,
+            "collision_message": collision_message,
+        }
+    )
+
+
+@mcp.custom_route("/api/index", methods=["POST"])
+async def api_index(request):
+    """Trigger initial indexing of a project from the dashboard."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    project_path = body.get("project_path")
+    index_name = body.get("index_name")
+
+    if not project_path:
+        return JSONResponse({"error": "project_path is required"}, status_code=400)
+
+    # Derive index name if not provided
+    if not index_name:
+        index_name = derive_index_name(project_path)
+
+    # Register metadata before starting
+    try:
+        ensure_metadata_table()
+        register_index_path(index_name, project_path)
+        set_index_status(index_name, "indexing")
+    except Exception as e:
+        logger.warning(f"Metadata registration failed: {e}")
+
+    def _run():
+        try:
+            cocoindex.init()
+            run_index(
+                index_name=index_name,
+                codebase_path=project_path,
+                config=IndexingConfig(),
+            )
+            register_index_path(index_name, project_path)
+        except Exception as exc:
+            logger.error(f"Background indexing failed: {exc}")
+        finally:
+            try:
+                set_index_status(index_name, "indexed")
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+
+    return JSONResponse(
+        {
+            "success": True,
+            "index_name": index_name,
+            "message": f"Indexing started for '{index_name}' from {project_path}",
+        }
+    )
+
+
 def _get_treesitter_language(ext: str) -> str | None:
     """Map file extension to tree-sitter language name."""
     mapping = {

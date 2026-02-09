@@ -559,6 +559,32 @@ def get_comprehensive_stats(
     # Get parse failure stats
     parse_stats = get_parse_stats(index_name)
 
+    # Enrich parse_stats with languages that were skipped from parse tracking
+    # (text-only formats like md, yaml, json) so dashboards show all languages.
+    # Note: chunks table stores raw extensions (e.g., "py") while parse_results
+    # stores tree-sitter names (e.g., "python") via LANGUAGE_MAP. We must check
+    # both the raw extension and its mapped name to avoid duplicates.
+    if parse_stats and "by_language" in parse_stats:
+        from cocosearch.indexer.symbols import LANGUAGE_MAP
+
+        tracked_languages = set(parse_stats["by_language"].keys())
+        for lang_stat in languages:
+            lang = lang_stat["language"]
+            mapped_lang = LANGUAGE_MAP.get(lang)
+            # Skip if already tracked under either the raw extension or mapped name
+            if lang in tracked_languages or (
+                mapped_lang and mapped_lang in tracked_languages
+            ):
+                continue
+            parse_stats["by_language"][lang] = {
+                "files": lang_stat["file_count"],
+                "ok": 0,
+                "partial": 0,
+                "error": 0,
+                "no_grammar": 0,
+                "skipped": True,
+            }
+
     # Check staleness
     is_stale, staleness_days = check_staleness(index_name, staleness_threshold)
 

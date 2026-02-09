@@ -123,12 +123,55 @@ def format_details_panel(stats: IndexStats) -> Panel:
         for sym_type, count in sorted(stats.symbols.items(), key=lambda x: -x[1])[:5]:
             sym_table.add_row(sym_type, f"{count:,}")
 
-        # Combine tables vertically
-        from rich.console import Group
+    # Parse health by language (if available)
+    parse_table = None
+    if stats.parse_stats and stats.parse_stats.get("by_language"):
+        parse_table = Table(title="Parse Health", show_header=True, expand=True)
+        parse_table.add_column("Lang", style="cyan", width=10)
+        parse_table.add_column("Files", justify="right", width=6)
+        parse_table.add_column("OK", justify="right", width=6)
+        parse_table.add_column("Issues", justify="right", width=7)
+        parse_table.add_column("Status", width=12)
 
-        content = Group(lang_table, "", sym_table)
-    else:
-        content = lang_table
+        by_lang = stats.parse_stats["by_language"]
+        # Tracked languages first, then skipped
+        tracked = sorted(
+            [(l, d) for l, d in by_lang.items() if not d.get("skipped")],
+            key=lambda x: -x[1]["files"],
+        )
+        skipped = sorted(
+            [(l, d) for l, d in by_lang.items() if d.get("skipped")],
+            key=lambda x: -x[1]["files"],
+        )
+        for lang, data in tracked:
+            issues = data.get("partial", 0) + data.get("error", 0) + data.get("no_grammar", 0)
+            pct = (data["ok"] / data["files"] * 100) if data["files"] > 0 else 100
+            color = "green" if pct >= 95 else "yellow" if pct >= 80 else "red"
+            parse_table.add_row(
+                lang[:10],
+                str(data["files"]),
+                str(data["ok"]),
+                str(issues) if issues else "-",
+                f"[{color}]{pct:.0f}%[/{color}]",
+            )
+        for lang, data in skipped:
+            parse_table.add_row(
+                lang[:10],
+                str(data["files"]),
+                "-",
+                "-",
+                "[dim]skipped[/dim]",
+            )
+
+    # Combine tables vertically
+    from rich.console import Group
+
+    parts = [lang_table]
+    if stats.symbols:
+        parts.extend(["", sym_table])
+    if parse_table:
+        parts.extend(["", parse_table])
+    content = Group(*parts)
 
     return Panel(content, title="Details", border_style="cyan")
 

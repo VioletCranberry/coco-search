@@ -272,6 +272,31 @@
             color: white;
         }
 
+        .not-indexed-banner {
+            background: var(--accent-orange);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .not-indexed-banner h3 {
+            font-size: 16px;
+            margin-bottom: 6px;
+        }
+
+        .not-indexed-banner p {
+            font-size: 14px;
+            margin-top: 6px;
+        }
+
+        .not-indexed-banner code {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+
         .parse-table {
             width: 100%;
             border-collapse: collapse;
@@ -415,6 +440,15 @@
 
         <div id="statusBanner" class="status-banner"></div>
 
+        <div id="notIndexedBanner" class="not-indexed-banner" style="display: none;">
+            <h3>Project Not Indexed</h3>
+            <p>Current project at <code id="notIndexedPath"></code> is not indexed.</p>
+            <p>
+                <button id="indexNowBtn" class="action-btn" onclick="indexCurrentProject()">Index Now</button>
+                <span style="margin-left: 8px; font-size: 13px;">or run: <code>cocosearch index .</code></span>
+            </p>
+        </div>
+
         <div id="warningBanner" class="warning-banner">
             <h3>Index Warnings</h3>
             <ul id="warningList"></ul>
@@ -504,6 +538,16 @@
         let languageChart = null;
         let symbolChart = null;
         let allIndexes = [];
+        let projectContext = null;
+
+        async function loadProjectContext() {
+            try {
+                const resp = await fetch('/api/project');
+                if (!resp.ok) return null;
+                const data = await resp.json();
+                return data.has_project ? data : null;
+            } catch { return null; }
+        }
 
         async function fetchStats(indexName = null) {
             let url = indexName
@@ -767,7 +811,20 @@
             const byLang = parseStats.by_language;
             const entries = Object.entries(byLang).sort((a, b) => b[1].files - a[1].files);
 
-            tbody.innerHTML = entries.map(([lang, data]) => {
+            // Sort: tracked languages first (by file count desc), then skipped languages
+            const tracked = entries.filter(([, d]) => !d.skipped).sort((a, b) => b[1].files - a[1].files);
+            const skipped = entries.filter(([, d]) => d.skipped).sort((a, b) => b[1].files - a[1].files);
+            const sorted = [...tracked, ...skipped];
+
+            tbody.innerHTML = sorted.map(([lang, data]) => {
+                if (data.skipped) {
+                    return `<tr style="opacity: 0.5">
+                        <td style="font-weight: 500">${escapeHtml(lang)}</td>
+                        <td class="num">${data.files}</td>
+                        <td class="num" colspan="4" style="text-align: center; font-style: italic">text format — indexed as-is, no AST parsing</td>
+                    </tr>`;
+                }
+
                 const healthPct = data.files > 0 ? (data.ok / data.files * 100) : 100;
                 let langColor = 'var(--accent-green)';
                 if (healthPct < 80) langColor = 'var(--accent-red)';
@@ -838,7 +895,12 @@
 
         async function loadIndexList() {
             try {
-                const data = await fetchStats();
+                // Load project context and stats in parallel
+                const [ctx, data] = await Promise.all([
+                    loadProjectContext(),
+                    fetchStats(),
+                ]);
+                projectContext = ctx;
                 allIndexes = Array.isArray(data) ? data : [data];
 
                 const select = document.getElementById('indexSelect');
@@ -846,9 +908,28 @@
                     `<option value="${i}">${idx.name}</option>`
                 ).join('');
 
-                // Load first index by default
+                // Determine which index to select
+                let selectedIndex = 0;
+                if (projectContext) {
+                    if (projectContext.is_indexed) {
+                        // Find the project's index in the list and auto-select it
+                        const matchIdx = allIndexes.findIndex(
+                            idx => idx.name === projectContext.index_name
+                        );
+                        if (matchIdx >= 0) {
+                            selectedIndex = matchIdx;
+                            select.value = String(selectedIndex);
+                        }
+                    } else {
+                        // Project not indexed — show the banner
+                        const banner = document.getElementById('notIndexedBanner');
+                        document.getElementById('notIndexedPath').textContent = projectContext.project_path;
+                        banner.style.display = 'block';
+                    }
+                }
+
                 if (allIndexes.length > 0) {
-                    await loadDashboard(0);
+                    await loadDashboard(selectedIndex);
                 }
             } catch (error) {
                 showError(`Failed to load index list: ${error.message}`);
@@ -940,7 +1021,41 @@
             }
         }
 
-        function startPolling() {
+        async function indexCurrentProject() {
+            if (!projectContext) return;
+
+            const btn = document.getElementById('indexNowBtn');
+            btn.disabled = true;
+            showStatusBanner('Indexing starting...', 'info');
+
+            try {
+                const resp = await fetch('/api/index', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        project_path: projectContext.project_path,
+                        index_name: projectContext.index_name,
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    showStatusBanner('Error: ' + (data.error || 'Request failed'), 'error');
+                    btn.disabled = false;
+                    return;
+                }
+                // Hide the not-indexed banner
+                document.getElementById('notIndexedBanner').style.display = 'none';
+                showStatusBanner(data.message, 'info');
+                setButtonsDisabled(true);
+                // Poll until indexing completes, then reload index list
+                startPolling(true);
+            } catch (err) {
+                showStatusBanner('Error: ' + err.message, 'error');
+                btn.disabled = false;
+            }
+        }
+
+        function startPolling(reloadListOnComplete = false) {
             stopPolling();
             pollInterval = setInterval(async () => {
                 try {
@@ -948,6 +1063,34 @@
                     allIndexes = Array.isArray(data) ? data : [data];
 
                     const select = document.getElementById('indexSelect');
+
+                    // If we're polling after initial indexing, look for the new index
+                    if (reloadListOnComplete && projectContext) {
+                        const matchIdx = allIndexes.findIndex(
+                            idx => idx.name === projectContext.index_name
+                        );
+                        if (matchIdx >= 0) {
+                            // Rebuild dropdown and select the new index
+                            select.innerHTML = allIndexes.map((idx, i) =>
+                                `<option value="${i}">${idx.name}</option>`
+                            ).join('');
+                            select.value = String(matchIdx);
+                            updateDashboard(allIndexes[matchIdx]);
+
+                            const status = allIndexes[matchIdx].status || 'indexed';
+                            if (status !== 'indexing') {
+                                stopPolling();
+                                setButtonsDisabled(false);
+                                showStatusBanner('Indexing complete', 'success');
+                                setTimeout(hideStatusBanner, 5000);
+                                // Show dashboard content now that we have data
+                                document.getElementById('loadingMessage').style.display = 'none';
+                                document.getElementById('dashboardContent').style.display = 'block';
+                            }
+                            return;
+                        }
+                    }
+
                     const indexIndex = parseInt(select.value);
                     if (allIndexes[indexIndex]) {
                         updateDashboard(allIndexes[indexIndex]);

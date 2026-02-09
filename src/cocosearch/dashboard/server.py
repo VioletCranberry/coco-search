@@ -26,6 +26,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_dashboard()
         elif self.path == "/health":
             self._json_response({"status": "ok"})
+        elif self.path == "/api/project":
+            self._serve_project_context()
         elif self.path == "/api/stats" or self.path.startswith("/api/stats?"):
             self._serve_all_stats()
         elif self.path.startswith("/api/stats/"):
@@ -37,6 +39,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         if self.path == "/api/reindex":
             self._handle_reindex()
+        elif self.path == "/api/index":
+            self._handle_index()
         else:
             self.send_error(404)
 
@@ -103,6 +107,126 @@ class DashboardHandler(BaseHTTPRequestHandler):
         action = "Fresh reindex" if fresh else "Reindex"
         self._json_response(
             {"success": True, "message": f"{action} started for '{index_name}'"}
+        )
+
+    def _serve_project_context(self):
+        import cocoindex
+        from pathlib import Path
+        from cocosearch.management import (
+            resolve_index_name,
+            get_index_metadata,
+        )
+        from cocosearch.management import list_indexes as mgmt_list_indexes
+        from cocosearch.management.context import find_project_root
+
+        env_path = os.environ.get("COCOSEARCH_PROJECT_PATH")
+        if not env_path:
+            self._json_response({"has_project": False})
+            return
+
+        project_root, detection_method = find_project_root(Path(env_path))
+        if project_root is None:
+            project_root = Path(env_path).resolve()
+            detection_method = None
+
+        index_name = resolve_index_name(project_root, detection_method)
+
+        is_indexed = False
+        path_collision = False
+        collision_message = None
+        try:
+            cocoindex.init()
+            indexes = mgmt_list_indexes()
+            index_names = {idx["name"] for idx in indexes}
+            is_indexed = index_name in index_names
+
+            if is_indexed:
+                metadata = get_index_metadata(index_name)
+                if metadata and metadata.get("canonical_path"):
+                    canonical_cwd = str(project_root.resolve())
+                    stored_path = metadata["canonical_path"]
+                    if stored_path != canonical_cwd:
+                        path_collision = True
+                        collision_message = (
+                            f"Index '{index_name}' is mapped to {stored_path}, "
+                            f"but current project is at {canonical_cwd}"
+                        )
+        except Exception:
+            pass
+
+        self._json_response(
+            {
+                "has_project": True,
+                "project_path": str(project_root),
+                "index_name": index_name,
+                "is_indexed": is_indexed,
+                "detection_method": detection_method,
+                "path_collision": path_collision,
+                "collision_message": collision_message,
+            }
+        )
+
+    def _handle_index(self):
+        import cocoindex
+        from cocosearch.cli import derive_index_name
+        from cocosearch.indexer import IndexingConfig, run_index
+        from cocosearch.management import (
+            ensure_metadata_table,
+            register_index_path,
+            set_index_status,
+        )
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(content_length) if content_length else b""
+        try:
+            body = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            self._json_response({"error": "Invalid JSON body"}, status=400)
+            return
+
+        project_path = body.get("project_path")
+        index_name = body.get("index_name")
+
+        if not project_path:
+            self._json_response({"error": "project_path is required"}, status=400)
+            return
+
+        if not index_name:
+            index_name = derive_index_name(project_path)
+
+        try:
+            ensure_metadata_table()
+            register_index_path(index_name, project_path)
+            set_index_status(index_name, "indexing")
+        except Exception:
+            pass
+
+        def _run():
+            try:
+                cocoindex.init()
+                run_index(
+                    index_name=index_name,
+                    codebase_path=project_path,
+                    config=IndexingConfig(),
+                )
+                register_index_path(index_name, project_path)
+            except Exception as exc:
+                logger.error(f"Background indexing failed: {exc}")
+            finally:
+                try:
+                    set_index_status(index_name, "indexed")
+                except Exception:
+                    pass
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+
+        self._json_response(
+            {
+                "success": True,
+                "index_name": index_name,
+                "message": f"Indexing started for '{index_name}' from {project_path}",
+            }
         )
 
     def _serve_dashboard(self):
