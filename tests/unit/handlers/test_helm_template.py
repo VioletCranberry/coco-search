@@ -15,9 +15,9 @@ class TestHelmTemplateHandlerAttributes:
         assert handler.GRAMMAR_NAME == "helm-template"
 
     def test_base_language(self):
-        """BASE_LANGUAGE should be 'yaml'."""
+        """BASE_LANGUAGE should be 'gotmpl'."""
         handler = HelmTemplateHandler()
-        assert handler.BASE_LANGUAGE == "yaml"
+        assert handler.BASE_LANGUAGE == "gotmpl"
 
     def test_path_patterns(self):
         """PATH_PATTERNS should match templates/ directory."""
@@ -222,8 +222,6 @@ class TestHelmTemplateHandlerExtractMetadata:
     def test_kind_takes_priority_over_control_flow(self):
         """Kind detection takes priority over control flow detection."""
         handler = HelmTemplateHandler()
-        m = handler.extract_metadata(
-            "kind: Deployment\n{{- if .Values.enabled }}"
-        )
+        m = handler.extract_metadata("kind: Deployment\n{{- if .Values.enabled }}")
         assert m["block_type"] == "Deployment"
         assert m["hierarchy"] == "kind:Deployment"

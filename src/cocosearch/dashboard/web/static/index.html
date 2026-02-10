@@ -458,6 +458,7 @@
                 <span id="sourcePath" style="color: var(--text-muted); font-size: 13px; margin-left: 8px;"></span>
                 <button id="reindexBtn" class="action-btn" onclick="reindex(false)">Reindex</button>
                 <button id="freshIndexBtn" class="action-btn danger" onclick="reindex(true)">Fresh Index</button>
+                <button id="stopIndexBtn" class="action-btn danger" onclick="stopIndexing()" style="display: none;">Stop</button>
             </div>
         </header>
 
@@ -516,7 +517,7 @@
 
             <div class="chart-grid">
                 <div class="chart-card">
-                    <h2>Language Distribution</h2>
+                    <h2>Language Distribution (Chunks)</h2>
                     <div class="chart-container">
                         <canvas id="languageChart"></canvas>
                     </div>
@@ -559,12 +560,12 @@
 
             <div id="grammarHealthSection" class="chart-card" style="display: none;">
                 <h2>Parse Health by Grammar</h2>
-                <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">Grammar handlers provide domain-specific chunking. Health measures metadata extraction quality.</p>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">Grammar handlers provide domain-specific chunking for specialized file formats. Health measures metadata extraction quality.</p>
                 <table class="parse-table">
                     <thead>
                         <tr>
                             <th>Grammar</th>
-                            <th>Base</th>
+                            <th>Format</th>
                             <th class="num">Files</th>
                             <th class="num">Chunks</th>
                             <th class="num">Recognized</th>
@@ -700,6 +701,10 @@
                 statusEl.textContent = 'Indexing...';
                 statusEl.style.color = 'var(--accent-orange)';
                 statusLabelEl.textContent = 'In progress';
+            } else if (status === 'error') {
+                statusEl.textContent = 'Error';
+                statusEl.style.color = 'var(--accent-red, #ef4444)';
+                statusLabelEl.textContent = 'Indexing failed';
             } else {
                 statusEl.textContent = 'Indexed';
                 statusEl.style.color = 'var(--accent-green)';
@@ -1090,6 +1095,15 @@
 
                 if (allIndexes.length > 0) {
                     await loadDashboard(selectedIndex);
+
+                    // Auto-poll if any index is currently being indexed
+                    // (e.g. indexing started from CLI, MCP tool, or another process)
+                    const selected = allIndexes[selectedIndex];
+                    if (selected && selected.status === 'indexing') {
+                        setButtonsDisabled(true);
+                        showStatusBanner('Indexing in progress...', 'info');
+                        startPolling();
+                    }
                 }
             } catch (error) {
                 showError(`Failed to load index list: ${error.message}`);
@@ -1125,6 +1139,7 @@
         function setButtonsDisabled(disabled) {
             document.getElementById('reindexBtn').disabled = disabled;
             document.getElementById('freshIndexBtn').disabled = disabled;
+            document.getElementById('stopIndexBtn').style.display = disabled ? 'inline-block' : 'none';
         }
 
         function showStatusBanner(message, type) {
@@ -1168,6 +1183,31 @@
             } catch (err) {
                 showStatusBanner('Error: ' + err.message, 'error');
                 setButtonsDisabled(false);
+            }
+        }
+
+        async function stopIndexing() {
+            const select = document.getElementById('indexSelect');
+            const stats = allIndexes[parseInt(select.value)];
+            if (!stats) return;
+
+            try {
+                const resp = await fetch('/api/stop-indexing', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index_name: stats.name})
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    stopPolling();
+                    setButtonsDisabled(false);
+                    showStatusBanner('Indexing stopped', 'info');
+                    setTimeout(hideStatusBanner, 5000);
+                } else {
+                    showStatusBanner('Error: ' + (data.error || 'Stop failed'), 'error');
+                }
+            } catch (err) {
+                showStatusBanner('Error: ' + err.message, 'error');
             }
         }
 

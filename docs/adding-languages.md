@@ -7,7 +7,7 @@ Every indexed file is chunked by CocoIndex's `SplitRecursively`. The chunking st
 | Tier | How it works | Languages |
 |------|-------------|-----------|
 | **Tree-sitter (CocoIndex built-in)** | `SplitRecursively` uses Tree-sitter internally to split at syntax boundaries (function/class edges) | Python, JS, TS, Go, Rust, Java, C, C++, C#, Ruby, PHP, and ~10 more in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages) |
-| **Custom handler regex** | `SplitRecursively` receives a `CustomLanguageSpec` with hierarchical regex separators | HCL, Dockerfile, Bash (language handlers) + GitHub Actions, GitLab CI, Docker Compose (grammar handlers) |
+| **Custom handler regex** | `SplitRecursively` receives a `CustomLanguageSpec` with hierarchical regex separators | HCL, Go Template, Dockerfile, Bash (language handlers) + GitHub Actions, GitLab CI, Docker Compose, Helm Template, Helm Values (grammar handlers) |
 | **Plain-text fallback** | Splits on blank lines, newlines, whitespace | Everything not matched by either tier above |
 
 ## Systems Overview
@@ -67,11 +67,13 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
    - Define `SEPARATOR_SPEC` with `CustomLanguageSpec` — hierarchical regex separators from coarsest to finest
    - Implement `extract_metadata()` returning `block_type`, `hierarchy`, and `language_id`
 
-3. **Important constraints:**
+3. **Add file extensions to `include_patterns`** in `src/cocosearch/indexer/config.py` so CocoIndex's `LocalFile` source picks up the files.
+
+4. **Important constraints:**
    - Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
    - The handler is autodiscovered at import time; no registration code needed
 
-4. **Add tests:**
+5. **Add tests:**
    ```bash
    # Create test file
    touch tests/unit/handlers/test_<language>.py
@@ -80,13 +82,14 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
    uv run pytest tests/unit/handlers/test_<language>.py -v
    ```
 
-5. **Update `cli.py` `languages_command`** — add a display name to the `display_names` dict in `languages_command` if the default `.title()` casing isn't right (e.g., `"hcl": "HCL"`). Extensions are derived from the handler's `EXTENSIONS` automatically.
+6. **Update `cli.py` `languages_command`** — add a display name to the `display_names` dict in `languages_command` if the default `.title()` casing isn't right (e.g., `"hcl": "HCL"`). Extensions are derived from the handler's `EXTENSIONS` automatically.
 
 ### Files to Create/Modify
 
 | File | Action |
 |------|--------|
 | `src/cocosearch/handlers/<language>.py` | Create — handler class |
+| `src/cocosearch/indexer/config.py` | Modify — add extensions to `include_patterns` |
 | `tests/unit/handlers/test_<language>.py` | Create — handler tests |
 | `src/cocosearch/cli.py` | Modify — `display_names` in `languages_command` (only if `.title()` casing is wrong) |
 
@@ -225,12 +228,15 @@ Priority: Grammar match > Language match > TextHandler fallback.
 | `github-actions` | yaml | `.github/workflows/*.yml` | `on:` + `jobs:` |
 | `gitlab-ci` | yaml | `.gitlab-ci.yml` | `stages:` or (`script:` + `image:`/`stage:`) |
 | `docker-compose` | yaml | `docker-compose*.yml`, `compose*.yml` | `services:` |
+| `helm-template` | gotmpl | `templates/*.yaml`, `templates/*.tpl` | `apiVersion:` or `{{` |
+| `helm-values` | yaml | `values*.yaml` in chart dirs | `## @section` or YAML with comments |
 
 ## Registration Checklist
 
 When adding a new language handler, verify all registrations are complete:
 
 - [ ] **Handler** (if applicable): `handlers/<language>.py` created, extensions registered via autodiscovery
+- [ ] **include_patterns**: file extensions added to `IndexingConfig.include_patterns` in `indexer/config.py`
 - [ ] **LANGUAGE_MAP** (if symbol extraction): all file extensions mapped to tree-sitter language name
 - [ ] **Query file** (if symbol extraction): `indexer/queries/<language>.scm` created
 - [ ] **SYMBOL_AWARE_LANGUAGES**: language added to set in `search/query.py`

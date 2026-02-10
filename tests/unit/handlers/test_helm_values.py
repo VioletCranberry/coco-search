@@ -98,8 +98,7 @@ class TestHelmValuesHandlerMatches:
         """Should not match non-values.yaml files."""
         handler = HelmValuesHandler()
         content = (
-            "replicaCount: 1\nimage:\n  tag: latest\n"
-            "service:\n  type: ClusterIP\n"
+            "replicaCount: 1\nimage:\n  tag: latest\nservice:\n  type: ClusterIP\n"
         )
         assert not handler.matches("mychart/config.yaml", content)
 

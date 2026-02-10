@@ -29,7 +29,7 @@ class HelmTemplateHandler:
     """Grammar handler for Helm template YAML files."""
 
     GRAMMAR_NAME = "helm-template"
-    BASE_LANGUAGE = "yaml"
+    BASE_LANGUAGE = "gotmpl"
     PATH_PATTERNS = [
         "**/templates/*.yaml",
         "**/templates/**/*.yaml",

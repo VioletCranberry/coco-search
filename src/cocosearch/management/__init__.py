@@ -14,6 +14,7 @@ from cocosearch.management.context import (
 from cocosearch.management.discovery import list_indexes
 from cocosearch.management.git import derive_index_from_git, get_git_root, get_repo_url
 from cocosearch.management.metadata import (
+    auto_recover_stale_indexing,
     clear_index_path,
     ensure_metadata_table,
     get_index_for_path,
@@ -30,6 +31,7 @@ from cocosearch.management.stats import (
 )
 
 __all__ = [
+    "auto_recover_stale_indexing",
     "clear_index",
     "clear_index_path",
     "derive_index_from_git",

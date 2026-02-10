@@ -22,6 +22,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_active_indexing: dict[str, threading.Thread] = {}
+
 from pathlib import Path  # noqa: E402
 from typing import Annotated  # noqa: E402
 
@@ -177,6 +179,14 @@ async def api_reindex(request):
 
     source_path = metadata["canonical_path"]
 
+    # Reject if a previous indexing thread is still alive
+    prev = _active_indexing.get(index_name)
+    if prev is not None and prev.is_alive():
+        return JSONResponse(
+            {"error": "Previous indexing still completing. Try again shortly."},
+            status_code=409,
+        )
+
     # Set status to indexing
     try:
         set_index_status(index_name, "indexing")
@@ -199,12 +209,16 @@ async def api_reindex(request):
             logger.error(f"Background reindex failed: {exc}")
         finally:
             try:
-                set_index_status(index_name, "error" if failed else "indexed")
+                current = get_index_metadata(index_name)
+                if current and current.get("status") == "indexing":
+                    set_index_status(index_name, "error" if failed else "indexed")
             except Exception:
                 pass
+            _active_indexing.pop(index_name, None)
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
+    _active_indexing[index_name] = thread
 
     action = "Fresh reindex" if fresh else "Reindex"
     return JSONResponse(
@@ -284,6 +298,14 @@ async def api_index(request):
     if not index_name:
         index_name = derive_index_name(project_path)
 
+    # Reject if a previous indexing thread is still alive
+    prev = _active_indexing.get(index_name)
+    if prev is not None and prev.is_alive():
+        return JSONResponse(
+            {"error": "Previous indexing still completing. Try again shortly."},
+            status_code=409,
+        )
+
     # Register metadata before starting
     try:
         ensure_metadata_table()
@@ -307,12 +329,16 @@ async def api_index(request):
             logger.error(f"Background indexing failed: {exc}")
         finally:
             try:
-                set_index_status(index_name, "error" if failed else "indexed")
+                current = get_index_metadata(index_name)
+                if current and current.get("status") == "indexing":
+                    set_index_status(index_name, "error" if failed else "indexed")
             except Exception:
                 pass
+            _active_indexing.pop(index_name, None)
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
+    _active_indexing[index_name] = thread
 
     return JSONResponse(
         {
@@ -320,6 +346,35 @@ async def api_index(request):
             "index_name": index_name,
             "message": f"Indexing started for '{index_name}' from {project_path}",
         }
+    )
+
+
+@mcp.custom_route("/api/stop-indexing", methods=["POST"])
+async def api_stop_indexing(request):
+    """Stop an in-progress indexing operation."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    index_name = body.get("index_name")
+    if not index_name:
+        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    thread = _active_indexing.get(index_name)
+    if thread is None or not thread.is_alive():
+        return JSONResponse(
+            {"error": f"No active indexing found for '{index_name}'"},
+            status_code=404,
+        )
+
+    try:
+        set_index_status(index_name, "indexed")
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to update status: {e}"}, status_code=500)
+
+    return JSONResponse(
+        {"success": True, "message": f"Indexing stopped for '{index_name}'"}
     )
 
 

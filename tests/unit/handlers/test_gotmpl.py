@@ -49,9 +49,7 @@ class TestGoTmplHandlerSeparatorSpec:
             assert "(?=" not in sep, f"Lookahead found in separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found in separator: {sep}"
-            assert "(?<!" not in sep, (
-                f"Negative lookbehind found in separator: {sep}"
-            )
+            assert "(?<!" not in sep, f"Negative lookbehind found in separator: {sep}"
 
 
 @pytest.mark.unit

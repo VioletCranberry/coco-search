@@ -7,7 +7,10 @@ for indexed codebases.
 from dataclasses import dataclass, asdict, field
 from datetime import datetime
 
-from cocosearch.management.metadata import get_index_metadata
+from cocosearch.management.metadata import (
+    auto_recover_stale_indexing,
+    get_index_metadata,
+)
 from cocosearch.search.db import get_connection_pool, get_table_name
 
 
@@ -215,6 +218,9 @@ class IndexStats:
     )
     source_path: str | None  # Canonical path where index was created from
     status: str | None  # Index status: 'indexed', 'indexing', etc.
+    indexing_elapsed_seconds: (
+        float | None
+    )  # Seconds since indexing started (only when status='indexing')
     repo_url: str | None  # Browsable HTTPS URL for the git remote origin
     grammars: list[dict] = field(default_factory=list)  # Per-grammar stats
 
@@ -684,12 +690,18 @@ def get_comprehensive_stats(
     # Check staleness
     is_stale, staleness_days = check_staleness(index_name, staleness_threshold)
 
+    # Auto-recover indexes stuck in 'indexing' status (e.g., interrupted process)
+    auto_recover_stale_indexing(index_name)
+
     # Get metadata (timestamps, source path, status)
     metadata = get_index_metadata(index_name)
     created_at = metadata["created_at"] if metadata else None
     updated_at = metadata["updated_at"] if metadata else None
     source_path = metadata.get("canonical_path") if metadata else None
     status = metadata.get("status", "indexed") if metadata else None
+    indexing_elapsed_seconds = (
+        metadata.get("indexing_elapsed_seconds") if metadata else None
+    )
 
     # Derive repo URL from source path
     from cocosearch.management.git import get_repo_url
@@ -715,6 +727,7 @@ def get_comprehensive_stats(
         parse_stats=parse_stats,
         source_path=source_path,
         status=status,
+        indexing_elapsed_seconds=indexing_elapsed_seconds,
         repo_url=repo_url,
         grammars=grammars,
     )

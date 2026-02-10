@@ -12,6 +12,7 @@ from cocosearch.management.stats import (
     check_staleness,
     collect_warnings,
     format_bytes,
+    get_comprehensive_stats,
     get_grammar_stats,
     get_parse_failures,
     get_parse_stats,
@@ -207,6 +208,7 @@ class TestIndexStats:
             parse_stats={},
             source_path="/path/to/project",
             status="indexed",
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
         assert stats.name == "test"
@@ -246,6 +248,7 @@ class TestIndexStats:
             parse_stats={},
             source_path="/path/to/project",
             status="indexed",
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
         result = stats.to_dict()
@@ -273,6 +276,7 @@ class TestIndexStats:
             parse_stats={},
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
         result = stats.to_dict()
@@ -647,6 +651,7 @@ class TestIndexStatsWithParseStats:
             },
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
         d = stats.to_dict()
@@ -671,6 +676,7 @@ class TestIndexStatsWithParseStats:
             parse_stats={},
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
         d = stats.to_dict()
@@ -817,6 +823,7 @@ class TestIndexStatsGrammarsField:
             parse_stats={},
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
         assert stats.grammars == []
@@ -850,8 +857,52 @@ class TestIndexStatsGrammarsField:
             parse_stats={},
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
             grammars=grammar_data,
         )
         d = stats.to_dict()
         assert d["grammars"] == grammar_data
+
+
+class TestComprehensiveStatsAutoRecovery:
+    """Tests that get_comprehensive_stats triggers auto-recovery of stale indexing."""
+
+    def test_calls_auto_recover_before_reading_metadata(self):
+        """get_comprehensive_stats calls auto_recover_stale_indexing."""
+        with (
+            patch("cocosearch.management.stats.get_stats") as mock_stats,
+            patch("cocosearch.management.stats.get_language_stats", return_value=[]),
+            patch("cocosearch.management.stats.get_symbol_stats", return_value={}),
+            patch("cocosearch.management.stats.get_parse_stats", return_value={}),
+            patch("cocosearch.management.stats.get_grammar_stats", return_value=[]),
+            patch(
+                "cocosearch.management.stats.check_staleness", return_value=(False, 0)
+            ),
+            patch(
+                "cocosearch.management.stats.get_index_metadata",
+                return_value={
+                    "index_name": "test",
+                    "canonical_path": "/path",
+                    "created_at": None,
+                    "updated_at": None,
+                    "status": "indexed",
+                },
+            ),
+            patch(
+                "cocosearch.management.stats.auto_recover_stale_indexing"
+            ) as mock_recover,
+            patch("cocosearch.management.stats.collect_warnings", return_value=[]),
+            patch("cocosearch.management.git.get_repo_url", return_value=None),
+        ):
+            mock_stats.return_value = {
+                "name": "test",
+                "file_count": 10,
+                "chunk_count": 50,
+                "storage_size": 1024,
+                "storage_size_pretty": "1.0 KB",
+            }
+            result = get_comprehensive_stats("test")
+
+        mock_recover.assert_called_once_with("test")
+        assert result.status == "indexed"

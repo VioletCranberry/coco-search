@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from cocosearch.management.metadata import (
-    STALE_INDEXING_TIMEOUT_SECONDS,
+    auto_recover_stale_indexing,
     ensure_metadata_table,
     get_index_metadata,
     get_index_for_path,
@@ -130,13 +130,11 @@ class TestGetIndexMetadata:
 
 
 class TestStaleIndexingDetection:
-    """Tests for auto-recovery of stale 'indexing' status."""
+    """Tests for indexing elapsed time reporting (read-only, no DB mutation)."""
 
-    def test_stale_indexing_recovered_to_error(self, mock_db_pool):
-        """get_index_metadata returns 'error' for stale 'indexing' status."""
-        stale_time = datetime.now() - timedelta(
-            seconds=STALE_INDEXING_TIMEOUT_SECONDS + 60
-        )
+    def test_stale_indexing_preserves_status(self, mock_db_pool):
+        """get_index_metadata keeps 'indexing' status even when stale (no auto-recovery)."""
+        stale_time = datetime.now() - timedelta(seconds=300 + 60)
         pool, cursor, conn = mock_db_pool(
             results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
         )
@@ -146,13 +144,13 @@ class TestStaleIndexingDetection:
         ):
             result = get_index_metadata("myindex")
 
-        assert result["status"] == "error"
+        # Status should remain "indexing" — read path must not mutate
+        assert result["status"] == "indexing"
+        assert result["indexing_elapsed_seconds"] > 300
 
-    def test_stale_indexing_issues_db_update(self, mock_db_pool):
-        """get_index_metadata writes 'error' back to DB for stale status."""
-        stale_time = datetime.now() - timedelta(
-            seconds=STALE_INDEXING_TIMEOUT_SECONDS + 60
-        )
+    def test_stale_indexing_no_db_update(self, mock_db_pool):
+        """get_index_metadata never writes to DB (read-only operation)."""
+        stale_time = datetime.now() - timedelta(seconds=300 + 60)
         pool, cursor, conn = mock_db_pool(
             results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
         )
@@ -162,14 +160,11 @@ class TestStaleIndexingDetection:
         ):
             get_index_metadata("myindex")
 
-        # Should have issued an UPDATE after the SELECT
-        assert len(cursor.calls) == 2
-        update_sql = cursor.calls[1][0]
-        assert "UPDATE" in update_sql
-        assert "status = 'error'" in update_sql
+        # Only the SELECT — no UPDATE should be issued
+        assert len(cursor.calls) == 1
 
-    def test_fresh_indexing_not_recovered(self, mock_db_pool):
-        """get_index_metadata keeps 'indexing' status if within timeout."""
+    def test_fresh_indexing_includes_elapsed(self, mock_db_pool):
+        """get_index_metadata includes elapsed seconds for active indexing."""
         fresh_time = datetime.now() - timedelta(seconds=60)
         pool, cursor, conn = mock_db_pool(
             results=[("myindex", "/path", "2024-01-01", fresh_time, "indexing")]
@@ -181,11 +176,12 @@ class TestStaleIndexingDetection:
             result = get_index_metadata("myindex")
 
         assert result["status"] == "indexing"
+        assert 50 < result["indexing_elapsed_seconds"] < 120
         # No UPDATE should be issued
         assert len(cursor.calls) == 1
 
-    def test_indexed_status_not_affected(self, mock_db_pool):
-        """get_index_metadata leaves 'indexed' status untouched."""
+    def test_indexed_status_no_elapsed(self, mock_db_pool):
+        """get_index_metadata omits elapsed for non-indexing status."""
         old_time = datetime.now() - timedelta(hours=24)
         pool, cursor, conn = mock_db_pool(
             results=[("myindex", "/path", "2024-01-01", old_time, "indexed")]
@@ -197,35 +193,88 @@ class TestStaleIndexingDetection:
             result = get_index_metadata("myindex")
 
         assert result["status"] == "indexed"
+        assert "indexing_elapsed_seconds" not in result
         assert len(cursor.calls) == 1
 
-    def test_stale_recovery_db_failure_still_returns_error(self, mock_db_pool):
-        """get_index_metadata returns 'error' even if DB update fails."""
-        stale_time = datetime.now() - timedelta(
-            seconds=STALE_INDEXING_TIMEOUT_SECONDS + 60
-        )
+
+class TestAutoRecoverStaleIndexing:
+    """Tests for auto_recover_stale_indexing function."""
+
+    def test_recovers_stale_indexing_status(self, mock_db_pool):
+        """auto_recover_stale_indexing flips 'indexing' to 'indexed' after threshold."""
+        stale_time = datetime.now() - timedelta(seconds=300 + 60)
         pool, cursor, conn = mock_db_pool(
             results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
         )
-        # Make the UPDATE fail
-        original_execute = cursor.execute
-        call_count = [0]
-
-        def execute_failing_on_second(query, params=None):
-            call_count[0] += 1
-            if call_count[0] == 2:
-                raise RuntimeError("DB write failed")
-            return original_execute(query, params)
-
-        cursor.execute = execute_failing_on_second
+        cursor.rowcount = 1
 
         with patch(
             "cocosearch.management.metadata.get_connection_pool", return_value=pool
         ):
-            result = get_index_metadata("myindex")
+            result = auto_recover_stale_indexing("myindex")
 
-        # Should still return "error" even though DB update failed
-        assert result["status"] == "error"
+        assert result is True
+        # Should have issued a SELECT (get_index_metadata) + UPDATE (set_index_status)
+        assert len(cursor.calls) == 2
+        assert "UPDATE" in cursor.calls[1][0]
+
+    def test_skips_fresh_indexing_status(self, mock_db_pool):
+        """auto_recover_stale_indexing does not recover fresh indexing."""
+        fresh_time = datetime.now() - timedelta(seconds=60)
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", fresh_time, "indexing")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = auto_recover_stale_indexing("myindex")
+
+        assert result is False
+        # Only the SELECT — no UPDATE
+        assert len(cursor.calls) == 1
+
+    def test_skips_already_indexed(self, mock_db_pool):
+        """auto_recover_stale_indexing does nothing for 'indexed' status."""
+        old_time = datetime.now() - timedelta(hours=24)
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", old_time, "indexed")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = auto_recover_stale_indexing("myindex")
+
+        assert result is False
+        assert len(cursor.calls) == 1
+
+    def test_skips_nonexistent_index(self, mock_db_pool):
+        """auto_recover_stale_indexing returns False for missing index."""
+        pool, cursor, conn = mock_db_pool(results=[])
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = auto_recover_stale_indexing("nonexistent")
+
+        assert result is False
+
+    def test_threshold_boundary(self, mock_db_pool):
+        """auto_recover_stale_indexing does not recover below the threshold."""
+        # Just below threshold (299 seconds) - should NOT recover
+        boundary_time = datetime.now() - timedelta(seconds=299)
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", boundary_time, "indexing")]
+        )
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = auto_recover_stale_indexing("myindex")
+
+        assert result is False
+        assert len(cursor.calls) == 1
 
 
 class TestRegisterIndexPath:

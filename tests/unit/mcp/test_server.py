@@ -250,6 +250,7 @@ class TestIndexStats:
             parse_stats={},
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
 
@@ -294,6 +295,7 @@ class TestIndexStats:
             parse_stats={},
             source_path=None,
             status=None,
+            indexing_elapsed_seconds=None,
             repo_url=None,
         )
 

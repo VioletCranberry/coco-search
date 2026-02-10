@@ -64,6 +64,9 @@ class IndexingConfig(BaseModel):
         # Handler files (Bash/Shell)
         "*.sh",
         "*.bash",
+        # Handler files (Go Templates)
+        "*.tpl",
+        "*.gotmpl",
     ]
     exclude_patterns: list[str] = []
     chunk_size: int = 1000  # bytes

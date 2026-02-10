@@ -1094,7 +1094,7 @@ def grammars_command(args: argparse.Namespace) -> int:
 
         table = Table(title="Supported Grammars")
         table.add_column("Grammar", style="cyan", no_wrap=True)
-        table.add_column("Base Language", style="dim")
+        table.add_column("File Format", style="dim")
         table.add_column("Path Patterns", style="dim")
 
         for g in grammars:
@@ -1106,7 +1106,7 @@ def grammars_command(args: argparse.Namespace) -> int:
 
         console.print(table)
         console.print(
-            "\n[dim]Grammars provide domain-specific chunking for files within a base language.[/dim]"
+            "\n[dim]Grammars provide domain-specific chunking for specific file formats.[/dim]"
         )
 
     return 0
@@ -1622,7 +1622,7 @@ def main() -> None:
     grammars_parser = subparsers.add_parser(
         "grammars",
         help="List supported grammars",
-        description="Show domain-specific grammars that provide structured chunking within a base language.",
+        description="Show domain-specific grammars that provide structured chunking for specific file formats.",
     )
     grammars_parser.add_argument(
         "--json",
@@ -1750,14 +1750,31 @@ def main() -> None:
         "--help",
     )
 
+    # Handle <index_name> <subcommand> shorthand
+    # e.g., `cocosearch helm_charts stats` → `cocosearch stats helm_charts`
+    # e.g., `cocosearch helm_charts search "query"` → `cocosearch search -n helm_charts "query"`
+    index_positional_subcommands = {"stats", "clear"}
+    index_flag_subcommands = {"search", "index"}
+    index_aware_subcommands = index_positional_subcommands | index_flag_subcommands
+
+    if (
+        len(sys.argv) > 2
+        and sys.argv[1] not in known_subcommands
+        and not sys.argv[1].startswith("-")
+        and sys.argv[2] in index_aware_subcommands
+    ):
+        index_name_arg = sys.argv[1]
+        subcmd = sys.argv[2]
+        if subcmd in index_positional_subcommands:
+            sys.argv = [sys.argv[0], subcmd, index_name_arg] + sys.argv[3:]
+        else:
+            sys.argv = [sys.argv[0], subcmd, "-n", index_name_arg] + sys.argv[3:]
+
     # Handle default action (query without subcommand)
     # Check before parsing if first argument is not a known subcommand
     # Supports: `cocosearch "query"` or `cocosearch --interactive`
-    if len(sys.argv) > 1 and sys.argv[1] not in known_subcommands:
-        first_arg = sys.argv[1]
-        # If it's a flag (like --interactive) or a query, insert "search"
-        if first_arg.startswith("-") or not first_arg.startswith("-"):
-            sys.argv.insert(1, "search")
+    elif len(sys.argv) > 1 and sys.argv[1] not in known_subcommands:
+        sys.argv.insert(1, "search")
 
     # Parse args
     args = parser.parse_args()
