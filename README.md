@@ -1,12 +1,12 @@
 # Coco-s
 
-Coco[-S]earch is a local-first hybrid semantic code search tool powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/). It indexes codebases into PostgreSQL with pgvector embeddings (via Ollama) and provides search through CLI, MCP server, or interactive REPL. No external APIs — everything runs locally. Incremental updates by default. `.gitignore` is respected.
+Coco[-S]earch is a local-first hybrid semantic code search tool powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/). It indexes codebases into PostgreSQL with pgvector embeddings (via Ollama) and provides search through CLI, MCP server, or interactive REPL. No external APIs — everything runs locally. Incremental updates by default. `.gitignore` is respected. Supports 30 [languages](#supported-languages) with symbol extraction for 12, plus domain-specific [grammars](#supported-grammars) for structured config files.
 
 ## Disclaimer
 
-This is a personal initiative built using [GSD](https://github.com/glittercowboy/get-shit-done), with manual refinements. It was designed as a local-first, private solution to accelerate self-onboarding and explore spec-driven development. The project features both a Command Line Interface (CLI) and MCP tools, alongside dashboards (TUI/WEB), API for quick status checks and useful [Claude SKILLS](https://code.claude.com/docs/en/skills).
+A personal initiative, originally scaffolded with [GSD](https://github.com/glittercowboy/get-shit-done) and refined by hand. Built as a local-first, private tool for accelerating self-onboarding and exploring spec-driven development. Ships with a CLI, MCP tools, dashboards (TUI/WEB), a status API, and reusable [Claude SKILLS](https://code.claude.com/docs/en/skills).
 
-## Where CocoSearch MCP wins (fewer tokens, fewer round-trips)
+## Where MCP wins (fewer tokens, fewer round-trips)
 
 For codebases of meaningful size, CocoSearch reduces the number of MCP tool calls needed to find relevant code — often from 5-15 iterative grep/read cycles down to 1-2 semantic searches. This means fewer round-trips, less irrelevant content in the context window, and lower token consumption for exploratory and intent-based queries.
 
@@ -80,10 +80,18 @@ done
 
 ## Supported Languages
 
-CocoSearch indexes 30 programming languages via Tree-sitter. Symbol extraction (for `--symbol-type` and `--symbol-name` filtering) is available for 12 languages.
+CocoSearch indexes 30 programming languages. Chunking strategy depends on the language:
+
+- **Tree-sitter chunking (~20 languages)**: CocoIndex's `SplitRecursively` uses Tree-sitter internally to split at syntax-aware boundaries (function/class edges). Covers Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, C#, Ruby, PHP, and others in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages).
+- **Custom handler chunking (3 languages)**: HCL, Dockerfile, and Bash use regex-based `CustomLanguageSpec` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
+- **Text fallback**: Languages not recognized by either tier (Markdown, JSON, YAML, TOML, etc.) are split on blank lines and whitespace boundaries.
+
+Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 12 languages:
 
 - **Full Support (Symbol-Aware)**: Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, Ruby, PHP, HCL, Bash. All features: hybrid search, symbol filtering, smart context expansion. Symbol types extracted: `function`, `class`, `method`, `interface`.
 - **Basic Support**: C#, CSS, Fortran, HTML, JSON, Kotlin, Markdown, Pascal, R, Scala, Solidity, SQL, Swift, TOML, XML, YAML, Dockerfile, and more. Features: hybrid search, semantic + keyword search.
+
+See [Adding Languages](./docs/adding-languages.md) for details on how these tiers work and how to add new languages or grammars.
 
 ```bash
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch languages
@@ -92,24 +100,24 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch languages
 ┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃ Language   ┃ Extensions                  ┃ Symbols ┃
 ┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ C          │ .c, .h                      │    ✗    │
-│ C++        │ .cpp, .cc, .cxx, .hpp, .hxx │    ✗    │
+│ C          │ .c, .h                      │    ✓    │
+│ C++        │ .cpp, .cc, .cxx, .hpp, .hxx │    ✓    │
 │ C#         │ .cs                         │    ✗    │
 │ CSS        │ .css, .scss                 │    ✗    │
 │ DTD        │ .dtd                        │    ✗    │
 │ Fortran    │ .f, .f90, .f95, .f03        │    ✗    │
 │ Go         │ .go                         │    ✓    │
 │ HTML       │ .html, .htm                 │    ✗    │
-│ Java       │ .java                       │    ✗    │
+│ Java       │ .java                       │    ✓    │
 │ Javascript │ .js, .mjs, .cjs, .jsx       │    ✓    │
 │ JSON       │ .json                       │    ✗    │
 │ Kotlin     │ .kt, .kts                   │    ✗    │
 │ Markdown   │ .md, .mdx                   │    ✗    │
 │ Pascal     │ .pas, .dpr                  │    ✗    │
-│ Php        │ .php                        │    ✗    │
+│ Php        │ .php                        │    ✓    │
 │ Python     │ .py, .pyw, .pyi             │    ✓    │
 │ R          │ .r, .R                      │    ✗    │
-│ Ruby       │ .rb                         │    ✗    │
+│ Ruby       │ .rb                         │    ✓    │
 │ Rust       │ .rs                         │    ✓    │
 │ Scala      │ .scala                      │    ✗    │
 │ Solidity   │ .sol                        │    ✗    │
@@ -125,6 +133,28 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch languages
 └────────────┴─────────────────────────────┴─────────┘
 
 Symbol-aware languages support --symbol-type and --symbol-name filtering.
+```
+
+## Supported Grammars
+
+Beyond language-level support, CocoSearch recognizes **grammars** -- domain-specific schemas within a base language. A **language** is matched by file extension (e.g., `.yaml` -> YAML), while a **grammar** is matched by file path and content patterns (e.g., `.github/workflows/ci.yml` containing `on:` + `jobs:` -> GitHub Actions). Grammars provide structured chunking and richer metadata (job names, service names, stages) compared to generic text chunking.
+
+Priority: Grammar match > Language match > TextHandler fallback.
+
+```bash
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch grammars
+
+                             Supported Grammars
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Grammar        ┃ Base Language ┃ Path Patterns                                          ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ docker-compose │ yaml          │ docker-compose*.yml, docker-compose*.yaml,             │
+│                │               │ compose*.yml, compose*.yaml                            │
+│ github-actions │ yaml          │ .github/workflows/*.yml, .github/workflows/*.yaml      │
+│ gitlab-ci      │ yaml          │ .gitlab-ci.yml                                         │
+└────────────────┴───────────────┴────────────────────────────────────────────────────────┘
+
+Grammars provide domain-specific chunking for files within a base language.
 ```
 
 ## Features

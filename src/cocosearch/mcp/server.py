@@ -212,7 +212,6 @@ async def api_reindex(request):
     )
 
 
-
 @mcp.custom_route("/api/project", methods=["GET"])
 async def api_project(request):
     """Return current project context based on COCOSEARCH_PROJECT_PATH."""

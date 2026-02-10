@@ -97,6 +97,11 @@ SYMBOL_AWARE_LANGUAGES = {
     "typescript",
     "go",
     "rust",
+    "java",
+    "c",
+    "cpp",
+    "ruby",
+    "php",
     "hcl",
     "bash",
 }

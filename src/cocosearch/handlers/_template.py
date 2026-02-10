@@ -8,6 +8,9 @@ Example: To add support for YAML files, copy this to yaml.py and:
 3. Define SEPARATOR_SPEC with appropriate regex separators
 4. Implement _extract_metadata() with YAML-specific logic
 
+For domain-specific schemas within a language (e.g., GitHub Actions is
+a grammar of YAML), see grammars/_template.py instead.
+
 For full documentation, see handlers/README.md
 """
 

@@ -1,14 +1,28 @@
 # Adding Language Support
 
-CocoSearch has two independent systems for language support:
+## Chunking Tiers
 
-1. **Language Handlers** (`src/cocosearch/handlers/`) — chunking and metadata extraction for languages processed outside Tree-sitter's built-in language list.
-2. **Symbol Extraction** (`src/cocosearch/indexer/symbols.py`) — tree-sitter query-based extraction of functions, classes, methods, and other symbols for `--symbol-type` / `--symbol-name` filtering.
+Every indexed file is chunked by CocoIndex's `SplitRecursively`. The chunking strategy depends on what the `language` parameter resolves to:
+
+| Tier | How it works | Languages |
+|------|-------------|-----------|
+| **Tree-sitter (CocoIndex built-in)** | `SplitRecursively` uses Tree-sitter internally to split at syntax boundaries (function/class edges) | Python, JS, TS, Go, Rust, Java, C, C++, C#, Ruby, PHP, and ~10 more in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages) |
+| **Custom handler regex** | `SplitRecursively` receives a `CustomLanguageSpec` with hierarchical regex separators | HCL, Dockerfile, Bash (language handlers) + GitHub Actions, GitLab CI, Docker Compose (grammar handlers) |
+| **Plain-text fallback** | Splits on blank lines, newlines, whitespace | Everything not matched by either tier above |
+
+## Systems Overview
+
+CocoSearch has three independent systems for language support:
+
+1. **Language Handlers** (`src/cocosearch/handlers/`) — custom chunking and metadata extraction for languages not in CocoIndex's built-in Tree-sitter list. Matched by file extension.
+2. **Grammar Handlers** (`src/cocosearch/handlers/grammars/`) — domain-specific chunking for files that share a base language but have distinct structure (e.g., GitHub Actions is a grammar of YAML). Matched by file path + content patterns.
+3. **Symbol Extraction** (`src/cocosearch/indexer/symbols.py`) — tree-sitter query-based extraction of functions, classes, methods, and other symbols for `--symbol-type` / `--symbol-name` filtering.
 
 These systems are independent. A language can have:
 - A handler only (e.g., Dockerfile, Bash)
 - Symbol extraction only (e.g., Java, C, Ruby)
 - Both (e.g., HCL/Terraform)
+- A grammar handler (e.g., GitHub Actions, GitLab CI, Docker Compose)
 
 ## Checking Tree-sitter's Built-in Language List
 
@@ -155,9 +169,66 @@ HCL/Terraform is a worked example of a language with both systems.
 - `SYMBOL_AWARE_LANGUAGES` in `search/query.py` includes `"hcl"`
 - `cli.py` `languages_command` shows HCL with checkmark and all three extensions
 
+## Path D: Adding a Grammar Handler (Domain-Specific Schema)
+
+Use this when multiple domain syntaxes share the same file extension and you want structured chunking and metadata for a specific schema. For example, GitHub Actions, GitLab CI, and Docker Compose are all YAML files, but each has distinct structure.
+
+**Language vs Grammar:**
+- A **language** is matched by file extension (1:1 mapping, e.g., `.tf` -> HCL)
+- A **grammar** is matched by file path + content patterns (e.g., `.github/workflows/*.yml` with `on:` + `jobs:` -> GitHub Actions)
+
+Priority: Grammar match > Language match > TextHandler fallback.
+
+### How it works
+
+`extract_language()` in `indexer/embedder.py` checks grammar handlers first. If a grammar matches, it returns the grammar name (e.g., `"github-actions"`) instead of the file extension. This grammar name flows through the pipeline:
+- `SplitRecursively` uses the grammar's `CustomLanguageSpec` for chunking
+- `extract_chunk_metadata` dispatches to the grammar handler for metadata
+
+### Steps
+
+1. **Copy the template:**
+   ```bash
+   cp src/cocosearch/handlers/grammars/_template.py src/cocosearch/handlers/grammars/<grammar>.py
+   ```
+
+2. **Implement the grammar handler class:**
+   - Set `GRAMMAR_NAME` to a unique identifier (lowercase, hyphenated, e.g., `"github-actions"`)
+   - Set `BASE_LANGUAGE` to the base language (e.g., `"yaml"`)
+   - Set `PATH_PATTERNS` to glob patterns matching the file paths
+   - Define `SEPARATOR_SPEC` with `CustomLanguageSpec` (or `None` for default)
+   - Implement `matches(filepath, content)` for path + content detection
+   - Implement `extract_metadata(text)` returning `block_type`, `hierarchy`, and `language_id`
+
+3. **Important constraints:**
+   - Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
+   - The grammar is autodiscovered at import time; no registration code needed
+   - `matches()` should check path first, then optionally validate content markers
+
+4. **Add tests:**
+   ```bash
+   touch tests/unit/handlers/grammars/test_<grammar>.py
+   uv run pytest tests/unit/handlers/grammars/test_<grammar>.py -v
+   ```
+
+### Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `src/cocosearch/handlers/grammars/<grammar>.py` | Create — grammar handler class |
+| `tests/unit/handlers/grammars/test_<grammar>.py` | Create — grammar handler tests |
+
+### Existing grammar handlers
+
+| Grammar | Base Language | Path Patterns | Content Markers |
+|---------|-------------|---------------|-----------------|
+| `github-actions` | yaml | `.github/workflows/*.yml` | `on:` + `jobs:` |
+| `gitlab-ci` | yaml | `.gitlab-ci.yml` | `stages:` or (`script:` + `image:`/`stage:`) |
+| `docker-compose` | yaml | `docker-compose*.yml`, `compose*.yml` | `services:` |
+
 ## Registration Checklist
 
-When adding a new language, verify all registrations are complete:
+When adding a new language handler, verify all registrations are complete:
 
 - [ ] **Handler** (if applicable): `handlers/<language>.py` created, extensions registered via autodiscovery
 - [ ] **LANGUAGE_MAP** (if symbol extraction): all file extensions mapped to tree-sitter language name
@@ -169,7 +240,14 @@ When adding a new language, verify all registrations are complete:
 - [ ] **Tests**: handler tests and/or symbol extraction tests added
 - [ ] **README.md**: Supported Languages section updated (count, table, lists)
 
+When adding a new grammar handler:
+
+- [ ] **Grammar handler**: `handlers/grammars/<grammar>.py` created with `GRAMMAR_NAME`, `BASE_LANGUAGE`, `PATH_PATTERNS`, `matches()`, `extract_metadata()`
+- [ ] **Tests**: `tests/unit/handlers/grammars/test_<grammar>.py` created
+- [ ] **README.md**: Supported Grammars section updated
+
 ## Reference
 
 - [handlers/README.md](../src/cocosearch/handlers/README.md) — handler protocol, separator design, testing
+- [handlers/grammars/_template.py](../src/cocosearch/handlers/grammars/_template.py) — grammar handler template
 - [CLAUDE.md](../CLAUDE.md) — quick handler steps, architecture overview

@@ -127,9 +127,9 @@ class TestBashLanguage:
 class TestDevopsCustomLanguages:
     """Tests for HANDLER_CUSTOM_LANGUAGES aggregated list."""
 
-    def test_contains_all_three_specs(self):
-        """HANDLER_CUSTOM_LANGUAGES should contain exactly three specs."""
-        assert len(HANDLER_CUSTOM_LANGUAGES) == 3
+    def test_contains_all_six_specs(self):
+        """HANDLER_CUSTOM_LANGUAGES should contain 6 specs (3 language + 3 grammar)."""
+        assert len(HANDLER_CUSTOM_LANGUAGES) == 6
 
     def test_contains_hcl(self):
         """HANDLER_CUSTOM_LANGUAGES should contain the HCL spec."""

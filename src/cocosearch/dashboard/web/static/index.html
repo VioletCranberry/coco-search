@@ -21,21 +21,35 @@
             --shadow: rgba(0, 0, 0, 0.1);
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-primary: #1a1a1a;
-                --bg-secondary: #2d2d2d;
-                --bg-card: #252525;
-                --border-color: #404040;
-                --text-primary: #e0e0e0;
-                --text-secondary: #b0b0b0;
-                --text-muted: #707070;
-                --accent-blue: #64B5F6;
-                --accent-green: #81C784;
-                --accent-orange: #FFB74D;
-                --accent-red: #E57373;
-                --shadow: rgba(0, 0, 0, 0.3);
-            }
+        :root[data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-card: #252525;
+            --border-color: #404040;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-muted: #707070;
+            --accent-blue: #64B5F6;
+            --accent-green: #81C784;
+            --accent-orange: #FFB74D;
+            --accent-red: #E57373;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        .theme-toggle {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            line-height: 1;
+        }
+
+        .theme-toggle:hover {
+            opacity: 0.8;
         }
 
         * {
@@ -63,11 +77,17 @@
             border-bottom: 2px solid var(--border-color);
         }
 
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
         h1 {
             font-size: 28px;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 8px;
         }
 
         .subtitle {
@@ -420,7 +440,10 @@
 <body>
     <div class="container">
         <header>
-            <h1>CocoSearch Dashboard</h1>
+            <div class="header-title">
+                <h1>CocoSearch Dashboard</h1>
+                <button id="themeToggle" class="theme-toggle" onclick="cycleTheme()" title="Theme: System"></button>
+            </div>
             <p class="subtitle">Real-time code index statistics and health monitoring</p>
             <p id="repoUrl" style="font-size: 13px; margin-top: 4px; display: none;">
                 <a id="repoUrlLink" href="#" target="_blank" rel="noopener noreferrer"
@@ -504,6 +527,12 @@
                         <canvas id="symbolChart"></canvas>
                     </div>
                 </div>
+                <div class="chart-card" id="grammarDistributionSection" style="display: none;">
+                    <h2>Grammar Distribution</h2>
+                    <div class="chart-container">
+                        <canvas id="grammarChart"></canvas>
+                    </div>
+                </div>
             </div>
 
             <div id="parseHealthSection" class="chart-card" style="display: none;">
@@ -527,6 +556,25 @@
                     <div class="failure-list" id="parseFailuresList"></div>
                 </details>
             </div>
+
+            <div id="grammarHealthSection" class="chart-card" style="display: none;">
+                <h2>Parse Health by Grammar</h2>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 12px;">Grammar handlers provide domain-specific chunking. Health measures metadata extraction quality.</p>
+                <table class="parse-table">
+                    <thead>
+                        <tr>
+                            <th>Grammar</th>
+                            <th>Base</th>
+                            <th class="num">Files</th>
+                            <th class="num">Chunks</th>
+                            <th class="num">Recognized</th>
+                            <th class="num">Unrecognized</th>
+                            <th class="num">Health</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grammarHealthTableBody"></tbody>
+                </table>
+            </div>
         </div>
 
         <footer>
@@ -537,8 +585,41 @@
     <script>
         let languageChart = null;
         let symbolChart = null;
+        let grammarChart = null;
         let allIndexes = [];
         let projectContext = null;
+
+        function isDarkMode() {
+            return document.documentElement.getAttribute('data-theme') === 'dark';
+        }
+
+        function applyTheme(mode) {
+            document.documentElement.setAttribute('data-theme', mode);
+            const btn = document.getElementById('themeToggle');
+            btn.textContent = mode === 'dark' ? '\u{1F319}' : '\u2600\uFE0F';
+            btn.title = 'Switch to ' + (mode === 'dark' ? 'light' : 'dark') + ' theme';
+        }
+
+        function cycleTheme() {
+            const next = isDarkMode() ? 'light' : 'dark';
+            localStorage.setItem('cocosearch-theme', next);
+            applyTheme(next);
+            // Refresh charts with new colors
+            const select = document.getElementById('indexSelect');
+            const indexIndex = parseInt(select.value);
+            if (!isNaN(indexIndex) && allIndexes[indexIndex]) {
+                updateDashboard(allIndexes[indexIndex]);
+            }
+        }
+
+        // Apply saved theme (default to OS preference on first visit)
+        (function() {
+            let saved = localStorage.getItem('cocosearch-theme');
+            if (!saved) {
+                saved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            applyTheme(saved);
+        })();
 
         async function loadProjectContext() {
             try {
@@ -675,8 +756,7 @@
                 languageChart.destroy();
             }
 
-            // Detect color scheme
-            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = isDarkMode();
             const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
             const gridColor = isDark ? '#404040' : '#e0e0e0';
 
@@ -745,8 +825,7 @@
                 symbolChart.destroy();
             }
 
-            // Detect color scheme
-            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = isDarkMode();
             const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
             const gridColor = isDark ? '#404040' : '#e0e0e0';
 
@@ -884,11 +963,92 @@
             details.style.display = 'block';
         }
 
+        function updateGrammarChart(grammars) {
+            const section = document.getElementById('grammarDistributionSection');
+            const ctx = document.getElementById('grammarChart');
+
+            if (!grammars || grammars.length === 0) {
+                section.style.display = 'none';
+                if (grammarChart) {
+                    grammarChart.destroy();
+                    grammarChart = null;
+                }
+                return;
+            }
+
+            const labels = grammars.map(g => g.grammar_name);
+            const data = grammars.map(g => g.chunk_count);
+
+            if (grammarChart) {
+                grammarChart.destroy();
+            }
+
+            const isDark = isDarkMode();
+            const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
+            const gridColor = isDark ? '#404040' : '#e0e0e0';
+
+            grammarChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Chunks',
+                        data: data,
+                        backgroundColor: 'rgba(255, 152, 0, 0.7)',
+                        borderColor: 'rgba(255, 152, 0, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } },
+                        x: { ticks: { color: textColor }, grid: { color: gridColor } }
+                    }
+                }
+            });
+
+            section.style.display = 'block';
+        }
+
+        function updateGrammarHealthTable(grammars) {
+            const section = document.getElementById('grammarHealthSection');
+            const tbody = document.getElementById('grammarHealthTableBody');
+
+            if (!grammars || grammars.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            tbody.innerHTML = grammars.map(g => {
+                const pct = g.recognition_pct;
+                let healthColor = 'var(--accent-green)';
+                if (pct < 50) healthColor = 'var(--accent-red)';
+                else if (pct < 80) healthColor = 'var(--accent-orange)';
+
+                return `<tr>
+                    <td style="font-weight: 500">${escapeHtml(g.grammar_name)}</td>
+                    <td>${escapeHtml(g.base_language)}</td>
+                    <td class="num">${g.file_count}</td>
+                    <td class="num">${g.chunk_count}</td>
+                    <td class="num status-ok">${g.recognized_chunks}</td>
+                    <td class="num status-error">${g.unrecognized_chunks}</td>
+                    <td class="num" style="color: ${healthColor}; font-weight: 600">${pct}%</td>
+                </tr>`;
+            }).join('');
+
+            section.style.display = 'block';
+        }
+
         function updateDashboard(stats) {
             updateSummaryCards(stats);
             updateWarnings(stats.warnings);
             updateLanguageChart(stats.languages || []);
             updateSymbolChart(stats.symbols || {});
+            updateGrammarChart(stats.grammars || []);
+            updateGrammarHealthTable(stats.grammars || []);
             updateParseHealthTable(stats.parse_stats);
             updateParseFailures(stats.parse_failures);
         }
@@ -958,16 +1118,6 @@
         document.getElementById('indexSelect').addEventListener('change', (e) => {
             const indexIndex = parseInt(e.target.value);
             loadDashboard(indexIndex);
-        });
-
-        // Listen for color scheme changes
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-            // Reload charts with new colors
-            const select = document.getElementById('indexSelect');
-            const indexIndex = parseInt(select.value);
-            if (!isNaN(indexIndex) && allIndexes[indexIndex]) {
-                updateDashboard(allIndexes[indexIndex]);
-            }
         });
 
         let pollInterval = null;

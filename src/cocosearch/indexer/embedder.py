@@ -26,20 +26,30 @@ def extract_extension(filename: str) -> str:
 
 
 @cocoindex.op.function()
-def extract_language(filename: str) -> str:
+def extract_language(filename: str, content: str) -> str:
     """Extract language identifier for SplitRecursively routing.
 
-    Checks filename patterns first (for extensionless files like Dockerfile),
-    then falls back to extension-based detection. This ensures correct
-    language routing for handler-based files that use non-standard naming.
+    Checks grammar handlers first (path + content matching), then filename
+    patterns (for extensionless files like Dockerfile), then falls back to
+    extension-based detection.
+
+    Priority: Grammar match > Filename pattern > Extension.
 
     Args:
         filename: File name or path.
+        content: File content for grammar detection.
 
     Returns:
-        Language identifier string (e.g., "dockerfile", "py", "tf").
+        Language identifier string (e.g., "github-actions", "dockerfile", "py").
         Returns empty string if no language detected.
     """
+    from cocosearch.handlers import detect_grammar
+
+    # Grammar-based routing (path + content matching)
+    grammar = detect_grammar(filename, content)
+    if grammar is not None:
+        return grammar
+
     basename = os.path.basename(filename)
 
     # Filename-based routing (extensionless files)

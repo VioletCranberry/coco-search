@@ -74,9 +74,11 @@ def create_code_index_flow(
 
         # Step 3: Process each file
         with data_scope["files"].row() as file:
-            # Extract language identifier for routing (handles extensionless files like Dockerfile)
+            # Extract language identifier for routing (grammar > filename > extension)
             # Note: field is still called "extension" to minimize downstream changes
-            file["extension"] = file["filename"].transform(extract_language)
+            file["extension"] = file["filename"].transform(
+                extract_language, content=file["content"]
+            )
 
             # Chunk using Tree-sitter + custom handler languages (SplitRecursively)
             file["chunks"] = file["content"].transform(
@@ -223,12 +225,6 @@ def run_index(
                         f"DROP TABLE IF EXISTS cocosearch_parse_results_{index_name}"
                     )
                 conn.commit()
-        except Exception:
-            pass  # Non-critical cleanup
-        try:
-            from cocosearch.management.metadata import clear_index_path
-
-            clear_index_path(index_name)
         except Exception:
             pass  # Non-critical cleanup
         logger.info(f"Dropped flow for index '{index_name}' (--fresh)")

@@ -84,96 +84,135 @@ class TestExtractExtension:
 class TestExtractLanguage:
     """Tests for extract_language function.
 
-    The extract_language function routes extensionless files like Dockerfile
-    by filename pattern, and all other files by extension (same as extract_extension).
+    The extract_language function checks grammar handlers first (path + content),
+    then filename patterns (for extensionless files like Dockerfile),
+    then falls back to extension-based detection.
     """
 
     def test_hcl_tf_extension(self):
         """Routes .tf files by extension."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("main.tf") == "tf"
+        assert extract_language("main.tf", "resource {}") == "tf"
 
     def test_hcl_tfvars_extension(self):
         """Routes .tfvars files by extension."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("variables.tfvars") == "tfvars"
+        assert extract_language("variables.tfvars", "var = 1") == "tfvars"
 
     def test_hcl_hcl_extension(self):
         """Routes .hcl files by extension."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("config.hcl") == "hcl"
+        assert extract_language("config.hcl", "block {}") == "hcl"
 
     def test_dockerfile_exact(self):
         """Routes Dockerfile by filename pattern."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("Dockerfile") == "dockerfile"
+        assert extract_language("Dockerfile", "FROM ubuntu") == "dockerfile"
 
     def test_dockerfile_dev_variant(self):
         """Routes Dockerfile.dev by filename prefix."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("Dockerfile.dev") == "dockerfile"
+        assert extract_language("Dockerfile.dev", "FROM node") == "dockerfile"
 
     def test_dockerfile_production_variant(self):
         """Routes Dockerfile.production by filename prefix."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("Dockerfile.production") == "dockerfile"
+        assert extract_language("Dockerfile.production", "FROM python") == "dockerfile"
 
     def test_containerfile_exact_match(self):
         """Routes Containerfile by exact filename match."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("Containerfile") == "dockerfile"
+        assert extract_language("Containerfile", "FROM alpine") == "dockerfile"
 
     def test_shell_sh_extension(self):
         """Routes .sh files by extension."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("deploy.sh") == "sh"
+        assert extract_language("deploy.sh", "#!/bin/bash") == "sh"
 
     def test_shell_bash_extension(self):
         """Routes .bash files by extension."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("build.bash") == "bash"
+        assert extract_language("build.bash", "#!/bin/bash") == "bash"
 
     def test_non_handler_python(self):
         """Routes .py files by extension (non-handler, unchanged)."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("test.py") == "py"
+        assert extract_language("test.py", "def hello(): pass") == "py"
 
     def test_non_handler_javascript(self):
         """Routes .js files by extension (non-handler, unchanged)."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("app.js") == "js"
+        assert extract_language("app.js", "const x = 1") == "js"
 
     def test_extensionless_non_dockerfile(self):
         """Returns empty string for extensionless non-Dockerfile files."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("Makefile") == ""
+        assert extract_language("Makefile", "all: build") == ""
 
     def test_full_path_dockerfile(self):
         """Routes Dockerfile from full path."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("/path/to/Dockerfile") == "dockerfile"
+        assert extract_language("/path/to/Dockerfile", "FROM ubuntu") == "dockerfile"
 
     def test_full_path_dockerfile_variant(self):
         """Routes Dockerfile.dev from full path."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("/path/to/Dockerfile.dev") == "dockerfile"
+        assert extract_language("/path/to/Dockerfile.dev", "FROM node") == "dockerfile"
 
     def test_full_path_hcl(self):
         """Routes .tf from full path."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("/infra/main.tf") == "tf"
+        assert extract_language("/infra/main.tf", "resource {}") == "tf"
+
+    # Grammar-aware routing tests
+
+    def test_github_actions_grammar(self):
+        """Routes GitHub Actions workflow via grammar detection."""
+        from cocosearch.indexer.embedder import extract_language
+
+        content = "name: CI\non: push\njobs:\n  build:"
+        assert extract_language(".github/workflows/ci.yml", content) == "github-actions"
+
+    def test_gitlab_ci_grammar(self):
+        """Routes GitLab CI via grammar detection."""
+        from cocosearch.indexer.embedder import extract_language
+
+        content = "stages:\n  - build\nbuild:\n  script: make"
+        assert extract_language(".gitlab-ci.yml", content) == "gitlab-ci"
+
+    def test_docker_compose_grammar(self):
+        """Routes Docker Compose via grammar detection."""
+        from cocosearch.indexer.embedder import extract_language
+
+        content = "services:\n  web:\n    image: nginx"
+        assert extract_language("docker-compose.yml", content) == "docker-compose"
+
+    def test_generic_yaml_no_grammar(self):
+        """Generic YAML falls through to extension-based routing."""
+        from cocosearch.indexer.embedder import extract_language
+
+        assert extract_language("config.yml", "key: value") == "yml"
+
+    def test_grammar_priority_over_extension(self):
+        """Grammar detection takes priority over extension-based routing."""
+        from cocosearch.indexer.embedder import extract_language
+
+        content = "name: Deploy\non: push\njobs:\n  deploy:"
+        # Even though .yaml extension would return "yaml", grammar wins
+        result = extract_language(".github/workflows/deploy.yaml", content)
+        assert result == "github-actions"

@@ -17,6 +17,7 @@ import psycopg
 from tree_sitter_language_pack import get_parser as pack_get_parser
 
 from cocosearch.indexer.symbols import LANGUAGE_MAP
+from cocosearch.handlers import get_registered_grammars
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,9 @@ _SKIP_PARSE_EXTENSIONS = frozenset(
         "properties",
     }
 )
+
+# Grammar handler names — these files get domain-specific chunking, not tree-sitter parsing
+_GRAMMAR_NAMES = frozenset(g.GRAMMAR_NAME for g in get_registered_grammars())
 
 
 def detect_parse_status(file_content: str, language_ext: str) -> tuple[str, str | None]:
@@ -135,6 +139,9 @@ def track_parse_results(
     for filename, language_id in files:
         # Skip text-only formats — no tree-sitter grammar, parse health is meaningless
         if language_id in _SKIP_PARSE_EXTENSIONS:
+            continue
+        # Skip grammar-handled files — they use domain-specific chunking, not tree-sitter
+        if language_id in _GRAMMAR_NAMES:
             continue
 
         summary["total_files"] += 1

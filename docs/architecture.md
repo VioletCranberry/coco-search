@@ -18,7 +18,7 @@ CocoSearch is a hybrid semantic code search system that runs entirely locally. T
 
 **CocoIndex:** Python framework orchestrating the indexing pipeline. Handles file reading, language-aware chunking via Tree-sitter, embedding generation, metadata extraction, and PostgreSQL storage. The flow definition coordinates all processing steps. Implementation: `src/cocosearch/indexer/flow.py`
 
-**Tree-sitter:** Language-aware code parser supporting 31 programming languages. Used by CocoIndex's `SplitRecursively` function to chunk code at semantic boundaries (function definitions, class boundaries) rather than arbitrary byte offsets. Default chunk size: 1000 bytes with 300 byte overlap.
+**Tree-sitter:** Language-aware code parser. Used in two independent roles: (1) **chunking** — CocoIndex's `SplitRecursively` uses Tree-sitter internally for ~20 built-in languages to split at syntax boundaries; languages not in CocoIndex's built-in list use custom handler regex separators or plain-text fallback; (2) **symbol extraction** — CocoSearch runs Tree-sitter queries (`.scm` files) to extract function/class/method names for 12 languages. Default chunk size: 1000 bytes with 300 byte overlap.
 
 **FastMCP:** Model Context Protocol server framework exposing CocoSearch functionality as tools for AI assistants (Claude Code, Claude Desktop, OpenCode). Provides stdio, SSE, and HTTP transports for client integration. Supports the MCP Roots capability for automatic project detection in clients that support it (such as Claude Code). Implementation: `src/cocosearch/mcp/server.py`
 
@@ -27,8 +27,8 @@ CocoSearch is a hybrid semantic code search system that runs entirely locally. T
 The indexing pipeline transforms a codebase into searchable vector embeddings:
 
 1. **File Discovery:** Read codebase files respecting `.gitignore` patterns and configured include/exclude filters
-2. **Language Detection:** Identify programming language from file extension (handles special cases like Dockerfile)
-3. **Semantic Chunking:** Tree-sitter parses code and splits at semantic boundaries (1000 bytes, 300 overlap)
+2. **Language Detection:** Identify language from grammar handlers (path + content matching), filename patterns (Dockerfile), or file extension. Grammar match takes priority over extension.
+3. **Semantic Chunking:** `SplitRecursively` routes to Tree-sitter (built-in languages), custom handler regex separators (HCL, Dockerfile, Bash, grammars), or plain-text splitting (everything else). Default: 1000 bytes, 300 overlap.
 4. **Embedding Generation:** Ollama's `nomic-embed-text` model converts each chunk to a 768-dimensional vector
 5. **Metadata Extraction:** Extract DevOps block types (pipeline, job, stage), symbol information (function/class/method names, signatures), and language identifiers
 6. **Text Preprocessing:** Generate tsvector representation for full-text search capabilities
@@ -86,8 +86,8 @@ See [MCP Tools Reference](mcp-tools.md) for complete parameter documentation, re
 
 **Reference storage:** Store file paths and byte offsets, not chunk text. Chunk content is read from source files at query time using byte offsets. Reduces database size and ensures search results reflect current file contents (not stale cached text).
 
-**Semantic chunking:** Tree-sitter provides language-aware code splitting at function/class boundaries rather than arbitrary byte counts. Produces more coherent chunks that better represent logical code units. Falls back to simple splitting for unsupported languages.
+**Semantic chunking:** Three-tier strategy: (1) Tree-sitter via CocoIndex's built-in list for ~20 languages — splits at function/class boundaries; (2) Custom regex separators for handler languages (HCL, Dockerfile, Bash) and grammar handlers (GitHub Actions, GitLab CI, Docker Compose); (3) Plain-text fallback for everything else. Produces more coherent chunks that better represent logical code units.
 
-**Symbol metadata:** Extract function/class/method names and signatures during indexing for precise filtering. Enables queries like "find all functions named `validate*`" or "show only class definitions". Currently supported for 10 languages (Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, Ruby, PHP).
+**Symbol metadata:** Extract function/class/method names and signatures during indexing for precise filtering. Enables queries like "find all functions named `validate*`" or "show only class definitions". Currently supported for 12 languages (Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, Ruby, PHP, HCL, Bash).
 
 **Parse tracking:** Non-fatal parse status tracking per file provides observability without blocking indexing. Each file receives a status (ok, partial, error, no_grammar) based on tree-sitter results. Parse failures are surfaced in stats output and available via the MCP `index_stats` tool.

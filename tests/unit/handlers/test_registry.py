@@ -127,10 +127,10 @@ class TestGetCustomLanguages:
         specs = get_custom_languages()
         assert isinstance(specs, list)
 
-    def test_returns_three_specs(self):
-        """get_custom_languages() should return exactly 3 specs (HCL, Dockerfile, Bash)."""
+    def test_returns_six_specs(self):
+        """get_custom_languages() should return 6 specs (3 language + 3 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 3
+        assert len(specs) == 6
 
     def test_all_specs_have_language_name(self):
         """All specs should have language_name attribute."""

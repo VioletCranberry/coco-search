@@ -132,3 +132,22 @@ class TestSkipParseExtensions:
 
         for ext in ("py", "js", "ts", "go", "rs", "sh"):
             assert ext not in _SKIP_PARSE_EXTENSIONS, f"{ext} should NOT be skipped"
+
+
+class TestGrammarNamesSkip:
+    """Tests for _GRAMMAR_NAMES exclusion set."""
+
+    def test_grammar_names_skipped_in_parse_tracking(self):
+        """Grammar handler names are included in _GRAMMAR_NAMES skip set."""
+        from cocosearch.indexer.parse_tracking import _GRAMMAR_NAMES
+
+        # These are the registered grammar handlers
+        for name in ("docker-compose", "github-actions", "gitlab-ci"):
+            assert name in _GRAMMAR_NAMES, f"{name} should be in _GRAMMAR_NAMES"
+
+    def test_code_extensions_not_in_grammar_names(self):
+        """Regular code extensions are not in _GRAMMAR_NAMES."""
+        from cocosearch.indexer.parse_tracking import _GRAMMAR_NAMES
+
+        for ext in ("py", "js", "ts", "go", "yaml"):
+            assert ext not in _GRAMMAR_NAMES, f"{ext} should NOT be in _GRAMMAR_NAMES"

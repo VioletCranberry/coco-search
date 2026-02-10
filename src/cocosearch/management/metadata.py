@@ -198,8 +198,7 @@ def register_index_path(index_name: str, project_path: str | Path) -> None:
                 VALUES (%s, %s, NOW(), NOW(), 'indexed')
                 ON CONFLICT (index_name) DO UPDATE SET
                     canonical_path = EXCLUDED.canonical_path,
-                    updated_at = NOW(),
-                    status = 'indexed'
+                    updated_at = NOW()
                 """,
                 (index_name, canonical),
             )

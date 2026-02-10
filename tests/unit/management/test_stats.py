@@ -12,6 +12,7 @@ from cocosearch.management.stats import (
     check_staleness,
     collect_warnings,
     format_bytes,
+    get_grammar_stats,
     get_parse_failures,
     get_parse_stats,
     get_stats,
@@ -583,6 +584,34 @@ class TestGetParseFailures:
 
         assert failures == []
 
+    def test_excludes_grammar_handled_languages(self, mock_db_pool):
+        """Grammar-handled languages (docker-compose, etc.) are filtered out."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                (True,),  # Table exists
+                ("docker-compose.yml", "docker-compose", "no_grammar", None),
+                ("src/broken.py", "python", "error", "SyntaxError"),
+            ]
+        )
+
+        class MockGrammar:
+            GRAMMAR_NAME = "docker-compose"
+
+        with (
+            patch(
+                "cocosearch.management.stats.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=[MockGrammar()],
+            ),
+        ):
+            failures = get_parse_failures("test")
+
+        assert len(failures) == 1
+        assert failures[0]["file_path"] == "src/broken.py"
+
 
 class TestIndexStatsWithParseStats:
     """Tests for IndexStats with parse_stats field."""
@@ -646,3 +675,183 @@ class TestIndexStatsWithParseStats:
         )
         d = stats.to_dict()
         assert d["parse_stats"] == {}
+
+
+class TestGetGrammarStats:
+    """Tests for get_grammar_stats function."""
+
+    def _make_mock_grammar(self, name, base):
+        """Create a mock grammar handler object."""
+
+        class MockGrammar:
+            GRAMMAR_NAME = name
+            BASE_LANGUAGE = base
+
+        return MockGrammar()
+
+    def test_returns_grammar_stats(self, mock_db_pool):
+        """Returns per-grammar stats with recognition percentage."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("docker-compose", 5, 20, 18, 2),
+                ("github-actions", 3, 12, 10, 2),
+            ]
+        )
+
+        grammars = [
+            self._make_mock_grammar("docker-compose", "yaml"),
+            self._make_mock_grammar("github-actions", "yaml"),
+        ]
+
+        with (
+            patch(
+                "cocosearch.management.stats.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+            patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=grammars,
+            ),
+        ):
+            result = get_grammar_stats("test")
+
+        assert len(result) == 2
+        assert result[0]["grammar_name"] == "docker-compose"
+        assert result[0]["base_language"] == "yaml"
+        assert result[0]["file_count"] == 5
+        assert result[0]["chunk_count"] == 20
+        assert result[0]["recognized_chunks"] == 18
+        assert result[0]["unrecognized_chunks"] == 2
+        assert result[0]["recognition_pct"] == 90.0
+
+    def test_returns_empty_for_no_grammars(self):
+        """Returns empty list when no grammar handlers are registered."""
+        with patch(
+            "cocosearch.handlers.get_registered_grammars",
+            return_value=[],
+        ):
+            result = get_grammar_stats("test")
+
+        assert result == []
+
+    def test_handles_zero_chunks(self, mock_db_pool):
+        """Handles grammar with zero chunks (recognition_pct = 0.0)."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("docker-compose", 1, 0, 0, 0),
+            ]
+        )
+
+        grammars = [self._make_mock_grammar("docker-compose", "yaml")]
+
+        with (
+            patch(
+                "cocosearch.management.stats.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+            patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=grammars,
+            ),
+        ):
+            result = get_grammar_stats("test")
+
+        assert len(result) == 1
+        assert result[0]["recognition_pct"] == 0.0
+
+    def test_calculates_recognition_pct(self, mock_db_pool):
+        """Correctly calculates recognition percentage."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("github-actions", 2, 10, 7, 3),
+            ]
+        )
+
+        grammars = [self._make_mock_grammar("github-actions", "yaml")]
+
+        with (
+            patch(
+                "cocosearch.management.stats.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+            patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=grammars,
+            ),
+        ):
+            result = get_grammar_stats("test")
+
+        assert result[0]["recognition_pct"] == 70.0
+
+
+class TestIndexStatsGrammarsField:
+    """Tests for IndexStats grammars field."""
+
+    def test_default_grammars_is_empty_list(self):
+        """grammars field defaults to empty list."""
+        stats = IndexStats(
+            name="test",
+            file_count=10,
+            chunk_count=50,
+            storage_size=1024,
+            storage_size_pretty="1.0 KB",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=0,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
+        )
+        assert stats.grammars == []
+
+    def test_to_dict_includes_grammars(self):
+        """to_dict() includes grammars in output."""
+        grammar_data = [
+            {
+                "grammar_name": "docker-compose",
+                "base_language": "yaml",
+                "file_count": 3,
+                "chunk_count": 15,
+                "recognized_chunks": 12,
+                "unrecognized_chunks": 3,
+                "recognition_pct": 80.0,
+            }
+        ]
+        stats = IndexStats(
+            name="test",
+            file_count=10,
+            chunk_count=50,
+            storage_size=1024,
+            storage_size_pretty="1.0 KB",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=0,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status=None,
+            repo_url=None,
+            grammars=grammar_data,
+        )
+        d = stats.to_dict()
+        assert d["grammars"] == grammar_data

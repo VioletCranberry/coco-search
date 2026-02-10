@@ -1,7 +1,7 @@
 [project]
 name = "cocosearch"
 version = "0.1.0"
-description = "Local-first semantic code search via MCP"
+description = "Local-first code search via MCP/CLI"
 readme = "README.md"
 authors = [
     { name = "VioletCranberry", email = "zh6an0w.fedor@gmail.com" }

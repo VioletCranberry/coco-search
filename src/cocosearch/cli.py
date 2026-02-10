@@ -592,7 +592,17 @@ def format_parse_health(parse_stats: dict, console: Console) -> None:
     table.add_column("Error", justify="right", style="red")
     table.add_column("No Grammar", justify="right", style="dim")
 
-    for lang, counts in sorted(parse_stats.get("by_language", {}).items()):
+    by_language = parse_stats.get("by_language", {})
+    # Tracked languages first (by file count desc), then skipped
+    tracked = sorted(
+        [(la, c) for la, c in by_language.items() if not c.get("skipped")],
+        key=lambda x: -x[1]["files"],
+    )
+    skipped = sorted(
+        [(la, c) for la, c in by_language.items() if c.get("skipped")],
+        key=lambda x: -x[1]["files"],
+    )
+    for lang, counts in tracked:
         table.add_row(
             lang,
             str(counts["files"]),
@@ -600,6 +610,16 @@ def format_parse_health(parse_stats: dict, console: Console) -> None:
             str(counts["partial"]),
             str(counts["error"]),
             str(counts["no_grammar"]),
+        )
+    for lang, counts in skipped:
+        table.add_row(
+            lang,
+            str(counts["files"]),
+            "[dim]-[/dim]",
+            "[dim]-[/dim]",
+            "[dim]-[/dim]",
+            "[dim]-[/dim]",
+            style="dim",
         )
     console.print(table)
 
@@ -1037,6 +1057,56 @@ def languages_command(args: argparse.Namespace) -> int:
         console.print(table)
         console.print(
             "\n[dim]Symbol-aware languages support --symbol-type and --symbol-name filtering.[/dim]"
+        )
+
+    return 0
+
+
+def grammars_command(args: argparse.Namespace) -> int:
+    """Execute the grammars command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    console = Console()
+
+    from cocosearch.handlers import get_registered_grammars
+
+    grammars = []
+    for handler in sorted(get_registered_grammars(), key=lambda h: h.GRAMMAR_NAME):
+        grammars.append(
+            {
+                "name": handler.GRAMMAR_NAME,
+                "base_language": handler.BASE_LANGUAGE,
+                "path_patterns": handler.PATH_PATTERNS,
+            }
+        )
+
+    if args.json:
+        import json as json_module
+
+        print(json_module.dumps(grammars, indent=2))
+    else:
+        from rich.table import Table
+
+        table = Table(title="Supported Grammars")
+        table.add_column("Grammar", style="cyan", no_wrap=True)
+        table.add_column("Base Language", style="dim")
+        table.add_column("Path Patterns", style="dim")
+
+        for g in grammars:
+            table.add_row(
+                g["name"],
+                g["base_language"],
+                ", ".join(g["path_patterns"]),
+            )
+
+        console.print(table)
+        console.print(
+            "\n[dim]Grammars provide domain-specific chunking for files within a base language.[/dim]"
         )
 
     return 0
@@ -1548,6 +1618,18 @@ def main() -> None:
         help="Output as JSON (default: table)",
     )
 
+    # Grammars subcommand
+    grammars_parser = subparsers.add_parser(
+        "grammars",
+        help="List supported grammars",
+        description="Show domain-specific grammars that provide structured chunking within a base language.",
+    )
+    grammars_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON (default: table)",
+    )
+
     # Clear subcommand
     clear_parser = subparsers.add_parser(
         "clear",
@@ -1658,6 +1740,7 @@ def main() -> None:
         "list",
         "stats",
         "languages",
+        "grammars",
         "clear",
         "init",
         "mcp",
@@ -1694,6 +1777,8 @@ def main() -> None:
         sys.exit(stats_command(args))
     elif args.command == "languages":
         sys.exit(languages_command(args))
+    elif args.command == "grammars":
+        sys.exit(grammars_command(args))
     elif args.command == "clear":
         sys.exit(clear_command(args))
     elif args.command == "init":

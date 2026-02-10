@@ -292,6 +292,23 @@ class TestRegisterIndexPath:
                 # Should not raise - same path is fine
                 register_index_path("myindex", tmp_path)
 
+    def test_preserves_status_on_reregistration(self, mock_db_pool, tmp_path):
+        """register_index_path does not overwrite status on conflict update."""
+        pool, cursor, conn = mock_db_pool(results=[])
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            with patch("cocosearch.management.metadata.ensure_metadata_table"):
+                register_index_path("myindex", tmp_path)
+
+        # The ON CONFLICT UPDATE should NOT include status
+        upsert_sql = cursor.calls[-1][0]
+        assert "ON CONFLICT" in upsert_sql
+        # The SET clause should update canonical_path and updated_at but not status
+        set_clause = upsert_sql.split("DO UPDATE SET")[1]
+        assert "status" not in set_clause
+
     def test_clears_cache_after_registration(self, mock_db_pool, tmp_path):
         """register_index_path clears lru_cache after write."""
         pool, cursor, conn = mock_db_pool(results=[])
