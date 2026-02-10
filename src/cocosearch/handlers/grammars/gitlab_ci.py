@@ -64,6 +64,8 @@ class GitLabCIHandler:
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if file is a GitLab CI configuration.
 
+        Uses basename matching so nested .gitlab-ci.yml files are detected.
+
         Args:
             filepath: Relative file path within the project.
             content: Optional file content for deeper matching.
@@ -71,8 +73,9 @@ class GitLabCIHandler:
         Returns:
             True if this is a GitLab CI configuration file.
         """
+        basename = filepath.rsplit("/", 1)[-1] if "/" in filepath else filepath
         for pattern in self.PATH_PATTERNS:
-            if fnmatch.fnmatch(filepath, pattern):
+            if fnmatch.fnmatch(basename, pattern):
                 if content is not None:
                     has_stages = "stages:" in content
                     has_script_combo = "script:" in content and (

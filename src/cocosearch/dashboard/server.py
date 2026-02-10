@@ -17,6 +17,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 logger = logging.getLogger(__name__)
 
+# Track active indexing threads (mirrors mcp/server.py's _active_indexing)
+_active_indexing: dict[str, threading.Thread] = {}
+
 
 class DashboardHandler(BaseHTTPRequestHandler):
     """Serves dashboard HTML and stats API."""
@@ -41,8 +44,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._handle_reindex()
         elif self.path == "/api/index":
             self._handle_index()
+        elif self.path == "/api/stop-indexing":
+            self._handle_stop_indexing()
+        elif self.path == "/api/delete-index":
+            self._handle_delete_index()
         else:
             self.send_error(404)
+
+    def _read_json_body(self) -> dict | None:
+        """Read and parse JSON body from request. Returns None on error (response already sent)."""
+        content_length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(content_length) if content_length else b""
+        try:
+            return json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            self._json_response({"error": "Invalid JSON body"}, status=400)
+            return None
 
     def _handle_reindex(self):
         import cocoindex
@@ -53,12 +70,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             register_index_path,
         )
 
-        content_length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(content_length) if content_length else b""
-        try:
-            body = json.loads(raw) if raw else {}
-        except json.JSONDecodeError:
-            self._json_response({"error": "Invalid JSON body"}, status=400)
+        body = self._read_json_body()
+        if body is None:
             return
 
         index_name = body.get("index_name")
@@ -78,6 +91,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         source_path = metadata["canonical_path"]
 
+        # Reject if a previous indexing thread is still alive
+        prev = _active_indexing.get(index_name)
+        if prev is not None and prev.is_alive():
+            self._json_response(
+                {"error": "Previous indexing still completing. Try again shortly."},
+                status=409,
+            )
+            return
+
+        # Set status to indexing
         try:
             set_index_status(index_name, "indexing")
         except Exception:
@@ -99,17 +122,158 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 logger.error(f"Background reindex failed: {exc}")
             finally:
                 try:
-                    set_index_status(index_name, "error" if failed else "indexed")
+                    current = get_index_metadata(index_name)
+                    if current and current.get("status") == "indexing":
+                        set_index_status(index_name, "error" if failed else "indexed")
                 except Exception:
                     pass
+                _active_indexing.pop(index_name, None)
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
+        _active_indexing[index_name] = thread
 
         action = "Fresh reindex" if fresh else "Reindex"
         self._json_response(
             {"success": True, "message": f"{action} started for '{index_name}'"}
         )
+
+    def _handle_index(self):
+        import cocoindex
+        from cocosearch.cli import derive_index_name
+        from cocosearch.indexer import IndexingConfig, run_index
+        from cocosearch.management import (
+            ensure_metadata_table,
+            register_index_path,
+            set_index_status,
+            get_index_metadata,
+        )
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        project_path = body.get("project_path")
+        index_name = body.get("index_name")
+
+        if not project_path:
+            self._json_response({"error": "project_path is required"}, status=400)
+            return
+
+        if not index_name:
+            index_name = derive_index_name(project_path)
+
+        # Reject if a previous indexing thread is still alive
+        prev = _active_indexing.get(index_name)
+        if prev is not None and prev.is_alive():
+            self._json_response(
+                {"error": "Previous indexing still completing. Try again shortly."},
+                status=409,
+            )
+            return
+
+        # Register metadata before starting
+        try:
+            ensure_metadata_table()
+            register_index_path(index_name, project_path)
+            set_index_status(index_name, "indexing")
+        except Exception as e:
+            logger.warning(f"Metadata registration failed: {e}")
+
+        def _run():
+            failed = False
+            try:
+                cocoindex.init()
+                run_index(
+                    index_name=index_name,
+                    codebase_path=project_path,
+                    config=IndexingConfig(),
+                )
+                register_index_path(index_name, project_path)
+            except Exception as exc:
+                failed = True
+                logger.error(f"Background indexing failed: {exc}")
+            finally:
+                try:
+                    current = get_index_metadata(index_name)
+                    if current and current.get("status") == "indexing":
+                        set_index_status(index_name, "error" if failed else "indexed")
+                except Exception:
+                    pass
+                _active_indexing.pop(index_name, None)
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        _active_indexing[index_name] = thread
+
+        self._json_response(
+            {
+                "success": True,
+                "index_name": index_name,
+                "message": f"Indexing started for '{index_name}' from {project_path}",
+            }
+        )
+
+    def _handle_stop_indexing(self):
+        from cocosearch.management import set_index_status
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        index_name = body.get("index_name")
+        if not index_name:
+            self._json_response({"error": "index_name is required"}, status=400)
+            return
+
+        thread = _active_indexing.get(index_name)
+        if thread is None or not thread.is_alive():
+            self._json_response(
+                {"error": f"No active indexing found for '{index_name}'"},
+                status=404,
+            )
+            return
+
+        try:
+            set_index_status(index_name, "indexed")
+        except Exception as e:
+            self._json_response({"error": f"Failed to update status: {e}"}, status=500)
+            return
+
+        self._json_response(
+            {"success": True, "message": f"Indexing stopped for '{index_name}'"}
+        )
+
+    def _handle_delete_index(self):
+        from cocosearch.management import clear_index as mgmt_clear_index
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        index_name = body.get("index_name")
+        if not index_name:
+            self._json_response({"error": "index_name is required"}, status=400)
+            return
+
+        # Reject if indexing is currently active for this index
+        prev = _active_indexing.get(index_name)
+        if prev is not None and prev.is_alive():
+            self._json_response(
+                {
+                    "error": f"Cannot delete '{index_name}' while indexing is active. Stop indexing first."
+                },
+                status=409,
+            )
+            return
+
+        try:
+            result = mgmt_clear_index(index_name)
+            self._json_response(result)
+        except ValueError as e:
+            self._json_response({"error": str(e)}, status=404)
+        except Exception as e:
+            self._json_response({"error": f"Failed to delete index: {e}"}, status=500)
 
     def _serve_project_context(self):
         import cocoindex
@@ -168,71 +332,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             }
         )
 
-    def _handle_index(self):
-        import cocoindex
-        from cocosearch.cli import derive_index_name
-        from cocosearch.indexer import IndexingConfig, run_index
-        from cocosearch.management import (
-            ensure_metadata_table,
-            register_index_path,
-            set_index_status,
-        )
-
-        content_length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(content_length) if content_length else b""
-        try:
-            body = json.loads(raw) if raw else {}
-        except json.JSONDecodeError:
-            self._json_response({"error": "Invalid JSON body"}, status=400)
-            return
-
-        project_path = body.get("project_path")
-        index_name = body.get("index_name")
-
-        if not project_path:
-            self._json_response({"error": "project_path is required"}, status=400)
-            return
-
-        if not index_name:
-            index_name = derive_index_name(project_path)
-
-        try:
-            ensure_metadata_table()
-            register_index_path(index_name, project_path)
-            set_index_status(index_name, "indexing")
-        except Exception:
-            pass
-
-        def _run():
-            failed = False
-            try:
-                cocoindex.init()
-                run_index(
-                    index_name=index_name,
-                    codebase_path=project_path,
-                    config=IndexingConfig(),
-                )
-                register_index_path(index_name, project_path)
-            except Exception as exc:
-                failed = True
-                logger.error(f"Background indexing failed: {exc}")
-            finally:
-                try:
-                    set_index_status(index_name, "error" if failed else "indexed")
-                except Exception:
-                    pass
-
-        thread = threading.Thread(target=_run, daemon=True)
-        thread.start()
-
-        self._json_response(
-            {
-                "success": True,
-                "index_name": index_name,
-                "message": f"Indexing started for '{index_name}' from {project_path}",
-            }
-        )
-
     def _serve_dashboard(self):
         from cocosearch.dashboard.web import get_dashboard_html
 
@@ -247,6 +346,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         from cocosearch.management import list_indexes as mgmt_list_indexes
         from cocosearch.management.stats import (
             get_comprehensive_stats,
+            get_grammar_failures,
             get_parse_failures,
         )
 
@@ -262,8 +362,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             try:
                 stats = get_comprehensive_stats(idx["name"])
                 result = stats.to_dict()
+                # Override status from thread liveness — the DB status may
+                # lag behind the actual indexing state due to race conditions.
+                active = _active_indexing.get(idx["name"])
+                if active is not None and active.is_alive():
+                    result["status"] = "indexing"
                 if include_failures:
                     result["parse_failures"] = get_parse_failures(idx["name"])
+                    result["grammar_failures"] = get_grammar_failures(idx["name"])
                 all_stats.append(result)
             except ValueError:
                 continue
@@ -273,6 +379,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         import cocoindex
         from cocosearch.management.stats import (
             get_comprehensive_stats,
+            get_grammar_failures,
             get_parse_failures,
         )
 
@@ -285,8 +392,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
         try:
             stats = get_comprehensive_stats(index_name)
             result = stats.to_dict()
+            # Override status from thread liveness
+            active = _active_indexing.get(index_name)
+            if active is not None and active.is_alive():
+                result["status"] = "indexing"
             if include_failures:
                 result["parse_failures"] = get_parse_failures(index_name)
+                result["grammar_failures"] = get_grammar_failures(index_name)
             self._json_response(result)
         except ValueError as e:
             self._json_response({"error": str(e)}, status=404)

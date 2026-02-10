@@ -2,9 +2,21 @@
 
 from pathlib import Path
 
-# Default exclusion patterns for common generated/vendored directories
+# Default exclusion patterns for common generated/vendored directories.
+# Note: include_patterns already restricts indexed files by extension,
+# so dotfiles like .gitlab-ci.yml or .github/workflows/*.yml are only
+# indexed if they match an include pattern (e.g., *.yml).
 DEFAULT_EXCLUDES: list[str] = [
-    ".*",  # hidden files/dirs
+    "**/.git",
+    "**/.svn",
+    "**/.hg",
+    "**/.venv",
+    "**/.tox",
+    "**/.mypy_cache",
+    "**/.ruff_cache",
+    "**/.pytest_cache",
+    "**/.idea",
+    "**/.vscode",
     "**/node_modules",
     "**/__pycache__",
     "**/target",  # Rust
@@ -13,7 +25,6 @@ DEFAULT_EXCLUDES: list[str] = [
     "**/*.min.css",
     "**/dist",
     "**/build",
-    "**/.git",
 ]
 
 

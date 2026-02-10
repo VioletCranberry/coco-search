@@ -46,11 +46,15 @@ class HelmValuesHandler:
             r"\n## ",
             # Level 3: top-level YAML keys (no indent)
             r"\n[a-zA-Z_][\w-]*:",
-            # Level 4: blank lines
+            # Level 4: second-level keys (2-space indent)
+            r"\n  [a-zA-Z_][\w-]*:",
+            # Level 5: third-level keys (4-space indent)
+            r"\n    [a-zA-Z_][\w-]*:",
+            # Level 6: blank lines
             r"\n\n+",
-            # Level 5: newlines
+            # Level 7: newlines
             r"\n",
-            # Level 6: whitespace
+            # Level 8: whitespace
             r" ",
         ],
         aliases=[],
@@ -63,6 +67,12 @@ class HelmValuesHandler:
 
     # Match top-level YAML key (no indentation)
     _TOP_KEY_RE = re.compile(r"^([a-zA-Z_][\w-]*):", re.MULTILINE)
+
+    # Match indented YAML key (any indentation level)
+    _NESTED_KEY_RE = re.compile(r"^\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
+
+    # Match YAML list item key (e.g., "  - name: value")
+    _LIST_ITEM_KEY_RE = re.compile(r"^\s*-\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
 
     # Match top-level key at start of line for content detection
     _TOP_LEVEL_KEY_RE = re.compile(r"^[a-zA-Z_][\w-]*:", re.MULTILINE)
@@ -94,7 +104,8 @@ class HelmValuesHandler:
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from Helm values chunk.
 
-        Identifies section annotations and top-level YAML keys.
+        Identifies section annotations, top-level keys, nested keys,
+        list items, value continuations, and document separators.
 
         Args:
             text: The chunk text content.
@@ -105,6 +116,9 @@ class HelmValuesHandler:
         Examples:
             Section: block_type="section", hierarchy="section:Global parameters"
             Key: block_type="key", hierarchy="key:image"
+            Nested: block_type="nested-key", hierarchy="nested-key:receivers"
+            List item: block_type="list-item", hierarchy="list-item:name"
+            Value: block_type="value", hierarchy="value"
         """
         stripped = self._strip_comments_for_key(text)
 
@@ -125,6 +139,42 @@ class HelmValuesHandler:
             return {
                 "block_type": "key",
                 "hierarchy": f"key:{key_name}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for YAML list item key (e.g., "- name: value")
+        list_match = self._LIST_ITEM_KEY_RE.match(stripped)
+        if list_match:
+            key_name = list_match.group(1)
+            return {
+                "block_type": "list-item",
+                "hierarchy": f"list-item:{key_name}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for nested/indented key (sub-section of a top-level key)
+        nested_match = self._NESTED_KEY_RE.match(stripped)
+        if nested_match:
+            key_name = nested_match.group(1)
+            return {
+                "block_type": "nested-key",
+                "hierarchy": f"nested-key:{key_name}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # YAML document separator
+        if "---" in text:
+            return {
+                "block_type": "document",
+                "hierarchy": "document",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Value continuation (chunk starts with a value, not a key)
+        if stripped:
+            return {
+                "block_type": "value",
+                "hierarchy": "value",
                 "language_id": self.GRAMMAR_NAME,
             }
 

@@ -49,6 +49,20 @@ class TestGitHubActionsMatching:
         handler = GitHubActionsHandler()
         assert handler.matches("random/file.yml") is False
 
+    def test_matches_nested_github_workflows(self):
+        """Matches .github/workflows/ in nested directories."""
+        handler = GitHubActionsHandler()
+        content = "on: push\njobs:\n  build:\n    runs-on: ubuntu-latest"
+        assert (
+            handler.matches("monorepo/frontend/.github/workflows/ci.yml", content)
+            is True
+        )
+
+    def test_matches_nested_path_without_content(self):
+        """Matches nested .github/workflows/ by path alone."""
+        handler = GitHubActionsHandler()
+        assert handler.matches("sub/.github/workflows/deploy.yml") is True
+
 
 @pytest.mark.unit
 class TestGitHubActionsSeparatorSpec:

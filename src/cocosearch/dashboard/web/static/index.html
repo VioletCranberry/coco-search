@@ -426,6 +426,39 @@
             white-space: nowrap;
         }
 
+        .expandable-row {
+            cursor: pointer;
+        }
+
+        .expandable-row td:first-child::before {
+            content: "\25B6\00a0";
+            font-size: 10px;
+            display: inline-block;
+            transition: transform 0.15s;
+        }
+
+        .expandable-row.expanded td:first-child::before {
+            transform: rotate(90deg);
+        }
+
+        .detail-row {
+            display: none;
+        }
+
+        .detail-row.visible {
+            display: table-row;
+        }
+
+        .detail-row td {
+            padding: 0 12px 12px 28px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-row .failure-list {
+            margin-top: 0;
+        }
+
         @media (max-width: 768px) {
             .chart-grid {
                 grid-template-columns: 1fr;
@@ -553,10 +586,6 @@
                     <tbody id="parseTableBody"></tbody>
                 </table>
 
-                <details class="parse-details" id="parseFailuresDetails" style="display: none;">
-                    <summary id="parseFailuresSummary">0 files with issues</summary>
-                    <div class="failure-list" id="parseFailuresList"></div>
-                </details>
             </div>
 
             <div id="grammarHealthSection" class="chart-card" style="display: none;">
@@ -590,6 +619,8 @@
         let grammarChart = null;
         let allIndexes = [];
         let projectContext = null;
+        let parseFailuresData = [];
+        let grammarFailuresData = [];
 
         function isDarkMode() {
             return document.documentElement.getAttribute('data-theme') === 'dark';
@@ -901,6 +932,7 @@
             const skipped = entries.filter(([, d]) => d.skipped).sort((a, b) => b[1].files - a[1].files);
             const sorted = [...tracked, ...skipped];
 
+            let rowId = 0;
             tbody.innerHTML = sorted.map(([lang, data]) => {
                 if (data.skipped) {
                     return `<tr style="opacity: 0.5">
@@ -915,30 +947,47 @@
                 if (healthPct < 80) langColor = 'var(--accent-red)';
                 else if (healthPct < 95) langColor = 'var(--accent-orange)';
 
-                return `<tr>
+                const issues = (data.partial || 0) + (data.error || 0) + (data.no_grammar || 0);
+                const id = 'lang-detail-' + (rowId++);
+                const expandable = issues > 0 ? ` class="expandable-row" onclick="toggleLanguageDetails('${escapeHtml(lang)}', '${id}')"` : '';
+
+                return `<tr${expandable}>
                     <td style="font-weight: 500; color: ${langColor}">${escapeHtml(lang)}</td>
                     <td class="num">${data.files}</td>
                     <td class="num status-ok">${data.ok}</td>
                     <td class="num status-partial">${data.partial || 0}</td>
                     <td class="num status-error">${data.error || 0}</td>
                     <td class="num status-no-grammar">${data.no_grammar || 0}</td>
-                </tr>`;
+                </tr>
+                <tr class="detail-row" id="${id}"><td colspan="6"><div class="failure-list"></div></td></tr>`;
             }).join('');
 
             section.style.display = 'block';
         }
 
-        function updateParseFailures(failures) {
-            const details = document.getElementById('parseFailuresDetails');
-            const summary = document.getElementById('parseFailuresSummary');
-            const listEl = document.getElementById('parseFailuresList');
+        function toggleLanguageDetails(language, rowId) {
+            const detailRow = document.getElementById(rowId);
+            const parentRow = detailRow.previousElementSibling;
+            const isExpanded = detailRow.classList.contains('visible');
 
-            if (!failures || failures.length === 0) {
-                details.style.display = 'none';
+            if (isExpanded) {
+                detailRow.classList.remove('visible');
+                parentRow.classList.remove('expanded');
                 return;
             }
 
-            summary.textContent = `${failures.length} file${failures.length !== 1 ? 's' : ''} with issues`;
+            parentRow.classList.add('expanded');
+            detailRow.classList.add('visible');
+
+            // Only populate once
+            const listEl = detailRow.querySelector('.failure-list');
+            if (listEl.innerHTML) return;
+
+            const failures = parseFailuresData.filter(f => f.language === language);
+            if (failures.length === 0) {
+                listEl.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">No failure details available</p>';
+                return;
+            }
 
             const statusOrder = { error: 0, partial: 1, no_grammar: 2 };
             const sorted = [...failures].sort((a, b) =>
@@ -954,19 +1003,15 @@
             listEl.innerHTML = `<table>
                 <thead><tr>
                     <th>File</th>
-                    <th>Language</th>
                     <th>Status</th>
                     <th>Error</th>
                 </tr></thead>
                 <tbody>${sorted.map(f => `<tr>
                     <td class="file-path">${escapeHtml(f.file_path)}</td>
-                    <td>${escapeHtml(f.language)}</td>
                     <td class="${statusClass(f.parse_status)}">${escapeHtml(f.parse_status)}</td>
                     <td class="error-msg" title="${escapeHtml(f.error_message || '')}">${escapeHtml(f.error_message || '-')}</td>
                 </tr>`).join('')}</tbody>
             </table>`;
-
-            details.style.display = 'block';
         }
 
         function updateGrammarChart(grammars) {
@@ -1028,13 +1073,17 @@
                 return;
             }
 
+            let rowId = 0;
             tbody.innerHTML = grammars.map(g => {
                 const pct = g.recognition_pct;
                 let healthColor = 'var(--accent-green)';
                 if (pct < 50) healthColor = 'var(--accent-red)';
                 else if (pct < 80) healthColor = 'var(--accent-orange)';
 
-                return `<tr>
+                const id = 'grammar-detail-' + (rowId++);
+                const expandable = g.unrecognized_chunks > 0 ? ` class="expandable-row" onclick="toggleGrammarDetails('${escapeHtml(g.grammar_name)}', '${id}')"` : '';
+
+                return `<tr${expandable}>
                     <td style="font-weight: 500">${escapeHtml(g.grammar_name)}</td>
                     <td>${escapeHtml(g.base_language)}</td>
                     <td class="num">${g.file_count}</td>
@@ -1042,13 +1091,54 @@
                     <td class="num status-ok">${g.recognized_chunks}</td>
                     <td class="num status-error">${g.unrecognized_chunks}</td>
                     <td class="num" style="color: ${healthColor}; font-weight: 600">${pct}%</td>
-                </tr>`;
+                </tr>
+                <tr class="detail-row" id="${id}"><td colspan="7"><div class="failure-list"></div></td></tr>`;
             }).join('');
 
             section.style.display = 'block';
         }
 
+        function toggleGrammarDetails(grammarName, rowId) {
+            const detailRow = document.getElementById(rowId);
+            const parentRow = detailRow.previousElementSibling;
+            const isExpanded = detailRow.classList.contains('visible');
+
+            if (isExpanded) {
+                detailRow.classList.remove('visible');
+                parentRow.classList.remove('expanded');
+                return;
+            }
+
+            parentRow.classList.add('expanded');
+            detailRow.classList.add('visible');
+
+            // Only populate once
+            const listEl = detailRow.querySelector('.failure-list');
+            if (listEl.innerHTML) return;
+
+            const failures = grammarFailuresData.filter(f => f.grammar_name === grammarName);
+            if (failures.length === 0) {
+                listEl.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; padding: 8px 0;">No failure details available</p>';
+                return;
+            }
+
+            listEl.innerHTML = `<table>
+                <thead><tr>
+                    <th>File</th>
+                    <th>Total Chunks</th>
+                    <th>Unrecognized</th>
+                </tr></thead>
+                <tbody>${failures.map(f => `<tr>
+                    <td class="file-path">${escapeHtml(f.file_path)}</td>
+                    <td class="num">${f.total_chunks}</td>
+                    <td class="num status-error">${f.unrecognized_chunks}</td>
+                </tr>`).join('')}</tbody>
+            </table>`;
+        }
+
         function updateDashboard(stats) {
+            parseFailuresData = stats.parse_failures || [];
+            grammarFailuresData = stats.grammar_failures || [];
             updateSummaryCards(stats);
             updateWarnings(stats.warnings);
             updateLanguageChart(stats.languages || []);
@@ -1056,7 +1146,6 @@
             updateGrammarChart(stats.grammars || []);
             updateGrammarHealthTable(stats.grammars || []);
             updateParseHealthTable(stats.parse_stats);
-            updateParseFailures(stats.parse_failures);
         }
 
         async function loadIndexList() {
@@ -1181,6 +1270,9 @@
                     return;
                 }
                 showStatusBanner(data.message, 'info');
+                // Immediately reflect indexing status in the UI
+                allIndexes[indexIndex].status = 'indexing';
+                updateSummaryCards(allIndexes[indexIndex]);
                 startPolling();
             } catch (err) {
                 showStatusBanner('Error: ' + err.message, 'error');
@@ -1274,6 +1366,12 @@
                 document.getElementById('notIndexedBanner').style.display = 'none';
                 showStatusBanner(data.message, 'info');
                 setButtonsDisabled(true);
+                // Immediately reflect indexing status in the Status card
+                const statusEl = document.getElementById('indexStatus');
+                const statusLabelEl = document.getElementById('statusLabel');
+                statusEl.textContent = 'Indexing...';
+                statusEl.style.color = 'var(--accent-orange)';
+                statusLabelEl.textContent = 'In progress';
                 // Poll until indexing completes, then reload index list
                 startPolling(true);
             } catch (err) {

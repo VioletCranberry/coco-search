@@ -45,8 +45,8 @@ class DockerComposeHandler:
 
     _COMMENT_LINE = re.compile(r"^\s*#.*$", re.MULTILINE)
 
-    # Top-level key at start of line
-    _TOP_KEY_RE = re.compile(r"^([a-zA-Z_][\w-]*):\s*$", re.MULTILINE)
+    # Top-level key at start of line (with or without inline value)
+    _TOP_KEY_RE = re.compile(r"^([a-zA-Z_][\w-]*):", re.MULTILINE)
 
     # Service/item definition (2-space indented key)
     _ITEM_RE = re.compile(r"^  ([a-zA-Z_][\w-]*):", re.MULTILINE)

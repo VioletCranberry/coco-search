@@ -51,6 +51,12 @@ class KubernetesHandler:
     # Match top-level section key (at start of line, not indented)
     _TOP_KEY_RE = re.compile(r"^([a-zA-Z_][\w-]*):", re.MULTILINE)
 
+    # Match YAML list item key (e.g., "- name: value", "  - name: value")
+    _LIST_ITEM_KEY_RE = re.compile(r"^\s*-\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
+
+    # Match indented YAML key (any indentation level)
+    _NESTED_KEY_RE = re.compile(r"^\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
+
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if file is a Kubernetes manifest.
 
@@ -79,7 +85,8 @@ class KubernetesHandler:
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from Kubernetes manifest chunk.
 
-        Identifies K8s resource kinds and top-level sections.
+        Identifies K8s resource kinds, top-level sections, nested keys,
+        list items, and value continuations.
 
         Args:
             text: The chunk text content.
@@ -90,6 +97,8 @@ class KubernetesHandler:
         Examples:
             Kind chunk: block_type="Deployment", hierarchy="kind:Deployment"
             Section chunk: block_type="spec", hierarchy="spec"
+            Nested: block_type="nested-key", hierarchy="nested-key:containers"
+            List item: block_type="list-item", hierarchy="list-item:name"
         """
         stripped = self._strip_comments(text)
 
@@ -113,6 +122,42 @@ class KubernetesHandler:
                 "language_id": self.GRAMMAR_NAME,
             }
 
+        # Check for YAML list item key (e.g., "- name: value")
+        list_match = self._LIST_ITEM_KEY_RE.match(stripped)
+        if list_match:
+            key = list_match.group(1)
+            return {
+                "block_type": "list-item",
+                "hierarchy": f"list-item:{key}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for nested/indented key
+        nested_match = self._NESTED_KEY_RE.match(stripped)
+        if nested_match:
+            key = nested_match.group(1)
+            return {
+                "block_type": "nested-key",
+                "hierarchy": f"nested-key:{key}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # YAML document separator (--- header chunks)
+        if "---" in text:
+            return {
+                "block_type": "document",
+                "hierarchy": "document",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Value continuation (chunk has content but no recognizable key)
+        if stripped:
+            return {
+                "block_type": "value",
+                "hierarchy": "value",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
         return {
             "block_type": "",
             "hierarchy": "",
@@ -120,9 +165,14 @@ class KubernetesHandler:
         }
 
     def _strip_comments(self, text: str) -> str:
-        """Strip leading comments from chunk text."""
+        """Strip leading comments and document separators from chunk text."""
         lines = text.lstrip().split("\n")
         for i, line in enumerate(lines):
-            if line.strip() and not self._COMMENT_LINE.match(line):
+            stripped_line = line.strip()
+            if (
+                stripped_line
+                and not self._COMMENT_LINE.match(line)
+                and stripped_line != "---"
+            ):
                 return "\n".join(lines[i:])
         return ""

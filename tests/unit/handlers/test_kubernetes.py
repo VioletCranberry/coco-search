@@ -110,6 +110,22 @@ class TestKubernetesHandlerMatches:
         )
         assert not handler.matches("mychart/templates/deployment.yaml", content)
 
+    def test_no_match_helm_template_action(self):
+        """Should NOT match K8s manifest with {{ template marker."""
+        handler = KubernetesHandler()
+        content = (
+            '{{- define "app.pull.secret" -}}\n'
+            "apiVersion: v1\nkind: Secret\nmetadata:\n"
+            '  name: {{ template "app.fullname" . }}-pull-secret'
+        )
+        assert not handler.matches("mychart/templates/pull-secret.yaml", content)
+
+    def test_no_match_helm_define(self):
+        """Should NOT match K8s manifest with {{- define marker."""
+        handler = KubernetesHandler()
+        content = '{{- define "app.secret" -}}\napiVersion: v1\nkind: Secret\n'
+        assert not handler.matches("mychart/templates/secret.yaml", content)
+
     def test_no_match_docker_compose(self):
         """Should NOT match Docker Compose (has services: but not apiVersion+kind)."""
         handler = KubernetesHandler()
@@ -173,10 +189,74 @@ class TestKubernetesHandlerExtractMetadata:
         assert m["block_type"] == "Deployment"
         assert m["hierarchy"] == "kind:Deployment"
 
-    def test_unrecognized_content_returns_empty(self):
-        """Unrecognized content produces empty metadata."""
+    def test_document_separator_header(self):
+        """YAML document separator chunk produces 'document' metadata."""
         handler = KubernetesHandler()
-        m = handler.extract_metadata("    - containerPort: 8080")
+        m = handler.extract_metadata("---\n# Source: mychart/templates/service.yaml")
+        assert m["block_type"] == "document"
+        assert m["hierarchy"] == "document"
+        assert m["language_id"] == "kubernetes"
+
+    def test_document_separator_before_kind(self):
+        """Document separator before kind is stripped, kind is extracted."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata("---\napiVersion: v1\nkind: Service")
+        assert m["block_type"] == "Service"
+        assert m["hierarchy"] == "kind:Service"
+
+    def test_document_separator_before_top_key(self):
+        """Document separator before top-level key is stripped."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata("---\n# comment\nspec:\n  replicas: 3")
+        assert m["block_type"] == "spec"
+        assert m["hierarchy"] == "spec"
+
+    def test_list_item_key(self):
+        """YAML list item with key produces correct metadata."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata(
+            "- name: opentelemetry-collector\n  image: otel:latest"
+        )
+        assert m["block_type"] == "list-item"
+        assert m["hierarchy"] == "list-item:name"
+        assert m["language_id"] == "kubernetes"
+
+    def test_indented_list_item_key(self):
+        """Indented list item key is recognized after lstrip."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata(
+            "        - name: jaeger-compact\n          containerPort: 6831"
+        )
+        assert m["block_type"] == "list-item"
+        assert m["hierarchy"] == "list-item:name"
+
+    def test_indented_key_recognized_as_top_level(self):
+        """Indented key becomes top-level after _strip_comments lstrip."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata("    containers:\n      - name: web")
+        assert m["block_type"] == "containers"
+        assert m["hierarchy"] == "containers"
+        assert m["language_id"] == "kubernetes"
+
+    def test_deep_indented_key_recognized(self):
+        """Deeply indented key becomes top-level after lstrip."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata("          endpoint: localhost:4317")
+        assert m["block_type"] == "endpoint"
+        assert m["hierarchy"] == "endpoint"
+
+    def test_value_continuation(self):
+        """Value-only chunks should be recognized as value."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata("    - 8080\n    - 9090")
+        assert m["block_type"] == "value"
+        assert m["hierarchy"] == "value"
+        assert m["language_id"] == "kubernetes"
+
+    def test_empty_content_returns_empty(self):
+        """Empty/whitespace-only content produces empty metadata."""
+        handler = KubernetesHandler()
+        m = handler.extract_metadata("\n\n  \n")
         assert m["block_type"] == ""
         assert m["hierarchy"] == ""
         assert m["language_id"] == "kubernetes"

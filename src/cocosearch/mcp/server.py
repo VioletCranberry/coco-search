@@ -101,6 +101,11 @@ async def api_stats(request):
         try:
             stats = get_comprehensive_stats(index_name)
             result = stats.to_dict()
+            # Override status from thread liveness — the DB status may
+            # lag behind the actual indexing state due to race conditions.
+            active = _active_indexing.get(index_name)
+            if active is not None and active.is_alive():
+                result["status"] = "indexing"
             if include_failures:
                 result["parse_failures"] = get_parse_failures(index_name)
             return JSONResponse(
@@ -116,6 +121,10 @@ async def api_stats(request):
             try:
                 stats = get_comprehensive_stats(idx["name"])
                 result = stats.to_dict()
+                # Override status from thread liveness
+                active = _active_indexing.get(idx["name"])
+                if active is not None and active.is_alive():
+                    result["status"] = "indexing"
                 if include_failures:
                     result["parse_failures"] = get_parse_failures(idx["name"])
                 all_stats.append(result)
@@ -146,6 +155,10 @@ async def api_stats_single(request):
     try:
         stats = get_comprehensive_stats(index_name)
         result = stats.to_dict()
+        # Override status from thread liveness
+        active = _active_indexing.get(index_name)
+        if active is not None and active.is_alive():
+            result["status"] = "indexing"
         if include_failures:
             result["parse_failures"] = get_parse_failures(index_name)
         return JSONResponse(
@@ -394,7 +407,9 @@ async def api_delete_index(request):
     prev = _active_indexing.get(index_name)
     if prev is not None and prev.is_alive():
         return JSONResponse(
-            {"error": f"Cannot delete '{index_name}' while indexing is active. Stop indexing first."},
+            {
+                "error": f"Cannot delete '{index_name}' while indexing is active. Stop indexing first."
+            },
             status_code=409,
         )
 

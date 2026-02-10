@@ -13,6 +13,7 @@ from cocosearch.management.stats import (
     collect_warnings,
     format_bytes,
     get_comprehensive_stats,
+    get_grammar_failures,
     get_grammar_stats,
     get_parse_failures,
     get_parse_stats,
@@ -800,6 +801,94 @@ class TestGetGrammarStats:
             result = get_grammar_stats("test")
 
         assert result[0]["recognition_pct"] == 70.0
+
+
+class TestGetGrammarFailures:
+    """Tests for get_grammar_failures function."""
+
+    def _make_mock_grammar(self, name, base):
+        """Create a mock grammar handler object."""
+
+        class MockGrammar:
+            GRAMMAR_NAME = name
+            BASE_LANGUAGE = base
+
+        return MockGrammar()
+
+    def test_returns_failures_grouped_by_grammar(self, mock_db_pool):
+        """Returns per-file failure data grouped by grammar name."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                ("docker-compose", "docker-compose.yml", 5, 2),
+                ("docker-compose", "docker-compose.prod.yml", 3, 1),
+                ("github-actions", ".github/workflows/ci.yml", 8, 3),
+            ]
+        )
+
+        grammars = [
+            self._make_mock_grammar("docker-compose", "yaml"),
+            self._make_mock_grammar("github-actions", "yaml"),
+        ]
+
+        with (
+            patch(
+                "cocosearch.management.stats.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+            patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=grammars,
+            ),
+        ):
+            result = get_grammar_failures("test")
+
+        assert len(result) == 3
+        assert result[0]["grammar_name"] == "docker-compose"
+        assert result[0]["file_path"] == "docker-compose.yml"
+        assert result[0]["total_chunks"] == 5
+        assert result[0]["unrecognized_chunks"] == 2
+        assert result[2]["grammar_name"] == "github-actions"
+        assert result[2]["file_path"] == ".github/workflows/ci.yml"
+
+    def test_returns_empty_for_no_grammars(self):
+        """Returns empty list when no grammar handlers are registered."""
+        with patch(
+            "cocosearch.handlers.get_registered_grammars",
+            return_value=[],
+        ):
+            result = get_grammar_failures("test")
+
+        assert result == []
+
+    def test_returns_empty_when_no_failures(self, mock_db_pool):
+        """Returns empty list when query returns no rows."""
+        pool, cursor, conn = mock_db_pool(
+            results=[]  # No rows — all files fully recognized
+        )
+
+        grammars = [self._make_mock_grammar("docker-compose", "yaml")]
+
+        with (
+            patch(
+                "cocosearch.management.stats.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+            patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=grammars,
+            ),
+        ):
+            result = get_grammar_failures("test")
+
+        assert result == []
 
 
 class TestIndexStatsGrammarsField:

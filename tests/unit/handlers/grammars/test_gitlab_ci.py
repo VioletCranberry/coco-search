@@ -49,6 +49,20 @@ class TestGitLabCIMatching:
         handler = GitLabCIHandler()
         assert handler.matches("build.yml") is False
 
+    def test_matches_nested_path(self):
+        """Matches .gitlab-ci.yml in nested directories."""
+        handler = GitLabCIHandler()
+        content = "stages:\n  - build\nbuild:\n  script: make"
+        assert (
+            handler.matches("vendor/gitlab.com/org/repo/.gitlab-ci.yml", content)
+            is True
+        )
+
+    def test_matches_nested_path_without_content(self):
+        """Matches nested .gitlab-ci.yml by path alone."""
+        handler = GitLabCIHandler()
+        assert handler.matches("sub/dir/.gitlab-ci.yml") is True
+
 
 @pytest.mark.unit
 class TestGitLabCISeparatorSpec:

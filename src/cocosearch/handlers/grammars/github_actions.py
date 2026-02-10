@@ -54,6 +54,8 @@ class GitHubActionsHandler:
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if file is a GitHub Actions workflow.
 
+        Checks if path ends with .github/workflows/*.yml (at any depth).
+
         Args:
             filepath: Relative file path within the project.
             content: Optional file content for deeper matching.
@@ -61,8 +63,11 @@ class GitHubActionsHandler:
         Returns:
             True if this is a GitHub Actions workflow file.
         """
+        # Match .github/workflows/ at any depth in the path
         for pattern in self.PATH_PATTERNS:
-            if fnmatch.fnmatch(filepath, pattern):
+            if fnmatch.fnmatch(filepath, pattern) or fnmatch.fnmatch(
+                filepath, f"*/{pattern}"
+            ):
                 if content is not None:
                     return "on:" in content and "jobs:" in content
                 return True

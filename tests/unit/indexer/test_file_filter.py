@@ -22,9 +22,19 @@ class TestDefaultExcludes:
         """DEFAULT_EXCLUDES should contain .git pattern."""
         assert "**/.git" in DEFAULT_EXCLUDES
 
-    def test_contains_hidden_files(self):
-        """DEFAULT_EXCLUDES should contain hidden files pattern."""
-        assert ".*" in DEFAULT_EXCLUDES
+    def test_does_not_blanket_exclude_dotfiles(self):
+        """DEFAULT_EXCLUDES should NOT blanket-exclude all dotfiles.
+
+        The old '.*' pattern blocked CI config files like .gitlab-ci.yml.
+        Instead, specific hidden directories are excluded individually.
+        """
+        assert ".*" not in DEFAULT_EXCLUDES
+
+    def test_contains_hidden_directories(self):
+        """DEFAULT_EXCLUDES should exclude common hidden directories."""
+        assert "**/.venv" in DEFAULT_EXCLUDES
+        assert "**/.idea" in DEFAULT_EXCLUDES
+        assert "**/.vscode" in DEFAULT_EXCLUDES
 
     def test_contains_build_directories(self):
         """DEFAULT_EXCLUDES should contain common build directories."""

@@ -132,6 +132,15 @@ class TestDockerComposeExtractMetadata:
         assert m["hierarchy"] == "volumes"
         assert m["language_id"] == "docker-compose"
 
+    def test_top_level_version_with_inline_value(self):
+        """Top-level key with inline value (version: '3') is identified."""
+        handler = DockerComposeHandler()
+        text = "version: '3'\nservices:\n  grafana:\n    image: grafana/grafana"
+        m = handler.extract_metadata(text)
+        assert m["block_type"] == "version"
+        assert m["hierarchy"] == "version"
+        assert m["language_id"] == "docker-compose"
+
     def test_unrecognized_content(self):
         """Unrecognized content returns empty block_type."""
         handler = DockerComposeHandler()

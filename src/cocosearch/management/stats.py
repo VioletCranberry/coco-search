@@ -297,6 +297,58 @@ def get_grammar_stats(index_name: str) -> list[dict]:
     ]
 
 
+def get_grammar_failures(index_name: str) -> list[dict]:
+    """Get per-file failure details for grammar-handled files with unrecognized chunks.
+
+    Queries the chunks table for files handled by registered grammar handlers
+    where at least one chunk has no block_type (unrecognized), grouped by grammar
+    and filename.
+
+    Args:
+        index_name: The name of the index.
+
+    Returns:
+        List of dicts with keys: grammar_name, file_path, total_chunks,
+        unrecognized_chunks. Empty list if no grammars registered or no failures.
+    """
+    from cocosearch.handlers import get_registered_grammars
+
+    grammars = get_registered_grammars()
+    if not grammars:
+        return []
+
+    grammar_names = [g.GRAMMAR_NAME for g in grammars]
+
+    pool = get_connection_pool()
+    table_name = get_table_name(index_name)
+
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            query = f"""
+                SELECT language_id,
+                       filename,
+                       COUNT(*) as total_chunks,
+                       SUM(CASE WHEN block_type IS NULL OR block_type = '' THEN 1 ELSE 0 END) as unrecognized
+                FROM {table_name}
+                WHERE language_id = ANY(%s)
+                GROUP BY language_id, filename
+                HAVING SUM(CASE WHEN block_type IS NULL OR block_type = '' THEN 1 ELSE 0 END) > 0
+                ORDER BY language_id, filename
+            """
+            cur.execute(query, (grammar_names,))
+            rows = cur.fetchall()
+
+    return [
+        {
+            "grammar_name": row[0],
+            "file_path": row[1],
+            "total_chunks": row[2],
+            "unrecognized_chunks": row[3],
+        }
+        for row in rows
+    ]
+
+
 def get_parse_stats(index_name: str) -> dict:
     """Get aggregated parse statistics per language for an index.
 
@@ -405,11 +457,14 @@ def get_parse_failures(
     pool = get_connection_pool()
     table_name = f"cocosearch_parse_results_{index_name}"
 
-    # Grammar-handled languages should not appear in parse failures —
-    # they use domain-specific chunking, not tree-sitter parsing
+    # Grammar-handled and no-grammar languages should not appear in parse
+    # failures — they use domain-specific chunking, not tree-sitter parsing
     from cocosearch.handlers import get_registered_grammars
+    from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
 
-    grammar_names = {g.GRAMMAR_NAME for g in get_registered_grammars()}
+    excluded = {
+        g.GRAMMAR_NAME for g in get_registered_grammars()
+    } | _SKIP_PARSE_EXTENSIONS
 
     # Check if parse_results table exists
     check_query = """
@@ -446,7 +501,7 @@ def get_parse_failures(
             "error_message": row[3],
         }
         for row in rows
-        if row[1] not in grammar_names
+        if row[1] not in excluded
     ]
 
 
@@ -647,14 +702,17 @@ def get_comprehensive_stats(
     if parse_stats and "by_language" in parse_stats:
         from cocosearch.indexer.symbols import LANGUAGE_MAP
         from cocosearch.handlers import get_registered_grammars
+        from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
 
         grammar_names = {g.GRAMMAR_NAME for g in get_registered_grammars()}
+        # Languages to exclude from parse stats (grammars + no-grammar handlers)
+        excluded_from_parse = grammar_names | _SKIP_PARSE_EXTENSIONS
 
-        # Remove grammar-handled languages from parse stats (stale DB entries
+        # Remove excluded languages from parse stats (stale DB entries
         # or languages that shouldn't appear in parse health)
-        for gname in grammar_names:
-            if gname in parse_stats["by_language"]:
-                removed = parse_stats["by_language"].pop(gname)
+        for name in list(parse_stats["by_language"].keys()):
+            if name in excluded_from_parse:
+                removed = parse_stats["by_language"].pop(name)
                 parse_stats["total_files"] -= removed["files"]
                 parse_stats["total_ok"] -= removed.get("ok", 0)
 
@@ -669,8 +727,8 @@ def get_comprehensive_stats(
         tracked_languages = set(parse_stats["by_language"].keys())
         for lang_stat in languages:
             lang = lang_stat["language"]
-            # Skip grammar-handled languages — shown in Grammar Stats section
-            if lang in grammar_names:
+            # Skip grammar-handled and excluded languages
+            if lang in excluded_from_parse:
                 continue
             mapped_lang = LANGUAGE_MAP.get(lang)
             # Skip if already tracked under either the raw extension or mapped name

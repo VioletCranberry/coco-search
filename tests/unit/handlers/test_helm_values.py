@@ -188,18 +188,74 @@ class TestHelmValuesHandlerExtractMetadata:
         assert m["block_type"] == "key"
         assert m["hierarchy"] == "key:resources"
 
-    def test_indented_key_not_top_level(self):
-        """Indented key should not be treated as top-level."""
+    def test_nested_key_recognized(self):
+        """Indented key should be recognized as nested-key."""
         handler = HelmValuesHandler()
         m = handler.extract_metadata("  repository: nginx\n  tag: latest")
-        assert m["block_type"] == ""
-        assert m["hierarchy"] == ""
+        assert m["block_type"] == "nested-key"
+        assert m["hierarchy"] == "nested-key:repository"
         assert m["language_id"] == "helm-values"
 
-    def test_unrecognized_content_returns_empty(self):
-        """Unrecognized content produces empty metadata."""
+    def test_nested_key_deep_indent(self):
+        """Deeply indented key should be recognized as nested-key."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata(
+            "      endpoint: ${env:MY_POD_IP}:4317\n      auth:"
+        )
+        assert m["block_type"] == "nested-key"
+        assert m["hierarchy"] == "nested-key:endpoint"
+
+    def test_nested_key_with_leading_comment(self):
+        """Comment before indented key should be stripped."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata(
+            "  # Configures the collector\n  receivers:\n    otlp:"
+        )
+        assert m["block_type"] == "nested-key"
+        assert m["hierarchy"] == "nested-key:receivers"
+
+    def test_list_item_recognized(self):
+        """YAML list item with key should be recognized."""
         handler = HelmValuesHandler()
         m = handler.extract_metadata("  - name: http\n    containerPort: 8080")
+        assert m["block_type"] == "list-item"
+        assert m["hierarchy"] == "list-item:name"
+        assert m["language_id"] == "helm-values"
+
+    def test_list_item_no_indent(self):
+        """YAML list item at root level should be recognized."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata("- name: myvolume\n  emptyDir: {}")
+        assert m["block_type"] == "list-item"
+        assert m["hierarchy"] == "list-item:name"
+
+    def test_value_continuation(self):
+        """Value continuation chunk should be recognized."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata(' ""\nfullnameOverride: ""')
+        assert m["block_type"] == "value"
+        assert m["hierarchy"] == "value"
+        assert m["language_id"] == "helm-values"
+
+    def test_value_continuation_empty_object(self):
+        """Empty object value continuation should be recognized."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata(" {}\nsecurityContext:")
+        assert m["block_type"] == "value"
+        assert m["hierarchy"] == "value"
+
+    def test_document_separator(self):
+        """YAML document separator should be recognized."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata("---\n")
+        assert m["block_type"] == "document"
+        assert m["hierarchy"] == "document"
+        assert m["language_id"] == "helm-values"
+
+    def test_empty_content_returns_empty(self):
+        """Empty/whitespace-only content produces empty metadata."""
+        handler = HelmValuesHandler()
+        m = handler.extract_metadata("\n\n")
         assert m["block_type"] == ""
         assert m["hierarchy"] == ""
         assert m["language_id"] == "helm-values"

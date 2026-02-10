@@ -140,6 +140,22 @@ class TestHelmTemplateHandlerMatches:
         handler = HelmTemplateHandler()
         assert handler.matches("mychart/templates/deployment.yaml")
 
+    def test_matches_template_yaml_with_template_action(self):
+        """Should match templates/*.yaml with {{ template marker."""
+        handler = HelmTemplateHandler()
+        assert handler.matches(
+            "mychart/templates/pull-secret.yaml",
+            '{{ template "mychart.fullname" . }}\napiVersion: v1',
+        )
+
+    def test_matches_template_yaml_with_define(self):
+        """Should match templates/*.yaml with {{- define marker."""
+        handler = HelmTemplateHandler()
+        assert handler.matches(
+            "mychart/templates/helpers.yaml",
+            '{{- define "mychart.labels" }}\napp: test\n{{- end }}',
+        )
+
     def test_no_match_jinja2_template(self):
         """Should not match Jinja2 templates in templates/ dir."""
         handler = HelmTemplateHandler()

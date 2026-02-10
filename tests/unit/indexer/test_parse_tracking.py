@@ -127,6 +127,12 @@ class TestSkipParseExtensions:
         for ext in ("txt", "json", "yaml", "yml", "toml", "xml", "csv"):
             assert ext in _SKIP_PARSE_EXTENSIONS, f"{ext} should be skipped"
 
+    def test_gotmpl_in_skip_set(self):
+        """gotmpl has no tree-sitter grammar and should be skipped."""
+        from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
+
+        assert "gotmpl" in _SKIP_PARSE_EXTENSIONS
+
     def test_code_extensions_not_in_skip_set(self):
         from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
 

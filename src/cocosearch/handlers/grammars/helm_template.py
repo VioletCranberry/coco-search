@@ -22,6 +22,10 @@ _HELM_MARKERS = [
     "{{- .Chart",
     "{{ include",
     "{{- include",
+    "{{ template",
+    "{{- template",
+    "{{ define",
+    "{{- define",
 ]
 
 

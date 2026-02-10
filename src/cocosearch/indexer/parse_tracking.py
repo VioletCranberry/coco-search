@@ -21,8 +21,8 @@ from cocosearch.handlers import get_registered_grammars
 
 logger = logging.getLogger(__name__)
 
-# Extensions that are indexed as plain text — no tree-sitter grammar exists
-# or parse health is meaningless. Excluded from parse tracking entirely.
+# Extensions/language IDs that are indexed as plain text — no tree-sitter grammar
+# exists or parse health is meaningless. Excluded from parse tracking entirely.
 _SKIP_PARSE_EXTENSIONS = frozenset(
     {
         "md",
@@ -44,6 +44,8 @@ _SKIP_PARSE_EXTENSIONS = frozenset(
         "conf",
         "env",
         "properties",
+        # Language handlers without a tree-sitter grammar
+        "gotmpl",
     }
 )
 
