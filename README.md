@@ -1,6 +1,6 @@
 # Coco-s
 
-Coco[-S]earch is a local-first hybrid semantic code search tool powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/). It indexes codebases into PostgreSQL with pgvector embeddings (via Ollama) and provides search through CLI, MCP server, or interactive REPL. No external APIs — everything runs locally. Incremental updates by default. `.gitignore` is respected. Supports 30 [languages](#supported-languages) with symbol extraction for 12, plus domain-specific [grammars](#supported-grammars) for structured config files.
+Coco[-S]earch is a local-first hybrid semantic code search tool powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/). It indexes codebases into PostgreSQL with pgvector embeddings (via Ollama) and provides search through CLI, MCP server, or interactive REPL. No external APIs — everything runs locally. Incremental updates by default. `.gitignore` is respected. Supports 30+ [languages](#supported-languages) with symbol extraction for 12+, plus domain-specific [grammars](#supported-grammars) for structured config files.
 
 ## Disclaimer
 
@@ -145,14 +145,17 @@ Priority: Grammar match > Language match > TextHandler fallback.
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch grammars
 
                              Supported Grammars
-┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Grammar        ┃ Base Language ┃ Path Patterns                                          ┃
-┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ docker-compose │ yaml          │ docker-compose*.yml, docker-compose*.yaml,             │
-│                │               │ compose*.yml, compose*.yaml                            │
-│ github-actions │ yaml          │ .github/workflows/*.yml, .github/workflows/*.yaml      │
-│ gitlab-ci      │ yaml          │ .gitlab-ci.yml                                         │
-└────────────────┴───────────────┴────────────────────────────────────────────────────────┘
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Grammar        ┃ File Format ┃ Path Patterns                                                                    ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ docker-compose │ yaml        │ docker-compose*.yml, docker-compose*.yaml, compose*.yml, compose*.yaml           │
+│ github-actions │ yaml        │ .github/workflows/*.yml, .github/workflows/*.yaml                                │
+│ gitlab-ci      │ yaml        │ .gitlab-ci.yml                                                                   │
+│ helm-template  │ gotmpl      │ **/templates/*.yaml, **/templates/**/*.yaml, **/templates/*.yml,                 │
+│                │             │ **/templates/**/*.yml                                                            │
+│ helm-values    │ yaml        │ **/values.yaml, **/values-*.yaml                                                 │
+│ kubernetes     │ yaml        │ *.yaml, *.yml                                                                    │
+└────────────────┴─────────────┴──────────────────────────────────────────────────────────────────────────────────┘
 
 Grammars provide domain-specific chunking for files within a base language.
 ```
@@ -186,35 +189,35 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search --int
 # View index stats with parse health
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --pretty
 
-Files: 147 | Chunks: 1,537 | Size: 8.6 MB
+ndex: cocosearch
+Source: /GIT/coco-s
+Status: Indexed
+Files: 155 | Chunks: 1,689 | Size: 11.8 MB
 Created: 2026-02-09
-Last Updated: 2026-02-09 (0 days ago)
+Last Updated: 2026-02-10 (0 days ago)
 
                         Language Distribution
 ┏━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Language     ┃  Files ┃   Chunks ┃ Distribution                   ┃
 ┡━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ py           │    124 │     1281 │ ██████████████████████████████ │
-│ md           │     18 │      200 │ ████▋                          │
-│ html         │      1 │       46 │ █                              │
-│ bash         │      1 │        6 │ ▏                              │
+│ py           │    132 │     1405 │ ██████████████████████████████ │
+│ md           │     19 │      218 │ ████▋                          │
+│ html         │      1 │       62 │ █▎                             │
 │ toml         │      1 │        2 │                                │
+│ docker-comp… │      1 │        1 │                                │
 │ yaml         │      1 │        1 │                                │
-│ yml          │      1 │        1 │                                │
 └──────────────┴────────┴──────────┴────────────────────────────────┘
 
-Parse health: 100.0% clean (125/125 files)
+Parse health: 100.0% clean (132/132 files)
                 Parse Status by Language
 ┏━━━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
 ┃ Language ┃ Files ┃  OK ┃ Partial ┃ Error ┃ No Grammar ┃
 ┡━━━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
-│ bash     │     1 │   1 │       0 │     0 │          0 │
-│ html     │     1 │   0 │       0 │     0 │          0 │
-│ md       │    18 │   0 │       0 │     0 │          0 │
-│ python   │   124 │ 124 │       0 │     0 │          0 │
-│ toml     │     1 │   0 │       0 │     0 │          0 │
-│ yaml     │     1 │   0 │       0 │     0 │          0 │
-│ yml      │     1 │   0 │       0 │     0 │          0 │
+│ python   │   132 │ 132 │       0 │     0 │          0 │
+│ md       │    19 │   - │       - │     - │          - │
+│ html     │     1 │   - │       - │     - │          - │
+│ toml     │     1 │   - │       - │     - │          - │
+│ yaml     │     1 │   - │       - │     - │          - │
 └──────────┴───────┴─────┴─────────┴───────┴────────────┘
 
 # View index stats with parse health live

@@ -18,7 +18,7 @@ class TestGrammarRegistryDiscovery:
 
     def test_discover_finds_all_grammars(self):
         """_GRAMMAR_REGISTRY should have 5 grammar handlers."""
-        assert len(_GRAMMAR_REGISTRY) == 5
+        assert len(_GRAMMAR_REGISTRY) == 6
 
     def test_grammar_names(self):
         """All expected grammar names should be registered."""
@@ -28,6 +28,7 @@ class TestGrammarRegistryDiscovery:
         assert "docker-compose" in names
         assert "helm-template" in names
         assert "helm-values" in names
+        assert "kubernetes" in names
 
     def test_all_grammars_have_base_language(self):
         """All grammars should declare a BASE_LANGUAGE."""
@@ -77,10 +78,28 @@ class TestDetectGrammar:
         )
         assert result == "docker-compose"
 
+    def test_detects_kubernetes(self):
+        """detect_grammar should identify Kubernetes manifests."""
+        result = detect_grammar(
+            "k8s/deployment.yaml",
+            "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web",
+        )
+        assert result == "kubernetes"
+
     def test_returns_none_for_generic_yaml(self):
         """detect_grammar should return None for generic YAML."""
         result = detect_grammar("config.yml", "key: value")
         assert result is None
+
+    def test_kubernetes_does_not_match_helm_template(self):
+        """detect_grammar on a Helm template with K8s markers should return helm-template."""
+        content = (
+            "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n"
+            "  name: {{ .Values.name }}\nspec:\n"
+            "  replicas: {{ .Values.replicas }}"
+        )
+        result = detect_grammar("mychart/templates/deployment.yaml", content)
+        assert result == "helm-template"
 
     def test_returns_none_for_non_yaml(self):
         """detect_grammar should return None for non-YAML files."""
@@ -122,6 +141,12 @@ class TestGetGrammarHandler:
         assert handler is not None
         assert handler.GRAMMAR_NAME == "helm-values"
 
+    def test_get_kubernetes(self):
+        """get_grammar_handler returns handler for 'kubernetes'."""
+        handler = get_grammar_handler("kubernetes")
+        assert handler is not None
+        assert handler.GRAMMAR_NAME == "kubernetes"
+
     def test_returns_none_for_unknown(self):
         """get_grammar_handler returns None for unknown grammar."""
         assert get_grammar_handler("unknown-grammar") is None
@@ -134,7 +159,7 @@ class TestGetCustomLanguagesWithGrammars:
     def test_returns_nine_specs(self):
         """get_custom_languages() should return 9 specs (4 language + 5 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 9
+        assert len(specs) == 10
 
     def test_includes_grammar_specs(self):
         """get_custom_languages() should include grammar language names."""
@@ -145,6 +170,7 @@ class TestGetCustomLanguagesWithGrammars:
         assert "docker-compose" in language_names
         assert "helm-template" in language_names
         assert "helm-values" in language_names
+        assert "kubernetes" in language_names
 
     def test_still_includes_language_specs(self):
         """get_custom_languages() should still include language handler specs."""
@@ -174,7 +200,7 @@ class TestGetRegisteredGrammars:
     def test_returns_five_grammars(self):
         """get_registered_grammars() should return 5 grammars."""
         grammars = get_registered_grammars()
-        assert len(grammars) == 5
+        assert len(grammars) == 6
 
 
 @pytest.mark.unit
@@ -202,6 +228,14 @@ class TestExtractChunkMetadataGrammarDispatch:
         result = extract_chunk_metadata(text, "docker-compose")
         assert result.language_id == "docker-compose"
         assert result.block_type == "service"
+
+    def test_dispatches_to_kubernetes(self):
+        """extract_chunk_metadata dispatches to Kubernetes handler."""
+        text = "apiVersion: apps/v1\nkind: Deployment"
+        result = extract_chunk_metadata(text, "kubernetes")
+        assert result.language_id == "kubernetes"
+        assert result.block_type == "Deployment"
+        assert result.hierarchy == "kind:Deployment"
 
     def test_still_dispatches_to_language_handler(self):
         """extract_chunk_metadata still works for language handlers."""

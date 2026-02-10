@@ -261,7 +261,7 @@ class TestCustomLanguageIntegration:
 
         HANDLER_CUSTOM_LANGUAGES = get_custom_languages()
         assert isinstance(HANDLER_CUSTOM_LANGUAGES, list)
-        assert len(HANDLER_CUSTOM_LANGUAGES) == 9
+        assert len(HANDLER_CUSTOM_LANGUAGES) == 10
 
     def test_extract_language_importable(self):
         """extract_language is importable from embedder module."""

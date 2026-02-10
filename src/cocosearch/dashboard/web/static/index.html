@@ -459,6 +459,7 @@
                 <button id="reindexBtn" class="action-btn" onclick="reindex(false)">Reindex</button>
                 <button id="freshIndexBtn" class="action-btn danger" onclick="reindex(true)">Fresh Index</button>
                 <button id="stopIndexBtn" class="action-btn danger" onclick="stopIndexing()" style="display: none;">Stop</button>
+                <button id="deleteIndexBtn" class="action-btn danger" onclick="deleteIndex()">Delete</button>
             </div>
         </header>
 
@@ -1139,6 +1140,7 @@
         function setButtonsDisabled(disabled) {
             document.getElementById('reindexBtn').disabled = disabled;
             document.getElementById('freshIndexBtn').disabled = disabled;
+            document.getElementById('deleteIndexBtn').disabled = disabled;
             document.getElementById('stopIndexBtn').style.display = disabled ? 'inline-block' : 'none';
         }
 
@@ -1208,6 +1210,41 @@
                 }
             } catch (err) {
                 showStatusBanner('Error: ' + err.message, 'error');
+            }
+        }
+
+        async function deleteIndex() {
+            const select = document.getElementById('indexSelect');
+            const stats = allIndexes[parseInt(select.value)];
+            if (!stats) return;
+
+            if (!confirm(`Permanently delete index "${stats.name}"? This cannot be undone.`)) {
+                return;
+            }
+
+            setButtonsDisabled(true);
+            showStatusBanner('Deleting index...', 'info');
+
+            try {
+                const resp = await fetch('/api/delete-index', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({index_name: stats.name})
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    showStatusBanner('Error: ' + (data.error || 'Delete failed'), 'error');
+                    setButtonsDisabled(false);
+                    return;
+                }
+                showStatusBanner(`Index "${stats.name}" deleted`, 'success');
+                setTimeout(() => {
+                    hideStatusBanner();
+                    loadIndexList();
+                }, 1500);
+            } catch (err) {
+                showStatusBanner('Error: ' + err.message, 'error');
+                setButtonsDisabled(false);
             }
         }
 

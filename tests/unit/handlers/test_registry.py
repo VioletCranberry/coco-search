@@ -130,7 +130,7 @@ class TestGetCustomLanguages:
     def test_returns_nine_specs(self):
         """get_custom_languages() should return 9 specs (4 language + 5 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 9
+        assert len(specs) == 10
 
     def test_all_specs_have_language_name(self):
         """All specs should have language_name attribute."""

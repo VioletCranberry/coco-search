@@ -378,6 +378,35 @@ async def api_stop_indexing(request):
     )
 
 
+@mcp.custom_route("/api/delete-index", methods=["POST"])
+async def api_delete_index(request):
+    """Delete an index permanently."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    index_name = body.get("index_name")
+    if not index_name:
+        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    # Reject if indexing is currently active for this index
+    prev = _active_indexing.get(index_name)
+    if prev is not None and prev.is_alive():
+        return JSONResponse(
+            {"error": f"Cannot delete '{index_name}' while indexing is active. Stop indexing first."},
+            status_code=409,
+        )
+
+    try:
+        result = mgmt_clear_index(index_name)
+        return JSONResponse(result)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to delete index: {e}"}, status_code=500)
+
+
 def _get_treesitter_language(ext: str) -> str | None:
     """Map file extension to tree-sitter language name."""
     mapping = {
