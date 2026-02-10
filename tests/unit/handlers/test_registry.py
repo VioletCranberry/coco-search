@@ -18,9 +18,9 @@ class TestHandlerRegistryDiscovery:
     """Tests for handler registry autodiscovery."""
 
     def test_discover_finds_all_handlers(self):
-        """_HANDLER_REGISTRY should have at least 3 handlers registered."""
-        # Should have .tf, .hcl, .tfvars, .dockerfile, .sh, .bash, .zsh
-        assert len(_HANDLER_REGISTRY) >= 7
+        """_HANDLER_REGISTRY should have at least 4 handlers registered."""
+        # Should have .tf, .hcl, .tfvars, .dockerfile, .sh, .bash, .zsh, .tpl, .gotmpl
+        assert len(_HANDLER_REGISTRY) >= 9
 
     def test_template_excluded_from_discovery(self):
         """_template.py should be excluded from discovery."""
@@ -127,10 +127,10 @@ class TestGetCustomLanguages:
         specs = get_custom_languages()
         assert isinstance(specs, list)
 
-    def test_returns_six_specs(self):
-        """get_custom_languages() should return 6 specs (3 language + 3 grammar)."""
+    def test_returns_nine_specs(self):
+        """get_custom_languages() should return 9 specs (4 language + 5 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 6
+        assert len(specs) == 9
 
     def test_all_specs_have_language_name(self):
         """All specs should have language_name attribute."""

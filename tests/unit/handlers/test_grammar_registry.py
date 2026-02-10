@@ -17,8 +17,8 @@ class TestGrammarRegistryDiscovery:
     """Tests for grammar handler autodiscovery."""
 
     def test_discover_finds_all_grammars(self):
-        """_GRAMMAR_REGISTRY should have 3 grammar handlers."""
-        assert len(_GRAMMAR_REGISTRY) == 3
+        """_GRAMMAR_REGISTRY should have 5 grammar handlers."""
+        assert len(_GRAMMAR_REGISTRY) == 5
 
     def test_grammar_names(self):
         """All expected grammar names should be registered."""
@@ -26,6 +26,8 @@ class TestGrammarRegistryDiscovery:
         assert "github-actions" in names
         assert "gitlab-ci" in names
         assert "docker-compose" in names
+        assert "helm-template" in names
+        assert "helm-values" in names
 
     def test_all_grammars_have_base_language(self):
         """All grammars should declare a BASE_LANGUAGE."""
@@ -108,6 +110,18 @@ class TestGetGrammarHandler:
         assert handler is not None
         assert handler.GRAMMAR_NAME == "docker-compose"
 
+    def test_get_helm_template(self):
+        """get_grammar_handler returns handler for 'helm-template'."""
+        handler = get_grammar_handler("helm-template")
+        assert handler is not None
+        assert handler.GRAMMAR_NAME == "helm-template"
+
+    def test_get_helm_values(self):
+        """get_grammar_handler returns handler for 'helm-values'."""
+        handler = get_grammar_handler("helm-values")
+        assert handler is not None
+        assert handler.GRAMMAR_NAME == "helm-values"
+
     def test_returns_none_for_unknown(self):
         """get_grammar_handler returns None for unknown grammar."""
         assert get_grammar_handler("unknown-grammar") is None
@@ -117,10 +131,10 @@ class TestGetGrammarHandler:
 class TestGetCustomLanguagesWithGrammars:
     """Tests for get_custom_languages() including grammar specs."""
 
-    def test_returns_six_specs(self):
-        """get_custom_languages() should return 6 specs (3 language + 3 grammar)."""
+    def test_returns_nine_specs(self):
+        """get_custom_languages() should return 9 specs (4 language + 5 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 6
+        assert len(specs) == 9
 
     def test_includes_grammar_specs(self):
         """get_custom_languages() should include grammar language names."""
@@ -129,6 +143,8 @@ class TestGetCustomLanguagesWithGrammars:
         assert "github-actions" in language_names
         assert "gitlab-ci" in language_names
         assert "docker-compose" in language_names
+        assert "helm-template" in language_names
+        assert "helm-values" in language_names
 
     def test_still_includes_language_specs(self):
         """get_custom_languages() should still include language handler specs."""
@@ -137,6 +153,7 @@ class TestGetCustomLanguagesWithGrammars:
         assert "hcl" in language_names
         assert "dockerfile" in language_names
         assert "bash" in language_names
+        assert "gotmpl" in language_names
 
     def test_no_duplicate_specs(self):
         """get_custom_languages() should not return duplicate specs."""
@@ -154,10 +171,10 @@ class TestGetRegisteredGrammars:
         grammars = get_registered_grammars()
         assert isinstance(grammars, list)
 
-    def test_returns_three_grammars(self):
-        """get_registered_grammars() should return 3 grammars."""
+    def test_returns_five_grammars(self):
+        """get_registered_grammars() should return 5 grammars."""
         grammars = get_registered_grammars()
-        assert len(grammars) == 3
+        assert len(grammars) == 5
 
 
 @pytest.mark.unit
