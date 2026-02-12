@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="960" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#161b22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="300" rx="12" fill="url(#bg)"/>
+  <rect x=".5" y=".5" width="959" height="299" rx="11.5" fill="none" stroke="#30363d"/>
+
+  <!-- Background: faint vector-embedding network (right side) -->
+  <g opacity=".06" fill="#8b5cf6" stroke="#8b5cf6" stroke-width=".5">
+    <circle cx="680" cy="55" r="2.5"/><circle cx="740" cy="90" r="2"/>
+    <circle cx="810" cy="40" r="2.5"/><circle cx="770" cy="155" r="2"/>
+    <circle cx="850" cy="125" r="2.5"/><circle cx="660" cy="175" r="2"/>
+    <circle cx="900" cy="75" r="2.5"/><circle cx="710" cy="225" r="2"/>
+    <circle cx="850" cy="215" r="2.5"/><circle cx="920" cy="185" r="2"/>
+    <circle cx="630" cy="95" r="2"/><circle cx="890" cy="255" r="2"/>
+    <line x1="680" y1="55" x2="740" y2="90"/>
+    <line x1="740" y1="90" x2="810" y2="40"/>
+    <line x1="740" y1="90" x2="770" y2="155"/>
+    <line x1="770" y1="155" x2="850" y2="125"/>
+    <line x1="850" y1="125" x2="900" y2="75"/>
+    <line x1="660" y1="175" x2="710" y2="225"/>
+    <line x1="710" y1="225" x2="850" y2="215"/>
+    <line x1="770" y1="155" x2="850" y2="215"/>
+    <line x1="920" y1="185" x2="890" y2="255"/>
+    <line x1="850" y1="125" x2="920" y2="185"/>
+    <line x1="630" y1="95" x2="680" y2="55"/>
+    <line x1="630" y1="95" x2="660" y2="175"/>
+  </g>
+
+  <!-- Subtle glow behind icon -->
+  <circle cx="125" cy="127" r="62" fill="#f0a060" opacity=".025"/>
+
+  <!-- Magnifying glass icon -->
+  <g transform="translate(70,72)">
+    <circle cx="55" cy="55" r="42" fill="none" stroke="#f0a060" stroke-width="4.5" opacity=".9"/>
+    <line x1="85" y1="85" x2="112" y2="112" stroke="#e07840" stroke-width="5.5" stroke-linecap="round" opacity=".9"/>
+    <text x="55" y="65" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="28" fill="#f0a060" font-weight="bold" opacity=".85">&lt;/&gt;</text>
+  </g>
+
+  <!-- Title: Coco[-S]earch -->
+  <text x="240" y="130" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="52" font-weight="bold" letter-spacing="-0.5">
+    <tspan fill="#f0f6fc">Coco</tspan><tspan fill="#f0a060">[-S]</tspan><tspan fill="#f0f6fc">earch</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="242" y="164" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="17" fill="#8b949e" letter-spacing=".3">
+    Local-first hybrid semantic code search
+  </text>
+
+  <!-- Feature pills -->
+  <g transform="translate(240,185)" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="#8b949e">
+    <!-- Row 1 -->
+    <rect width="132" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="66" y="17" text-anchor="middle">Vector + Keyword</text>
+
+    <rect x="144" width="104" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="196" y="17" text-anchor="middle">Tree-sitter</text>
+
+    <rect x="260" width="60" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="290" y="17" text-anchor="middle">MCP</text>
+
+    <rect x="332" width="84" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="374" y="17" text-anchor="middle">pgvector</text>
+
+    <!-- Row 2 -->
+    <rect y="34" width="94" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="47" y="51" text-anchor="middle">CocoIndex</text>
+
+    <rect x="106" y="34" width="74" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="143" y="51" text-anchor="middle">Ollama</text>
+
+    <rect x="192" y="34" width="96" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="240" y="51" text-anchor="middle">PostgreSQL</text>
+
+    <rect x="300" y="34" width="74" height="26" rx="13" fill="none" stroke="#30363d"/>
+    <text x="337" y="51" text-anchor="middle">Docker</text>
+  </g>
+</svg>

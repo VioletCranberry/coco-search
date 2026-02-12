@@ -133,8 +133,8 @@ Use this for languages already supported by Tree-sitter where you want `--symbol
 
 6. **Add tests:**
    ```bash
-   # Add test cases to tests/unit/indexer/test_symbols.py
-   uv run pytest tests/unit/indexer/test_symbols.py -v
+   # Create tests/unit/indexer/symbols/test_<language>.py
+   uv run pytest tests/unit/indexer/symbols/test_<language>.py -v
    ```
 
 ### Files to Create/Modify
@@ -144,7 +144,7 @@ Use this for languages already supported by Tree-sitter where you want `--symbol
 | `src/cocosearch/indexer/queries/<language>.scm` | Create — tree-sitter query |
 | `src/cocosearch/indexer/symbols.py` | Modify — `LANGUAGE_MAP`, possibly `_map_symbol_type` and `_build_qualified_name` |
 | `src/cocosearch/search/query.py` | Modify — `SYMBOL_AWARE_LANGUAGES` |
-| `tests/unit/indexer/test_symbols.py` | Modify — add test cases |
+| `tests/unit/indexer/symbols/test_<language>.py` | Create — symbol extraction tests |
 
 ### Query file resolution
 

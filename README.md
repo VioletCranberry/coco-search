@@ -1,12 +1,27 @@
-# Coco-s
+<p align="center">
+  <img src="./docs/banner.svg" alt="Coco[-S]earch — Local-first hybrid semantic code search" width="960">
+</p>
 
-Coco[-S]earch is a local-first hybrid semantic code search tool powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) and [Tree-sitter](https://tree-sitter.github.io/tree-sitter/). It indexes codebases into PostgreSQL with pgvector embeddings (via Ollama) and provides search through CLI, MCP server, or interactive REPL. No external APIs — everything runs locally. Incremental updates by default. `.gitignore` is respected. Supports 30+ [languages](#supported-languages) with symbol extraction for 12+, plus domain-specific [grammars](#supported-grammars) for structured config files.
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-%3E%3D3.11-blue?logo=python&logoColor=white" alt="Python >= 3.11"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv"></a>
+  <a href="https://docs.pytest.org/"><img src="https://img.shields.io/badge/tests-pytest-blue?logo=pytest&logoColor=white" alt="pytest"></a>
+  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-compatible-8A2BE2?logo=anthropic&logoColor=white" alt="MCP"></a>
+</p>
+
+Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, PostgreSQL with pgvector for storage, and Ollama for local embeddings. No external APIs — everything runs on your machine.
+
+Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 30+ languages with symbol-level filtering for 13+, plus domain-specific grammars for structured config files.
+
+[Supported Languages (30+)](#supported-languages) | [Supported Grammars](#supported-grammars)
 
 ## Disclaimer
 
 A personal initiative, originally scaffolded with [GSD](https://github.com/glittercowboy/get-shit-done) and refined by hand. Built as a local-first, private tool for accelerating self-onboarding and exploring spec-driven development. Ships with a CLI, MCP tools, dashboards (TUI/WEB), a status API, and reusable [Claude SKILLS](https://code.claude.com/docs/en/skills).
 
-## Where MCP wins (fewer tokens, fewer round-trips)
+## Where MCP wins
 
 For codebases of meaningful size, CocoSearch reduces the number of MCP tool calls needed to find relevant code — often from 5-15 iterative grep/read cycles down to 1-2 semantic searches. This means fewer round-trips, less irrelevant content in the context window, and lower token consumption for exploratory and intent-based queries.
 
@@ -20,6 +35,7 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 
 ## Useful Documentation
 
+- [How It Works](./docs/how-it-works.md)
 - [Architecture Overview](./docs/architecture.md)
 - [Search Features](./docs/search-features.md)
 - [Dogfooding](./docs/dogfooding.md)
@@ -53,12 +69,62 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 - **coco-new-feature** ([SKILL.md](./skills/coco-new-feature/SKILL.md)): Use when adding new functionality — a new command, endpoint, module, handler, or capability. Guides placement, pattern matching, and integration using CocoSearch.
 - **coco-subway** ([SKILL.md](./skills/coco-subway/SKILL.md)): Use when the user wants to visualize codebase structure as an interactive London Underground-style subway map. AI-generated visualization using CocoSearch tools for exploration.
 
+## How Search Works
+
+```
+ Query: "authentication flow"
+ ─────────────────────────────────────────────────────────────────────
+                              │
+                    ┌─────────▼──────────┐
+                    │   Query Analysis   │  Detect identifiers
+                    │  (camelCase, etc.) │  → auto-enable hybrid
+                    └─────────┬──────────┘
+                              │
+                    ┌─────────▼──────────┐
+                    │  Ollama Embedding  │  nomic-embed-text
+                    │   768-dim vector   │  (runs locally)
+                    └─────────┬──────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+    ┌─────────▼──────────┐          ┌─────────▼──────────┐
+    │  Vector Similarity │          │  Keyword Search    │
+    │  (pgvector cosine) │          │  (tsvector FTS)    │
+    └─────────┬──────────┘          └─────────┬──────────┘
+              │                               │
+              └───────────┬───────────────────┘
+                          │
+                ┌─────────▼──────────┐
+                │    RRF Fusion      │  Reciprocal Rank Fusion
+                │  + Definition 2x   │  merges both ranked lists
+                └─────────┬──────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Symbol & Language  │  --symbol-type function
+                │     Filtering       │  --language python
+                └─────────┬──────────┘
+                          │
+                ┌─────────▼──────────┐
+                │ Context Expansion  │  Expand to enclosing
+                │ (Tree-sitter)      │  function/class boundaries
+                └─────────┬──────────┘
+                          │
+                ┌─────────▼──────────┐
+                │   Query Cache      │  Exact hash + semantic
+                │   (LRU + 0.95)     │  similarity fallback
+                └─────────┬──────────┘
+                          │
+                          ▼
+                   Ranked Results
+ ─────────────────────────────────────────────────────────────────────
+```
+
 ## Quick Start
 
 ```bash
 # 1. Start infrastructure.
 docker compose up -d
-# 2. Index your project.
+# 2. Index your project (or use WEB dashboard).
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index .
 # 3. Register with your AI assistant.
 claude mcp add --scope user cocosearch -- \
@@ -80,23 +146,9 @@ done
 
 ## Supported Languages
 
-CocoSearch indexes 30 programming languages. Chunking strategy depends on the language:
+CocoSearch indexes 30 programming languages. Symbol-aware languages (✓) support `--symbol-type` and `--symbol-name` filtering.
 
-- **Tree-sitter chunking (~20 languages)**: CocoIndex's `SplitRecursively` uses Tree-sitter internally to split at syntax-aware boundaries (function/class edges). Covers Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, C#, Ruby, PHP, and others in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages).
-- **Custom handler chunking (3 languages)**: HCL, Dockerfile, and Bash use regex-based `CustomLanguageSpec` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
-- **Text fallback**: Languages not recognized by either tier (Markdown, JSON, YAML, TOML, etc.) are split on blank lines and whitespace boundaries.
-
-Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 12 languages:
-
-- **Full Support (Symbol-Aware)**: Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, Ruby, PHP, HCL, Bash. All features: hybrid search, symbol filtering, smart context expansion. Symbol types extracted: `function`, `class`, `method`, `interface`.
-- **Basic Support**: C#, CSS, Fortran, HTML, JSON, Kotlin, Markdown, Pascal, R, Scala, Solidity, SQL, Swift, TOML, XML, YAML, Dockerfile, and more. Features: hybrid search, semantic + keyword search.
-
-See [Adding Languages](./docs/adding-languages.md) for details on how these tiers work and how to add new languages or grammars.
-
-```bash
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch languages
-
-                 Supported Languages
+```
 ┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃ Language   ┃ Extensions                  ┃ Symbols ┃
 ┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
@@ -119,7 +171,7 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch languages
 │ R          │ .r, .R                      │    ✗    │
 │ Ruby       │ .rb                         │    ✓    │
 │ Rust       │ .rs                         │    ✓    │
-│ Scala      │ .scala                      │    ✗    │
+│ Scala      │ .scala                      │    ✓    │
 │ Solidity   │ .sol                        │    ✗    │
 │ SQL        │ .sql                        │    ✗    │
 │ Swift      │ .swift                      │    ✗    │
@@ -131,20 +183,30 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch languages
 │ Dockerfile │ Dockerfile                  │    ✗    │
 │ HCL        │ .tf, .hcl, .tfvars          │    ✓    │
 └────────────┴─────────────────────────────┴─────────┘
-
-Symbol-aware languages support --symbol-type and --symbol-name filtering.
 ```
+
+<details>
+<summary>How chunking works</summary>
+
+Chunking strategy depends on the language:
+
+- **Tree-sitter chunking (~20 languages)**: CocoIndex's `SplitRecursively` uses Tree-sitter internally to split at syntax-aware boundaries (function/class edges). Covers Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, C#, Ruby, PHP, and others in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages).
+- **Custom handler chunking (5 languages)**: HCL, Dockerfile, Bash, Go Template, and Scala use regex-based `CustomLanguageSpec` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
+- **Text fallback**: Languages not recognized by either tier (Markdown, JSON, YAML, TOML, etc.) are split on blank lines and whitespace boundaries.
+
+In short: CocoIndex's Tree-sitter tells you _where to cut_; the `.scm` files tell you _what's inside each piece_.
+
+Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 13 languages.
+
+See [Adding Languages](./docs/adding-languages.md) for details on how these tiers work and how to add new languages or grammars.
+
+</details>
 
 ## Supported Grammars
 
-Beyond language-level support, CocoSearch recognizes **grammars** -- domain-specific schemas within a base language. A **language** is matched by file extension (e.g., `.yaml` -> YAML), while a **grammar** is matched by file path and content patterns (e.g., `.github/workflows/ci.yml` containing `on:` + `jobs:` -> GitHub Actions). Grammars provide structured chunking and richer metadata (job names, service names, stages) compared to generic text chunking.
+Beyond language-level support, CocoSearch recognizes **grammars** — domain-specific schemas within a base language. A **language** is matched by file extension (e.g., `.yaml` -> YAML), while a **grammar** is matched by file path and content patterns (e.g., `.github/workflows/ci.yml` containing `on:` + `jobs:` -> GitHub Actions). Grammars provide structured chunking and richer metadata compared to generic text chunking.
 
-Priority: Grammar match > Language match > TextHandler fallback.
-
-```bash
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch grammars
-
-                             Supported Grammars
+```
 ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ Grammar        ┃ File Format ┃ Path Patterns                                                                    ┃
 ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
@@ -156,9 +218,16 @@ uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch grammars
 │ helm-values    │ yaml        │ **/values.yaml, **/values-*.yaml                                                 │
 │ kubernetes     │ yaml        │ *.yaml, *.yml                                                                    │
 └────────────────┴─────────────┴──────────────────────────────────────────────────────────────────────────────────┘
-
-Grammars provide domain-specific chunking for files within a base language.
 ```
+
+<details>
+<summary>How grammar matching works</summary>
+
+Priority: Grammar match > Language match > TextHandler fallback.
+
+A grammar is matched by file path patterns and optionally by content patterns. For example, a YAML file at `.github/workflows/ci.yml` containing `on:` + `jobs:` is recognized as GitHub Actions, not generic YAML. This enables structured chunking by job/step and richer metadata extraction (job names, service names, stages).
+
+</details>
 
 ## Features
 

@@ -129,7 +129,7 @@ class TestDevopsCustomLanguages:
 
     def test_contains_all_specs(self):
         """HANDLER_CUSTOM_LANGUAGES should contain 9 specs (4 language + 5 grammar)."""
-        assert len(HANDLER_CUSTOM_LANGUAGES) == 10
+        assert len(HANDLER_CUSTOM_LANGUAGES) == 11
 
     def test_contains_hcl(self):
         """HANDLER_CUSTOM_LANGUAGES should contain the HCL spec."""

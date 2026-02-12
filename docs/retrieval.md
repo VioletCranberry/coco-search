@@ -81,7 +81,7 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 
 **How It Works:**
 
-**DevOps Metadata** (all files):
+**Handler Metadata** (all files):
 - `block_type`: Type of code block (e.g., "resource", "FROM", "function")
 - `hierarchy`: Nested path representation (e.g., "resource.aws_s3_bucket.data")
 - `language_id`: Language identifier (e.g., "hcl", "dockerfile", "bash", "python")
@@ -95,7 +95,7 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 - Signature truncation: 200 characters maximum to prevent oversized database entries
 
 **Implementation:**
-- DevOps metadata: `src/cocosearch/handlers/` (language-specific handlers)
+- Handler metadata: `src/cocosearch/handlers/` (language-specific handlers)
 - Symbol metadata: `src/cocosearch/indexer/symbols.py` — `extract_symbol_metadata()`
 
 ### 6. Text Preprocessing for Keyword Search

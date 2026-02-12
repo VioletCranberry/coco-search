@@ -91,6 +91,8 @@ LANGUAGE_MAP = {
     "tf": "terraform",
     "hcl": "hcl",
     "tfvars": "hcl",
+    # Scala
+    "scala": "scala",
 }
 
 # ============================================================================
@@ -287,6 +289,7 @@ def _build_qualified_name(node, name: str, chunk_text: str, language: str) -> st
         "cpp": ["class_specifier", "struct_specifier", "namespace_definition"],
         "ruby": ["class", "module"],
         "php": ["class_declaration", "interface_declaration", "trait_declaration"],
+        "scala": ["class_definition", "trait_definition", "object_definition"],
     }
 
     parents = []

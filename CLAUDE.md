@@ -62,13 +62,13 @@ uv run cocosearch mcp --project-from-cwd
 - **`cli.py`** — Argparse CLI orchestrating all subcommands
 - **`mcp/server.py`** — MCP server exposing tools (search_code, index_codebase, etc.) + web dashboard with custom HTTP routes (`/api/stats`, `/api/reindex`)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
-- **`indexer/`** — CocoIndex pipeline: file filtering, Tree-sitter symbol extraction (11 languages), Ollama embedding, tsvector generation, parse health tracking, schema migration
+- **`indexer/`** — CocoIndex pipeline: file filtering, Tree-sitter symbol extraction (14 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
 - **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, LRU query cache (exact + semantic similarity), context expansion via Tree-sitter boundaries, symbol/language filtering
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution
 - **`management/`** — Index lifecycle: discovery, stats, clearing, git-based naming, metadata
-- **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose) with autodiscovery registry
+- **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash, Scala) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose, Kubernetes) with autodiscovery registry
 - **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards
 
 **Data flow:** Files → Tree-sitter parse → symbol extraction → chunking → Ollama embeddings → PostgreSQL (pgvector). Search queries → embedding → hybrid RRF (vector similarity + tsvector keyword) → context expansion → results.
@@ -76,7 +76,7 @@ uv run cocosearch mcp --project-from-cwd
 **Key patterns:**
 
 - Singleton DB connection pool via `search.db` — reset between tests with `reset_db_pool()` autouse fixture in `tests/conftest.py`
-- Handler autodiscovery: any `handlers/*.py` (not prefixed with `_`) implementing `LanguageHandler` protocol is auto-registered. Grammar handlers in `handlers/grammars/*.py` are also autodiscovered. Total custom language specs: 9 (4 language + 5 grammar) — update `test_languages.py` and `test_flow.py` count assertions when adding handlers
+- Handler autodiscovery: any `handlers/*.py` (not prefixed with `_`) implementing `LanguageHandler` protocol is auto-registered. Grammar handlers in `handlers/grammars/*.py` are also autodiscovered. Total custom language specs: 11 (5 language + 6 grammar) — update `test_languages.py` and `test_flow.py` count assertions when adding handlers
 - CocoIndex framework orchestrates the indexing pipeline in `indexer/flow.py`
 - **CocoIndex table naming:** `codeindex_{index_name}__{index_name}_chunks` (flow name `CodeIndex_{name}` is lowercased by CocoIndex). Parse results go to `cocosearch_parse_results_{index_name}`.
 - Parse status categories: `ok`, `partial`, `error`, `no_grammar`. Text-only formats (md, yaml, json, etc.) are skipped from parse tracking entirely via `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py`.
@@ -91,14 +91,30 @@ Async tests use `pytest-asyncio` with `strict` mode — async test functions mus
 
 Shared fixtures live in `tests/fixtures/`.
 
-## Adding a Language Handler
+Symbol extraction tests live in `tests/unit/indexer/symbols/` (one file per language). Handler tests are in `tests/unit/handlers/`.
 
+## Adding Language Support
+
+Three independent systems — a language can use any combination. See `docs/adding-languages.md` for the full guide.
+
+**Language Handler** (custom chunking for languages not in CocoIndex's built-in list):
 1. Copy `src/cocosearch/handlers/_template.py` to `<language>.py`
 2. Define `EXTENSIONS`, `SEPARATOR_SPEC` (using `CustomLanguageSpec`), and `extract_metadata()`
 3. Add file extensions to `include_patterns` in `src/cocosearch/indexer/config.py`
 4. Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
 5. Create `tests/unit/handlers/test_<language>.py`
-6. Run: `uv run pytest tests/unit/handlers/test_<language>.py -v`
+
+**Symbol Extraction** (enables `--symbol-type`/`--symbol-name` filtering):
+1. Create `src/cocosearch/indexer/queries/<language>.scm` with tree-sitter queries
+2. Add the language to `LANGUAGE_MAP` in `src/cocosearch/indexer/symbols.py`
+3. Create `tests/unit/indexer/symbols/test_<language>.py`
+
+**Grammar Handler** (domain-specific chunking within a base language, e.g. GitHub Actions within YAML):
+1. Copy `src/cocosearch/handlers/grammars/_template.py` to `<grammar>.py`
+2. Define path patterns, content matchers, separators, and metadata extraction
+3. Create `tests/unit/handlers/test_<grammar>.py`
+
+After adding any handler/grammar, update the count assertion in `test_languages.py` and `test_flow.py`.
 
 ## Configuration
 
