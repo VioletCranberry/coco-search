@@ -344,8 +344,8 @@ Recommended next steps:
 **Claude Code (project-local):**
 
 ```bash
-mkdir -p .claude/skills/coco-new-feature
-cp skills/coco-new-feature/SKILL.md .claude/skills/coco-new-feature/SKILL.md
+mkdir -p .claude/skills
+ln -sfn ../../skills/coco-new-feature .claude/skills/coco-new-feature
 ```
 
 **Claude Code (global):**

@@ -127,8 +127,8 @@ search_code(query="error handling", language="python", smart_context=True)
 
 **Claude Code (project-local):**
 ```bash
-mkdir -p .claude/skills/coco-quickstart
-cp skills/coco-quickstart/SKILL.md .claude/skills/coco-quickstart/SKILL.md
+mkdir -p .claude/skills
+ln -sfn ../../skills/coco-quickstart .claude/skills/coco-quickstart
 ```
 
 **Claude Code (global):**

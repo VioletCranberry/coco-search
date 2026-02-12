@@ -335,8 +335,8 @@ search_code(
 **Claude Code (project-local):**
 
 ```bash
-mkdir -p .claude/skills/coco-explain
-cp skills/coco-explain/SKILL.md .claude/skills/coco-explain/SKILL.md
+mkdir -p .claude/skills
+ln -sfn ../../skills/coco-explain .claude/skills/coco-explain
 ```
 
 **Claude Code (global):**

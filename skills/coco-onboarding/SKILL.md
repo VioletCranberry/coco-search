@@ -155,7 +155,14 @@ Now you've seen the architecture, key layers, and conventions. Would you like me
 
 ## Installation
 
-**Claude Code:**
+**Claude Code (project-local, recommended for team-shared skills):**
+
+```bash
+mkdir -p .claude/skills
+ln -sfn ../../skills/coco-onboarding .claude/skills/coco-onboarding
+```
+
+**Claude Code (global):**
 
 ```bash
 mkdir -p ~/.claude/skills/coco-onboarding
@@ -169,16 +176,4 @@ mkdir -p ~/.config/opencode/skills/coco-onboarding
 cp skills/coco-onboarding/SKILL.md ~/.config/opencode/skills/coco-onboarding/SKILL.md
 ```
 
-**Project-local (recommended for team-shared skills):**
-
-```bash
-# Claude Code
-mkdir -p .claude/skills/coco-onboarding
-cp skills/coco-onboarding/SKILL.md .claude/skills/coco-onboarding/SKILL.md
-
-# OpenCode
-mkdir -p .opencode/skills/coco-onboarding
-cp skills/coco-onboarding/SKILL.md .opencode/skills/coco-onboarding/SKILL.md
-```
-
-After copying, restart your AI coding assistant or run the skill activation command for your platform.
+After installation, restart your AI coding assistant or run the skill activation command for your platform.

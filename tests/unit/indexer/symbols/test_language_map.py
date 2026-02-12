@@ -7,8 +7,8 @@ class TestLanguageMap:
     """Test language extension mapping."""
 
     def test_language_map_count(self):
-        """LANGUAGE_MAP contains all 30 extension mappings."""
-        assert len(LANGUAGE_MAP) == 30
+        """LANGUAGE_MAP contains all 32 extension mappings."""
+        assert len(LANGUAGE_MAP) == 32
 
     def test_javascript_extensions(self):
         """JavaScript extensions map correctly."""
@@ -69,6 +69,11 @@ class TestLanguageMap:
     def test_scala_extension(self):
         """Scala extension maps correctly."""
         assert LANGUAGE_MAP["scala"] == "scala"
+
+    def test_css_extensions(self):
+        """CSS extensions map correctly."""
+        assert LANGUAGE_MAP["css"] == "css"
+        assert LANGUAGE_MAP["scss"] == "css"
 
     def test_unsupported_extension(self):
         """Unsupported extension returns None."""

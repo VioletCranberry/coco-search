@@ -104,6 +104,7 @@ SYMBOL_AWARE_LANGUAGES = {
     "php",
     "hcl",
     "bash",
+    "css",
 }
 
 # Handler language canonical names mapped to language_id values in the database

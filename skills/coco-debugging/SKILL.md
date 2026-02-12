@@ -307,14 +307,21 @@ search_code(query="error handling", context_before=10, context_after=10)
 
 ## Installation
 
-**For Claude Code:**
+**Claude Code (project-local):**
+
+```bash
+mkdir -p .claude/skills
+ln -sfn ../../skills/coco-debugging .claude/skills/coco-debugging
+```
+
+**Claude Code (global):**
 
 ```bash
 mkdir -p ~/.claude/skills/coco-debugging
 cp skills/coco-debugging/SKILL.md ~/.claude/skills/coco-debugging/SKILL.md
 ```
 
-**For OpenCode:**
+**OpenCode:**
 
 ```bash
 mkdir -p ~/.config/opencode/skills/coco-debugging

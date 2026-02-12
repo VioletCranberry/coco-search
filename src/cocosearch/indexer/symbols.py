@@ -17,6 +17,7 @@ Supported languages:
 - PHP: functions, classes, interfaces, traits, methods
 - HCL: blocks (resource, variable, data, module, locals, output, provider)
 - Terraform: blocks (same as HCL — identical AST structure)
+- CSS: rule sets (class/ID/element selectors), @keyframes, @media queries
 
 Features:
 - Query-based extraction using external .scm files
@@ -93,6 +94,9 @@ LANGUAGE_MAP = {
     "tfvars": "hcl",
     # Scala
     "scala": "scala",
+    # CSS
+    "css": "css",
+    "scss": "css",
 }
 
 # ============================================================================

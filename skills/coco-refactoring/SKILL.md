@@ -318,7 +318,14 @@ Recommended next steps:
 
 ## Installation
 
-**Claude Code:**
+**Claude Code (project-local):**
+
+```bash
+mkdir -p .claude/skills
+ln -sfn ../../skills/coco-refactoring .claude/skills/coco-refactoring
+```
+
+**Claude Code (global):**
 
 ```bash
 mkdir -p ~/.claude/skills/coco-refactoring

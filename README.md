@@ -13,7 +13,7 @@
 
 Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, PostgreSQL with pgvector for storage, and Ollama for local embeddings. No external APIs — everything runs on your machine.
 
-Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 30+ languages with symbol-level filtering for 13+, plus domain-specific grammars for structured config files.
+Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 30+ languages with symbol-level filtering for 14+, plus domain-specific grammars for structured config files.
 
 [Supported Languages (30+)](#supported-languages) | [Supported Grammars](#supported-grammars)
 
@@ -134,10 +134,10 @@ claude mcp add --scope user cocosearch -- \
 Use skills:
 
 ```bash
-# Clone this repository and install coco skills. For global installation install them to ~/.claude/skills/
+# Clone this repository and symlink coco skills. For global installation symlink them to ~/.claude/skills/
+mkdir -p .claude/skills
 for skill in coco-onboarding coco-refactoring coco-debugging coco-quickstart coco-explain coco-new-feature coco-subway; do
-    mkdir -p .claude/skills/$skill
-    cp skills/$skill/SKILL.md .claude/skills/$skill/SKILL.md
+    ln -sfn "../../skills/$skill" ".claude/skills/$skill"
 done
 # Then restart your Claude session and instruct it to
 # 'onboard current repository with CocoSearch' or use
@@ -155,7 +155,7 @@ CocoSearch indexes 30 programming languages. Symbol-aware languages (✓) suppor
 │ C          │ .c, .h                      │    ✓    │
 │ C++        │ .cpp, .cc, .cxx, .hpp, .hxx │    ✓    │
 │ C#         │ .cs                         │    ✗    │
-│ CSS        │ .css, .scss                 │    ✗    │
+│ CSS        │ .css, .scss                 │    ✓    │
 │ DTD        │ .dtd                        │    ✗    │
 │ Fortran    │ .f, .f90, .f95, .f03        │    ✗    │
 │ Go         │ .go                         │    ✓    │
@@ -196,7 +196,7 @@ Chunking strategy depends on the language:
 
 In short: CocoIndex's Tree-sitter tells you _where to cut_; the `.scm` files tell you _what's inside each piece_.
 
-Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 13 languages.
+Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 14 languages.
 
 See [Adding Languages](./docs/adding-languages.md) for details on how these tiers work and how to add new languages or grammars.
 
