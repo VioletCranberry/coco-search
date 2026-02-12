@@ -166,13 +166,6 @@ class KubernetesHandler:
 
     def _strip_comments(self, text: str) -> str:
         """Strip leading comments and document separators from chunk text."""
-        lines = text.lstrip().split("\n")
-        for i, line in enumerate(lines):
-            stripped_line = line.strip()
-            if (
-                stripped_line
-                and not self._COMMENT_LINE.match(line)
-                and stripped_line != "---"
-            ):
-                return "\n".join(lines[i:])
-        return ""
+        from cocosearch.handlers.utils import strip_leading_comments
+
+        return strip_leading_comments(text, [self._COMMENT_LINE], skip_strings=["---"])

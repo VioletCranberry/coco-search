@@ -24,6 +24,7 @@ from cocosearch.management.metadata import (
 )
 from cocosearch.management.stats import (
     get_comprehensive_stats,
+    get_grammar_failures,
     get_language_stats,
     get_parse_failures,
     get_parse_stats,
@@ -40,6 +41,7 @@ __all__ = [
     "get_canonical_path",
     "get_comprehensive_stats",
     "get_git_root",
+    "get_grammar_failures",
     "get_repo_url",
     "get_index_for_path",
     "get_index_metadata",

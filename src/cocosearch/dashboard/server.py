@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Track active indexing threads (mirrors mcp/server.py's _active_indexing)
 _active_indexing: dict[str, threading.Thread] = {}
+_indexing_lock = threading.Lock()
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -48,6 +49,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._handle_stop_indexing()
         elif self.path == "/api/delete-index":
             self._handle_delete_index()
+        elif self.path == "/api/search":
+            self._handle_search()
         else:
             self.send_error(404)
 
@@ -60,6 +63,101 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._json_response({"error": "Invalid JSON body"}, status=400)
             return None
+
+    def _handle_search(self):
+        import time
+        import cocoindex
+        from cocosearch.search import byte_to_line, read_chunk_content, search
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        query = (body.get("query") or "").strip()
+        index_name = body.get("index_name")
+
+        if not query:
+            self._json_response({"error": "query is required"}, status=400)
+            return
+        if not index_name:
+            self._json_response({"error": "index_name is required"}, status=400)
+            return
+
+        limit = body.get("limit", 10)
+        language = body.get("language") or None
+        symbol_type = body.get("symbol_type") or None
+        symbol_name = body.get("symbol_name") or None
+        min_score = body.get("min_score", 0.3)
+        use_hybrid = body.get("use_hybrid")
+
+        try:
+            cocoindex.init()
+        except Exception:
+            self._json_response(
+                {"error": "Database not initialized. Index a codebase first."},
+                status=503,
+            )
+            return
+
+        start_time = time.monotonic()
+        try:
+            results = search(
+                query=query,
+                index_name=index_name,
+                limit=limit,
+                min_score=min_score,
+                language_filter=language,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+            )
+        except ValueError as e:
+            self._json_response({"error": str(e)}, status=400)
+            return
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            self._json_response({"error": f"Search failed: {e}"}, status=500)
+            return
+
+        query_time_ms = round((time.monotonic() - start_time) * 1000)
+
+        output = []
+        for r in results:
+            start_line = byte_to_line(r.filename, r.start_byte)
+            end_line = byte_to_line(r.filename, r.end_byte)
+            content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+
+            result_dict = {
+                "file_path": r.filename,
+                "start_line": start_line,
+                "end_line": end_line,
+                "score": r.score,
+                "content": content,
+                "block_type": r.block_type,
+                "hierarchy": r.hierarchy,
+                "language_id": r.language_id,
+                "symbol_type": r.symbol_type,
+                "symbol_name": r.symbol_name,
+                "symbol_signature": r.symbol_signature,
+            }
+
+            if r.match_type:
+                result_dict["match_type"] = r.match_type
+            if r.vector_score is not None:
+                result_dict["vector_score"] = r.vector_score
+            if r.keyword_score is not None:
+                result_dict["keyword_score"] = r.keyword_score
+
+            output.append(result_dict)
+
+        self._json_response(
+            {
+                "success": True,
+                "results": output,
+                "query_time_ms": query_time_ms,
+                "total": len(output),
+            }
+        )
 
     def _handle_reindex(self):
         import cocoindex
@@ -92,7 +190,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         source_path = metadata["canonical_path"]
 
         # Reject if a previous indexing thread is still alive
-        prev = _active_indexing.get(index_name)
+        with _indexing_lock:
+            prev = _active_indexing.get(index_name)
         if prev is not None and prev.is_alive():
             self._json_response(
                 {"error": "Previous indexing still completing. Try again shortly."},
@@ -103,8 +202,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # Set status to indexing
         try:
             set_index_status(index_name, "indexing")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to set indexing status for '{index_name}': {e}")
 
         def _run():
             failed = False
@@ -125,13 +224,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     current = get_index_metadata(index_name)
                     if current and current.get("status") == "indexing":
                         set_index_status(index_name, "error" if failed else "indexed")
-                except Exception:
-                    pass
-                _active_indexing.pop(index_name, None)
+                except Exception as e:
+                    logger.warning(f"Failed to update status for '{index_name}': {e}")
+                with _indexing_lock:
+                    _active_indexing.pop(index_name, None)
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
-        _active_indexing[index_name] = thread
+        with _indexing_lock:
+            _active_indexing[index_name] = thread
 
         action = "Fresh reindex" if fresh else "Reindex"
         self._json_response(
@@ -164,7 +265,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             index_name = derive_index_name(project_path)
 
         # Reject if a previous indexing thread is still alive
-        prev = _active_indexing.get(index_name)
+        with _indexing_lock:
+            prev = _active_indexing.get(index_name)
         if prev is not None and prev.is_alive():
             self._json_response(
                 {"error": "Previous indexing still completing. Try again shortly."},
@@ -198,13 +300,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     current = get_index_metadata(index_name)
                     if current and current.get("status") == "indexing":
                         set_index_status(index_name, "error" if failed else "indexed")
-                except Exception:
-                    pass
-                _active_indexing.pop(index_name, None)
+                except Exception as e:
+                    logger.warning(f"Failed to update status for '{index_name}': {e}")
+                with _indexing_lock:
+                    _active_indexing.pop(index_name, None)
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
-        _active_indexing[index_name] = thread
+        with _indexing_lock:
+            _active_indexing[index_name] = thread
 
         self._json_response(
             {
@@ -226,7 +330,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json_response({"error": "index_name is required"}, status=400)
             return
 
-        thread = _active_indexing.get(index_name)
+        with _indexing_lock:
+            thread = _active_indexing.get(index_name)
         if thread is None or not thread.is_alive():
             self._json_response(
                 {"error": f"No active indexing found for '{index_name}'"},
@@ -257,7 +362,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         # Reject if indexing is currently active for this index
-        prev = _active_indexing.get(index_name)
+        with _indexing_lock:
+            prev = _active_indexing.get(index_name)
         if prev is not None and prev.is_alive():
             self._json_response(
                 {
@@ -344,7 +450,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def _serve_all_stats(self):
         import cocoindex
         from cocosearch.management import list_indexes as mgmt_list_indexes
-        from cocosearch.management.stats import (
+        from cocosearch.management import (
             get_comprehensive_stats,
             get_grammar_failures,
             get_parse_failures,
@@ -364,7 +470,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 result = stats.to_dict()
                 # Override status from thread liveness — the DB status may
                 # lag behind the actual indexing state due to race conditions.
-                active = _active_indexing.get(idx["name"])
+                with _indexing_lock:
+                    active = _active_indexing.get(idx["name"])
                 if active is not None and active.is_alive():
                     result["status"] = "indexing"
                 if include_failures:
@@ -377,7 +484,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _serve_single_stats(self, index_name: str):
         import cocoindex
-        from cocosearch.management.stats import (
+        from cocosearch.management import (
             get_comprehensive_stats,
             get_grammar_failures,
             get_parse_failures,
@@ -393,7 +500,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             stats = get_comprehensive_stats(index_name)
             result = stats.to_dict()
             # Override status from thread liveness
-            active = _active_indexing.get(index_name)
+            with _indexing_lock:
+                active = _active_indexing.get(index_name)
             if active is not None and active.is_alive():
                 result["status"] = "indexing"
             if include_failures:

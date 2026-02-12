@@ -68,6 +68,35 @@ def add_config_arg(
     parser.add_argument(*flags, help=full_help, **kwargs)
 
 
+def _resolve_index_name(
+    resolver: ConfigResolver,
+    cli_value: str | None,
+    fallback_path: str | None = None,
+) -> tuple[str, str]:
+    """Resolve index name with CLI > env > config > git > path fallback.
+
+    Args:
+        resolver: Config resolver instance.
+        cli_value: Value from CLI flag (--name or --index).
+        fallback_path: Path to derive name from if all else fails.
+            Defaults to os.getcwd().
+
+    Returns:
+        Tuple of (index_name, source) where source describes where
+        the name came from.
+    """
+    name, source = resolver.resolve(
+        "indexName", cli_value=cli_value, env_var="COCOSEARCH_INDEX_NAME"
+    )
+    if name:
+        return name, source
+    # Auto-detect: try git root first, fall back to path
+    git_index = derive_index_from_git()
+    if git_index:
+        return git_index, "git"
+    return derive_index_name(fallback_path or os.getcwd()), "derived"
+
+
 def derive_index_name(path: str) -> str:
     """Derive an index name from a directory path.
 
@@ -156,18 +185,14 @@ def index_command(args: argparse.Namespace) -> int:
     # Create resolver with loaded config
     resolver = ConfigResolver(project_config, config_path)
 
-    # Resolve index name with CLI > env > config > default precedence
-    index_name, index_source = resolver.resolve(
-        "indexName", cli_value=args.name, env_var="COCOSEARCH_INDEX_NAME"
+    # Resolve index name with CLI > env > config > git > path fallback
+    index_name, index_source = _resolve_index_name(
+        resolver, cli_value=args.name, fallback_path=codebase_path
     )
-    if not index_name:
-        index_name = derive_index_name(codebase_path)
+    if index_source == "derived":
         console.print(f"[dim]Using derived index name: {index_name}[/dim]")
     elif index_source not in ("default", "CLI flag"):
         console.print(f"[dim]Using index name: {index_name} ({index_source})[/dim]")
-    elif index_source == "CLI flag":
-        # CLI flag is explicit, no need to show source
-        pass
 
     # Map project config to IndexingConfig
     # Only override defaults if patterns are explicitly set in config
@@ -322,17 +347,8 @@ def search_command(args: argparse.Namespace) -> int:
     # Create resolver with loaded config
     resolver = ConfigResolver(project_config, config_path)
 
-    # Resolve index name with CLI > env > config > default precedence
-    index_name, _ = resolver.resolve(
-        "indexName", cli_value=args.index, env_var="COCOSEARCH_INDEX_NAME"
-    )
-    if not index_name:
-        # Auto-detect: try git root first, fall back to cwd
-        git_index = derive_index_from_git()
-        if git_index:
-            index_name = git_index
-        else:
-            index_name = derive_index_name(os.getcwd())
+    # Resolve index name with CLI > env > config > git > cwd fallback
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
 
     # Resolve search settings with precedence
     limit, _ = resolver.resolve(
@@ -699,17 +715,7 @@ def stats_command(args: argparse.Namespace) -> int:
         else:
             project_config = CocoSearchConfig()
         resolver = ConfigResolver(project_config, config_path)
-        index_name, _ = resolver.resolve(
-            "indexName",
-            cli_value=args.index,
-            env_var="COCOSEARCH_INDEX_NAME",
-        )
-        if not index_name:
-            git_index = derive_index_from_git()
-            if git_index:
-                index_name = git_index
-            else:
-                index_name = derive_index_name(os.getcwd())
+        index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
 
         # Validate index exists before starting dashboard
         try:
@@ -825,18 +831,7 @@ def stats_command(args: argparse.Namespace) -> int:
     else:
         project_config = CocoSearchConfig()
     resolver = ConfigResolver(project_config, config_path)
-    index_name, _ = resolver.resolve(
-        "indexName",
-        cli_value=args.index,
-        env_var="COCOSEARCH_INDEX_NAME",
-    )
-    if not index_name:
-        # Auto-detect from cwd (like search command)
-        git_index = derive_index_from_git()
-        if git_index:
-            index_name = git_index
-        else:
-            index_name = derive_index_name(os.getcwd())
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
 
     # Get comprehensive stats for the index
     try:
@@ -1784,39 +1779,40 @@ def main() -> None:
 
     get_database_url()
 
-    if args.command == "index":
-        sys.exit(index_command(args))
-    elif args.command == "search":
-        sys.exit(search_command(args))
-    elif args.command == "list":
-        sys.exit(list_command(args))
-    elif args.command == "stats":
-        sys.exit(stats_command(args))
-    elif args.command == "languages":
-        sys.exit(languages_command(args))
-    elif args.command == "grammars":
-        sys.exit(grammars_command(args))
-    elif args.command == "clear":
-        sys.exit(clear_command(args))
-    elif args.command == "init":
-        sys.exit(init_command(args))
-    elif args.command == "mcp":
-        sys.exit(mcp_command(args))
-    elif args.command == "config":
-        if args.config_command == "show":
-            sys.exit(config_show_command(args))
-        elif args.config_command == "path":
-            sys.exit(config_path_command(args))
-        elif args.config_command == "check":
-            sys.exit(config_check_command(args))
+    # Command routing via registry
+    _command_registry: dict[str, Any] = {
+        "index": index_command,
+        "search": search_command,
+        "list": list_command,
+        "stats": stats_command,
+        "languages": languages_command,
+        "grammars": grammars_command,
+        "clear": clear_command,
+        "init": init_command,
+        "mcp": mcp_command,
+        "serve-dashboard": serve_dashboard_command,
+    }
+
+    _config_command_registry: dict[str, Any] = {
+        "show": config_show_command,
+        "path": config_path_command,
+        "check": config_check_command,
+    }
+
+    if args.command == "config":
+        handler = _config_command_registry.get(args.config_command)
+        if handler:
+            sys.exit(handler(args))
         else:
             parser.print_help()
             sys.exit(1)
-    elif args.command == "serve-dashboard":
-        sys.exit(serve_dashboard_command(args))
     else:
-        parser.print_help()
-        sys.exit(1)
+        handler = _command_registry.get(args.command)
+        if handler:
+            sys.exit(handler(args))
+        else:
+            parser.print_help()
+            sys.exit(1)
 
 
 if __name__ == "__main__":

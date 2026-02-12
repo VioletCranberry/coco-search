@@ -23,6 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _active_indexing: dict[str, threading.Thread] = {}
+_indexing_lock = threading.Lock()
 
 from pathlib import Path  # noqa: E402
 from typing import Annotated  # noqa: E402
@@ -63,14 +64,14 @@ register_roots_notification(mcp)
 
 # Health endpoint for Docker/orchestration
 @mcp.custom_route("/health", methods=["GET"])
-async def health_check(request):
+async def health_check(request) -> JSONResponse:
     """Health check endpoint. Also see /dashboard for web UI."""
     return JSONResponse({"status": "ok"})
 
 
 # Dashboard endpoint
 @mcp.custom_route("/dashboard", methods=["GET"])
-async def serve_dashboard(request):
+async def serve_dashboard(request) -> HTMLResponse:
     """Serve the web dashboard HTML."""
     html_content = get_dashboard_html()
     return HTMLResponse(content=html_content)
@@ -78,7 +79,7 @@ async def serve_dashboard(request):
 
 # Stats API endpoints
 @mcp.custom_route("/api/stats", methods=["GET"])
-async def api_stats(request):
+async def api_stats(request) -> JSONResponse:
     """Stats API endpoint for web dashboard and programmatic access."""
     # Initialize CocoIndex (required for database connection)
     try:
@@ -103,7 +104,8 @@ async def api_stats(request):
             result = stats.to_dict()
             # Override status from thread liveness — the DB status may
             # lag behind the actual indexing state due to race conditions.
-            active = _active_indexing.get(index_name)
+            with _indexing_lock:
+                active = _active_indexing.get(index_name)
             if active is not None and active.is_alive():
                 result["status"] = "indexing"
             if include_failures:
@@ -122,7 +124,8 @@ async def api_stats(request):
                 stats = get_comprehensive_stats(idx["name"])
                 result = stats.to_dict()
                 # Override status from thread liveness
-                active = _active_indexing.get(idx["name"])
+                with _indexing_lock:
+                    active = _active_indexing.get(idx["name"])
                 if active is not None and active.is_alive():
                     result["status"] = "indexing"
                 if include_failures:
@@ -136,7 +139,7 @@ async def api_stats(request):
 
 
 @mcp.custom_route("/api/stats/{index_name}", methods=["GET"])
-async def api_stats_single(request):
+async def api_stats_single(request) -> JSONResponse:
     """Stats for a single index by name."""
     # Initialize CocoIndex (required for database connection)
     try:
@@ -156,7 +159,8 @@ async def api_stats_single(request):
         stats = get_comprehensive_stats(index_name)
         result = stats.to_dict()
         # Override status from thread liveness
-        active = _active_indexing.get(index_name)
+        with _indexing_lock:
+            active = _active_indexing.get(index_name)
         if active is not None and active.is_alive():
             result["status"] = "indexing"
         if include_failures:
@@ -169,7 +173,7 @@ async def api_stats_single(request):
 
 
 @mcp.custom_route("/api/reindex", methods=["POST"])
-async def api_reindex(request):
+async def api_reindex(request) -> JSONResponse:
     """Trigger reindexing of an existing index in a background thread."""
     try:
         body = await request.json()
@@ -193,7 +197,8 @@ async def api_reindex(request):
     source_path = metadata["canonical_path"]
 
     # Reject if a previous indexing thread is still alive
-    prev = _active_indexing.get(index_name)
+    with _indexing_lock:
+        prev = _active_indexing.get(index_name)
     if prev is not None and prev.is_alive():
         return JSONResponse(
             {"error": "Previous indexing still completing. Try again shortly."},
@@ -203,8 +208,8 @@ async def api_reindex(request):
     # Set status to indexing
     try:
         set_index_status(index_name, "indexing")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to set indexing status for '{index_name}': {e}")
 
     def _run():
         failed = False
@@ -225,13 +230,15 @@ async def api_reindex(request):
                 current = get_index_metadata(index_name)
                 if current and current.get("status") == "indexing":
                     set_index_status(index_name, "error" if failed else "indexed")
-            except Exception:
-                pass
-            _active_indexing.pop(index_name, None)
+            except Exception as e:
+                logger.warning(f"Failed to update status for '{index_name}': {e}")
+            with _indexing_lock:
+                _active_indexing.pop(index_name, None)
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    _active_indexing[index_name] = thread
+    with _indexing_lock:
+        _active_indexing[index_name] = thread
 
     action = "Fresh reindex" if fresh else "Reindex"
     return JSONResponse(
@@ -240,7 +247,7 @@ async def api_reindex(request):
 
 
 @mcp.custom_route("/api/project", methods=["GET"])
-async def api_project(request):
+async def api_project(request) -> JSONResponse:
     """Return current project context based on COCOSEARCH_PROJECT_PATH."""
     from cocosearch.management.context import find_project_root
 
@@ -294,7 +301,7 @@ async def api_project(request):
 
 
 @mcp.custom_route("/api/index", methods=["POST"])
-async def api_index(request):
+async def api_index(request) -> JSONResponse:
     """Trigger initial indexing of a project from the dashboard."""
     try:
         body = await request.json()
@@ -312,7 +319,8 @@ async def api_index(request):
         index_name = derive_index_name(project_path)
 
     # Reject if a previous indexing thread is still alive
-    prev = _active_indexing.get(index_name)
+    with _indexing_lock:
+        prev = _active_indexing.get(index_name)
     if prev is not None and prev.is_alive():
         return JSONResponse(
             {"error": "Previous indexing still completing. Try again shortly."},
@@ -345,13 +353,15 @@ async def api_index(request):
                 current = get_index_metadata(index_name)
                 if current and current.get("status") == "indexing":
                     set_index_status(index_name, "error" if failed else "indexed")
-            except Exception:
-                pass
-            _active_indexing.pop(index_name, None)
+            except Exception as e:
+                logger.warning(f"Failed to update status for '{index_name}': {e}")
+            with _indexing_lock:
+                _active_indexing.pop(index_name, None)
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    _active_indexing[index_name] = thread
+    with _indexing_lock:
+        _active_indexing[index_name] = thread
 
     return JSONResponse(
         {
@@ -363,7 +373,7 @@ async def api_index(request):
 
 
 @mcp.custom_route("/api/stop-indexing", methods=["POST"])
-async def api_stop_indexing(request):
+async def api_stop_indexing(request) -> JSONResponse:
     """Stop an in-progress indexing operation."""
     try:
         body = await request.json()
@@ -374,7 +384,8 @@ async def api_stop_indexing(request):
     if not index_name:
         return JSONResponse({"error": "index_name is required"}, status_code=400)
 
-    thread = _active_indexing.get(index_name)
+    with _indexing_lock:
+        thread = _active_indexing.get(index_name)
     if thread is None or not thread.is_alive():
         return JSONResponse(
             {"error": f"No active indexing found for '{index_name}'"},
@@ -392,7 +403,7 @@ async def api_stop_indexing(request):
 
 
 @mcp.custom_route("/api/delete-index", methods=["POST"])
-async def api_delete_index(request):
+async def api_delete_index(request) -> JSONResponse:
     """Delete an index permanently."""
     try:
         body = await request.json()
@@ -404,7 +415,8 @@ async def api_delete_index(request):
         return JSONResponse({"error": "index_name is required"}, status_code=400)
 
     # Reject if indexing is currently active for this index
-    prev = _active_indexing.get(index_name)
+    with _indexing_lock:
+        prev = _active_indexing.get(index_name)
     if prev is not None and prev.is_alive():
         return JSONResponse(
             {
@@ -420,6 +432,99 @@ async def api_delete_index(request):
         return JSONResponse({"error": str(e)}, status_code=404)
     except Exception as e:
         return JSONResponse({"error": f"Failed to delete index: {e}"}, status_code=500)
+
+
+@mcp.custom_route("/api/search", methods=["POST"])
+async def api_search(request) -> JSONResponse:
+    """Search indexed code via the dashboard API."""
+    import time
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    query = body.get("query", "").strip()
+    index_name = body.get("index_name")
+
+    if not query:
+        return JSONResponse({"error": "query is required"}, status_code=400)
+    if not index_name:
+        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    limit = body.get("limit", 10)
+    language = body.get("language") or None
+    symbol_type = body.get("symbol_type") or None
+    symbol_name = body.get("symbol_name") or None
+    min_score = body.get("min_score", 0.3)
+    use_hybrid = body.get("use_hybrid")
+
+    try:
+        cocoindex.init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed: {e}")
+        return JSONResponse(
+            {"error": "Database not initialized. Index a codebase first."},
+            status_code=503,
+        )
+
+    start_time = time.monotonic()
+    try:
+        results = search(
+            query=query,
+            index_name=index_name,
+            limit=limit,
+            min_score=min_score,
+            language_filter=language,
+            use_hybrid=use_hybrid,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+        )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+    query_time_ms = round((time.monotonic() - start_time) * 1000)
+
+    output = []
+    for r in results:
+        start_line = byte_to_line(r.filename, r.start_byte)
+        end_line = byte_to_line(r.filename, r.end_byte)
+        content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+
+        result_dict = {
+            "file_path": r.filename,
+            "start_line": start_line,
+            "end_line": end_line,
+            "score": r.score,
+            "content": content,
+            "block_type": r.block_type,
+            "hierarchy": r.hierarchy,
+            "language_id": r.language_id,
+            "symbol_type": r.symbol_type,
+            "symbol_name": r.symbol_name,
+            "symbol_signature": r.symbol_signature,
+        }
+
+        if r.match_type:
+            result_dict["match_type"] = r.match_type
+        if r.vector_score is not None:
+            result_dict["vector_score"] = r.vector_score
+        if r.keyword_score is not None:
+            result_dict["keyword_score"] = r.keyword_score
+
+        output.append(result_dict)
+
+    return JSONResponse(
+        {
+            "success": True,
+            "results": output,
+            "query_time_ms": query_time_ms,
+            "total": len(output),
+        }
+    )
 
 
 def _get_treesitter_language(ext: str) -> str | None:

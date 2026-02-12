@@ -138,13 +138,8 @@ class ScalaHandler:
         Returns:
             Text from first non-comment, non-blank line onward
         """
-        lines = text.lstrip().split("\n")
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if (
-                stripped
-                and not self._COMMENT_LINE.match(line)
-                and not self._DOC_COMMENT_LINE.match(line)
-            ):
-                return "\n".join(lines[i:])
-        return ""
+        from cocosearch.handlers.utils import strip_leading_comments
+
+        return strip_leading_comments(
+            text, [self._COMMENT_LINE, self._DOC_COMMENT_LINE]
+        )

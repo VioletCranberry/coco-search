@@ -459,6 +459,276 @@
             margin-top: 0;
         }
 
+        /* Search section */
+        .search-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .search-section h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .search-bar input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-bar input[type="text"]:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .search-bar input[type="text"]::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-filters {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .search-filters label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .search-filters select {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .search-advanced {
+            margin-top: 8px;
+        }
+
+        .search-advanced summary {
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+            list-style: none;
+            user-select: none;
+        }
+
+        .search-advanced summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .search-advanced summary::before {
+            content: "\25B6\00a0";
+            font-size: 10px;
+        }
+
+        .search-advanced[open] summary::before {
+            content: "\25BC\00a0";
+        }
+
+        .search-advanced-content {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+        }
+
+        .search-advanced-content label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .search-advanced-content input[type="range"] {
+            width: 100px;
+        }
+
+        .search-advanced-content input[type="number"] {
+            width: 60px;
+            padding: 4px 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .search-results-area {
+            margin-top: 16px;
+        }
+
+        .search-results-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .search-loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            display: none;
+        }
+
+        .search-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 14px;
+            display: none;
+        }
+
+        .search-error {
+            background: var(--accent-red);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .search-result-card {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .search-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .search-result-path {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--accent-blue);
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .search-result-meta {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-result-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-score-high { background: var(--accent-green); color: white; }
+        .badge-score-mid { background: var(--accent-orange); color: white; }
+        .badge-score-low { background: var(--text-muted); color: white; }
+        .badge-match { background: var(--accent-blue); color: white; }
+        .badge-lang { background: var(--border-color); color: var(--text-primary); }
+
+        .search-result-symbol {
+            padding: 6px 14px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+
+        .search-result-code {
+            padding: 12px 14px;
+            background: var(--bg-card);
+            overflow-x: auto;
+        }
+
+        .search-result-code pre {
+            margin: 0;
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .search-result-code .expand-btn {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--accent-blue);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font-family: inherit;
+        }
+
+        .search-result-code .expand-btn:hover {
+            text-decoration: underline;
+        }
+
+        .search-result-actions {
+            display: flex;
+            gap: 8px;
+            padding: 8px 14px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .search-result-actions button {
+            padding: 4px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .search-result-actions button:hover {
+            background: var(--bg-secondary);
+        }
+
         @media (max-width: 768px) {
             .chart-grid {
                 grid-template-columns: 1fr;
@@ -466,6 +736,11 @@
 
             .summary-grid {
                 grid-template-columns: repeat(3, 1fr);
+            }
+
+            .search-filters {
+                flex-direction: column;
+                align-items: stretch;
             }
         }
     </style>
@@ -495,6 +770,45 @@
                 <button id="deleteIndexBtn" class="action-btn danger" onclick="deleteIndex()">Delete</button>
             </div>
         </header>
+
+        <div class="search-section">
+            <h2>Search Code</h2>
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search code with natural language..." autocomplete="off">
+                <button class="action-btn" id="searchBtn" onclick="executeSearch()">Search</button>
+            </div>
+            <div class="search-filters">
+                <label>Language:
+                    <select id="searchLanguage">
+                        <option value="">All</option>
+                    </select>
+                </label>
+                <label>Symbol Type:
+                    <select id="searchSymbolType">
+                        <option value="">All</option>
+                        <option value="function">Function</option>
+                        <option value="class">Class</option>
+                        <option value="method">Method</option>
+                        <option value="interface">Interface</option>
+                    </select>
+                </label>
+            </div>
+            <details class="search-advanced">
+                <summary>Advanced filters</summary>
+                <div class="search-advanced-content">
+                    <label>Min score: <input type="range" id="searchMinScore" min="0" max="1" step="0.05" value="0.3"> <span id="minScoreValue">0.3</span></label>
+                    <label>Limit: <input type="number" id="searchLimit" min="1" max="50" value="10"></label>
+                    <label><input type="checkbox" id="searchHybrid"> Hybrid search</label>
+                </div>
+            </details>
+            <div class="search-results-area">
+                <div class="search-loading" id="searchLoading">Searching...</div>
+                <div class="search-empty" id="searchEmpty"></div>
+                <div class="search-error" id="searchError"></div>
+                <div id="searchResultsInfo" class="search-results-info" style="display: none;"></div>
+                <div id="searchResults"></div>
+            </div>
+        </div>
 
         <div id="statusBanner" class="status-banner"></div>
 
@@ -1146,6 +1460,7 @@
             updateGrammarChart(stats.grammars || []);
             updateGrammarHealthTable(stats.grammars || []);
             updateParseHealthTable(stats.parse_stats);
+            populateLanguageFilter(stats.languages || []);
         }
 
         async function loadIndexList() {
@@ -1439,6 +1754,176 @@
                 clearInterval(pollInterval);
                 pollInterval = null;
             }
+        }
+
+        // --- Search functionality ---
+
+        document.getElementById('searchInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') executeSearch();
+        });
+
+        document.getElementById('searchMinScore').addEventListener('input', (e) => {
+            document.getElementById('minScoreValue').textContent = e.target.value;
+        });
+
+        function populateLanguageFilter(languages) {
+            const select = document.getElementById('searchLanguage');
+            const current = select.value;
+            const options = ['<option value="">All</option>'];
+            if (languages && languages.length > 0) {
+                const langs = [...languages].sort((a, b) => b.chunk_count - a.chunk_count);
+                for (const l of langs) {
+                    options.push(`<option value="${escapeHtml(l.language)}">${escapeHtml(l.language)}</option>`);
+                }
+            }
+            select.innerHTML = options.join('');
+            // Preserve previous selection
+            if (current) {
+                select.value = current;
+            }
+        }
+
+        async function executeSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            const select = document.getElementById('indexSelect');
+            const indexIndex = parseInt(select.value);
+            const stats = allIndexes[indexIndex];
+            if (!stats) return;
+
+            const language = document.getElementById('searchLanguage').value || undefined;
+            const symbolType = document.getElementById('searchSymbolType').value || undefined;
+            const minScore = parseFloat(document.getElementById('searchMinScore').value);
+            const limit = parseInt(document.getElementById('searchLimit').value) || 10;
+            const useHybrid = document.getElementById('searchHybrid').checked ? true : undefined;
+
+            // Show loading
+            document.getElementById('searchLoading').style.display = 'block';
+            document.getElementById('searchEmpty').style.display = 'none';
+            document.getElementById('searchError').style.display = 'none';
+            document.getElementById('searchResultsInfo').style.display = 'none';
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('searchBtn').disabled = true;
+
+            try {
+                const body = {
+                    query: query,
+                    index_name: stats.name,
+                    limit: limit,
+                    min_score: minScore,
+                };
+                if (language) body.language = language;
+                if (symbolType) body.symbol_type = symbolType;
+                if (useHybrid !== undefined) body.use_hybrid = useHybrid;
+
+                const resp = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+
+                document.getElementById('searchLoading').style.display = 'none';
+                document.getElementById('searchBtn').disabled = false;
+
+                if (!resp.ok) {
+                    document.getElementById('searchError').textContent = data.error || 'Search failed';
+                    document.getElementById('searchError').style.display = 'block';
+                    return;
+                }
+
+                displaySearchResults(data);
+            } catch (err) {
+                document.getElementById('searchLoading').style.display = 'none';
+                document.getElementById('searchBtn').disabled = false;
+                document.getElementById('searchError').textContent = 'Search failed: ' + err.message;
+                document.getElementById('searchError').style.display = 'block';
+            }
+        }
+
+        function displaySearchResults(data) {
+            const results = data.results || [];
+            const container = document.getElementById('searchResults');
+            const infoEl = document.getElementById('searchResultsInfo');
+            const emptyEl = document.getElementById('searchEmpty');
+
+            if (results.length === 0) {
+                emptyEl.textContent = 'No results found. Try a different query or broader filters.';
+                emptyEl.style.display = 'block';
+                return;
+            }
+
+            infoEl.textContent = `${data.total} result${data.total !== 1 ? 's' : ''} in ${data.query_time_ms}ms`;
+            infoEl.style.display = 'block';
+
+            container.innerHTML = results.map((r, i) => {
+                const scoreClass = r.score >= 0.7 ? 'badge-score-high' : r.score >= 0.4 ? 'badge-score-mid' : 'badge-score-low';
+                const matchBadge = r.match_type ? `<span class="search-result-badge badge-match">${escapeHtml(r.match_type)}</span>` : '';
+                const langBadge = r.language_id ? `<span class="search-result-badge badge-lang">${escapeHtml(r.language_id)}</span>` : '';
+                const lineRange = r.start_line && r.end_line ? `Lines ${r.start_line}-${r.end_line}` : '';
+
+                let symbolHtml = '';
+                if (r.symbol_type || r.symbol_name) {
+                    const parts = [];
+                    if (r.symbol_type) parts.push(`[${escapeHtml(r.symbol_type)}]`);
+                    if (r.symbol_name) parts.push(escapeHtml(r.symbol_name));
+                    symbolHtml = `<div class="search-result-symbol">${parts.join(' ')}</div>`;
+                }
+
+                const lines = (r.content || '').split('\n');
+                const previewLines = lines.slice(0, 8);
+                const hasMore = lines.length > 8;
+                const previewText = escapeHtml(previewLines.join('\n'));
+                const fullText = escapeHtml(r.content || '');
+
+                return `<div class="search-result-card">
+                    <div class="search-result-header">
+                        <span class="search-result-path">${escapeHtml(r.file_path)}</span>
+                        <div class="search-result-meta">
+                            <span style="font-size: 12px; color: var(--text-muted);">${escapeHtml(lineRange)}</span>
+                            <span class="search-result-badge ${scoreClass}">${r.score.toFixed(2)}</span>
+                            ${matchBadge}
+                            ${langBadge}
+                        </div>
+                    </div>
+                    ${symbolHtml}
+                    <div class="search-result-code">
+                        <pre id="code-preview-${i}">${previewText}</pre>
+                        ${hasMore ? `<button class="expand-btn" onclick="toggleCodeExpand(${i}, this)" data-full="${fullText.replace(/"/g, '&quot;')}" data-preview="${previewText.replace(/"/g, '&quot;')}">Show all ${lines.length} lines</button>` : ''}
+                    </div>
+                    <div class="search-result-actions">
+                        <button onclick="copyToClipboard('${escapeHtml(r.file_path).replace(/'/g, "\\'")}')">Copy Path</button>
+                        <button onclick="copyToClipboard(document.getElementById('code-preview-${i}').textContent)">Copy Code</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleCodeExpand(index, btn) {
+            const pre = document.getElementById('code-preview-' + index);
+            const isExpanded = btn.dataset.expanded === 'true';
+            if (isExpanded) {
+                pre.textContent = btn.dataset.preview;
+                btn.textContent = 'Show all lines';
+                btn.dataset.expanded = 'false';
+            } else {
+                pre.textContent = btn.dataset.full;
+                btn.textContent = 'Show less';
+                btn.dataset.expanded = 'true';
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            });
         }
 
         // Initialize dashboard
