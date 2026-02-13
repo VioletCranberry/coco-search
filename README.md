@@ -64,6 +64,133 @@ Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.git
 
 A personal initiative, originally scaffolded with [GSD](https://github.com/glittercowboy/get-shit-done) and refined by hand. Built as a local-first, private tool for accelerating self-onboarding and exploring spec-driven development. Ships with a CLI, MCP tools, dashboards (TUI/WEB), a status API, and reusable [Claude SKILLS](https://code.claude.com/docs/en/skills).
 
+## Features
+
+- 🔍 **Hybrid search** -- combines semantic similarity and keyword matching via RRF fusion to find code by meaning and by text.
+- 🏷️ **Symbol filtering** -- narrow results to functions, classes, methods, or interfaces; match symbol names with glob patterns.
+- 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter, so you see complete units of code.
+- ⚡ **Query caching** -- exact and semantic cache for fast repeated queries (0.95 cosine threshold).
+- 🩺 **Parse health tracking** -- per-language parse status, failure details, and staleness warnings when the index drifts from your branch.
+- 🔒 **Privacy-first** -- everything runs locally. No external API calls, no telemetry.
+
+## Interfaces
+
+Search your code four ways — pick what fits your workflow:
+
+| Interface            | Best for                                                                                                                                                          | How to start                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **CLI**              | One-off searches, scripting, CI                                                                                                                                   | `cocosearch search "auth flow"`     |
+| **Interactive REPL** | Exploratory sessions — tweak filters, switch indexes, iterate on queries without restarting                                                                       | `cocosearch search --interactive`   |
+| **Web Dashboard**    | Visual search + index management in the browser — filters, syntax-highlighted results, charts, dark/light theme                                                   | `cocosearch serve-dashboard`        |
+| **MCP Server**       | AI assistant integration ([Claude Code](https://claude.com/product/claude-code), [Claude Desktop](https://claude.com/download), [OpenCode](https://opencode.ai/)) | `cocosearch mcp --project-from-cwd` |
+
+### CLI
+
+```bash
+# Index a project
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index /path/to/project
+
+# Search with natural language
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search "authentication flow" --pretty
+
+# Serve CocoSearch WEB dashboard
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch serve-dashboard
+
+# Start interactive REPL
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search --interactive
+
+# View index stats with parse health
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --pretty
+
+ndex: cocosearch
+Source: /GIT/coco-s
+Status: Indexed
+Files: 155 | Chunks: 1,689 | Size: 11.8 MB
+Created: 2026-02-09
+Last Updated: 2026-02-10 (0 days ago)
+
+                        Language Distribution
+┏━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Language     ┃  Files ┃   Chunks ┃ Distribution                   ┃
+┡━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ py           │    132 │     1405 │ ██████████████████████████████ │
+│ md           │     19 │      218 │ ████▋                          │
+│ html         │      1 │       62 │ █▎                             │
+│ toml         │      1 │        2 │                                │
+│ docker-comp… │      1 │        1 │                                │
+│ yaml         │      1 │        1 │                                │
+└──────────────┴────────┴──────────┴────────────────────────────────┘
+
+Parse health: 100.0% clean (132/132 files)
+                Parse Status by Language
+┏━━━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
+┃ Language ┃ Files ┃  OK ┃ Partial ┃ Error ┃ No Grammar ┃
+┡━━━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
+│ python   │   132 │ 132 │       0 │     0 │          0 │
+│ md       │    19 │   - │       - │     - │          - │
+│ html     │     1 │   - │       - │     - │          - │
+│ toml     │     1 │   - │       - │     - │          - │
+│ yaml     │     1 │   - │       - │     - │          - │
+└──────────┴───────┴─────┴─────────┴───────┴────────────┘
+
+# View index stats with parse health live
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --live
+```
+
+For the full list of commands and flags, see [CLI Reference](./docs/cli-reference.md).
+
+### Web Dashboard
+
+`cocosearch serve-dashboard` opens a browser UI at `http://localhost:8080` with:
+
+- **Code search** — natural language queries with language, symbol type, and hybrid search filters. Results show syntax-highlighted snippets, score badges, match type, and symbol metadata.
+- **Index management** — create, reindex (incremental or fresh), and delete indexes from the browser.
+- **Observability** — language distribution charts, parse health breakdown, staleness warnings, storage metrics.
+
+### Interactive REPL
+
+`cocosearch search --interactive` starts a persistent search session:
+
+```
+cocosearch> authentication middleware
+  [results...]
+cocosearch> :lang python
+  Language filter: python
+cocosearch> error handling in views
+  [results filtered to Python...]
+cocosearch> :index other-project
+  Switched to index: other-project
+```
+
+Settings persist across queries — change `:limit`, `:lang`, `:context`, or `:index` without restarting. Supports command history (up/down arrows) and inline filters (`lang:python` directly in queries).
+
+## Quick Start
+
+```bash
+# 1. Start infrastructure.
+docker compose up -d
+# 2. Index your project (or use WEB dashboard).
+uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index .
+# 3. Register with your AI assistant.
+claude mcp add --scope user cocosearch -- \
+  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+```
+
+> **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
+
+Use skills:
+
+```bash
+# Clone this repository and symlink coco skills. For global installation symlink them to ~/.claude/skills/
+mkdir -p .claude/skills
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explain cocosearch-new-feature cocosearch-subway; do
+    ln -sfn "../../skills/$skill" ".claude/skills/$skill"
+done
+# Then restart your Claude session and instruct it to
+# 'onboard current repository with CocoSearch' or use
+# '/cocosearch-quickstart' skill.
+```
+
 ## Where MCP wins
 
 For codebases of meaningful size, CocoSearch reduces the number of MCP tool calls needed to find relevant code — often from 5-15 iterative grep/read cycles down to 1-2 semantic searches. This means fewer round-trips, less irrelevant content in the context window, and lower token consumption for exploratory and intent-based queries.
@@ -104,13 +231,13 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 
 ### Available Skills
 
-- **coco-quickstart** ([SKILL.md](./skills/coco-quickstart/SKILL.md)): Use when setting up CocoSearch for the first time or indexing a new project. Guides through infrastructure check, indexing, and verification in under 2 minutes.
-- **coco-debugging** ([SKILL.md](./skills/coco-debugging/SKILL.md)): Use when debugging an error, unexpected behavior, or tracing how code flows through a system. Guides root cause analysis using CocoSearch semantic and symbol search.
-- **coco-onboarding** ([SKILL.md](./skills/coco-onboarding/SKILL.md)): Use when onboarding to a new or unfamiliar codebase. Guides you through understanding architecture, key modules, and code patterns step-by-step using CocoSearch.
-- **coco-refactoring** ([SKILL.md](./skills/coco-refactoring/SKILL.md)): Use when planning a refactoring, extracting code into a new module, renaming across the codebase, or splitting a large file. Guides impact analysis and safe step-by-step execution using CocoSearch.
-- **coco-explain** ([SKILL.md](./skills/coco-explain/SKILL.md)): Use when a user asks how something works — a flow, logic path, subsystem, or concept. Guides targeted deep-dive explanations using CocoSearch semantic and hybrid search.
-- **coco-new-feature** ([SKILL.md](./skills/coco-new-feature/SKILL.md)): Use when adding new functionality — a new command, endpoint, module, handler, or capability. Guides placement, pattern matching, and integration using CocoSearch.
-- **coco-subway** ([SKILL.md](./skills/coco-subway/SKILL.md)): Use when the user wants to visualize codebase structure as an interactive London Underground-style subway map. AI-generated visualization using CocoSearch tools for exploration.
+- **cocosearch-quickstart** ([SKILL.md](./skills/cocosearch-quickstart/SKILL.md)): Use when setting up CocoSearch for the first time or indexing a new project. Guides through infrastructure check, indexing, and verification in under 2 minutes.
+- **cocosearch-debugging** ([SKILL.md](./skills/cocosearch-debugging/SKILL.md)): Use when debugging an error, unexpected behavior, or tracing how code flows through a system. Guides root cause analysis using CocoSearch semantic and symbol search.
+- **cocosearch-onboarding** ([SKILL.md](./skills/cocosearch-onboarding/SKILL.md)): Use when onboarding to a new or unfamiliar codebase. Guides you through understanding architecture, key modules, and code patterns step-by-step using CocoSearch.
+- **cocosearch-refactoring** ([SKILL.md](./skills/cocosearch-refactoring/SKILL.md)): Use when planning a refactoring, extracting code into a new module, renaming across the codebase, or splitting a large file. Guides impact analysis and safe step-by-step execution using CocoSearch.
+- **cocosearch-explain** ([SKILL.md](./skills/cocosearch-explain/SKILL.md)): Use when a user asks how something works — a flow, logic path, subsystem, or concept. Guides targeted deep-dive explanations using CocoSearch semantic and hybrid search.
+- **cocosearch-new-feature** ([SKILL.md](./skills/cocosearch-new-feature/SKILL.md)): Use when adding new functionality — a new command, endpoint, module, handler, or capability. Guides placement, pattern matching, and integration using CocoSearch.
+- **cocosearch-subway** ([SKILL.md](./skills/cocosearch-subway/SKILL.md)): Use when the user wants to visualize codebase structure as an interactive London Underground-style subway map. AI-generated visualization using CocoSearch tools for exploration.
 
 ## How Search Works
 
@@ -160,31 +287,6 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
                           ▼
                    Ranked Results
  ─────────────────────────────────────────────────────────────────────
-```
-
-## Quick Start
-
-```bash
-# 1. Start infrastructure.
-docker compose up -d
-# 2. Index your project (or use WEB dashboard).
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index .
-# 3. Register with your AI assistant.
-claude mcp add --scope user cocosearch -- \
-  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
-```
-
-Use skills:
-
-```bash
-# Clone this repository and symlink coco skills. For global installation symlink them to ~/.claude/skills/
-mkdir -p .claude/skills
-for skill in coco-onboarding coco-refactoring coco-debugging coco-quickstart coco-explain coco-new-feature coco-subway; do
-    ln -sfn "../../skills/$skill" ".claude/skills/$skill"
-done
-# Then restart your Claude session and instruct it to
-# 'onboard current repository with CocoSearch' or use
-# '/coco-quickstart' skill.
 ```
 
 ## Supported Languages
@@ -272,72 +374,6 @@ Priority: Grammar match > Language match > TextHandler fallback.
 A grammar is matched by file path patterns and optionally by content patterns. For example, a YAML file at `.github/workflows/ci.yml` containing `on:` + `jobs:` is recognized as GitHub Actions, not generic YAML. This enables structured chunking by job/step and richer metadata extraction (job names, service names, stages).
 
 </details>
-
-## Features
-
-- **Hybrid search** -- semantic similarity + keyword matching via RRF fusion.
-- **Symbol filtering** -- filter by function, class, method, or symbol name patterns.
-- **Context expansion** -- smart expansion to enclosing function/class boundaries.
-- **Query caching** -- exact and semantic cache for fast repeated queries.
-- **Index observability** -- stats dashboard for monitoring index health.
-- **Parse health tracking** -- detect and report parsing issues across indexed files.
-- **Stay private** -- everything runs locally, no external API calls.
-- **Use with AI assistants** -- integrate via CLI or MCP ([Claude Code](https://claude.com/product/claude-code), [Claude Desktop](https://claude.com/download), [OpenCode](https://opencode.ai/)).
-
-### CLI
-
-```bash
-# Index a project
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index /path/to/project
-
-# Search with natural language
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search "authentication flow" --pretty
-
-# Serve CocoSearch WEB dashboard
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch serve-dashboard
-
-# Start interactive REPL
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search --interactive
-
-# View index stats with parse health
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --pretty
-
-ndex: cocosearch
-Source: /GIT/coco-s
-Status: Indexed
-Files: 155 | Chunks: 1,689 | Size: 11.8 MB
-Created: 2026-02-09
-Last Updated: 2026-02-10 (0 days ago)
-
-                        Language Distribution
-┏━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Language     ┃  Files ┃   Chunks ┃ Distribution                   ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ py           │    132 │     1405 │ ██████████████████████████████ │
-│ md           │     19 │      218 │ ████▋                          │
-│ html         │      1 │       62 │ █▎                             │
-│ toml         │      1 │        2 │                                │
-│ docker-comp… │      1 │        1 │                                │
-│ yaml         │      1 │        1 │                                │
-└──────────────┴────────┴──────────┴────────────────────────────────┘
-
-Parse health: 100.0% clean (132/132 files)
-                Parse Status by Language
-┏━━━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
-┃ Language ┃ Files ┃  OK ┃ Partial ┃ Error ┃ No Grammar ┃
-┡━━━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
-│ python   │   132 │ 132 │       0 │     0 │          0 │
-│ md       │    19 │   - │       - │     - │          - │
-│ html     │     1 │   - │       - │     - │          - │
-│ toml     │     1 │   - │       - │     - │          - │
-│ yaml     │     1 │   - │       - │     - │          - │
-└──────────┴───────┴─────┴─────────┴───────┴────────────┘
-
-# View index stats with parse health live
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --live
-```
-
-For the full list of commands and flags, see [CLI Reference](./docs/cli-reference.md).
 
 ## Configuration
 

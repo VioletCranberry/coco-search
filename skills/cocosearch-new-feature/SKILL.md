@@ -1,5 +1,5 @@
 ---
-name: coco-new-feature
+name: cocosearch-new-feature
 description: Use when adding new functionality — a new command, endpoint, module, handler, or capability. Guides placement, pattern matching, and integration using CocoSearch.
 ---
 
@@ -345,21 +345,21 @@ Recommended next steps:
 
 ```bash
 mkdir -p .claude/skills
-ln -sfn ../../skills/coco-new-feature .claude/skills/coco-new-feature
+ln -sfn ../../skills/cocosearch-new-feature .claude/skills/cocosearch-new-feature
 ```
 
 **Claude Code (global):**
 
 ```bash
-mkdir -p ~/.claude/skills/coco-new-feature
-cp skills/coco-new-feature/SKILL.md ~/.claude/skills/coco-new-feature/SKILL.md
+mkdir -p ~/.claude/skills/cocosearch-new-feature
+cp skills/cocosearch-new-feature/SKILL.md ~/.claude/skills/cocosearch-new-feature/SKILL.md
 ```
 
 **OpenCode:**
 
 ```bash
-mkdir -p ~/.config/opencode/skills/coco-new-feature
-cp skills/coco-new-feature/SKILL.md ~/.config/opencode/skills/coco-new-feature/SKILL.md
+mkdir -p ~/.config/opencode/skills/cocosearch-new-feature
+cp skills/cocosearch-new-feature/SKILL.md ~/.config/opencode/skills/cocosearch-new-feature/SKILL.md
 ```
 
 After installation, restart your AI coding assistant or run the skill activation command for your platform.

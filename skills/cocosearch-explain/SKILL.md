@@ -1,5 +1,5 @@
 ---
-name: coco-explain
+name: cocosearch-explain
 description: Use when a user asks how something works — a flow, logic path, subsystem, or concept. Guides targeted deep-dive explanations using CocoSearch semantic and hybrid search.
 ---
 
@@ -336,21 +336,21 @@ search_code(
 
 ```bash
 mkdir -p .claude/skills
-ln -sfn ../../skills/coco-explain .claude/skills/coco-explain
+ln -sfn ../../skills/cocosearch-explain .claude/skills/cocosearch-explain
 ```
 
 **Claude Code (global):**
 
 ```bash
-mkdir -p ~/.claude/skills/coco-explain
-cp skills/coco-explain/SKILL.md ~/.claude/skills/coco-explain/SKILL.md
+mkdir -p ~/.claude/skills/cocosearch-explain
+cp skills/cocosearch-explain/SKILL.md ~/.claude/skills/cocosearch-explain/SKILL.md
 ```
 
 **OpenCode:**
 
 ```bash
-mkdir -p ~/.config/opencode/skills/coco-explain
-cp skills/coco-explain/SKILL.md ~/.config/opencode/skills/coco-explain/SKILL.md
+mkdir -p ~/.config/opencode/skills/cocosearch-explain
+cp skills/cocosearch-explain/SKILL.md ~/.config/opencode/skills/cocosearch-explain/SKILL.md
 ```
 
 After installation, restart your AI coding assistant or run the skill activation command for your platform.

@@ -1,5 +1,5 @@
 ---
-name: coco-debugging
+name: cocosearch-debugging
 description: Use when debugging an error, unexpected behavior, or tracing how code flows through a system. Guides root cause analysis using CocoSearch semantic and symbol search.
 ---
 
@@ -311,21 +311,21 @@ search_code(query="error handling", context_before=10, context_after=10)
 
 ```bash
 mkdir -p .claude/skills
-ln -sfn ../../skills/coco-debugging .claude/skills/coco-debugging
+ln -sfn ../../skills/cocosearch-debugging .claude/skills/cocosearch-debugging
 ```
 
 **Claude Code (global):**
 
 ```bash
-mkdir -p ~/.claude/skills/coco-debugging
-cp skills/coco-debugging/SKILL.md ~/.claude/skills/coco-debugging/SKILL.md
+mkdir -p ~/.claude/skills/cocosearch-debugging
+cp skills/cocosearch-debugging/SKILL.md ~/.claude/skills/cocosearch-debugging/SKILL.md
 ```
 
 **OpenCode:**
 
 ```bash
-mkdir -p ~/.config/opencode/skills/coco-debugging
-cp skills/coco-debugging/SKILL.md ~/.config/opencode/skills/coco-debugging/SKILL.md
+mkdir -p ~/.config/opencode/skills/cocosearch-debugging
+cp skills/cocosearch-debugging/SKILL.md ~/.config/opencode/skills/cocosearch-debugging/SKILL.md
 ```
 
 After installation, restart your editor or run the `/skills` command to verify the skill is loaded.

@@ -127,10 +127,10 @@ class TestGetCustomLanguages:
         specs = get_custom_languages()
         assert isinstance(specs, list)
 
-    def test_returns_eleven_specs(self):
-        """get_custom_languages() should return 11 specs (5 language + 6 grammar)."""
+    def test_returns_twelve_specs(self):
+        """get_custom_languages() should return 12 specs (6 language + 6 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 11
+        assert len(specs) == 12
 
     def test_all_specs_have_language_name(self):
         """All specs should have language_name attribute."""

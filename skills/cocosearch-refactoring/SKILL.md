@@ -1,5 +1,5 @@
 ---
-name: coco-refactoring
+name: cocosearch-refactoring
 description: Use when planning a refactoring, extracting code into a new module, renaming across the codebase, or splitting a large file. Guides impact analysis and safe step-by-step execution using CocoSearch.
 ---
 
@@ -322,21 +322,21 @@ Recommended next steps:
 
 ```bash
 mkdir -p .claude/skills
-ln -sfn ../../skills/coco-refactoring .claude/skills/coco-refactoring
+ln -sfn ../../skills/cocosearch-refactoring .claude/skills/cocosearch-refactoring
 ```
 
 **Claude Code (global):**
 
 ```bash
-mkdir -p ~/.claude/skills/coco-refactoring
-cp skills/coco-refactoring/SKILL.md ~/.claude/skills/coco-refactoring/SKILL.md
+mkdir -p ~/.claude/skills/cocosearch-refactoring
+cp skills/cocosearch-refactoring/SKILL.md ~/.claude/skills/cocosearch-refactoring/SKILL.md
 ```
 
 **OpenCode:**
 
 ```bash
-mkdir -p ~/.config/opencode/skills/coco-refactoring
-cp skills/coco-refactoring/SKILL.md ~/.config/opencode/skills/coco-refactoring/SKILL.md
+mkdir -p ~/.config/opencode/skills/cocosearch-refactoring
+cp skills/cocosearch-refactoring/SKILL.md ~/.config/opencode/skills/cocosearch-refactoring/SKILL.md
 ```
 
 **Verify installation:** Restart Claude Code / OpenCode and check skill appears in skill list.

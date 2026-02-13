@@ -7,8 +7,8 @@ class TestLanguageMap:
     """Test language extension mapping."""
 
     def test_language_map_count(self):
-        """LANGUAGE_MAP contains all 32 extension mappings."""
-        assert len(LANGUAGE_MAP) == 32
+        """LANGUAGE_MAP contains all 34 extension mappings."""
+        assert len(LANGUAGE_MAP) == 34
 
     def test_javascript_extensions(self):
         """JavaScript extensions map correctly."""

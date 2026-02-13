@@ -30,6 +30,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_dashboard()
         elif self.path == "/health":
             self._json_response({"status": "ok"})
+        elif self.path == "/api/heartbeat":
+            self._serve_heartbeat()
         elif self.path == "/api/project":
             self._serve_project_context()
         elif self.path == "/api/stats" or self.path.startswith("/api/stats?"):
@@ -380,6 +382,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json_response({"error": str(e)}, status=404)
         except Exception as e:
             self._json_response({"error": f"Failed to delete index: {e}"}, status=500)
+
+    def _serve_heartbeat(self):
+        """SSE heartbeat stream for dashboard disconnect detection."""
+        import time
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+        try:
+            while True:
+                self.wfile.write(b"data: ping\n\n")
+                self.wfile.flush()
+                time.sleep(5)
+        except (BrokenPipeError, ConnectionError, OSError):
+            return
 
     def _serve_project_context(self):
         import cocoindex

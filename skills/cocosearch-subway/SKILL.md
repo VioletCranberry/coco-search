@@ -1,5 +1,5 @@
 ---
-name: coco-subway
+name: cocosearch-subway
 description: Use when the user wants to visualize codebase structure as an interactive London Underground-style subway map. AI-generated visualization using CocoSearch tools for exploration.
 ---
 
@@ -43,7 +43,7 @@ Use CocoSearch tools to understand the codebase structure before generating the 
 
 Write a self-contained HTML file with an interactive London Underground-style subway map.
 
-**Output file:** Write to a temp file (e.g., `/tmp/coco-subway-<index-name>.html`) or to the project directory if the user prefers.
+**Output file:** Write to a temp file (e.g., `/tmp/cocosearch-subway-<index-name>.html`) or to the project directory if the user prefers.
 
 **Design requirements:**
 
@@ -76,7 +76,7 @@ Write a self-contained HTML file with an interactive London Underground-style su
 **I'll share with the user:**
 
 - The file path to the generated HTML
-- How to open it: "Open `/tmp/coco-subway-<name>.html` in your browser"
+- How to open it: "Open `/tmp/cocosearch-subway-<name>.html` in your browser"
 - Summary: number of lines, stations, and transfers
 - Brief interpretation of the map structure
 

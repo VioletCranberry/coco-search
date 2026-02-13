@@ -1,5 +1,5 @@
 ---
-name: coco-quickstart
+name: cocosearch-quickstart
 description: Use when setting up CocoSearch for the first time or indexing a new project. Guides through infrastructure check, indexing, and verification in under 2 minutes.
 ---
 
@@ -119,26 +119,26 @@ search_code(query="error handling", language="python", smart_context=True)
 ```
 
 **Recommended next steps:**
-- Try the `coco-onboarding` skill for a guided tour of the codebase
-- Use `coco-debugging` when investigating bugs
-- Use `coco-refactoring` before large code changes
+- Try the `cocosearch-onboarding` skill for a guided tour of the codebase
+- Use `cocosearch-debugging` when investigating bugs
+- Use `cocosearch-refactoring` before large code changes
 
 ## Installation
 
 **Claude Code (project-local):**
 ```bash
 mkdir -p .claude/skills
-ln -sfn ../../skills/coco-quickstart .claude/skills/coco-quickstart
+ln -sfn ../../skills/cocosearch-quickstart .claude/skills/cocosearch-quickstart
 ```
 
 **Claude Code (global):**
 ```bash
-mkdir -p ~/.claude/skills/coco-quickstart
-cp skills/coco-quickstart/SKILL.md ~/.claude/skills/coco-quickstart/SKILL.md
+mkdir -p ~/.claude/skills/cocosearch-quickstart
+cp skills/cocosearch-quickstart/SKILL.md ~/.claude/skills/cocosearch-quickstart/SKILL.md
 ```
 
 **OpenCode:**
 ```bash
-mkdir -p ~/.config/opencode/skills/coco-quickstart
-cp skills/coco-quickstart/SKILL.md ~/.config/opencode/skills/coco-quickstart/SKILL.md
+mkdir -p ~/.config/opencode/skills/cocosearch-quickstart
+cp skills/cocosearch-quickstart/SKILL.md ~/.config/opencode/skills/cocosearch-quickstart/SKILL.md
 ```

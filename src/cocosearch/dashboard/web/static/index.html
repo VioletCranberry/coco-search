@@ -1947,8 +1947,28 @@
             });
         }
 
+        // --- Server heartbeat (auto-close on disconnect) ---
+        function startHeartbeat() {
+            const es = new EventSource('/api/heartbeat');
+            es.onerror = () => {
+                es.close();
+                document.getElementById('disconnectOverlay').style.display = 'flex';
+                window.close();
+            };
+        }
+        startHeartbeat();
+
         // Initialize dashboard
         loadIndexList();
     </script>
+
+    <div id="disconnectOverlay" style="display:none; position:fixed; inset:0;
+         background:rgba(0,0,0,0.85); z-index:9999; align-items:center;
+         justify-content:center; flex-direction:column;">
+        <p style="color:white; font-size:24px; font-weight:600;">Server Disconnected</p>
+        <p style="color:#aaa; font-size:14px; margin-top:8px;">
+            The CocoSearch server has stopped. You can close this tab.
+        </p>
+    </div>
 </body>
 </html>

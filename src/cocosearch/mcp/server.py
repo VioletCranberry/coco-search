@@ -31,7 +31,7 @@ from typing import Annotated  # noqa: E402
 import cocoindex  # noqa: E402
 from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
 from pydantic import Field  # noqa: E402
-from starlette.responses import HTMLResponse, JSONResponse  # noqa: E402
+from starlette.responses import HTMLResponse, JSONResponse, StreamingResponse  # noqa: E402
 
 from cocosearch.cli import derive_index_name  # noqa: E402
 from cocosearch.dashboard.web import get_dashboard_html  # noqa: E402
@@ -67,6 +67,27 @@ register_roots_notification(mcp)
 async def health_check(request) -> JSONResponse:
     """Health check endpoint. Also see /dashboard for web UI."""
     return JSONResponse({"status": "ok"})
+
+
+# SSE heartbeat endpoint for dashboard disconnect detection
+@mcp.custom_route("/api/heartbeat", methods=["GET"])
+async def heartbeat(request) -> StreamingResponse:
+    """SSE heartbeat stream. Dashboard connects to detect server shutdown."""
+    import asyncio
+
+    async def event_stream():
+        try:
+            while True:
+                yield "data: ping\n\n"
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            return
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 # Dashboard endpoint

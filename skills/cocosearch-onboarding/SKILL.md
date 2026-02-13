@@ -1,5 +1,5 @@
 ---
-name: coco-onboarding
+name: cocosearch-onboarding
 description: Use when onboarding to a new or unfamiliar codebase. Guides you through understanding architecture, key modules, and code patterns step-by-step using CocoSearch.
 ---
 
@@ -159,21 +159,21 @@ Now you've seen the architecture, key layers, and conventions. Would you like me
 
 ```bash
 mkdir -p .claude/skills
-ln -sfn ../../skills/coco-onboarding .claude/skills/coco-onboarding
+ln -sfn ../../skills/cocosearch-onboarding .claude/skills/cocosearch-onboarding
 ```
 
 **Claude Code (global):**
 
 ```bash
-mkdir -p ~/.claude/skills/coco-onboarding
-cp skills/coco-onboarding/SKILL.md ~/.claude/skills/coco-onboarding/SKILL.md
+mkdir -p ~/.claude/skills/cocosearch-onboarding
+cp skills/cocosearch-onboarding/SKILL.md ~/.claude/skills/cocosearch-onboarding/SKILL.md
 ```
 
 **OpenCode:**
 
 ```bash
-mkdir -p ~/.config/opencode/skills/coco-onboarding
-cp skills/coco-onboarding/SKILL.md ~/.config/opencode/skills/coco-onboarding/SKILL.md
+mkdir -p ~/.config/opencode/skills/cocosearch-onboarding
+cp skills/cocosearch-onboarding/SKILL.md ~/.config/opencode/skills/cocosearch-onboarding/SKILL.md
 ```
 
 After installation, restart your AI coding assistant or run the skill activation command for your platform.

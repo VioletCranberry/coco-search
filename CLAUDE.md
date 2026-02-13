@@ -116,6 +116,10 @@ Three independent systems — a language can use any combination. See `docs/addi
 
 After adding any handler/grammar, update the count assertion in `test_languages.py` and `test_flow.py`.
 
+## Code Exploration
+
+When exploring or searching this codebase, prefer CocoSearch MCP tools (`search_code`, `list_indexes`, `index_stats`) over raw Grep/Glob for semantic and symbol-aware search. Use CocoSearch first for questions like "how does X work?", "find code related to Y", or symbol lookups. Fall back to Grep/Glob only for exact string matches or file pattern lookups.
+
 ## Configuration
 
 Project config via `cocosearch.yaml` (no leading dot) in project root. The `indexName` field sets the index name used by all commands. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). Config keys map to env vars via camelCase→UPPER_SNAKE conversion (e.g., `indexName` → `COCOSEARCH_INDEX_NAME`). See `.env.example` for available options.
