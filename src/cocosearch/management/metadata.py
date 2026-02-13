@@ -43,6 +43,14 @@ def ensure_metadata_table() -> None:
                     ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'indexed'
             """)
             cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS branch TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS commit_hash TEXT
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_cocosearch_metadata_path
                     ON cocosearch_index_metadata(canonical_path)
             """)
@@ -69,7 +77,8 @@ def get_index_metadata(index_name: str) -> dict | None:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT index_name, canonical_path, created_at, updated_at, status
+                    SELECT index_name, canonical_path, created_at, updated_at, status,
+                           branch, commit_hash
                     FROM cocosearch_index_metadata
                     WHERE index_name = %s
                     """,
@@ -87,6 +96,8 @@ def get_index_metadata(index_name: str) -> dict | None:
                     "created_at": row[2],
                     "updated_at": updated_at,
                     "status": status,
+                    "branch": row[5] if len(row) > 5 else None,
+                    "commit_hash": row[6] if len(row) > 6 else None,
                 }
 
                 # Provide elapsed time so callers can warn about
@@ -143,12 +154,19 @@ def get_index_for_path(canonical_path: str) -> str | None:
         return None
 
 
-def register_index_path(index_name: str, project_path: str | Path) -> None:
+def register_index_path(
+    index_name: str,
+    project_path: str | Path,
+    branch: str | None = None,
+    commit_hash: str | None = None,
+) -> None:
     """Register a path-to-index mapping with collision detection.
 
     Args:
         index_name: The name of the index
         project_path: The project directory path (will be resolved to canonical form)
+        branch: Git branch name at time of indexing (optional)
+        commit_hash: Git commit hash at time of indexing (optional)
 
     Raises:
         ValueError: If index_name already maps to a different path (collision)
@@ -177,13 +195,16 @@ def register_index_path(index_name: str, project_path: str | Path) -> None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO cocosearch_index_metadata (index_name, canonical_path, created_at, updated_at, status)
-                VALUES (%s, %s, NOW(), NOW(), 'indexing')
+                INSERT INTO cocosearch_index_metadata
+                    (index_name, canonical_path, created_at, updated_at, status, branch, commit_hash)
+                VALUES (%s, %s, NOW(), NOW(), 'indexing', %s, %s)
                 ON CONFLICT (index_name) DO UPDATE SET
                     canonical_path = EXCLUDED.canonical_path,
-                    updated_at = NOW()
+                    updated_at = NOW(),
+                    branch = EXCLUDED.branch,
+                    commit_hash = EXCLUDED.commit_hash
                 """,
-                (index_name, canonical),
+                (index_name, canonical, branch, commit_hash),
             )
         conn.commit()
 

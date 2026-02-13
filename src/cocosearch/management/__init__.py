@@ -12,7 +12,13 @@ from cocosearch.management.context import (
     resolve_index_name,
 )
 from cocosearch.management.discovery import list_indexes
-from cocosearch.management.git import derive_index_from_git, get_git_root, get_repo_url
+from cocosearch.management.git import (
+    derive_index_from_git,
+    get_commit_hash,
+    get_current_branch,
+    get_git_root,
+    get_repo_url,
+)
 from cocosearch.management.metadata import (
     auto_recover_stale_indexing,
     clear_index_path,
@@ -36,6 +42,8 @@ __all__ = [
     "clear_index",
     "clear_index_path",
     "derive_index_from_git",
+    "get_commit_hash",
+    "get_current_branch",
     "ensure_metadata_table",
     "find_project_root",
     "get_canonical_path",

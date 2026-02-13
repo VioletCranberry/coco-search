@@ -764,6 +764,7 @@
                     <option value="">Loading...</option>
                 </select>
                 <span id="sourcePath" style="color: var(--text-muted); font-size: 13px; margin-left: 8px;"></span>
+                <span id="branchBadge" style="display: none; margin-left: 8px; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary);"></span>
                 <button id="reindexBtn" class="action-btn" onclick="reindex(false)">Reindex</button>
                 <button id="freshIndexBtn" class="action-btn danger" onclick="reindex(true)">Fresh Index</button>
                 <button id="stopIndexBtn" class="action-btn danger" onclick="stopIndexing()" style="display: none;">Stop</button>
@@ -1037,6 +1038,19 @@
                 repoUrlEl.style.display = 'block';
             } else {
                 repoUrlEl.style.display = 'none';
+            }
+
+            // Branch badge
+            const branchBadge = document.getElementById('branchBadge');
+            if (stats.branch) {
+                let branchText = stats.branch;
+                if (stats.commit_hash) {
+                    branchText += ' (' + stats.commit_hash + ')';
+                }
+                branchBadge.textContent = branchText;
+                branchBadge.style.display = 'inline';
+            } else {
+                branchBadge.style.display = 'none';
             }
 
             // Status

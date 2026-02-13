@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from cocosearch.management.stats import (
     IndexStats,
+    check_branch_staleness,
     check_staleness,
     collect_warnings,
     format_bytes,
@@ -478,6 +479,304 @@ class TestCollectWarnings:
                 warnings = collect_warnings("test", is_stale=False, staleness_days=1)
 
         assert warnings == []
+
+
+class TestCheckBranchStaleness:
+    """Tests for check_branch_staleness function."""
+
+    def test_same_branch_no_change(self, mock_db_pool):
+        """No staleness when branch and commit match."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                (
+                    "myindex",
+                    "/path/to/project",
+                    "2024-01-01",
+                    "2024-01-01",
+                    "indexed",
+                    "main",
+                    "abc1234",
+                ),
+            ]
+        )
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.metadata.get_connection_pool",
+                return_value=pool,
+            ),
+            patch("cocosearch.management.git.get_current_branch", return_value="main"),
+            patch("cocosearch.management.git.get_commit_hash", return_value="abc1234"),
+        ):
+            result = check_branch_staleness("myindex", "/path/to/project")
+
+        assert result["branch_changed"] is False
+        assert result["commits_changed"] is False
+        assert result["indexed_branch"] == "main"
+        assert result["current_branch"] == "main"
+
+    def test_different_branch(self, mock_db_pool):
+        """Detects branch change."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                (
+                    "myindex",
+                    "/path/to/project",
+                    "2024-01-01",
+                    "2024-01-01",
+                    "indexed",
+                    "main",
+                    "abc1234",
+                ),
+            ]
+        )
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.metadata.get_connection_pool",
+                return_value=pool,
+            ),
+            patch(
+                "cocosearch.management.git.get_current_branch",
+                return_value="feature-x",
+            ),
+            patch("cocosearch.management.git.get_commit_hash", return_value="def5678"),
+        ):
+            result = check_branch_staleness("myindex", "/path/to/project")
+
+        assert result["branch_changed"] is True
+        assert result["indexed_branch"] == "main"
+        assert result["current_branch"] == "feature-x"
+
+    def test_same_branch_different_commit(self, mock_db_pool):
+        """Detects commit change on same branch."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                (
+                    "myindex",
+                    "/path/to/project",
+                    "2024-01-01",
+                    "2024-01-01",
+                    "indexed",
+                    "main",
+                    "abc1234",
+                ),
+            ]
+        )
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.metadata.get_connection_pool",
+                return_value=pool,
+            ),
+            patch("cocosearch.management.git.get_current_branch", return_value="main"),
+            patch("cocosearch.management.git.get_commit_hash", return_value="def5678"),
+        ):
+            result = check_branch_staleness("myindex", "/path/to/project")
+
+        assert result["branch_changed"] is False
+        assert result["commits_changed"] is True
+        assert result["indexed_commit"] == "abc1234"
+        assert result["current_commit"] == "def5678"
+
+    def test_no_metadata(self, mock_db_pool):
+        """Returns defaults when no metadata exists."""
+        pool, cursor, conn = mock_db_pool(results=[])
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.metadata.get_connection_pool",
+                return_value=pool,
+            ),
+        ):
+            result = check_branch_staleness("nonexistent")
+
+        assert result["branch_changed"] is False
+        assert result["commits_changed"] is False
+        assert result["indexed_branch"] is None
+
+    def test_detached_head(self, mock_db_pool):
+        """Handles detached HEAD (current_branch is None)."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                (
+                    "myindex",
+                    "/path/to/project",
+                    "2024-01-01",
+                    "2024-01-01",
+                    "indexed",
+                    "main",
+                    "abc1234",
+                ),
+            ]
+        )
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.metadata.get_connection_pool",
+                return_value=pool,
+            ),
+            patch("cocosearch.management.git.get_current_branch", return_value=None),
+            patch("cocosearch.management.git.get_commit_hash", return_value="def5678"),
+        ):
+            result = check_branch_staleness("myindex", "/path/to/project")
+
+        # No branch to compare, so not marked as changed
+        assert result["branch_changed"] is False
+        assert result["current_branch"] is None
+
+    def test_non_git_directory(self, mock_db_pool):
+        """Handles non-git directory (both current values None)."""
+        pool, cursor, conn = mock_db_pool(
+            results=[
+                (
+                    "myindex",
+                    "/path/to/project",
+                    "2024-01-01",
+                    "2024-01-01",
+                    "indexed",
+                    "main",
+                    "abc1234",
+                ),
+            ]
+        )
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.metadata.get_connection_pool",
+                return_value=pool,
+            ),
+            patch("cocosearch.management.git.get_current_branch", return_value=None),
+            patch("cocosearch.management.git.get_commit_hash", return_value=None),
+        ):
+            result = check_branch_staleness("myindex", "/path/to/project")
+
+        assert result["branch_changed"] is False
+        assert result["commits_changed"] is False
+
+
+class TestCollectWarningsBranch:
+    """Tests for collect_warnings with branch staleness."""
+
+    def test_branch_change_warning(self, mock_db_pool):
+        """Generates warning when branch has changed."""
+        pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])
+
+        branch_staleness = {
+            "branch_changed": True,
+            "commits_changed": True,
+            "indexed_branch": "main",
+            "indexed_commit": "abc1234",
+            "current_branch": "feature-x",
+            "current_commit": "def5678",
+        }
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+        ):
+            warnings = collect_warnings(
+                "test",
+                is_stale=False,
+                staleness_days=1,
+                branch_staleness=branch_staleness,
+            )
+
+        assert len(warnings) == 1
+        assert "main" in warnings[0]
+        assert "feature-x" in warnings[0]
+        assert "abc1234" in warnings[0]
+        assert "def5678" in warnings[0]
+
+    def test_commit_change_warning(self, mock_db_pool):
+        """Generates warning when commits differ on same branch."""
+        pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])
+
+        branch_staleness = {
+            "branch_changed": False,
+            "commits_changed": True,
+            "indexed_branch": "main",
+            "indexed_commit": "abc1234",
+            "current_branch": "main",
+            "current_commit": "def5678",
+        }
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+        ):
+            warnings = collect_warnings(
+                "test",
+                is_stale=False,
+                staleness_days=1,
+                branch_staleness=branch_staleness,
+            )
+
+        assert len(warnings) == 1
+        assert "behind" in warnings[0]
+        assert "abc1234" in warnings[0]
+        assert "def5678" in warnings[0]
+
+    def test_no_warning_when_no_change(self, mock_db_pool):
+        """No branch warning when nothing changed."""
+        pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])
+
+        branch_staleness = {
+            "branch_changed": False,
+            "commits_changed": False,
+            "indexed_branch": "main",
+            "indexed_commit": "abc1234",
+            "current_branch": "main",
+            "current_commit": "abc1234",
+        }
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+        ):
+            warnings = collect_warnings(
+                "test",
+                is_stale=False,
+                staleness_days=1,
+                branch_staleness=branch_staleness,
+            )
+
+        assert len(warnings) == 0
+
+    def test_no_warning_when_staleness_none(self, mock_db_pool):
+        """No branch warning when branch_staleness is None (backward compat)."""
+        pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+        ):
+            warnings = collect_warnings(
+                "test",
+                is_stale=False,
+                staleness_days=1,
+                branch_staleness=None,
+            )
+
+        assert len(warnings) == 0
 
 
 class TestGetParseStats:
@@ -976,6 +1275,8 @@ class TestComprehensiveStatsAutoRecovery:
                     "created_at": None,
                     "updated_at": None,
                     "status": "indexed",
+                    "branch": "main",
+                    "commit_hash": "abc1234",
                 },
             ),
             patch(
@@ -983,6 +1284,17 @@ class TestComprehensiveStatsAutoRecovery:
             ) as mock_recover,
             patch("cocosearch.management.stats.collect_warnings", return_value=[]),
             patch("cocosearch.management.git.get_repo_url", return_value=None),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={
+                    "branch_changed": False,
+                    "commits_changed": False,
+                    "indexed_branch": "main",
+                    "indexed_commit": "abc1234",
+                    "current_branch": "main",
+                    "current_commit": "abc1234",
+                },
+            ),
         ):
             mock_stats.return_value = {
                 "name": "test",
@@ -995,3 +1307,5 @@ class TestComprehensiveStatsAutoRecovery:
 
         mock_recover.assert_called_once_with("test")
         assert result.status == "indexed"
+        assert result.branch == "main"
+        assert result.commit_hash == "abc1234"

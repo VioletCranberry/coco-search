@@ -222,6 +222,8 @@ class IndexStats:
         float | None
     )  # Seconds since indexing started (only when status='indexing')
     repo_url: str | None  # Browsable HTTPS URL for the git remote origin
+    branch: str | None = None  # Git branch at time of indexing
+    commit_hash: str | None = None  # Git commit hash at time of indexing
     grammars: list[dict] = field(default_factory=list)  # Per-grammar stats
 
     def to_dict(self) -> dict:
@@ -561,6 +563,61 @@ def check_staleness(index_name: str, threshold_days: int = 7) -> tuple[bool, int
         return True, -1
 
 
+def check_branch_staleness(index_name: str, project_path: str | None = None) -> dict:
+    """Check if current git state differs from indexed state.
+
+    Args:
+        index_name: The name of the index.
+        project_path: Path to the project directory. If None, uses the
+            canonical_path from index metadata.
+
+    Returns:
+        Dict with keys:
+        - branch_changed: bool
+        - commits_changed: bool
+        - indexed_branch: str | None
+        - indexed_commit: str | None
+        - current_branch: str | None
+        - current_commit: str | None
+    """
+    from cocosearch.management.git import get_current_branch, get_commit_hash
+
+    result = {
+        "branch_changed": False,
+        "commits_changed": False,
+        "indexed_branch": None,
+        "indexed_commit": None,
+        "current_branch": None,
+        "current_commit": None,
+    }
+
+    # Get indexed branch/commit from metadata
+    metadata = get_index_metadata(index_name)
+    if metadata is None:
+        return result
+
+    result["indexed_branch"] = metadata.get("branch")
+    result["indexed_commit"] = metadata.get("commit_hash")
+
+    # Determine project path
+    check_path = project_path or metadata.get("canonical_path")
+    if not check_path:
+        return result
+
+    # Get current git state
+    result["current_branch"] = get_current_branch(check_path)
+    result["current_commit"] = get_commit_hash(check_path)
+
+    # Compare
+    if result["indexed_branch"] and result["current_branch"]:
+        result["branch_changed"] = result["indexed_branch"] != result["current_branch"]
+
+    if result["indexed_commit"] and result["current_commit"]:
+        result["commits_changed"] = result["indexed_commit"] != result["current_commit"]
+
+    return result
+
+
 def get_symbol_stats(index_name: str) -> dict[str, int]:
     """Get symbol type counts for an index.
 
@@ -605,18 +662,53 @@ def get_symbol_stats(index_name: str) -> dict[str, int]:
             return {row[0]: row[1] for row in rows}
 
 
-def collect_warnings(index_name: str, is_stale: bool, staleness_days: int) -> list[str]:
+def collect_warnings(
+    index_name: str,
+    is_stale: bool,
+    staleness_days: int,
+    branch_staleness: dict | None = None,
+) -> list[str]:
     """Collect warnings for an index.
 
     Args:
         index_name: The name of the index.
         is_stale: Whether the index is stale.
         staleness_days: Days since last update.
+        branch_staleness: Result from check_branch_staleness() (optional).
 
     Returns:
         List of warning messages.
     """
     warnings = []
+
+    # Branch staleness warning
+    if branch_staleness and branch_staleness.get("branch_changed"):
+        indexed_branch = branch_staleness["indexed_branch"]
+        indexed_commit = branch_staleness.get("indexed_commit", "")
+        current_branch = branch_staleness["current_branch"]
+        current_commit = branch_staleness.get("current_commit", "")
+
+        indexed_ref = f"'{indexed_branch}'"
+        if indexed_commit:
+            indexed_ref += f" ({indexed_commit})"
+        current_ref = f"'{current_branch}'"
+        if current_commit:
+            current_ref += f" ({current_commit})"
+
+        warnings.append(
+            f"Index was built from branch {indexed_ref}, "
+            f"but you're on {current_ref}. "
+            f"Run 'cocosearch index .' to update."
+        )
+    elif branch_staleness and branch_staleness.get("commits_changed"):
+        indexed_commit = branch_staleness.get("indexed_commit", "")
+        current_commit = branch_staleness.get("current_commit", "")
+        branch = branch_staleness.get("current_branch", "unknown")
+        warnings.append(
+            f"Index is behind on branch '{branch}': "
+            f"indexed at {indexed_commit}, now at {current_commit}. "
+            f"Run 'cocosearch index .' to update."
+        )
 
     # Staleness warning
     if is_stale:
@@ -766,8 +858,22 @@ def get_comprehensive_stats(
 
     repo_url = get_repo_url(source_path) if source_path else None
 
+    # Get branch info from metadata
+    branch = metadata.get("branch") if metadata else None
+    commit_hash = metadata.get("commit_hash") if metadata else None
+
+    # Check branch staleness (best-effort, skip if git not available)
+    branch_staleness = None
+    if source_path:
+        try:
+            branch_staleness = check_branch_staleness(index_name, source_path)
+        except Exception:
+            pass
+
     # Collect warnings
-    warnings = collect_warnings(index_name, is_stale, staleness_days)
+    warnings = collect_warnings(
+        index_name, is_stale, staleness_days, branch_staleness=branch_staleness
+    )
 
     return IndexStats(
         name=index_name,
@@ -787,5 +893,7 @@ def get_comprehensive_stats(
         status=status,
         indexing_elapsed_seconds=indexing_elapsed_seconds,
         repo_url=repo_url,
+        branch=branch,
+        commit_hash=commit_hash,
         grammars=grammars,
     )

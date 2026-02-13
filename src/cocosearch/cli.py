@@ -224,10 +224,23 @@ def index_command(args: argparse.Namespace) -> int:
             chunk_overlap=config.chunk_overlap,
         )
 
+    # Detect git branch/commit for metadata tracking
+    from cocosearch.management.git import get_current_branch, get_commit_hash
+
+    branch = get_current_branch(codebase_path)
+    commit_hash = get_commit_hash(codebase_path)
+    if branch:
+        branch_info = f"{branch}"
+        if commit_hash:
+            branch_info += f" ({commit_hash})"
+        console.print(f"[dim]Branch: {branch_info}[/dim]")
+
     # Set status to 'indexing' before starting (best-effort)
     try:
         ensure_metadata_table()
-        register_index_path(index_name, codebase_path)
+        register_index_path(
+            index_name, codebase_path, branch=branch, commit_hash=commit_hash
+        )
         set_index_status(index_name, "indexing")
     except Exception:
         pass  # Best-effort — don't block indexing on metadata failures
@@ -271,7 +284,9 @@ def index_command(args: argparse.Namespace) -> int:
 
         # Register path-to-index mapping for collision detection
         try:
-            register_index_path(index_name, codebase_path)
+            register_index_path(
+                index_name, codebase_path, branch=branch, commit_hash=commit_hash
+            )
         except ValueError as collision_error:
             # Collision detected - show warning but indexing already succeeded
             console.print(f"[bold yellow]Warning:[/bold yellow] {collision_error}")
@@ -374,6 +389,42 @@ def search_command(args: argparse.Namespace) -> int:
         import sys as _sys
 
         print(f"Using index: {index_name}", file=_sys.stderr)
+
+    # Check for branch staleness and warn if needed
+    if args.pretty or args.interactive:
+        try:
+            from cocosearch.management.stats import check_branch_staleness
+
+            staleness = check_branch_staleness(index_name)
+            if staleness.get("branch_changed") or staleness.get("commits_changed"):
+                from rich.panel import Panel
+
+                indexed_branch = staleness.get("indexed_branch", "unknown")
+                indexed_commit = staleness.get("indexed_commit", "")
+                current_branch = staleness.get("current_branch", "unknown")
+                current_commit = staleness.get("current_commit", "")
+
+                indexed_ref = f"'{indexed_branch}'"
+                if indexed_commit:
+                    indexed_ref += f" ({indexed_commit})"
+                current_ref = f"'{current_branch}'"
+                if current_commit:
+                    current_ref += f" ({current_commit})"
+
+                warning_msg = (
+                    f"Index built from {indexed_ref}, "
+                    f"current branch is {current_ref}. "
+                    f"Results may be stale."
+                )
+                console.print(
+                    Panel(
+                        f"[yellow]{warning_msg}[/yellow]",
+                        title="[bold yellow]Warning[/bold yellow]",
+                        border_style="yellow",
+                    )
+                )
+        except Exception:
+            pass  # Best-effort — don't block search on staleness check
 
     # Determine context parameters
     context_before = args.before_context
@@ -778,6 +829,11 @@ def stats_command(args: argparse.Namespace) -> int:
                     console.print(f"[bold]Index:[/bold] {stats.name}")
                     if stats.source_path:
                         console.print(f"[dim]Source: {stats.source_path}[/dim]")
+                    if stats.branch:
+                        branch_info = stats.branch
+                        if stats.commit_hash:
+                            branch_info += f" ({stats.commit_hash})"
+                        console.print(f"[dim]Branch: {branch_info}[/dim]")
                     if stats.status:
                         if stats.status == "indexing":
                             console.print("[yellow]Status: Indexing...[/yellow]")
@@ -863,6 +919,11 @@ def stats_command(args: argparse.Namespace) -> int:
         console.print(f"\n[bold]Index:[/bold] {stats.name}")
         if stats.source_path:
             console.print(f"[dim]Source: {stats.source_path}[/dim]")
+        if stats.branch:
+            branch_info = stats.branch
+            if stats.commit_hash:
+                branch_info += f" ({stats.commit_hash})"
+            console.print(f"[dim]Branch: {branch_info}[/dim]")
         if stats.status:
             if stats.status == "indexing":
                 console.print("[yellow]Status: Indexing...[/yellow]")

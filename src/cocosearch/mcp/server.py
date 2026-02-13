@@ -805,6 +805,44 @@ async def search_code(
             }
         )
 
+    # Check branch staleness and add warning if needed
+    try:
+        from cocosearch.management.stats import check_branch_staleness
+
+        branch_staleness = check_branch_staleness(index_name)
+        if branch_staleness.get("branch_changed") or branch_staleness.get(
+            "commits_changed"
+        ):
+            indexed_branch = branch_staleness.get("indexed_branch", "unknown")
+            indexed_commit = branch_staleness.get("indexed_commit", "")
+            current_branch = branch_staleness.get("current_branch", "unknown")
+            current_commit = branch_staleness.get("current_commit", "")
+
+            indexed_ref = f"'{indexed_branch}'"
+            if indexed_commit:
+                indexed_ref += f" ({indexed_commit})"
+            current_ref = f"'{current_branch}'"
+            if current_commit:
+                current_ref += f" ({current_commit})"
+
+            reindex_path = str(root_path) if root_path else "<path-to-project>"
+            output.append(
+                {
+                    "type": "branch_staleness_warning",
+                    "warning": "Index built from different branch",
+                    "message": (
+                        f"Index built from {indexed_ref}, "
+                        f"current branch is {current_ref}. "
+                        f"Results may be stale. "
+                        f"Run `cocosearch index {reindex_path}` to update."
+                    ),
+                    "indexed_branch": indexed_branch,
+                    "current_branch": current_branch,
+                }
+            )
+    except Exception:
+        pass  # Best-effort — don't block search on staleness check
+
     # Check staleness and add footer warning if needed
     try:
         is_stale, staleness_days = check_staleness(index_name, threshold_days=7)

@@ -65,6 +65,54 @@ def get_repo_url(path: str | Path | None = None) -> str | None:
     return url
 
 
+def get_current_branch(path: str | Path | None = None) -> str | None:
+    """Get the current git branch name.
+
+    Args:
+        path: Directory to check. Defaults to current directory.
+
+    Returns:
+        Branch name (e.g., "main"), or None for detached HEAD or non-git dirs.
+    """
+    cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+    if path:
+        cmd = ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        branch = result.stdout.strip()
+        # "HEAD" means detached HEAD state
+        if branch == "HEAD":
+            return None
+        return branch
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def get_commit_hash(path: str | Path | None = None, short: bool = True) -> str | None:
+    """Get the current commit hash.
+
+    Args:
+        path: Directory to check. Defaults to current directory.
+        short: If True, return abbreviated hash (default 7 chars).
+
+    Returns:
+        Commit hash string, or None if not in a git repo.
+    """
+    cmd = ["git", "rev-parse"]
+    if short:
+        cmd.append("--short")
+    cmd.append("HEAD")
+    if path:
+        cmd = ["git", "-C", str(path)] + cmd[1:]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 def derive_index_from_git() -> str | None:
     """Derive an index name from the current git repository.
 

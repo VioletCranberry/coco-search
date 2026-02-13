@@ -98,6 +98,61 @@ class TestIndexCommand:
                     result = index_command(args)
         assert result == 0
 
+    def test_stores_branch_info(self, capsys, tmp_codebase):
+        """index_command passes branch and commit_hash to register_index_path."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path") as mock_register,
+            patch("cocosearch.management.git.get_current_branch", return_value="main"),
+            patch("cocosearch.management.git.get_commit_hash", return_value="abc1234"),
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        # Check that register_index_path was called with branch/commit args
+        # It's called twice (before and after indexing), check the second call
+        assert mock_register.call_count >= 2
+        last_call = mock_register.call_args_list[-1]
+        assert last_call.kwargs.get("branch") == "main"
+        assert last_call.kwargs.get("commit_hash") == "abc1234"
+
+    def test_shows_branch_in_output(self, capsys, tmp_codebase):
+        """index_command shows branch info in output."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+            patch(
+                "cocosearch.management.git.get_current_branch",
+                return_value="feature-branch",
+            ),
+            patch("cocosearch.management.git.get_commit_hash", return_value="def5678"),
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+            )
+            index_command(args)
+
+        captured = capsys.readouterr()
+        assert "feature-branch" in captured.out
+        assert "def5678" in captured.out
+
 
 class TestSearchCommand:
     """Tests for search_command."""
