@@ -382,7 +382,7 @@ class TestIndexCodebase:
                         }
                     }
                 )
-                with patch("cocosearch.mcp.server.register_index_path"):
+                with patch("cocosearch.mcp.server._register_with_git"):
                     result = index_codebase(
                         path=str(tmp_codebase),
                         index_name="testindex",
@@ -397,7 +397,7 @@ class TestIndexCodebase:
         with patch("cocoindex.init"):
             with patch("cocosearch.mcp.server.run_index") as mock_run:
                 mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server.register_index_path"):
+                with patch("cocosearch.mcp.server._register_with_git"):
                     result = index_codebase(
                         path=str(tmp_codebase),
                         index_name=None,  # Should be derived
@@ -610,6 +610,78 @@ class TestRunServer:
             mock_mcp.run.assert_called_once_with(transport="stdio")
 
 
+class TestRegisterWithGit:
+    """Tests for _register_with_git helper passing branch/commit metadata."""
+
+    def test_passes_branch_and_commit(self):
+        """_register_with_git calls register_index_path with git metadata."""
+        from cocosearch.mcp.server import _register_with_git
+
+        with patch(
+            "cocosearch.mcp.server.get_current_branch", return_value="main"
+        ) as mock_branch:
+            with patch(
+                "cocosearch.mcp.server.get_commit_hash", return_value="abc1234"
+            ) as mock_hash:
+                with patch(
+                    "cocosearch.management.git.get_branch_commit_count",
+                    return_value=1234,
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.register_index_path"
+                    ) as mock_register:
+                        _register_with_git("myindex", "/projects/repo")
+
+        mock_branch.assert_called_once_with("/projects/repo")
+        mock_hash.assert_called_once_with("/projects/repo")
+        mock_register.assert_called_once_with(
+            "myindex",
+            "/projects/repo",
+            branch="main",
+            commit_hash="abc1234",
+            branch_commit_count=1234,
+        )
+
+    def test_passes_none_when_not_git_repo(self):
+        """_register_with_git passes None branch/commit for non-git dirs."""
+        from cocosearch.mcp.server import _register_with_git
+
+        with patch("cocosearch.mcp.server.get_current_branch", return_value=None):
+            with patch("cocosearch.mcp.server.get_commit_hash", return_value=None):
+                with patch(
+                    "cocosearch.management.git.get_branch_commit_count",
+                    return_value=None,
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.register_index_path"
+                    ) as mock_register:
+                        _register_with_git("myindex", "/not/a/repo")
+
+        mock_register.assert_called_once_with(
+            "myindex",
+            "/not/a/repo",
+            branch=None,
+            commit_hash=None,
+            branch_commit_count=None,
+        )
+
+    def test_index_codebase_registers_with_git(self, tmp_codebase):
+        """index_codebase passes git metadata via _register_with_git."""
+        with patch("cocoindex.init"):
+            with patch("cocosearch.mcp.server.run_index") as mock_run:
+                mock_run.return_value = MagicMock(stats={})
+                with patch("cocosearch.mcp.server._register_with_git") as mock_rwg:
+                    result = index_codebase(
+                        path=str(tmp_codebase),
+                        index_name="testindex",
+                    )
+
+        assert result["success"] is True
+        # _register_with_git called twice: pre-start and post-index
+        assert mock_rwg.call_count == 2
+        mock_rwg.assert_any_call("testindex", str(tmp_codebase))
+
+
 class TestHealthEndpoint:
     """Tests for health check endpoint."""
 
@@ -639,3 +711,194 @@ class TestHealthEndpoint:
 
         body = json.loads(response.body.decode())
         assert body["status"] == "ok"
+
+
+class TestApiReindex:
+    """Tests for /api/reindex endpoint with fallback path resolution."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_active_indexing(self):
+        """Clear module-level _active_indexing between tests."""
+        from cocosearch.mcp import server as srv
+
+        srv._active_indexing.clear()
+        yield
+        srv._active_indexing.clear()
+
+    @staticmethod
+    def _make_request(body_dict):
+        """Create a mock Starlette request with JSON body."""
+        import asyncio
+
+        request = MagicMock()
+        future = asyncio.Future()
+        future.set_result(body_dict)
+        request.json = MagicMock(return_value=future)
+        return request
+
+    @pytest.mark.asyncio
+    async def test_reindex_with_metadata(self):
+        """Reindex works when metadata has canonical_path."""
+        import json
+
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request({"index_name": "myindex", "fresh": False})
+
+        with patch(
+            "cocosearch.mcp.server.get_index_metadata",
+            return_value={"canonical_path": "/projects/myrepo"},
+        ):
+            with patch("cocosearch.mcp.server.set_index_status"):
+                with patch("cocosearch.mcp.server.run_index"):
+                    with patch("cocosearch.mcp.server._register_with_git"):
+                        response = await api_reindex(request)
+
+        body = json.loads(response.body.decode())
+        assert response.status_code == 200
+        assert body["success"] is True
+        assert "Reindex started" in body["message"]
+
+    @pytest.mark.asyncio
+    async def test_reindex_fallback_to_body_source_path(self):
+        """Falls back to source_path from request body when metadata missing."""
+        import json
+
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request(
+            {
+                "index_name": "myindex",
+                "fresh": False,
+                "source_path": "/from/dashboard",
+            }
+        )
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+            with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                with patch("cocosearch.mcp.server._register_with_git") as mock_register:
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        with patch("cocosearch.mcp.server.run_index"):
+                            response = await api_reindex(request)
+
+        body = json.loads(response.body.decode())
+        assert response.status_code == 200
+        assert body["success"] is True
+        # Verify auto-registration was called with the fallback path
+        mock_register.assert_any_call("myindex", "/from/dashboard")
+
+    @pytest.mark.asyncio
+    async def test_reindex_fallback_to_env_var(self, monkeypatch, tmp_path):
+        """Falls back to COCOSEARCH_PROJECT_PATH when no metadata or body path."""
+        import json
+
+        from cocosearch.mcp.server import api_reindex
+
+        # Create a .git dir so find_project_root finds it
+        git_dir = tmp_path / ".git"
+        git_dir.mkdir()
+        monkeypatch.setenv("COCOSEARCH_PROJECT_PATH", str(tmp_path))
+
+        request = self._make_request({"index_name": "myindex", "fresh": False})
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+            with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                with patch("cocosearch.mcp.server._register_with_git") as mock_register:
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        with patch("cocosearch.mcp.server.run_index"):
+                            response = await api_reindex(request)
+
+        body = json.loads(response.body.decode())
+        assert response.status_code == 200
+        assert body["success"] is True
+        # Verify auto-registration with resolved path
+        mock_register.assert_any_call("myindex", str(tmp_path.resolve()))
+
+    @pytest.mark.asyncio
+    async def test_reindex_error_when_no_path_available(self, monkeypatch):
+        """Returns 400 when no metadata, no body path, and no env var."""
+        import json
+
+        from cocosearch.mcp.server import api_reindex
+
+        monkeypatch.delenv("COCOSEARCH_PROJECT_PATH", raising=False)
+
+        request = self._make_request({"index_name": "myindex", "fresh": False})
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+            response = await api_reindex(request)
+
+        body = json.loads(response.body.decode())
+        assert response.status_code == 400
+        assert "not found or has no source path" in body["error"]
+
+    @pytest.mark.asyncio
+    async def test_reindex_auto_registers_metadata(self):
+        """Auto-registers metadata when fallback path is used."""
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request(
+            {
+                "index_name": "myindex",
+                "fresh": False,
+                "source_path": "/fallback/path",
+            }
+        )
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+            with patch("cocosearch.mcp.server.ensure_metadata_table") as mock_ensure:
+                with patch("cocosearch.mcp.server._register_with_git") as mock_register:
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        with patch("cocosearch.mcp.server.run_index"):
+                            await api_reindex(request)
+
+        # ensure_metadata_table must be called before register
+        mock_ensure.assert_called_once()
+        mock_register.assert_any_call("myindex", "/fallback/path")
+
+    @pytest.mark.asyncio
+    async def test_reindex_skips_body_fallback_when_metadata_exists(self):
+        """Does not use body source_path when metadata has canonical_path."""
+        import json
+
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request(
+            {
+                "index_name": "myindex",
+                "fresh": False,
+                "source_path": "/should/not/use",
+            }
+        )
+
+        with patch(
+            "cocosearch.mcp.server.get_index_metadata",
+            return_value={"canonical_path": "/from/metadata"},
+        ):
+            with patch("cocosearch.mcp.server.set_index_status"):
+                with patch("cocosearch.mcp.server.run_index"):
+                    with patch(
+                        "cocosearch.mcp.server.ensure_metadata_table"
+                    ) as mock_ensure:
+                        with patch("cocosearch.mcp.server._register_with_git"):
+                            response = await api_reindex(request)
+
+        body = json.loads(response.body.decode())
+        assert response.status_code == 200
+        assert body["success"] is True
+        # ensure_metadata_table should NOT be called (no fallback triggered)
+        mock_ensure.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_reindex_missing_index_name(self):
+        """Returns 400 when index_name is missing."""
+        import json
+
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request({"fresh": False})
+        response = await api_reindex(request)
+
+        body = json.loads(response.body.decode())
+        assert response.status_code == 400
+        assert "index_name is required" in body["error"]

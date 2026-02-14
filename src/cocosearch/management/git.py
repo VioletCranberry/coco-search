@@ -113,6 +113,57 @@ def get_commit_hash(path: str | Path | None = None, short: bool = True) -> str |
         return None
 
 
+def get_commits_behind(
+    path: str | Path | None = None, from_commit: str = "HEAD"
+) -> int | None:
+    """Get the number of commits between a given commit and current HEAD.
+
+    Runs `git rev-list <from_commit>..HEAD --count` to determine how many
+    commits HEAD is ahead of from_commit.
+
+    Args:
+        path: Directory to check. Defaults to current directory.
+        from_commit: The commit hash to measure from (typically the indexed commit).
+
+    Returns:
+        Number of commits behind, or None if not in a git repo or if
+        from_commit is invalid.
+    """
+    cmd = ["git"]
+    if path:
+        cmd += ["-C", str(path)]
+    cmd += ["rev-list", f"{from_commit}..HEAD", "--count"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return int(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        return None
+
+
+def get_branch_commit_count(path: str | Path | None = None) -> int | None:
+    """Get the total number of commits in the current branch.
+
+    Runs `git rev-list --count HEAD` to count all reachable commits.
+
+    Args:
+        path: Directory to check. Defaults to current directory.
+
+    Returns:
+        Total commit count, or None if not in a git repo.
+    """
+    cmd = ["git"]
+    if path:
+        cmd += ["-C", str(path)]
+    cmd += ["rev-list", "--count", "HEAD"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return int(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        return None
+
+
 def derive_index_from_git() -> str | None:
     """Derive an index name from the current git repository.
 

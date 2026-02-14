@@ -32,9 +32,9 @@ class TestEnsureMetadataTable:
         ):
             ensure_metadata_table()
 
-        # Should execute CREATE TABLE, ALTER TABLE (status, branch, commit_hash),
-        # and CREATE INDEX
-        assert len(cursor.calls) >= 5
+        # Should execute CREATE TABLE, ALTER TABLE (status, branch, commit_hash,
+        # branch_commit_count), and CREATE INDEX
+        assert len(cursor.calls) >= 6
         sql = cursor.calls[0][0]
         assert "CREATE TABLE IF NOT EXISTS" in sql
         assert "cocosearch_index_metadata" in sql
@@ -78,6 +78,19 @@ class TestEnsureMetadataTable:
         assert "ALTER TABLE" in sql
         assert "commit_hash" in sql
 
+    def test_creates_branch_commit_count_column_migration(self, mock_db_pool):
+        """ensure_metadata_table adds branch_commit_count column for existing DBs."""
+        pool, cursor, conn = mock_db_pool()
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            ensure_metadata_table()
+
+        sql = cursor.calls[4][0]
+        assert "ALTER TABLE" in sql
+        assert "branch_commit_count" in sql
+
     def test_creates_path_index(self, mock_db_pool):
         """ensure_metadata_table creates index on canonical_path."""
         pool, cursor, conn = mock_db_pool()
@@ -87,8 +100,8 @@ class TestEnsureMetadataTable:
         ):
             ensure_metadata_table()
 
-        # Fifth SQL should be CREATE INDEX (after CREATE TABLE and 3 ALTER TABLEs)
-        sql = cursor.calls[4][0]
+        # Sixth SQL should be CREATE INDEX (after CREATE TABLE and 4 ALTER TABLEs)
+        sql = cursor.calls[5][0]
         assert "CREATE INDEX IF NOT EXISTS" in sql
         assert "canonical_path" in sql
 
@@ -119,6 +132,7 @@ class TestGetIndexMetadata:
                     "indexed",
                     "main",
                     "abc1234",
+                    1234,
                 ),
             ]
         )
@@ -136,6 +150,7 @@ class TestGetIndexMetadata:
         assert result["status"] == "indexed"
         assert result["branch"] == "main"
         assert result["commit_hash"] == "abc1234"
+        assert result["branch_commit_count"] == 1234
 
     def test_returns_none_branch_when_not_set(self, mock_db_pool):
         """get_index_metadata returns None for branch/commit when not stored."""
@@ -147,6 +162,7 @@ class TestGetIndexMetadata:
                     "2024-01-01 00:00:00",
                     "2024-01-01 00:00:00",
                     "indexed",
+                    None,
                     None,
                     None,
                 ),
@@ -161,6 +177,7 @@ class TestGetIndexMetadata:
         assert result is not None
         assert result["branch"] is None
         assert result["commit_hash"] is None
+        assert result["branch_commit_count"] is None
 
     def test_returns_none_when_not_found(self, mock_db_pool):
         """get_index_metadata returns None when index doesn't exist."""
@@ -398,7 +415,7 @@ class TestRegisterIndexPath:
                 register_index_path("myindex", tmp_path)
 
     def test_stores_branch_and_commit(self, mock_db_pool, tmp_path):
-        """register_index_path stores branch and commit_hash."""
+        """register_index_path stores branch, commit_hash, and branch_commit_count."""
         pool, cursor, conn = mock_db_pool(results=[])
 
         with patch(
@@ -406,13 +423,18 @@ class TestRegisterIndexPath:
         ):
             with patch("cocosearch.management.metadata.ensure_metadata_table"):
                 register_index_path(
-                    "myindex", tmp_path, branch="main", commit_hash="abc1234"
+                    "myindex",
+                    tmp_path,
+                    branch="main",
+                    commit_hash="abc1234",
+                    branch_commit_count=1234,
                 )
 
-        # The INSERT should include branch and commit_hash columns
+        # The INSERT should include branch, commit_hash, and branch_commit_count columns
         upsert_sql = cursor.calls[-1][0]
         assert "branch" in upsert_sql
         assert "commit_hash" in upsert_sql
+        assert "branch_commit_count" in upsert_sql
 
     def test_preserves_status_on_reregistration(self, mock_db_pool, tmp_path):
         """register_index_path does not overwrite status on conflict update."""

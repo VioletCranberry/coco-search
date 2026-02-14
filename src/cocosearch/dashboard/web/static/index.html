@@ -74,7 +74,6 @@
         header {
             margin-bottom: 24px;
             padding-bottom: 16px;
-            border-bottom: 2px solid var(--border-color);
         }
 
         .header-title {
@@ -95,20 +94,20 @@
             font-size: 14px;
         }
 
-        .index-selector {
-            margin: 16px 0;
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .controls-grid .summary-card {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            flex-direction: column;
         }
 
-        .index-selector label {
-            font-weight: 500;
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-
-        .index-selector select {
+        .controls-grid select {
+            width: 100%;
             padding: 8px 12px;
             border: 1px solid var(--border-color);
             border-radius: 6px;
@@ -116,7 +115,58 @@
             color: var(--text-primary);
             font-size: 14px;
             cursor: pointer;
-            min-width: 200px;
+            margin-top: 4px;
+        }
+
+        .controls-grid .source-path {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            word-break: break-all;
+        }
+
+        .controls-grid .repo-link {
+            margin-top: 6px;
+        }
+
+        .controls-grid .repo-link a {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .controls-grid .repo-link a:hover {
+            text-decoration: underline;
+        }
+
+        .controls-grid .branch-display {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 4px 0;
+        }
+
+        .controls-grid .action-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .controls-grid .action-row .action-btn {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+        }
+
+        .controls-grid .danger-row {
+            margin-top: auto;
+            padding-top: 12px;
+        }
+
+        .controls-grid .danger-row .action-btn {
+            width: 100%;
         }
 
         .warning-banner {
@@ -730,6 +780,10 @@
         }
 
         @media (max-width: 768px) {
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+
             .chart-grid {
                 grid-template-columns: 1fr;
             }
@@ -753,30 +807,43 @@
                 <button id="themeToggle" class="theme-toggle" onclick="cycleTheme()" title="Theme: System"></button>
             </div>
             <p class="subtitle">Real-time code index statistics and health monitoring</p>
-            <p id="repoUrl" style="font-size: 13px; margin-top: 4px; display: none;">
-                <a id="repoUrlLink" href="#" target="_blank" rel="noopener noreferrer"
-                   style="color: var(--accent-blue); text-decoration: none;"></a>
-            </p>
+        </header>
 
-            <div class="index-selector">
-                <label for="indexSelect">Index:</label>
+        <div class="controls-grid">
+            <div class="summary-card">
+                <h3>Index</h3>
                 <select id="indexSelect">
                     <option value="">Loading...</option>
                 </select>
-                <span id="sourcePath" style="color: var(--text-muted); font-size: 13px; margin-left: 8px;"></span>
-                <span id="branchBadge" style="display: none; margin-left: 8px; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary);"></span>
-                <button id="reindexBtn" class="action-btn" onclick="reindex(false)">Reindex</button>
-                <button id="freshIndexBtn" class="action-btn danger" onclick="reindex(true)">Fresh Index</button>
-                <button id="stopIndexBtn" class="action-btn danger" onclick="stopIndexing()" style="display: none;">Stop</button>
-                <button id="deleteIndexBtn" class="action-btn danger" onclick="deleteIndex()">Delete</button>
+                <div id="sourcePath" class="source-path"></div>
+                <p id="repoUrl" class="repo-link" style="display: none;">
+                    <a id="repoUrlLink" href="#" target="_blank" rel="noopener noreferrer"></a>
+                </p>
             </div>
-        </header>
+            <div class="summary-card">
+                <h3>Repository</h3>
+                <span id="branchBadge" class="branch-display" style="display: none;"></span>
+                <div class="label">Branch &amp; commit</div>
+            </div>
+            <div class="summary-card">
+                <h3>Actions</h3>
+                <div class="action-row">
+                    <button id="reindexBtn" class="action-btn" onclick="reindex(false)">Reindex</button>
+                    <button id="freshIndexBtn" class="action-btn danger" onclick="reindex(true)">Fresh Index</button>
+                    <button id="stopIndexBtn" class="action-btn danger" onclick="stopIndexing()" style="display: none;">Stop</button>
+                </div>
+                <div class="danger-row">
+                    <button id="deleteIndexBtn" class="action-btn danger" onclick="deleteIndex()">Delete</button>
+                </div>
+            </div>
+        </div>
 
         <div class="search-section">
             <h2>Search Code</h2>
             <div class="search-bar">
                 <input type="text" id="searchInput" placeholder="Search code with natural language..." autocomplete="off">
                 <button class="action-btn" id="searchBtn" onclick="executeSearch()">Search</button>
+                <button class="action-btn" id="clearSearchBtn" onclick="clearSearch()" style="display:none;">Clear</button>
             </div>
             <div class="search-filters">
                 <label>Language:
@@ -1053,11 +1120,14 @@
             // Branch badge
             const branchBadge = document.getElementById('branchBadge');
             if (stats.branch) {
-                let branchText = stats.branch;
-                if (stats.commit_hash) {
-                    branchText += ' (' + stats.commit_hash + ')';
+                const parts = [stats.branch + (stats.commit_hash ? ' (' + stats.commit_hash + ')' : '')];
+                if (stats.commits_behind !== null && stats.commits_behind !== undefined) {
+                    parts.push(stats.commits_behind === 0 ? 'up to date' : stats.commits_behind + ' commits behind');
                 }
-                branchBadge.textContent = branchText;
+                if (stats.branch_commit_count !== null && stats.branch_commit_count !== undefined) {
+                    parts.push(stats.branch_commit_count.toLocaleString() + ' commits');
+                }
+                branchBadge.textContent = parts.join(' \u00b7 ');
                 branchBadge.style.display = 'inline';
             } else {
                 branchBadge.style.display = 'none';
@@ -1600,7 +1670,11 @@
                 const resp = await fetch('/api/reindex', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({index_name: stats.name, fresh: fresh})
+                    body: JSON.stringify({
+                        index_name: stats.name,
+                        fresh: fresh,
+                        source_path: stats.source_path || (projectContext && projectContext.project_path)
+                    })
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
@@ -1855,16 +1929,29 @@
                 if (!resp.ok) {
                     document.getElementById('searchError').textContent = data.error || 'Search failed';
                     document.getElementById('searchError').style.display = 'block';
+                    document.getElementById('clearSearchBtn').style.display = '';
                     return;
                 }
 
                 displaySearchResults(data);
+                document.getElementById('clearSearchBtn').style.display = '';
             } catch (err) {
                 document.getElementById('searchLoading').style.display = 'none';
                 document.getElementById('searchBtn').disabled = false;
                 document.getElementById('searchError').textContent = 'Search failed: ' + err.message;
                 document.getElementById('searchError').style.display = 'block';
+                document.getElementById('clearSearchBtn').style.display = '';
             }
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('searchResultsInfo').style.display = 'none';
+            document.getElementById('searchEmpty').style.display = 'none';
+            document.getElementById('searchError').style.display = 'none';
+            document.getElementById('searchLoading').style.display = 'none';
+            document.getElementById('clearSearchBtn').style.display = 'none';
         }
 
         function displaySearchResults(data) {

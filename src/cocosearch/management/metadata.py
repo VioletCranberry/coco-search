@@ -51,6 +51,10 @@ def ensure_metadata_table() -> None:
                     ADD COLUMN IF NOT EXISTS commit_hash TEXT
             """)
             cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS branch_commit_count INTEGER
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_cocosearch_metadata_path
                     ON cocosearch_index_metadata(canonical_path)
             """)
@@ -78,7 +82,7 @@ def get_index_metadata(index_name: str) -> dict | None:
                 cur.execute(
                     """
                     SELECT index_name, canonical_path, created_at, updated_at, status,
-                           branch, commit_hash
+                           branch, commit_hash, branch_commit_count
                     FROM cocosearch_index_metadata
                     WHERE index_name = %s
                     """,
@@ -98,6 +102,7 @@ def get_index_metadata(index_name: str) -> dict | None:
                     "status": status,
                     "branch": row[5] if len(row) > 5 else None,
                     "commit_hash": row[6] if len(row) > 6 else None,
+                    "branch_commit_count": row[7] if len(row) > 7 else None,
                 }
 
                 # Provide elapsed time so callers can warn about
@@ -159,6 +164,7 @@ def register_index_path(
     project_path: str | Path,
     branch: str | None = None,
     commit_hash: str | None = None,
+    branch_commit_count: int | None = None,
 ) -> None:
     """Register a path-to-index mapping with collision detection.
 
@@ -196,15 +202,17 @@ def register_index_path(
             cur.execute(
                 """
                 INSERT INTO cocosearch_index_metadata
-                    (index_name, canonical_path, created_at, updated_at, status, branch, commit_hash)
-                VALUES (%s, %s, NOW(), NOW(), 'indexing', %s, %s)
+                    (index_name, canonical_path, created_at, updated_at, status,
+                     branch, commit_hash, branch_commit_count)
+                VALUES (%s, %s, NOW(), NOW(), 'indexing', %s, %s, %s)
                 ON CONFLICT (index_name) DO UPDATE SET
                     canonical_path = EXCLUDED.canonical_path,
                     updated_at = NOW(),
                     branch = EXCLUDED.branch,
-                    commit_hash = EXCLUDED.commit_hash
+                    commit_hash = EXCLUDED.commit_hash,
+                    branch_commit_count = EXCLUDED.branch_commit_count
                 """,
-                (index_name, canonical, branch, commit_hash),
+                (index_name, canonical, branch, commit_hash, branch_commit_count),
             )
         conn.commit()
 

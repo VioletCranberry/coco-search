@@ -22,6 +22,27 @@ _active_indexing: dict[str, threading.Thread] = {}
 _indexing_lock = threading.Lock()
 
 
+def _register_with_git(index_name: str, project_path: str) -> None:
+    """Register index path with current git branch/commit metadata."""
+    from cocosearch.management import register_index_path
+    from cocosearch.management.git import (
+        get_current_branch,
+        get_commit_hash,
+        get_branch_commit_count,
+    )
+
+    branch = get_current_branch(project_path)
+    commit_hash = get_commit_hash(project_path)
+    branch_commit_count = get_branch_commit_count(project_path)
+    register_index_path(
+        index_name,
+        project_path,
+        branch=branch,
+        commit_hash=commit_hash,
+        branch_commit_count=branch_commit_count,
+    )
+
+
 class DashboardHandler(BaseHTTPRequestHandler):
     """Serves dashboard HTML and stats API."""
 
@@ -167,7 +188,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         from cocosearch.management import (
             get_index_metadata,
             set_index_status,
-            register_index_path,
         )
 
         body = self._read_json_body()
@@ -217,7 +237,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     config=IndexingConfig(),
                     fresh=fresh,
                 )
-                register_index_path(index_name, source_path)
+                _register_with_git(index_name, source_path)
             except Exception as exc:
                 failed = True
                 logger.error(f"Background reindex failed: {exc}")
@@ -247,7 +267,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         from cocosearch.indexer import IndexingConfig, run_index
         from cocosearch.management import (
             ensure_metadata_table,
-            register_index_path,
             set_index_status,
             get_index_metadata,
         )
@@ -279,7 +298,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         # Register metadata before starting
         try:
             ensure_metadata_table()
-            register_index_path(index_name, project_path)
+            _register_with_git(index_name, project_path)
             set_index_status(index_name, "indexing")
         except Exception as e:
             logger.warning(f"Metadata registration failed: {e}")
@@ -293,7 +312,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     codebase_path=project_path,
                     config=IndexingConfig(),
                 )
-                register_index_path(index_name, project_path)
+                _register_with_git(index_name, project_path)
             except Exception as exc:
                 failed = True
                 logger.error(f"Background indexing failed: {exc}")

@@ -496,6 +496,7 @@ class TestCheckBranchStaleness:
                     "indexed",
                     "main",
                     "abc1234",
+                    1234,
                 ),
             ]
         )
@@ -513,6 +514,7 @@ class TestCheckBranchStaleness:
 
         assert result["branch_changed"] is False
         assert result["commits_changed"] is False
+        assert result["commits_behind"] == 0
         assert result["indexed_branch"] == "main"
         assert result["current_branch"] == "main"
 
@@ -528,6 +530,7 @@ class TestCheckBranchStaleness:
                     "indexed",
                     "main",
                     "abc1234",
+                    1234,
                 ),
             ]
         )
@@ -551,7 +554,7 @@ class TestCheckBranchStaleness:
         assert result["current_branch"] == "feature-x"
 
     def test_same_branch_different_commit(self, mock_db_pool):
-        """Detects commit change on same branch."""
+        """Detects commit change on same branch with commits_behind count."""
         pool, cursor, conn = mock_db_pool(
             results=[
                 (
@@ -562,6 +565,7 @@ class TestCheckBranchStaleness:
                     "indexed",
                     "main",
                     "abc1234",
+                    1234,
                 ),
             ]
         )
@@ -574,11 +578,13 @@ class TestCheckBranchStaleness:
             ),
             patch("cocosearch.management.git.get_current_branch", return_value="main"),
             patch("cocosearch.management.git.get_commit_hash", return_value="def5678"),
+            patch("cocosearch.management.git.get_commits_behind", return_value=5),
         ):
             result = check_branch_staleness("myindex", "/path/to/project")
 
         assert result["branch_changed"] is False
         assert result["commits_changed"] is True
+        assert result["commits_behind"] == 5
         assert result["indexed_commit"] == "abc1234"
         assert result["current_commit"] == "def5678"
 
@@ -597,6 +603,7 @@ class TestCheckBranchStaleness:
 
         assert result["branch_changed"] is False
         assert result["commits_changed"] is False
+        assert result["commits_behind"] is None
         assert result["indexed_branch"] is None
 
     def test_detached_head(self, mock_db_pool):
@@ -611,6 +618,7 @@ class TestCheckBranchStaleness:
                     "indexed",
                     "main",
                     "abc1234",
+                    1234,
                 ),
             ]
         )
@@ -623,6 +631,7 @@ class TestCheckBranchStaleness:
             ),
             patch("cocosearch.management.git.get_current_branch", return_value=None),
             patch("cocosearch.management.git.get_commit_hash", return_value="def5678"),
+            patch("cocosearch.management.git.get_commits_behind", return_value=3),
         ):
             result = check_branch_staleness("myindex", "/path/to/project")
 
@@ -642,6 +651,7 @@ class TestCheckBranchStaleness:
                     "indexed",
                     "main",
                     "abc1234",
+                    1234,
                 ),
             ]
         )
@@ -659,6 +669,7 @@ class TestCheckBranchStaleness:
 
         assert result["branch_changed"] is False
         assert result["commits_changed"] is False
+        assert result["commits_behind"] is None
 
 
 class TestCollectWarningsBranch:
@@ -675,6 +686,7 @@ class TestCollectWarningsBranch:
             "indexed_commit": "abc1234",
             "current_branch": "feature-x",
             "current_commit": "def5678",
+            "commits_behind": 10,
         }
 
         with (
@@ -697,8 +709,8 @@ class TestCollectWarningsBranch:
         assert "abc1234" in warnings[0]
         assert "def5678" in warnings[0]
 
-    def test_commit_change_warning(self, mock_db_pool):
-        """Generates warning when commits differ on same branch."""
+    def test_commit_change_warning_with_count(self, mock_db_pool):
+        """Generates warning with commit count when commits differ on same branch."""
         pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])
 
         branch_staleness = {
@@ -708,6 +720,40 @@ class TestCollectWarningsBranch:
             "indexed_commit": "abc1234",
             "current_branch": "main",
             "current_commit": "def5678",
+            "commits_behind": 5,
+        }
+
+        with (
+            patch("cocosearch.management.stats.get_connection_pool", return_value=pool),
+            patch(
+                "cocosearch.management.stats.get_table_name",
+                return_value="codeindex_test__test_chunks",
+            ),
+        ):
+            warnings = collect_warnings(
+                "test",
+                is_stale=False,
+                staleness_days=1,
+                branch_staleness=branch_staleness,
+            )
+
+        assert len(warnings) == 1
+        assert "5 commits behind" in warnings[0]
+        assert "abc1234" in warnings[0]
+        assert "def5678" in warnings[0]
+
+    def test_commit_change_warning_without_count(self, mock_db_pool):
+        """Generates warning without count when commits_behind is None."""
+        pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])
+
+        branch_staleness = {
+            "branch_changed": False,
+            "commits_changed": True,
+            "indexed_branch": "main",
+            "indexed_commit": "abc1234",
+            "current_branch": "main",
+            "current_commit": "def5678",
+            "commits_behind": None,
         }
 
         with (
@@ -740,6 +786,7 @@ class TestCollectWarningsBranch:
             "indexed_commit": "abc1234",
             "current_branch": "main",
             "current_commit": "abc1234",
+            "commits_behind": 0,
         }
 
         with (
@@ -1277,6 +1324,7 @@ class TestComprehensiveStatsAutoRecovery:
                     "status": "indexed",
                     "branch": "main",
                     "commit_hash": "abc1234",
+                    "branch_commit_count": 1234,
                 },
             ),
             patch(
@@ -1293,6 +1341,7 @@ class TestComprehensiveStatsAutoRecovery:
                     "indexed_commit": "abc1234",
                     "current_branch": "main",
                     "current_commit": "abc1234",
+                    "commits_behind": 0,
                 },
             ),
         ):
@@ -1309,3 +1358,5 @@ class TestComprehensiveStatsAutoRecovery:
         assert result.status == "indexed"
         assert result.branch == "main"
         assert result.commit_hash == "abc1234"
+        assert result.commits_behind == 0
+        assert result.branch_commit_count == 1234

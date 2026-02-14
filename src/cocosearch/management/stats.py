@@ -224,6 +224,8 @@ class IndexStats:
     repo_url: str | None  # Browsable HTTPS URL for the git remote origin
     branch: str | None = None  # Git branch at time of indexing
     commit_hash: str | None = None  # Git commit hash at time of indexing
+    commits_behind: int | None = None  # How many commits behind HEAD
+    branch_commit_count: int | None = None  # Total commits in branch at index time
     grammars: list[dict] = field(default_factory=list)  # Per-grammar stats
 
     def to_dict(self) -> dict:
@@ -580,7 +582,11 @@ def check_branch_staleness(index_name: str, project_path: str | None = None) -> 
         - current_branch: str | None
         - current_commit: str | None
     """
-    from cocosearch.management.git import get_current_branch, get_commit_hash
+    from cocosearch.management.git import (
+        get_current_branch,
+        get_commit_hash,
+        get_commits_behind,
+    )
 
     result = {
         "branch_changed": False,
@@ -589,6 +595,7 @@ def check_branch_staleness(index_name: str, project_path: str | None = None) -> 
         "indexed_commit": None,
         "current_branch": None,
         "current_commit": None,
+        "commits_behind": None,
     }
 
     # Get indexed branch/commit from metadata
@@ -614,6 +621,14 @@ def check_branch_staleness(index_name: str, project_path: str | None = None) -> 
 
     if result["indexed_commit"] and result["current_commit"]:
         result["commits_changed"] = result["indexed_commit"] != result["current_commit"]
+
+        # Count how many commits behind
+        if result["commits_changed"]:
+            result["commits_behind"] = get_commits_behind(
+                check_path, result["indexed_commit"]
+            )
+        else:
+            result["commits_behind"] = 0
 
     return result
 
@@ -704,8 +719,14 @@ def collect_warnings(
         indexed_commit = branch_staleness.get("indexed_commit", "")
         current_commit = branch_staleness.get("current_commit", "")
         branch = branch_staleness.get("current_branch", "unknown")
+        commits_behind = branch_staleness.get("commits_behind")
+        behind_str = (
+            f"{commits_behind} commits behind"
+            if commits_behind is not None
+            else "behind"
+        )
         warnings.append(
-            f"Index is behind on branch '{branch}': "
+            f"Index is {behind_str} on branch '{branch}': "
             f"indexed at {indexed_commit}, now at {current_commit}. "
             f"Run 'cocosearch index .' to update."
         )
@@ -861,6 +882,7 @@ def get_comprehensive_stats(
     # Get branch info from metadata
     branch = metadata.get("branch") if metadata else None
     commit_hash = metadata.get("commit_hash") if metadata else None
+    branch_commit_count = metadata.get("branch_commit_count") if metadata else None
 
     # Check branch staleness (best-effort, skip if git not available)
     branch_staleness = None
@@ -869,6 +891,11 @@ def get_comprehensive_stats(
             branch_staleness = check_branch_staleness(index_name, source_path)
         except Exception:
             pass
+
+    # Extract commits_behind from branch staleness check
+    commits_behind = (
+        branch_staleness.get("commits_behind") if branch_staleness else None
+    )
 
     # Collect warnings
     warnings = collect_warnings(
@@ -895,5 +922,7 @@ def get_comprehensive_stats(
         repo_url=repo_url,
         branch=branch,
         commit_hash=commit_hash,
+        commits_behind=commits_behind,
+        branch_commit_count=branch_commit_count,
         grammars=grammars,
     )

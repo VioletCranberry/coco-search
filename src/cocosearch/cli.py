@@ -225,10 +225,15 @@ def index_command(args: argparse.Namespace) -> int:
         )
 
     # Detect git branch/commit for metadata tracking
-    from cocosearch.management.git import get_current_branch, get_commit_hash
+    from cocosearch.management.git import (
+        get_current_branch,
+        get_commit_hash,
+        get_branch_commit_count,
+    )
 
     branch = get_current_branch(codebase_path)
     commit_hash = get_commit_hash(codebase_path)
+    branch_commit_count = get_branch_commit_count(codebase_path)
     if branch:
         branch_info = f"{branch}"
         if commit_hash:
@@ -239,7 +244,11 @@ def index_command(args: argparse.Namespace) -> int:
     try:
         ensure_metadata_table()
         register_index_path(
-            index_name, codebase_path, branch=branch, commit_hash=commit_hash
+            index_name,
+            codebase_path,
+            branch=branch,
+            commit_hash=commit_hash,
+            branch_commit_count=branch_commit_count,
         )
         set_index_status(index_name, "indexing")
     except Exception:
@@ -411,9 +420,14 @@ def search_command(args: argparse.Namespace) -> int:
                 if current_commit:
                     current_ref += f" ({current_commit})"
 
+                commits_behind = staleness.get("commits_behind")
+                behind_part = ""
+                if commits_behind is not None and commits_behind > 0:
+                    behind_part = f" {commits_behind} commits behind."
                 warning_msg = (
                     f"Index built from {indexed_ref}, "
-                    f"current branch is {current_ref}. "
+                    f"current branch is {current_ref}."
+                    f"{behind_part} "
                     f"Results may be stale."
                 )
                 console.print(
@@ -566,6 +580,29 @@ def list_command(args: argparse.Namespace) -> int:
                         branch_display = meta["branch"]
                         if meta.get("commit_hash"):
                             branch_display += f" ({meta['commit_hash']})"
+                        # Compact git status indicator (best-effort)
+                        try:
+                            from cocosearch.management.git import (
+                                get_commit_hash,
+                                get_commits_behind,
+                            )
+
+                            check_path = meta.get("canonical_path")
+                            indexed_commit = meta.get("commit_hash")
+                            if check_path and indexed_commit:
+                                current = get_commit_hash(check_path)
+                                if current and current == indexed_commit:
+                                    branch_display += " \u2713"
+                                elif current and current != indexed_commit:
+                                    behind = get_commits_behind(
+                                        check_path, indexed_commit
+                                    )
+                                    if behind is not None and behind > 0:
+                                        branch_display += f" \u2193{behind}"
+                                    else:
+                                        branch_display += " \u2193"
+                        except Exception:
+                            pass
                     status_display = (meta.get("status") or "-").title()
                 table.add_row(
                     idx["name"], idx["table_name"], branch_display, status_display
@@ -583,6 +620,29 @@ def list_command(args: argparse.Namespace) -> int:
         print(json.dumps(indexes, indent=2))
 
     return 0
+
+
+def _format_branch_display(stats) -> str:
+    """Format enriched branch display for stats output.
+
+    Returns string like:
+        main (abc1234) · up to date · 1,234 commits
+        main (abc1234) · 5 commits behind · 1,234 commits
+    """
+    parts = [stats.branch]
+    if stats.commit_hash:
+        parts[0] += f" ({stats.commit_hash})"
+
+    if stats.commits_behind is not None:
+        if stats.commits_behind == 0:
+            parts.append("up to date")
+        else:
+            parts.append(f"{stats.commits_behind} commits behind")
+
+    if stats.branch_commit_count is not None:
+        parts.append(f"{stats.branch_commit_count:,} commits")
+
+    return " · ".join(parts)
 
 
 def print_warnings(warnings: list[str], console: Console) -> None:
@@ -893,9 +953,7 @@ def stats_command(args: argparse.Namespace) -> int:
                     if stats.source_path:
                         console.print(f"[dim]Source: {stats.source_path}[/dim]")
                     if stats.branch:
-                        branch_info = stats.branch
-                        if stats.commit_hash:
-                            branch_info += f" ({stats.commit_hash})"
+                        branch_info = _format_branch_display(stats)
                         console.print(f"[dim]Branch: {branch_info}[/dim]")
                     if stats.status:
                         if stats.status == "indexing":
@@ -989,9 +1047,7 @@ def stats_command(args: argparse.Namespace) -> int:
         if stats.source_path:
             console.print(f"[dim]Source: {stats.source_path}[/dim]")
         if stats.branch:
-            branch_info = stats.branch
-            if stats.commit_hash:
-                branch_info += f" ({stats.commit_hash})"
+            branch_info = _format_branch_display(stats)
             console.print(f"[dim]Branch: {branch_info}[/dim]")
         if stats.status:
             if stats.status == "indexing":

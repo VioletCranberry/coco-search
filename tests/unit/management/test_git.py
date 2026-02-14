@@ -11,6 +11,8 @@ from cocosearch.management.git import (
     derive_index_from_git,
     get_current_branch,
     get_commit_hash,
+    get_commits_behind,
+    get_branch_commit_count,
 )
 
 
@@ -180,3 +182,95 @@ class TestGetCommitHash:
         )
         result = get_commit_hash()
         assert result == "abc1234"
+
+
+class TestGetCommitsBehind:
+    """Tests for get_commits_behind function."""
+
+    def test_returns_count(self, fp):
+        """Returns integer count of commits behind."""
+        fp.register(
+            ["git", "rev-list", "abc1234..HEAD", "--count"],
+            stdout="5\n",
+        )
+        result = get_commits_behind(from_commit="abc1234")
+        assert result == 5
+
+    def test_returns_zero_when_up_to_date(self, fp):
+        """Returns 0 when from_commit matches HEAD."""
+        fp.register(
+            ["git", "rev-list", "abc1234..HEAD", "--count"],
+            stdout="0\n",
+        )
+        result = get_commits_behind(from_commit="abc1234")
+        assert result == 0
+
+    def test_returns_none_outside_repo(self, fp):
+        """Returns None when not in a git repo."""
+        fp.register(
+            ["git", "rev-list", "abc1234..HEAD", "--count"],
+            returncode=128,
+            stderr="fatal: not a git repository",
+        )
+        result = get_commits_behind(from_commit="abc1234")
+        assert result is None
+
+    def test_uses_c_flag_with_path(self, fp):
+        """Uses -C flag when path is provided."""
+        fp.register(
+            ["git", "-C", "/my/project", "rev-list", "abc1234..HEAD", "--count"],
+            stdout="3\n",
+        )
+        result = get_commits_behind("/my/project", from_commit="abc1234")
+        assert result == 3
+
+    def test_returns_none_for_invalid_commit(self, fp):
+        """Returns None when from_commit is invalid (e.g., rebased away)."""
+        fp.register(
+            ["git", "rev-list", "deadbeef..HEAD", "--count"],
+            returncode=128,
+            stderr="fatal: bad revision 'deadbeef..HEAD'",
+        )
+        result = get_commits_behind(from_commit="deadbeef")
+        assert result is None
+
+
+class TestGetBranchCommitCount:
+    """Tests for get_branch_commit_count function."""
+
+    def test_returns_count(self, fp):
+        """Returns total commit count for branch."""
+        fp.register(
+            ["git", "rev-list", "--count", "HEAD"],
+            stdout="1234\n",
+        )
+        result = get_branch_commit_count()
+        assert result == 1234
+
+    def test_returns_none_outside_repo(self, fp):
+        """Returns None when not in a git repo."""
+        fp.register(
+            ["git", "rev-list", "--count", "HEAD"],
+            returncode=128,
+            stderr="fatal: not a git repository",
+        )
+        result = get_branch_commit_count()
+        assert result is None
+
+    def test_uses_c_flag_with_path(self, fp):
+        """Uses -C flag when path is provided."""
+        fp.register(
+            ["git", "-C", "/my/project", "rev-list", "--count", "HEAD"],
+            stdout="567\n",
+        )
+        result = get_branch_commit_count("/my/project")
+        assert result == 567
+
+    def test_strips_whitespace(self, fp):
+        """Strips trailing whitespace from output."""
+        fp.register(
+            ["git", "rev-list", "--count", "HEAD"],
+            stdout="42\n\n",
+        )
+        result = get_branch_commit_count()
+        assert result == 42

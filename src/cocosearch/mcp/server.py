@@ -45,6 +45,7 @@ from cocosearch.management import (  # noqa: E402
     register_index_path,
     set_index_status,
 )
+from cocosearch.management.git import get_current_branch, get_commit_hash  # noqa: E402
 from cocosearch.mcp.project_detection import (  # noqa: E402
     _detect_project,
     register_roots_notification,
@@ -56,6 +57,23 @@ from cocosearch.management.stats import (  # noqa: E402
 )
 from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
 from cocosearch.search.context_expander import ContextExpander  # noqa: E402
+
+
+def _register_with_git(index_name: str, project_path: str) -> None:
+    """Register index path with current git branch/commit metadata."""
+    from cocosearch.management.git import get_branch_commit_count
+
+    branch = get_current_branch(project_path)
+    commit_hash = get_commit_hash(project_path)
+    branch_commit_count = get_branch_commit_count(project_path)
+    register_index_path(
+        index_name,
+        project_path,
+        branch=branch,
+        commit_hash=commit_hash,
+        branch_commit_count=branch_commit_count,
+    )
+
 
 # Create FastMCP server instance
 mcp = FastMCP("cocosearch")
@@ -226,15 +244,36 @@ async def api_reindex(request) -> JSONResponse:
     if not index_name:
         return JSONResponse({"error": "index_name is required"}, status_code=400)
 
-    # Look up source path from metadata
+    # Look up source path from metadata, with fallbacks
     metadata = get_index_metadata(index_name)
-    if not metadata or not metadata.get("canonical_path"):
-        return JSONResponse(
-            {"error": f"Index '{index_name}' not found or has no source path"},
-            status_code=400,
-        )
+    source_path = metadata.get("canonical_path") if metadata else None
 
-    source_path = metadata["canonical_path"]
+    if not source_path:
+        # Fallback 1: source_path from request body (dashboard sends this)
+        source_path = body.get("source_path")
+
+        # Fallback 2: COCOSEARCH_PROJECT_PATH env var
+        if not source_path:
+            from cocosearch.management.context import find_project_root
+
+            env_path = os.environ.get("COCOSEARCH_PROJECT_PATH")
+            if env_path:
+                project_root, _ = find_project_root(Path(env_path))
+                if project_root:
+                    source_path = str(project_root.resolve())
+
+        if not source_path:
+            return JSONResponse(
+                {"error": f"Index '{index_name}' not found or has no source path"},
+                status_code=400,
+            )
+
+        # Auto-register metadata so future reindex calls work without fallback
+        try:
+            ensure_metadata_table()
+            _register_with_git(index_name, source_path)
+        except Exception as e:
+            logger.warning(f"Auto-registration of metadata failed: {e}")
 
     # Reject if a previous indexing thread is still alive
     with _indexing_lock:
@@ -261,7 +300,7 @@ async def api_reindex(request) -> JSONResponse:
                 config=IndexingConfig(),
                 fresh=fresh,
             )
-            register_index_path(index_name, source_path)
+            _register_with_git(index_name, source_path)
         except Exception as exc:
             failed = True
             logger.error(f"Background reindex failed: {exc}")
@@ -370,7 +409,7 @@ async def api_index(request) -> JSONResponse:
     # Register metadata before starting
     try:
         ensure_metadata_table()
-        register_index_path(index_name, project_path)
+        _register_with_git(index_name, project_path)
         set_index_status(index_name, "indexing")
     except Exception as e:
         logger.warning(f"Metadata registration failed: {e}")
@@ -384,7 +423,7 @@ async def api_index(request) -> JSONResponse:
                 codebase_path=project_path,
                 config=IndexingConfig(),
             )
-            register_index_path(index_name, project_path)
+            _register_with_git(index_name, project_path)
         except Exception as exc:
             failed = True
             logger.error(f"Background indexing failed: {exc}")
@@ -1026,7 +1065,7 @@ def index_codebase(
         # Set status to 'indexing' before starting (best-effort)
         try:
             ensure_metadata_table()
-            register_index_path(index_name, path)
+            _register_with_git(index_name, path)
             set_index_status(index_name, "indexing")
         except Exception:
             pass  # Best-effort — don't block indexing on metadata failures
@@ -1050,7 +1089,7 @@ def index_codebase(
 
         # Register path-to-index mapping (enables collision detection)
         try:
-            register_index_path(index_name, path)
+            _register_with_git(index_name, path)
         except ValueError as collision_error:
             # Collision during indexing - warn but continue (index was created)
             logger.warning(f"Path registration warning: {collision_error}")
