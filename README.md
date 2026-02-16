@@ -67,20 +67,19 @@ This project was originally built for personal use — a solo experiment in loca
 ## Quick Start
 
 ```bash
-# 1. Start infrastructure.
+# 1. Clone this repository and start infrastructure:
+git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
+# Docker volumes are bind-mounted to ./docker_data/ inside the repository,
+# so infrastructure must be started from the cloned repo directory.
 docker compose up -d
 # 2. Verify services are ready.
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch config check
 # 3. Index your project (or use WEB dashboard).
 uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index .
-# 4. Register with your AI assistant.
-claude mcp add --scope user cocosearch -- \
-  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+# 4. Register with your AI assistant (pick one):
 ```
 
-> **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
-
-Install the CocoSearch plugin (recommended):
+**Option A — Plugin (recommended):**
 
 ```bash
 claude plugin marketplace add VioletCranberry/coco-s
@@ -88,7 +87,16 @@ claude plugin install cocosearch@cocosearch
 # All 7 skills + MCP server configured automatically
 ```
 
-Or install skills manually (for development):
+**Option B — Manual MCP registration:**
+
+```bash
+claude mcp add --scope user cocosearch -- \
+  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+```
+
+> **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
+
+Install skills manually (for development):
 
 ```bash
 mkdir -p .claude/skills
