@@ -17,7 +17,11 @@ import logging
 from cocosearch.config.env_validation import get_database_url
 from cocosearch.indexer.config import IndexingConfig
 from cocosearch.indexer.preflight import check_infrastructure
-from cocosearch.indexer.embedder import code_to_embedding, extract_language
+from cocosearch.indexer.embedder import (
+    code_to_embedding,
+    extract_language,
+    add_filename_context,
+)
 from cocosearch.indexer.tsvector import text_to_tsvector_sql
 from cocosearch.handlers import get_custom_languages, extract_chunk_metadata
 from cocosearch.indexer.file_filter import build_exclude_patterns
@@ -28,6 +32,7 @@ from cocosearch.indexer.schema_migration import (
 )
 from cocosearch.indexer.parse_tracking import track_parse_results
 from cocosearch.search.cache import invalidate_index_cache
+from cocosearch.validation import validate_index_name
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +98,11 @@ def create_code_index_flow(
             # Step 4: Process each chunk
             with file["chunks"].row() as chunk:
                 # Generate embedding via Ollama using shared transform
-                chunk["embedding"] = chunk["text"].call(code_to_embedding)
+                # Prepend filename context so embeddings capture file path relevance
+                chunk["embedding_text"] = chunk["text"].transform(
+                    add_filename_context, filename=file["filename"]
+                )
+                chunk["embedding"] = chunk["embedding_text"].call(code_to_embedding)
 
                 # Extract Handler metadata (block_type, hierarchy, language_id)
                 chunk["metadata"] = chunk["text"].transform(
@@ -110,8 +119,9 @@ def create_code_index_flow(
                 # v1.7 Hybrid Search: Store chunk text and tsvector for keyword search
                 # content_text: Raw text for storage and potential future use
                 # content_tsv_input: Preprocessed text for PostgreSQL to_tsvector()
+                # Filename tokens appended so keyword search matches file paths
                 chunk["content_tsv_input"] = chunk["text"].transform(
-                    text_to_tsvector_sql
+                    text_to_tsvector_sql, filename=file["filename"]
                 )
 
                 # Collect with metadata (includes hybrid search and symbol columns)
@@ -172,6 +182,9 @@ def run_index(
     Returns:
         IndexUpdateInfo with statistics about the indexing run.
     """
+    # Validate index name before any database operations
+    validate_index_name(index_name)
+
     # Use default config if not provided
     if config is None:
         config = IndexingConfig()
@@ -217,8 +230,10 @@ def run_index(
                         f"DROP TABLE IF EXISTS cocosearch_parse_results_{index_name}"
                     )
                 conn.commit()
-        except Exception:
-            pass  # Non-critical cleanup
+        except Exception as e:
+            logger.warning(
+                f"Failed to drop parse results table for '{index_name}': {e}"
+            )
         logger.info(f"Dropped flow for index '{index_name}' (--fresh)")
 
     # Setup flow (creates tables if needed)
@@ -235,8 +250,15 @@ def run_index(
     table_name = f"codeindex_{index_name}__{index_name}_chunks"
 
     with psycopg.connect(db_url) as conn:
-        ensure_symbol_columns(conn, table_name)
+        symbol_result = ensure_symbol_columns(conn, table_name)
         ensure_parse_results_table(conn, index_name)
+
+    # Invalidate symbol columns cache after migration so searches
+    # pick up newly added columns without requiring a process restart
+    if symbol_result.get("columns_added"):
+        from cocosearch.search.db import reset_symbol_columns_cache
+
+        reset_symbol_columns_cache()
 
     # Run indexing and return statistics
     update_info = flow.update()

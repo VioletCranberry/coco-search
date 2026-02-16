@@ -18,6 +18,7 @@ from tree_sitter_language_pack import get_parser as pack_get_parser
 
 from cocosearch.indexer.symbols import LANGUAGE_MAP
 from cocosearch.handlers import get_registered_grammars
+from cocosearch.validation import validate_index_name
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +215,7 @@ def rebuild_parse_results(
         index_name: Index name.
         results: List of dicts with file_path, language, parse_status, error_message.
     """
+    validate_index_name(index_name)
     parse_table = f"cocosearch_parse_results_{index_name}"
 
     with conn.cursor() as cur:

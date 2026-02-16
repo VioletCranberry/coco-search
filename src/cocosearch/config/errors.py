@@ -11,7 +11,6 @@ VALID_FIELDS = {
     "indexing": [
         "includePatterns",
         "excludePatterns",
-        "languages",
         "chunkSize",
         "chunkOverlap",
     ],

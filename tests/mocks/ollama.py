@@ -36,31 +36,3 @@ def deterministic_embedding(text: str, dimensions: int = 768) -> list[float]:
         embedding.append(value)
 
     return embedding
-
-
-def similar_embedding(
-    base_embedding: list[float], similarity: float = 0.9
-) -> list[float]:
-    """Create an embedding that has a specific similarity to the base.
-
-    Useful for testing similarity thresholds and ranking.
-
-    Args:
-        base_embedding: The reference embedding.
-        similarity: Target cosine similarity (0-1, default 0.9).
-
-    Returns:
-        New embedding with approximately the target similarity.
-    """
-    import random
-
-    # Mix the base with noise based on similarity
-    noise_factor = 1 - similarity
-    result = []
-    for val in base_embedding:
-        noise = (random.random() * 2 - 1) * noise_factor
-        new_val = val * similarity + noise
-        # Clamp to [-1, 1]
-        result.append(max(-1, min(1, new_val)))
-
-    return result

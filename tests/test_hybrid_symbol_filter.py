@@ -46,10 +46,10 @@ class TestHybridWithSymbolFilters:
         assert "where_clause" in sig.parameters
         assert "where_params" in sig.parameters
 
-    def test_execute_vector_search_accepts_include_symbol_columns(self):
-        """Verify execute_vector_search accepts include_symbol_columns parameter."""
+    def test_execute_vector_search_no_include_symbol_columns_param(self):
+        """Verify execute_vector_search auto-detects symbol columns (no param)."""
         sig = inspect.signature(execute_vector_search)
-        assert "include_symbol_columns" in sig.parameters
+        assert "include_symbol_columns" not in sig.parameters
 
     @patch("cocosearch.search.query.get_connection_pool")
     @patch("cocosearch.search.query.check_symbol_columns_exist")

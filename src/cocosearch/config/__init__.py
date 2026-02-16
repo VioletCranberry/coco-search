@@ -2,7 +2,6 @@
 
 from .env_validation import (
     DEFAULT_DATABASE_URL,
-    check_env_or_exit,
     get_database_url,
     mask_password,
     validate_required_env_vars,
@@ -35,7 +34,6 @@ __all__ = [
     "config_key_to_env_var",
     "parse_env_value",
     "validate_required_env_vars",
-    "check_env_or_exit",
     "mask_password",
     "DEFAULT_DATABASE_URL",
     "get_database_url",

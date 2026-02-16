@@ -3,7 +3,9 @@
 Provides functions to delete indexes from the PostgreSQL database.
 """
 
+from cocosearch.exceptions import IndexNotFoundError
 from cocosearch.search.db import get_connection_pool, get_table_name
+from cocosearch.validation import validate_index_name
 
 
 def clear_index(index_name: str) -> dict:
@@ -24,6 +26,7 @@ def clear_index(index_name: str) -> dict:
         ValueError: If the index does not exist.
     """
     pool = get_connection_pool()
+    validate_index_name(index_name)
     table_name = get_table_name(index_name)
 
     # First verify the table exists
@@ -41,7 +44,7 @@ def clear_index(index_name: str) -> dict:
             (exists,) = cur.fetchone()
 
             if not exists:
-                raise ValueError(f"Index '{index_name}' not found")
+                raise IndexNotFoundError(f"Index '{index_name}' not found")
 
             # Drop the table
             # Using format string is safe here because table_name comes from

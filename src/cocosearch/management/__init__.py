@@ -7,6 +7,7 @@ and path-to-index metadata storage.
 
 from cocosearch.management.clear import clear_index
 from cocosearch.management.context import (
+    derive_index_name,
     find_project_root,
     get_canonical_path,
     resolve_index_name,
@@ -42,6 +43,7 @@ __all__ = [
     "clear_index",
     "clear_index_path",
     "derive_index_from_git",
+    "derive_index_name",
     "get_commit_hash",
     "get_current_branch",
     "ensure_metadata_table",

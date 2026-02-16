@@ -5,15 +5,18 @@ querying CocoIndex-created vector tables in PostgreSQL.
 """
 
 import logging
+import threading
 
 from pgvector.psycopg import register_vector
 from psycopg_pool import ConnectionPool
 
 from cocosearch.config.env_validation import get_database_url
+from cocosearch.validation import validate_index_name
 
 logger = logging.getLogger(__name__)
 
 _pool: ConnectionPool | None = None
+_pool_lock = threading.Lock()
 
 # Module-level cache for symbol column availability per table
 _symbol_columns_available: dict[str, bool] = {}
@@ -23,6 +26,9 @@ def get_connection_pool() -> ConnectionPool:
     """Get or create the database connection pool.
 
     Creates a singleton connection pool with pgvector type registration.
+    Uses double-checked locking to prevent duplicate pool creation under
+    concurrent access.
+
     The pool reads the database URL from COCOSEARCH_DATABASE_URL environment
     variable, falling back to the default if not set.
 
@@ -35,21 +41,23 @@ def get_connection_pool() -> ConnectionPool:
     """
     global _pool
     if _pool is None:
-        conninfo = get_database_url()
+        with _pool_lock:
+            if _pool is None:
+                conninfo = get_database_url()
 
-        def configure(conn):
-            try:
-                register_vector(conn)
-            except Exception:
-                # pgvector extension not installed yet (fresh database).
-                # Non-vector queries will still work; vector search will
-                # fail with a clear error when actually attempted.
-                pass
+                def configure(conn):
+                    try:
+                        register_vector(conn)
+                    except Exception as e:
+                        # pgvector extension not installed yet (fresh database).
+                        # Non-vector queries will still work; vector search will
+                        # fail with a clear error when actually attempted.
+                        logger.debug(f"pgvector registration skipped: {e}")
 
-        _pool = ConnectionPool(
-            conninfo=conninfo,
-            configure=configure,
-        )
+                _pool = ConnectionPool(
+                    conninfo=conninfo,
+                    configure=configure,
+                )
     return _pool
 
 
@@ -61,12 +69,18 @@ def get_table_name(index_name: str) -> str:
     Target name: {index_name}_chunks
     Result: codeindex_{index_name}__{index_name}_chunks
 
+    Validates index_name to prevent SQL injection via dynamic table names.
+
     Args:
         index_name: The name of the search index.
 
     Returns:
         PostgreSQL table name following CocoIndex convention.
+
+    Raises:
+        ValueError: If index_name contains invalid characters.
     """
+    validate_index_name(index_name)
     # CocoIndex lowercases flow names
     flow_name = f"codeindex_{index_name}"
     target_name = f"{index_name}_chunks"

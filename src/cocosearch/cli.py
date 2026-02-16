@@ -100,54 +100,18 @@ def _resolve_index_name(
 def derive_index_name(path: str) -> str:
     """Derive an index name from a directory path.
 
-    Converts a path to a sanitized index name by:
-    1. Converting to absolute path
-    2. Extracting the last directory component
-    3. Converting to lowercase
-    4. Replacing non-alphanumeric characters with underscores
+    Thin wrapper around management.context.derive_index_name for backward
+    compatibility. New code should import from cocosearch.management.context.
 
     Args:
         path: Path to derive name from.
 
     Returns:
         Sanitized index name suitable for database table names.
-
-    Examples:
-        >>> derive_index_name("/home/user/MyProject")
-        'myproject'
-        >>> derive_index_name("/tmp/test-repo/")
-        'test_repo'
     """
-    # Convert to absolute and resolve any symlinks
-    abs_path = os.path.abspath(path)
+    from cocosearch.management.context import derive_index_name as _derive
 
-    # Remove trailing slashes
-    abs_path = abs_path.rstrip(os.sep)
-
-    # Handle root path edge case
-    if not abs_path or abs_path == os.sep:
-        return "root"
-
-    # Get the last component (directory name)
-    name = os.path.basename(abs_path)
-
-    # Lowercase
-    name = name.lower()
-
-    # Replace non-alphanumeric with underscore
-    name = re.sub(r"[^a-z0-9]", "_", name)
-
-    # Collapse multiple underscores
-    name = re.sub(r"_+", "_", name)
-
-    # Remove leading/trailing underscores
-    name = name.strip("_")
-
-    # Handle empty result
-    if not name:
-        return "index"
-
-    return name
+    return _derive(path)
 
 
 def index_command(args: argparse.Namespace) -> int:

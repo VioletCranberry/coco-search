@@ -11,7 +11,9 @@ from cocosearch.management.metadata import (
     auto_recover_stale_indexing,
     get_index_metadata,
 )
+from cocosearch.exceptions import IndexNotFoundError
 from cocosearch.search.db import get_connection_pool, get_table_name
+from cocosearch.validation import validate_index_name
 
 
 def format_bytes(size: int) -> str:
@@ -68,7 +70,7 @@ def get_stats(index_name: str) -> dict:
             (exists,) = cur.fetchone()
 
             if not exists:
-                raise ValueError(f"Index '{index_name}' not found")
+                raise IndexNotFoundError(f"Index '{index_name}' not found")
 
             # Get file count and chunk count
             stats_query = f"""
@@ -133,7 +135,7 @@ def get_language_stats(index_name: str) -> list[dict]:
             (exists,) = cur.fetchone()
 
             if not exists:
-                raise ValueError(f"Index '{index_name}' not found")
+                raise IndexNotFoundError(f"Index '{index_name}' not found")
 
             # Check if content_text column exists (v1.7+)
             col_check = """
@@ -373,6 +375,7 @@ def get_parse_stats(index_name: str) -> dict:
         Empty dict {} if parse_results table does not exist.
     """
     pool = get_connection_pool()
+    validate_index_name(index_name)
     table_name = f"cocosearch_parse_results_{index_name}"
 
     # Check if parse_results table exists (pre-v46 indexes won't have it)
@@ -459,6 +462,7 @@ def get_parse_failures(
         status_filter = ["partial", "error", "no_grammar"]
 
     pool = get_connection_pool()
+    validate_index_name(index_name)
     table_name = f"cocosearch_parse_results_{index_name}"
 
     # Grammar-handled and no-grammar languages should not appear in parse
@@ -738,31 +742,9 @@ def collect_warnings(
         else:
             warnings.append(f"Index is stale ({staleness_days} days since last update)")
 
-    # Check for files with zero chunks
-    pool = get_connection_pool()
-    table_name = get_table_name(index_name)
-
-    with pool.connection() as conn:
-        with conn.cursor() as cur:
-            # Count distinct files
-            file_count_query = f"""
-                SELECT COUNT(DISTINCT filename) FROM {table_name}
-            """
-            cur.execute(file_count_query)
-            cur.fetchone()[0]
-
-            # Count files with at least one chunk
-            files_with_chunks_query = f"""
-                SELECT COUNT(DISTINCT filename)
-                FROM {table_name}
-                WHERE 1=1
-            """
-            cur.execute(files_with_chunks_query)
-            cur.fetchone()[0]
-
-            # If there's a discrepancy, it would show in the metadata
-            # For now, we skip this check as it requires joining with metadata
-            # which may not exist for all indexes
+    # Note: Zero-chunk file detection was removed — the two queries
+    # (COUNT(DISTINCT filename) with and without WHERE 1=1) were
+    # identical and the results were never used.
 
     return warnings
 

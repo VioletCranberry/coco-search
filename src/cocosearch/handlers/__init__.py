@@ -29,23 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
-class ChunkConfig:
-    """Configuration for chunking operation."""
-
-    chunk_size: int
-    chunk_overlap: int
-
-
-@dataclasses.dataclass
-class Chunk:
-    """A chunk produced by a handler."""
-
-    text: str
-    location: dict
-    metadata: dict
-
-
-@dataclasses.dataclass
 class ChunkMetadata:
     """Metadata extracted from a code chunk."""
 
@@ -375,10 +358,6 @@ def extract_chunk_metadata(text: str, language_id: str) -> ChunkMetadata:
 
 
 __all__ = [
-    "LanguageHandler",
-    "GrammarHandler",
-    "ChunkConfig",
-    "Chunk",
     "ChunkMetadata",
     "get_handler",
     "get_grammar_handler",

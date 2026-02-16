@@ -10,6 +10,7 @@ Cache is in-memory for the session and invalidates on reindex.
 import hashlib
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -22,9 +23,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/cocosearch/queries")
 
 # Cache settings
-CACHE_SIZE_LIMIT = 1_000_000_000  # 1GB
+MAX_CACHE_ENTRIES = 500  # Max entries before LRU eviction
+MAX_SEMANTIC_SCAN = 50  # Max entries to scan for semantic similarity (O(n) search)
 DEFAULT_TTL = 86400  # 24 hours
-SEMANTIC_THRESHOLD = 0.95  # Cosine similarity threshold for semantic cache hits
+SEMANTIC_THRESHOLD = 0.92  # Cosine similarity threshold for semantic cache hits
 
 
 @dataclass
@@ -136,6 +138,7 @@ class QueryCache:
         self.cache_dir = cache_dir
         self.ttl = ttl
         self.semantic_threshold = semantic_threshold
+        self._lock = threading.Lock()
 
         # In-memory cache for fast access (session-scoped)
         # Key: cache_key, Value: CacheEntry
@@ -190,33 +193,36 @@ class QueryCache:
             symbol_name,
         )
 
-        # Level 1: Exact match
-        if cache_key in self._cache:
-            entry = self._cache[cache_key]
-            # Check TTL
-            if time.time() - entry.timestamp < self.ttl:
-                logger.debug(f"Cache hit (exact): {cache_key[:16]}...")
-                return entry.results, "exact"
-            else:
-                # Expired - remove from cache
-                del self._cache[cache_key]
-                self._remove_from_embedding_index(index_name, cache_key)
+        with self._lock:
+            # Level 1: Exact match
+            if cache_key in self._cache:
+                entry = self._cache[cache_key]
+                # Check TTL
+                if time.time() - entry.timestamp < self.ttl:
+                    logger.debug(f"Cache hit (exact): {cache_key[:16]}...")
+                    return entry.results, "exact"
+                else:
+                    # Expired - remove from cache
+                    del self._cache[cache_key]
+                    self._remove_from_embedding_index(index_name, cache_key)
 
-        # Level 2: Semantic match (only if we have embedding)
-        if query_embedding and index_name in self._embedding_index:
-            for key, cached_embedding in self._embedding_index[index_name]:
-                if key in self._cache:
-                    entry = self._cache[key]
-                    # Check TTL
-                    if time.time() - entry.timestamp >= self.ttl:
-                        continue
+            # Level 2: Semantic match (only if we have embedding)
+            # Scan only the most recent entries to bound O(n) cost
+            if query_embedding and index_name in self._embedding_index:
+                entries = self._embedding_index[index_name]
+                for key, cached_embedding in entries[-MAX_SEMANTIC_SCAN:]:
+                    if key in self._cache:
+                        entry = self._cache[key]
+                        # Check TTL
+                        if time.time() - entry.timestamp >= self.ttl:
+                            continue
 
-                    sim = cosine_similarity(query_embedding, cached_embedding)
-                    if sim >= self.semantic_threshold:
-                        logger.debug(
-                            f"Cache hit (semantic, sim={sim:.3f}): {key[:16]}..."
-                        )
-                        return entry.results, "semantic"
+                        sim = cosine_similarity(query_embedding, cached_embedding)
+                        if sim >= self.semantic_threshold:
+                            logger.debug(
+                                f"Cache hit (semantic, sim={sim:.3f}): {key[:16]}..."
+                            )
+                            return entry.results, "semantic"
 
         return None, "miss"
 
@@ -265,13 +271,18 @@ class QueryCache:
             index_name=index_name,
         )
 
-        self._cache[cache_key] = entry
+        with self._lock:
+            self._cache[cache_key] = entry
 
-        # Add to embedding index if we have embedding
-        if query_embedding:
-            if index_name not in self._embedding_index:
-                self._embedding_index[index_name] = []
-            self._embedding_index[index_name].append((cache_key, query_embedding))
+            # Add to embedding index if we have embedding
+            if query_embedding:
+                if index_name not in self._embedding_index:
+                    self._embedding_index[index_name] = []
+                self._embedding_index[index_name].append((cache_key, query_embedding))
+
+            # LRU eviction: remove oldest entries when cache exceeds limit
+            if len(self._cache) > MAX_CACHE_ENTRIES:
+                self._evict_oldest()
 
         logger.debug(f"Cache put: {cache_key[:16]}...")
 
@@ -286,36 +297,61 @@ class QueryCache:
         Returns:
             Number of entries removed.
         """
-        removed = 0
+        with self._lock:
+            removed = 0
 
-        # Remove from main cache
-        keys_to_remove = [
-            key for key, entry in self._cache.items() if entry.index_name == index_name
-        ]
-        for key in keys_to_remove:
-            del self._cache[key]
-            removed += 1
+            # Remove from main cache
+            keys_to_remove = [
+                key
+                for key, entry in self._cache.items()
+                if entry.index_name == index_name
+            ]
+            for key in keys_to_remove:
+                del self._cache[key]
+                removed += 1
 
-        # Remove from embedding index
-        if index_name in self._embedding_index:
-            del self._embedding_index[index_name]
+            # Remove from embedding index
+            if index_name in self._embedding_index:
+                del self._embedding_index[index_name]
 
         logger.info(
             f"Cache invalidated for index '{index_name}': {removed} entries removed"
         )
         return removed
 
+    def _evict_oldest(self) -> None:
+        """Evict oldest cache entries to stay within MAX_CACHE_ENTRIES.
+
+        Must be called while holding self._lock.
+        """
+        entries_to_remove = len(self._cache) - MAX_CACHE_ENTRIES
+        if entries_to_remove <= 0:
+            return
+
+        # Sort by timestamp ascending (oldest first)
+        sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k].timestamp)
+        for key in sorted_keys[:entries_to_remove]:
+            entry = self._cache.pop(key)
+            self._remove_from_embedding_index(entry.index_name, key)
+
     def _remove_from_embedding_index(self, index_name: str, cache_key: str) -> None:
-        """Remove a single entry from the embedding index."""
+        """Remove a single entry from the embedding index.
+
+        Deletes the key entirely when the list becomes empty to prevent
+        accumulating empty lists over time.
+        """
         if index_name in self._embedding_index:
             self._embedding_index[index_name] = [
                 (k, e) for k, e in self._embedding_index[index_name] if k != cache_key
             ]
+            if not self._embedding_index[index_name]:
+                del self._embedding_index[index_name]
 
     def clear(self) -> None:
         """Clear all cached entries."""
-        self._cache.clear()
-        self._embedding_index.clear()
+        with self._lock:
+            self._cache.clear()
+            self._embedding_index.clear()
         logger.info("Cache cleared")
 
 

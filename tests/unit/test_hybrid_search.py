@@ -261,10 +261,14 @@ class TestHybridSearch:
                         return_value=False,
                     ):
                         with patch(
-                            "cocosearch.search.hybrid.code_to_embedding"
-                        ) as mock_embed:
-                            mock_embed.eval.return_value = [0.1] * 1024
-                            results = hybrid_search("test query", "test_index")
+                            "cocosearch.search.hybrid.check_symbol_columns_exist",
+                            return_value=False,
+                        ):
+                            with patch(
+                                "cocosearch.search.hybrid.code_to_embedding"
+                            ) as mock_embed:
+                                mock_embed.eval.return_value = [0.1] * 1024
+                                results = hybrid_search("test query", "test_index")
 
         assert len(results) == 1
         assert results[0].match_type == "semantic"
@@ -301,10 +305,14 @@ class TestHybridSearch:
                         return_value=True,
                     ):
                         with patch(
-                            "cocosearch.search.hybrid.code_to_embedding"
-                        ) as mock_embed:
-                            mock_embed.eval.return_value = [0.1] * 1024
-                            results = hybrid_search("getUserById", "test_index")
+                            "cocosearch.search.hybrid.check_symbol_columns_exist",
+                            return_value=False,
+                        ):
+                            with patch(
+                                "cocosearch.search.hybrid.code_to_embedding"
+                            ) as mock_embed:
+                                mock_embed.eval.return_value = [0.1] * 1024
+                                results = hybrid_search("getUserById", "test_index")
 
         # Should have results from both sources
         assert len(results) >= 1
@@ -328,10 +336,14 @@ class TestHybridSearch:
                         return_value=False,
                     ):
                         with patch(
-                            "cocosearch.search.hybrid.code_to_embedding"
-                        ) as mock_embed:
-                            mock_embed.eval.return_value = [0.1] * 1024
-                            results = hybrid_search("test", "test_index", limit=5)
+                            "cocosearch.search.hybrid.check_symbol_columns_exist",
+                            return_value=False,
+                        ):
+                            with patch(
+                                "cocosearch.search.hybrid.code_to_embedding"
+                            ) as mock_embed:
+                                mock_embed.eval.return_value = [0.1] * 1024
+                                results = hybrid_search("test", "test_index", limit=5)
 
         assert len(results) <= 5
 

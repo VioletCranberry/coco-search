@@ -219,16 +219,16 @@ class TestConfigResolver:
         config = CocoSearchConfig()
         resolver = ConfigResolver(config)
 
-        monkeypatch.setenv("COCOSEARCH_INDEXING_LANGUAGES", '["rust", "python"]')
+        monkeypatch.setenv("COCOSEARCH_INDEXING_INCLUDE_PATTERNS", '["*.rs", "*.py"]')
 
         value, source = resolver.resolve(
-            "indexing.languages",
+            "indexing.includePatterns",
             cli_value=None,
-            env_var="COCOSEARCH_INDEXING_LANGUAGES",
+            env_var="COCOSEARCH_INDEXING_INCLUDE_PATTERNS",
         )
 
-        assert value == ["rust", "python"]
-        assert source == "env:COCOSEARCH_INDEXING_LANGUAGES"
+        assert value == ["*.rs", "*.py"]
+        assert source == "env:COCOSEARCH_INDEXING_INCLUDE_PATTERNS"
 
     def test_float_field_from_env(self, monkeypatch):
         """Test float field parsing from environment."""
@@ -280,10 +280,9 @@ class TestConfigResolver:
         assert "indexing.chunkOverlap" in paths
         assert "indexing.includePatterns" in paths
         assert "indexing.excludePatterns" in paths
-        assert "indexing.languages" in paths
         assert "search.resultLimit" in paths
         assert "search.minScore" in paths
         assert "embedding.model" in paths
 
-        # Should have at least these 9 fields
-        assert len(paths) >= 9
+        # Should have at least these 8 fields
+        assert len(paths) >= 8

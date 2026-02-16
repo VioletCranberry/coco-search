@@ -11,6 +11,8 @@ from typing import Any
 
 import psycopg
 
+from cocosearch.validation import validate_index_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -230,6 +232,7 @@ def ensure_parse_results_table(
     Returns:
         Dict with migration result: {"table_created": table_name}
     """
+    validate_index_name(index_name)
     table_name = f"cocosearch_parse_results_{index_name}"
 
     with conn.cursor() as cur:

@@ -2,6 +2,7 @@
 
 from cocosearch.indexer.tsvector import (
     split_code_identifier,
+    extract_filename_tokens,
     preprocess_code_for_tsvector,
     text_to_tsvector_sql,
 )
@@ -93,6 +94,61 @@ class TestPreprocessCodeForTsvector:
         assert isinstance(result, str)
 
 
+class TestExtractFilenameTokens:
+    """Tests for extract_filename_tokens function."""
+
+    def test_github_workflow_path(self):
+        """Extracts tokens from GitHub Actions workflow path."""
+        result = extract_filename_tokens(".github/workflows/release.yaml")
+        assert "github" in result
+        assert "workflows" in result
+        assert "release" in result
+        assert "yaml" in result
+
+    def test_nested_path(self):
+        """Extracts tokens from nested source path."""
+        result = extract_filename_tokens("src/cocosearch/indexer/flow.py")
+        assert "src" in result
+        assert "cocosearch" in result
+        assert "indexer" in result
+        assert "flow" in result
+        assert "py" in result
+
+    def test_camel_case_component(self):
+        """Splits camelCase path components."""
+        result = extract_filename_tokens("src/myModule.js")
+        assert "my" in result
+        assert "module" in result
+
+    def test_snake_case_component(self):
+        """Splits snake_case path components."""
+        result = extract_filename_tokens("src/my_module.py")
+        assert "my" in result
+        assert "module" in result
+
+    def test_kebab_case_component(self):
+        """Splits kebab-case path components."""
+        result = extract_filename_tokens("src/my-component.tsx")
+        assert "my" in result
+        assert "component" in result
+
+    def test_empty_filename(self):
+        """Returns empty string for empty input."""
+        assert extract_filename_tokens("") == ""
+
+    def test_leading_dots_stripped(self):
+        """Strips leading dots from path components."""
+        result = extract_filename_tokens(".github/workflows/ci.yml")
+        assert "github" in result
+        # Should not contain a bare dot token
+        assert "." not in result.split()
+
+    def test_simple_filename(self):
+        """Handles simple filename without path."""
+        result = extract_filename_tokens("Dockerfile")
+        assert "dockerfile" in result
+
+
 class TestTextToTsvectorSql:
     """Tests for text_to_tsvector_sql function."""
 
@@ -105,3 +161,17 @@ class TestTextToTsvectorSql:
         assert len(result) > 0
         # Should contain searchable tokens
         assert "hello" in result.lower() or "world" in result.lower()
+
+    def test_with_filename_appends_tokens(self):
+        """Filename tokens are appended to content tokens."""
+        code = "name: Deploy"
+        result = text_to_tsvector_sql(code, filename=".github/workflows/release.yaml")
+        assert "release" in result
+        assert "workflows" in result
+
+    def test_without_filename_unchanged(self):
+        """Without filename, output matches content-only preprocessing."""
+        code = "def hello(): pass"
+        result_no_file = text_to_tsvector_sql(code)
+        result_empty = text_to_tsvector_sql(code, filename="")
+        assert result_no_file == result_empty

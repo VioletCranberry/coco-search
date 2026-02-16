@@ -18,6 +18,7 @@ from cocosearch.search.db import (
 from cocosearch.search.filters import build_symbol_where_clause
 from cocosearch.search.hybrid import hybrid_search as execute_hybrid_search
 from cocosearch.search.query_analyzer import has_identifier_pattern
+from cocosearch.validation import validate_query
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,9 @@ def search(
     """
     global _has_content_text_column, _hybrid_warning_emitted
 
+    # Validate query input
+    query = validate_query(query)
+
     # Check cache first (exact match only at this point, semantic check after embedding)
     if not no_cache:
         cache = get_query_cache()
@@ -251,14 +255,15 @@ def search(
     table_name = get_table_name(index_name)
 
     # Validate symbol filter (requires v1.7+ index with symbol columns)
-    include_symbol_columns = False
     if symbol_type is not None or symbol_name is not None:
         if not check_symbol_columns_exist(table_name):
             raise ValueError(
                 f"Symbol filtering requires v1.7+ index. Index '{index_name}' lacks symbol columns. "
                 "Re-index with 'cocosearch index' to enable symbol filtering."
             )
-        include_symbol_columns = True
+
+    # Always include symbol columns when available (used by definition boost)
+    include_symbol_columns = check_symbol_columns_exist(table_name)
 
     # Check for hybrid search capability (content_text column) on first call
     if _has_content_text_column and not _hybrid_warning_emitted:
@@ -299,7 +304,9 @@ def search(
             limit,
             symbol_type=symbol_type,
             symbol_name=symbol_name,
-            language_filter=language_filter,
+            language_filter=",".join(validated_languages)
+            if validated_languages
+            else language_filter,
         )
 
         # Convert HybridSearchResult to SearchResult, applying min_score filter
@@ -376,7 +383,7 @@ def search(
             where_parts.append(f"({' OR '.join(lang_conditions)})")
 
     # Build WHERE clause for symbol filter (combines with language filter via AND)
-    if include_symbol_columns:
+    if symbol_type is not None or symbol_name is not None:
         symbol_where, symbol_params = build_symbol_where_clause(
             symbol_type, symbol_name
         )

@@ -28,6 +28,8 @@ The overlap exists so that context isn't lost at boundaries. If a function strad
 
 This is where the magic happens. Each chunk gets fed to an embedding model ([nomic-embed-text](https://ollama.com/library/nomic-embed-text), running locally via Ollama) that converts the text into a list of 768 numbers — a **vector**.
 
+Before embedding, CocoSearch prepends the file path to the chunk text (e.g., `"File: .github/workflows/release.yaml\n<chunk text>"`). This gives the model context about *where* the code lives, so searching "release flow" can surface `release.yaml` even if the chunk text itself doesn't say "release". The filename prefix is only used for generating the embedding — the stored text stays clean.
+
 What do these numbers mean? They're a compressed representation of the chunk's *meaning*. Two chunks that do similar things will produce similar vectors, even if the code looks completely different. A Python function that validates emails and a Go function that validates emails will end up with vectors that are close together in this 768-dimensional space.
 
 You don't need to understand the math. The key insight is: **similar code = similar numbers**.
@@ -36,7 +38,7 @@ You don't need to understand the math. The key insight is: **similar code = simi
 
 Vectors are great for "find code that *means* something like this," but sometimes you know the exact function name — `getUserById` — and you just want a direct match.
 
-For this, CocoSearch also prepares each chunk for PostgreSQL's full-text search. It splits camelCase and snake_case identifiers into individual words (`getUserById` becomes `get`, `user`, `by`, `id` — plus the original `getuserbyid`), then stores these as a tsvector. Think of it as building a keyword index alongside the semantic one.
+For this, CocoSearch also prepares each chunk for PostgreSQL's full-text search. It splits camelCase and snake_case identifiers into individual words (`getUserById` becomes `get`, `user`, `by`, `id` — plus the original `getuserbyid`), then appends tokens extracted from the file path (`.github/workflows/release.yaml` → `github`, `workflows`, `release`, `yaml`). All of this is stored as a tsvector. Think of it as building a keyword index alongside the semantic one — one that knows about both code content and file names.
 
 ### 5. Extract metadata
 

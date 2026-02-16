@@ -5,11 +5,8 @@ helpful error messages.
 """
 
 import os
-import sys
 from typing import NamedTuple
 from urllib.parse import urlparse, urlunparse
-
-from rich.console import Console
 
 
 DEFAULT_DATABASE_URL = "postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
@@ -53,21 +50,6 @@ def validate_required_env_vars() -> list[EnvVarError]:
     # COCOSEARCH_OLLAMA_URL is optional (has default), so don't validate it
 
     return errors
-
-
-def check_env_or_exit(console: Console) -> None:
-    """Check required environment variables and exit if any are missing.
-
-    Args:
-        console: Rich console for formatted output.
-    """
-    errors = validate_required_env_vars()
-    if errors:
-        console.print("[bold red]Environment configuration errors:[/bold red]")
-        for error in errors:
-            console.print(f"  - {error.hint}")
-        console.print("[dim]Run 'cocosearch config check' for details.[/dim]")
-        sys.exit(1)
 
 
 def mask_password(url: str) -> str:

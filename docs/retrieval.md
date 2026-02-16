@@ -67,13 +67,15 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 **What It Does:** Converts each code chunk into a numerical vector representation for semantic search.
 
 **How It Works:**
-- Sends chunk text to Ollama API with model `nomic-embed-text`
+- Before embedding, the file path is prepended to the chunk text as context (e.g., `"File: .github/workflows/release.yaml\n<chunk text>"`) — this helps the embedding model capture filename relevance, so queries like "release flow" can match files named `release.yaml` even if the chunk text doesn't mention "release"
+- The enriched text is sent to Ollama API with model `nomic-embed-text`
 - Receives 768-dimensional float vector (embedding)
 - Uses CocoIndex's shared transform — embedding function evaluated once and reused across all chunks in the flow
-- Same embedding function used during search queries to ensure consistency
+- The filename prefix is only used for embedding input — the stored `content_text` column retains the raw chunk text
+- Same embedding function used during search queries to ensure consistency (search queries are NOT prefixed with filenames — intentional asymmetry: document embeddings are enriched, queries stay natural)
 - Ollama server address configured via `COCOSEARCH_OLLAMA_URL` environment variable (defaults to http://localhost:11434)
 
-**Implementation:** `src/cocosearch/indexer/embedder.py` — `code_to_embedding`
+**Implementation:** `src/cocosearch/indexer/embedder.py` — `add_filename_context`, `code_to_embedding`
 
 ### 5. Metadata Extraction
 
@@ -109,11 +111,14 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
   - `getUserById` → `"get user by id getuserbyid"` (both split tokens AND original preserved)
   - `user_repository` → `"user repository user_repository"`
   - `HttpClient` → `"http client httpclient"`
+- Filename tokens are appended to the preprocessed text so keyword search matches file paths:
+  - `.github/workflows/release.yaml` → `"github workflows release yaml"` (leading dots stripped, split on `/`, `.`, `_`, `-`, camelCase handled)
+  - This ensures a search for "release" matches chunks from `release.yaml` even if the chunk text doesn't contain that word
 - PostgreSQL generates `content_tsv` tsvector column using `to_tsvector('simple', content_tsv_input)`
 - 'simple' configuration means no stemming (preserves exact code tokens)
 - GIN index created on `content_tsv` column for fast keyword search
 
-**Implementation:** `src/cocosearch/indexer/tsvector.py` — `text_to_tsvector_sql()`
+**Implementation:** `src/cocosearch/indexer/tsvector.py` — `extract_filename_tokens()`, `text_to_tsvector_sql()`
 
 ### 7. Storage
 
@@ -323,19 +328,16 @@ The result in both lists scores nearly **2x higher**, naturally boosting double-
 
 **How It Works:**
 - Applied AFTER RRF fusion to preserve rank-based algorithm semantics
-- Heuristic: Checks if chunk content starts with definition keywords:
-  - Python: `def`, `class`, `async def`
-  - JavaScript/TypeScript: `function`, `const`, `let`, `var`, `interface`, `type`
-  - Go: `func`, `type`
-  - Rust: `fn`, `struct`, `trait`, `enum`, `impl`
+- Uses `symbol_type` metadata from tree-sitter extraction to identify definitions
+- A chunk is a definition if `symbol_type is not None` (e.g., "function", "class", "method", "interface")
+- No file I/O required — symbol metadata is already in the database from the indexing pipeline
 - **Boost multiplier: 2.0x** (doubles the RRF score for definition chunks)
 - Re-sorts results after boost application
 - Requires v1.7+ index with symbol columns (skipped gracefully if unavailable)
-- Reads chunk content from disk to check for definition keywords
 
 **Rationale:** When searching for `UserService`, users typically want the class definition, not every file that imports it. Definition boost ensures definitions rank higher than usage sites.
 
-**Implementation:** `src/cocosearch/search/hybrid.py` — `apply_definition_boost()`, lines 442-519
+**Implementation:** `src/cocosearch/search/hybrid.py` — `apply_definition_boost()`
 
 ### 8. Score Filtering and Result Assembly
 

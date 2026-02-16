@@ -29,8 +29,6 @@ def reset_search_module_state():
         yield
 
     # Reset all module-level flags after test
-    query_module._has_metadata_columns = True
-    query_module._metadata_warning_emitted = False
     query_module._has_content_text_column = True
     query_module._hybrid_warning_emitted = False
 
@@ -65,34 +63,3 @@ def mock_db_pool():
         return pool, cursor, conn
 
     return _make_pool
-
-
-@pytest.fixture
-def patched_db_pool(mock_db_pool):
-    """Fixture that auto-patches get_connection_pool.
-
-    Patches cocosearch.search.db.get_connection_pool to return a mock pool.
-    Returns (pool, cursor, conn) for test assertions.
-
-    Usage:
-        def test_search(patched_db_pool):
-            pool, cursor, conn = patched_db_pool
-            # Now any code calling get_connection_pool() gets the mock
-    """
-    pool, cursor, conn = mock_db_pool()
-    with patch("cocosearch.search.db.get_connection_pool", return_value=pool):
-        yield pool, cursor, conn
-
-
-@pytest.fixture
-def mock_search_results():
-    """Sample search results for testing.
-
-    Returns a list of tuples in the format returned by search queries:
-    (filename, start_byte, end_byte, score)
-    """
-    return [
-        ("/path/to/main.py", 0, 150, 0.92),
-        ("/path/to/utils.py", 50, 200, 0.85),
-        ("/path/to/config.py", 100, 250, 0.78),
-    ]

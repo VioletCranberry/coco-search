@@ -46,7 +46,7 @@ uv run cocosearch search "config file discovery" --pretty
 
 ### MCP Server (Local Development)
 
-The repo includes a `.mcp.json` at the project root. Claude Code automatically picks it up — no manual configuration needed. Just make sure Docker containers are running (`docker compose up -d`) and restart Claude Code.
+Just make sure Docker containers are running (`docker compose up -d`).
 
 To run the MCP server manually (e.g., for debugging):
 

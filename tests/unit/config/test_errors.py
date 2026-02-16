@@ -24,7 +24,6 @@ class TestSuggestFieldName:
         assert suggest_field_name("chunkOverlap", "indexing") == "chunkOverlap"
         assert suggest_field_name("includePattern", "indexing") == "includePatterns"
         assert suggest_field_name("excludePattern", "indexing") == "excludePatterns"
-        assert suggest_field_name("language", "indexing") == "languages"
 
     def test_suggest_field_name_finds_close_match_search(self):
         """Test that close matches are found for search section fields."""

@@ -436,9 +436,14 @@ class TestEmptyDatabase:
 
     def test_index_stats_returns_error_on_init_failure(self):
         """index_stats returns error dict when cocoindex.init() fails."""
-        with patch(
-            "cocoindex.init",
-            side_effect=Exception('relation "cocoindex_setup_metadata" does not exist'),
+        with (
+            patch("cocosearch.mcp.server._cocoindex_initialized", False),
+            patch(
+                "cocoindex.init",
+                side_effect=Exception(
+                    'relation "cocoindex_setup_metadata" does not exist'
+                ),
+            ),
         ):
             result = index_stats()
 
@@ -458,22 +463,25 @@ class TestEmptyDatabase:
             ]
         )
 
-        with patch(
-            "cocosearch.management.discovery.get_connection_pool", return_value=pool
-        ):
-            with patch(
+        with (
+            patch("cocosearch.mcp.server._cocoindex_initialized", False),
+            patch(
+                "cocosearch.management.discovery.get_connection_pool", return_value=pool
+            ),
+            patch(
                 "cocosearch.management.metadata.get_connection_pool", return_value=pool
-            ):
-                with patch(
-                    "cocoindex.init",
-                    side_effect=Exception("cocoindex_setup_metadata does not exist"),
-                ):
-                    result = await search_code(
-                        query="test",
-                        ctx=_make_mock_ctx(),
-                        index_name="test",
-                        limit=5,
-                    )
+            ),
+            patch(
+                "cocoindex.init",
+                side_effect=Exception("cocoindex_setup_metadata does not exist"),
+            ),
+        ):
+            result = await search_code(
+                query="test",
+                ctx=_make_mock_ctx(),
+                index_name="test",
+                limit=5,
+            )
 
         assert isinstance(result, list)
         assert len(result) == 1

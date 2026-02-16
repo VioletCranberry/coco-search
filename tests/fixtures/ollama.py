@@ -31,17 +31,3 @@ def mock_code_to_embedding():
         # Also patch in search.query where it's imported
         with patch("cocosearch.search.query.code_to_embedding", mock):
             yield mock
-
-
-@pytest.fixture
-def embedding_for():
-    """Factory fixture that returns deterministic embeddings for given text.
-
-    Useful when you need to get the same embedding used by mocked functions.
-
-    Usage:
-        def test_something(embedding_for):
-            query_embedding = embedding_for("search query")
-            # This is the same embedding that mock_code_to_embedding would return
-    """
-    return deterministic_embedding

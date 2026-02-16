@@ -24,11 +24,6 @@ indexing: {}
   #   - "*_test.py"
   #   - "*.min.js"
 
-  # Languages to index (empty = all supported languages)
-  # languages:
-  #   - python
-  #   - typescript
-
   # Chunk settings
   # chunkSize: 1000
   # chunkOverlap: 300

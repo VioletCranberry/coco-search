@@ -29,9 +29,9 @@ The indexing pipeline transforms a codebase into searchable vector embeddings:
 1. **File Discovery:** Read codebase files respecting `.gitignore` patterns and configured include/exclude filters
 2. **Language Detection:** Identify language from grammar handlers (path + content matching), filename patterns (Dockerfile), or file extension. Grammar match takes priority over extension.
 3. **Semantic Chunking:** `SplitRecursively` routes to Tree-sitter (built-in languages), custom handler regex separators (HCL, Dockerfile, Bash, grammars), or plain-text splitting (everything else). Default: 1000 bytes, 300 overlap.
-4. **Embedding Generation:** Ollama's `nomic-embed-text` model converts each chunk to a 768-dimensional vector
+4. **Embedding Generation:** File path prepended to chunk text for context, then Ollama's `nomic-embed-text` model converts each chunk to a 768-dimensional vector
 5. **Metadata Extraction:** Extract DevOps block types (pipeline, job, stage), symbol information (function/class/method names, signatures), and language identifiers
-6. **Text Preprocessing:** Generate tsvector representation for full-text search capabilities
+6. **Text Preprocessing:** Generate tsvector representation for full-text search, including filename-derived tokens for path-aware keyword matching
 7. **Storage:** Insert chunks into PostgreSQL with vector index (cosine distance) and GIN index (tsvector)
 8. **Parse Tracking:** After indexing completes, parse results are recorded per file (ok, partial, error, no_grammar). This non-fatal tracking provides observability into tree-sitter parse health.
 

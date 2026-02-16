@@ -52,6 +52,43 @@ def split_code_identifier(identifier: str) -> list[str]:
     return tokens
 
 
+def extract_filename_tokens(filename: str) -> str:
+    """Extract searchable tokens from a file path.
+
+    Splits path components on /, ., _, - and applies camelCase splitting.
+    Leading dots are stripped from components.
+
+    Args:
+        filename: File path (e.g., ".github/workflows/release.yaml")
+
+    Returns:
+        Space-separated tokens (e.g., "github workflows release yaml")
+    """
+    if not filename:
+        return ""
+
+    # Split on path separator
+    parts = filename.split("/")
+
+    all_tokens = []
+    for part in parts:
+        # Strip leading dots (e.g., .github -> github)
+        part = part.lstrip(".")
+        if not part:
+            continue
+
+        # Split on . _ - to get sub-components
+        sub_parts = re.split(r"[._\-]", part)
+        for sub in sub_parts:
+            if not sub:
+                continue
+            # Apply camelCase splitting to each sub-component
+            tokens = split_code_identifier(sub)
+            all_tokens.extend(t.lower() for t in tokens)
+
+    return " ".join(all_tokens)
+
+
 def preprocess_code_for_tsvector(content: str) -> str:
     """Preprocess code content for tsvector generation.
 
@@ -85,8 +122,8 @@ def preprocess_code_for_tsvector(content: str) -> str:
     return " ".join(all_tokens)
 
 
-@cocoindex.op.function(behavior_version=1)
-def text_to_tsvector_sql(content: str) -> str:
+@cocoindex.op.function(behavior_version=2)
+def text_to_tsvector_sql(content: str, filename: str = "") -> str:
     """Generate SQL expression for creating tsvector from content.
 
     Returns the preprocessed text that should be passed to PostgreSQL's
@@ -97,8 +134,14 @@ def text_to_tsvector_sql(content: str) -> str:
 
     Args:
         content: Raw code content (chunk text)
+        filename: Optional file path to extract additional tokens from
 
     Returns:
         Preprocessed text ready for to_tsvector('simple', ...)
     """
-    return preprocess_code_for_tsvector(content)
+    result = preprocess_code_for_tsvector(content)
+    if filename:
+        filename_tokens = extract_filename_tokens(filename)
+        if filename_tokens:
+            result = f"{result} {filename_tokens}"
+    return result

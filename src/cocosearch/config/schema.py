@@ -16,7 +16,6 @@ class IndexingSection(BaseModel):
 
     includePatterns: list[str] = Field(default_factory=list)
     excludePatterns: list[str] = Field(default_factory=list)
-    languages: list[str] = Field(default_factory=list)
     chunkSize: int = Field(default=1000, gt=0)
     chunkOverlap: int = Field(default=300, ge=0)
 

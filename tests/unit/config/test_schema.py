@@ -19,7 +19,6 @@ class TestIndexingSection:
         section = IndexingSection()
         assert section.includePatterns == []
         assert section.excludePatterns == []
-        assert section.languages == []
         assert section.chunkSize == 1000
         assert section.chunkOverlap == 300
 
@@ -28,13 +27,11 @@ class TestIndexingSection:
         section = IndexingSection(
             includePatterns=["*.py", "*.js"],
             excludePatterns=["*.test.js"],
-            languages=["python", "javascript"],
             chunkSize=2000,
             chunkOverlap=500,
         )
         assert section.includePatterns == ["*.py", "*.js"]
         assert section.excludePatterns == ["*.test.js"]
-        assert section.languages == ["python", "javascript"]
         assert section.chunkSize == 2000
         assert section.chunkOverlap == 500
 

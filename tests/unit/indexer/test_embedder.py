@@ -45,6 +45,39 @@ class TestCodeToEmbedding:
             assert -1 <= value <= 1
 
 
+class TestAddFilenameContext:
+    """Tests for add_filename_context function."""
+
+    def test_prepends_filename(self):
+        """Prepends 'File: <filename>' to text."""
+        from cocosearch.indexer.embedder import add_filename_context
+
+        result = add_filename_context("name: Deploy", ".github/workflows/release.yaml")
+        assert result == "File: .github/workflows/release.yaml\nname: Deploy"
+
+    def test_preserves_text(self):
+        """Original text appears in full after the filename line."""
+        from cocosearch.indexer.embedder import add_filename_context
+
+        text = "def hello():\n    pass"
+        result = add_filename_context(text, "src/main.py")
+        assert result.endswith(text)
+
+    def test_empty_filename_returns_original(self):
+        """Returns original text when filename is empty."""
+        from cocosearch.indexer.embedder import add_filename_context
+
+        text = "some code"
+        assert add_filename_context(text, "") == text
+
+    def test_deep_path(self):
+        """Handles deeply nested file paths."""
+        from cocosearch.indexer.embedder import add_filename_context
+
+        result = add_filename_context("x", "a/b/c/d/e.py")
+        assert result.startswith("File: a/b/c/d/e.py\n")
+
+
 class TestExtractExtension:
     """Tests for extract_extension function.
 

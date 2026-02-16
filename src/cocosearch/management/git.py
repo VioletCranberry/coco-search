@@ -183,7 +183,6 @@ def derive_index_from_git() -> str | None:
     if git_root is None:
         return None
 
-    # Import here to avoid circular imports
-    from cocosearch.cli import derive_index_name
+    from cocosearch.management.context import derive_index_name
 
     return derive_index_name(str(git_root))

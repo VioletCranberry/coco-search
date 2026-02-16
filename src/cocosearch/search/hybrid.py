@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from cocosearch.indexer.embedder import code_to_embedding
 from cocosearch.search.db import (
     check_column_exists,
+    check_symbol_columns_exist,
     get_connection_pool,
     get_table_name,
 )
@@ -23,45 +24,17 @@ from cocosearch.search.query_analyzer import normalize_query_for_keyword
 
 logger = logging.getLogger(__name__)
 
+# RRF constant — standard value from the original RRF paper. Higher values
+# reduce the impact of rank differences between result lists.
+RRF_K = 60
 
-def _is_definition_chunk(content: str) -> bool:
-    """Check if chunk content starts with a definition keyword.
+# Score multiplier for results identified as definitions (function, class, etc.)
+# Applied after RRF fusion to boost definition-bearing chunks.
+DEFINITION_BOOST_MULTIPLIER = 2.0
 
-    Heuristic: definition chunks start with keywords like:
-    - def, class, async def (Python)
-    - function, const, let, var (JavaScript/TypeScript)
-    - func, type (Go)
-    - fn, struct, trait, enum, impl (Rust)
-
-    Args:
-        content: Chunk text content.
-
-    Returns:
-        True if chunk appears to be a definition.
-    """
-    stripped = content.lstrip()
-    definition_keywords = [
-        # Python
-        "def ",
-        "class ",
-        "async def ",
-        # JavaScript/TypeScript
-        "function ",
-        "const ",
-        "let ",
-        "var ",
-        "interface ",
-        "type ",
-        # Go
-        "func ",
-        # Rust
-        "fn ",
-        "struct ",
-        "trait ",
-        "enum ",
-        "impl ",
-    ]
-    return any(stripped.startswith(kw) for kw in definition_keywords)
+# Maximum results to request from each search backend before fusion.
+# Fetching more candidates improves fusion quality at modest cost.
+MAX_PREFETCH = 100
 
 
 @dataclass
@@ -217,8 +190,11 @@ def execute_keyword_search(
                 cur.execute(sql, params)
                 rows = cur.fetchall()
             except Exception as e:
-                # Log and return empty on any error (graceful degradation)
-                logger.warning(f"Keyword search failed: {e}")
+                # Log at warning level and fall back to vector-only.
+                # Common causes: malformed tsquery, missing column, connection error.
+                logger.warning(
+                    f"Keyword search failed (falling back to vector-only): {e}"
+                )
                 return []
 
     return [
@@ -238,12 +214,12 @@ def execute_vector_search(
     limit: int = 10,
     where_clause: str = "",
     where_params: list | None = None,
-    include_symbol_columns: bool = False,
 ) -> list[VectorResult]:
     """Execute vector similarity search.
 
     Embeds the query and performs cosine similarity search against
-    the embedding column.
+    the embedding column. Automatically includes symbol columns
+    when available (v1.7+ indexes).
 
     Args:
         query: Search query (will be embedded).
@@ -251,8 +227,6 @@ def execute_vector_search(
         limit: Maximum results to return.
         where_clause: Optional SQL condition (without "WHERE") to filter results.
         where_params: Optional list of parameters for where_clause placeholders.
-        include_symbol_columns: Whether to include symbol_type, symbol_name, symbol_signature
-            in the SELECT (for v1.7+ indexes with symbol filtering).
 
     Returns:
         List of VectorResult ordered by similarity (highest first).
@@ -264,6 +238,9 @@ def execute_vector_search(
 
     # Build WHERE clause if provided
     where_sql = f"WHERE {where_clause}" if where_clause else ""
+
+    # Check if symbol columns exist (cached, essentially free)
+    include_symbol_columns = check_symbol_columns_exist(table_name)
 
     # Build SELECT columns
     select_cols = """
@@ -300,42 +277,34 @@ def execute_vector_search(
             cur.execute(sql, params)
             rows = cur.fetchall()
 
-    # Build results based on whether symbol columns were included
-    if include_symbol_columns:
-        return [
-            VectorResult(
-                filename=row[0],
-                start_byte=int(row[1]),
-                end_byte=int(row[2]),
-                score=float(row[3]),
-                block_type=row[4] if row[4] else "",
-                hierarchy=row[5] if row[5] else "",
-                language_id=row[6] if row[6] else "",
-                symbol_type=row[7] if row[7] else None,
-                symbol_name=row[8] if row[8] else None,
-                symbol_signature=row[9] if row[9] else None,
-            )
-            for row in rows
-        ]
-    else:
-        return [
-            VectorResult(
-                filename=row[0],
-                start_byte=int(row[1]),
-                end_byte=int(row[2]),
-                score=float(row[3]),
-                block_type=row[4] if row[4] else "",
-                hierarchy=row[5] if row[5] else "",
-                language_id=row[6] if row[6] else "",
-            )
-            for row in rows
-        ]
+    # Build results, including symbol columns when available
+    return [
+        VectorResult(
+            filename=row[0],
+            start_byte=int(row[1]),
+            end_byte=int(row[2]),
+            score=float(row[3]),
+            block_type=row[4] if row[4] else "",
+            hierarchy=row[5] if row[5] else "",
+            language_id=row[6] if row[6] else "",
+            **(
+                {
+                    "symbol_type": row[7] if row[7] else None,
+                    "symbol_name": row[8] if row[8] else None,
+                    "symbol_signature": row[9] if row[9] else None,
+                }
+                if include_symbol_columns
+                else {}
+            ),
+        )
+        for row in rows
+    ]
 
 
 def rrf_fusion(
     vector_results: list[VectorResult],
     keyword_results: list[KeywordResult],
-    k: int = 60,
+    k: int = RRF_K,
 ) -> list[HybridSearchResult]:
     """Combine vector and keyword results using Reciprocal Rank Fusion.
 
@@ -448,13 +417,14 @@ def rrf_fusion(
 def apply_definition_boost(
     results: list[HybridSearchResult],
     index_name: str,
-    boost_multiplier: float = 2.0,
+    boost_multiplier: float = DEFINITION_BOOST_MULTIPLIER,
 ) -> list[HybridSearchResult]:
     """Apply score boost to definition symbols.
 
-    Definitions are identified by checking if chunk content starts with
-    definition keywords (def/class/func/fn/etc.). Boost is applied after
-    RRF fusion to preserve rank-based algorithm semantics.
+    Definitions are identified by the presence of symbol_type from
+    tree-sitter extraction (e.g., "function", "class", "method").
+    Boost is applied after RRF fusion to preserve rank-based algorithm
+    semantics.
 
     Args:
         results: Fused hybrid search results.
@@ -468,33 +438,17 @@ def apply_definition_boost(
         return results
 
     # Check if symbol columns exist (v1.7+ index)
-    # If not, skip boost - can't reliably identify definitions
-    from cocosearch.search.db import check_symbol_columns_exist
-
+    # If not, skip boost - can't identify definitions
     table_name = get_table_name(index_name)
     if not check_symbol_columns_exist(table_name):
         logger.debug("Skipping definition boost - symbol columns not available")
         return results
 
-    # Import chunk content reader
-    from cocosearch.search.utils import read_chunk_content
-
     boosted_results = []
     for result in results:
-        # Read chunk content to check if definition
-        try:
-            content = read_chunk_content(
-                result.filename,
-                result.start_byte,
-                result.end_byte,
-            )
-            is_definition = _is_definition_chunk(content)
-        except Exception:
-            # If we can't read content, don't boost
-            is_definition = False
+        is_definition = result.symbol_type is not None
 
         if is_definition:
-            # Create new result with boosted score
             boosted_results.append(
                 HybridSearchResult(
                     filename=result.filename,
@@ -568,15 +522,21 @@ def hybrid_search(
             where_parts.append(symbol_where)
             where_params.extend(symbol_params)
 
-    # Add language filter conditions (filename-based)
+    # Add language filter conditions (handler language_id + filename-based)
     if language_filter:
-        # Import LANGUAGE_EXTENSIONS and get_extension_patterns from query module
-        from cocosearch.search.query import LANGUAGE_EXTENSIONS, get_extension_patterns
+        from cocosearch.search.query import (
+            LANGUAGE_EXTENSIONS,
+            HANDLER_LANGUAGES,
+            get_extension_patterns,
+        )
 
         languages = [lang.strip() for lang in language_filter.split(",")]
         lang_conditions = []
         for lang in languages:
-            if lang in LANGUAGE_EXTENSIONS:
+            if lang in HANDLER_LANGUAGES:
+                lang_conditions.append("language_id = %s")
+                where_params.append(HANDLER_LANGUAGES[lang])
+            elif lang in LANGUAGE_EXTENSIONS:
                 extensions = get_extension_patterns(lang)
                 ext_parts = ["filename LIKE %s" for _ in extensions]
                 lang_conditions.append(f"({' OR '.join(ext_parts)})")
@@ -587,13 +547,10 @@ def hybrid_search(
     # Combine WHERE parts
     where_clause = " AND ".join(where_parts) if where_parts else ""
 
-    # Determine if we need symbol columns in results
-    include_symbol_cols = symbol_type is not None or symbol_name is not None
-
     # Execute both searches
     # Request more results from each to have better fusion
-    vector_limit = min(limit * 2, 100)
-    keyword_limit = min(limit * 2, 100)
+    vector_limit = min(limit * 2, MAX_PREFETCH)
+    keyword_limit = min(limit * 2, MAX_PREFETCH)
 
     vector_results = execute_vector_search(
         query,
@@ -601,7 +558,6 @@ def hybrid_search(
         vector_limit,
         where_clause,
         where_params if where_params else None,
-        include_symbol_columns=include_symbol_cols,
     )
     keyword_results = execute_keyword_search(
         query,

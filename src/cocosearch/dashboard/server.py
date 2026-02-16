@@ -263,7 +263,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _handle_index(self):
         import cocoindex
-        from cocosearch.cli import derive_index_name
+        from cocosearch.management.context import derive_index_name
         from cocosearch.indexer import IndexingConfig, run_index
         from cocosearch.management import (
             ensure_metadata_table,

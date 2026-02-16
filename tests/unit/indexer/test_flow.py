@@ -419,12 +419,6 @@ class TestCustomLanguageIntegration:
 
         assert callable(extract_language)
 
-    def test_extract_language_importable_from_init(self):
-        """extract_language is importable from indexer __init__.py."""
-        from cocosearch.indexer import extract_language
-
-        assert callable(extract_language)
-
     def test_flow_module_imports_custom_languages(self):
         """flow module successfully imports get_custom_languages from handlers."""
         import cocosearch.indexer.flow as flow_module
@@ -513,6 +507,59 @@ class TestMetadataIntegration:
             index_name="test_metadata",
             codebase_path="/test/path",
             include_patterns=["*.py", "*.tf", "Dockerfile"],
+            exclude_patterns=[],
+        )
+
+        assert flow is not None
+
+
+class TestFilenameContextIntegration:
+    """Tests for filename context integration in flow module."""
+
+    def test_add_filename_context_importable_from_flow(self):
+        """flow module successfully imports add_filename_context."""
+        import cocosearch.indexer.flow as flow_module
+
+        assert hasattr(flow_module, "add_filename_context")
+
+    def test_flow_source_has_embedding_text(self):
+        """flow module source creates intermediate embedding_text with filename context."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert 'chunk["embedding_text"]' in source
+        assert "add_filename_context" in source
+        assert 'filename=file["filename"]' in source
+
+    def test_flow_source_uses_embedding_text_for_embedding(self):
+        """flow module source generates embedding from embedding_text, not raw text."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert 'chunk["embedding_text"].call(code_to_embedding)' in source
+
+    def test_flow_source_passes_filename_to_tsvector(self):
+        """flow module source passes filename to text_to_tsvector_sql."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert "text_to_tsvector_sql, filename=file[" in source
+
+    def test_flow_source_preserves_raw_content_text(self):
+        """flow module source keeps content_text as raw chunk text (no filename prefix)."""
+        import cocosearch.indexer.flow as flow_module
+
+        source = inspect.getsource(flow_module)
+        assert 'content_text=chunk["text"]' in source
+
+    def test_create_code_index_flow_with_filename_context_succeeds(self):
+        """create_code_index_flow builds flow without errors after filename wiring."""
+        from cocosearch.indexer.flow import create_code_index_flow
+
+        flow = create_code_index_flow(
+            index_name="test_filename_ctx",
+            codebase_path="/test/path",
+            include_patterns=["*.py", "*.yaml"],
             exclude_patterns=[],
         )
 

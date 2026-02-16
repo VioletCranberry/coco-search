@@ -50,21 +50,3 @@ def test_mock_pool_context_manager(mock_db_pool):
             result = cur.fetchone()
 
     assert result == ("test",)
-
-
-def test_patched_db_pool_patches_module(patched_db_pool):
-    """Verify patched_db_pool patches the actual module."""
-    from cocosearch.search.db import get_connection_pool
-
-    pool, cursor, conn = patched_db_pool
-    actual_pool = get_connection_pool()
-
-    # Should return our mock, not try to connect to real DB
-    assert actual_pool is pool
-
-
-def test_mock_search_results_fixture(mock_search_results):
-    """Verify mock_search_results provides sample data."""
-    assert len(mock_search_results) == 3
-    assert mock_search_results[0][0] == "/path/to/main.py"
-    assert mock_search_results[0][3] == 0.92  # score

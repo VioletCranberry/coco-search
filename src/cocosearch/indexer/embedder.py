@@ -61,6 +61,28 @@ def extract_language(filename: str, content: str) -> str:
     return ext[1:] if ext else ""
 
 
+@cocoindex.op.function(behavior_version=1)
+def add_filename_context(text: str, filename: str) -> str:
+    """Prepend filename context to text for embedding generation.
+
+    Gives the embedding model file path context so that queries like
+    "release flow" can match files named release.yaml even if the
+    chunk text doesn't mention "release".
+
+    Only used for embedding input — the stored content_text remains raw.
+
+    Args:
+        text: Raw chunk text.
+        filename: File path (e.g., ".github/workflows/release.yaml").
+
+    Returns:
+        Text with filename prefix, or original text if filename is empty.
+    """
+    if filename:
+        return f"File: {filename}\n{text}"
+    return text
+
+
 @cocoindex.transform_flow()
 def code_to_embedding(
     text: cocoindex.DataSlice[str],

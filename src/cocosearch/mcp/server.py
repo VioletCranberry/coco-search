@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 _active_indexing: dict[str, threading.Thread] = {}
 _indexing_lock = threading.Lock()
+_cocoindex_initialized = False
+_cocoindex_init_lock = threading.Lock()
 
 from pathlib import Path  # noqa: E402
 from typing import Annotated  # noqa: E402
@@ -33,7 +35,7 @@ from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
 from pydantic import Field  # noqa: E402
 from starlette.responses import HTMLResponse, JSONResponse, StreamingResponse  # noqa: E402
 
-from cocosearch.cli import derive_index_name  # noqa: E402
+from cocosearch.management.context import derive_index_name  # noqa: E402
 from cocosearch.dashboard.web import get_dashboard_html  # noqa: E402
 from cocosearch.indexer import IndexingConfig, run_index  # noqa: E402
 from cocosearch.management import clear_index as mgmt_clear_index  # noqa: E402
@@ -57,6 +59,46 @@ from cocosearch.management.stats import (  # noqa: E402
 )
 from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
 from cocosearch.search.context_expander import ContextExpander  # noqa: E402
+
+
+def _ensure_cocoindex_init() -> None:
+    """Initialize CocoIndex exactly once, thread-safely.
+
+    cocoindex.init() is synchronous and triggers a RuntimeWarning when called
+    inside an async event loop. By calling it once (guarded by a lock) we
+    avoid the repeated sync-inside-async warnings from every HTTP/MCP handler.
+    """
+    global _cocoindex_initialized
+    if _cocoindex_initialized:
+        return
+    with _cocoindex_init_lock:
+        if not _cocoindex_initialized:
+            cocoindex.init()
+            _cocoindex_initialized = True
+
+
+def _apply_thread_liveness_status(
+    index_name: str, result: dict, db_status: str | None
+) -> None:
+    """Override status from thread liveness if indexing thread is still alive.
+
+    The DB status may lag behind the actual indexing state. This ensures
+    the API returns accurate status by checking the in-memory thread registry.
+
+    Args:
+        index_name: Index name to check.
+        result: Mutable result dict to update.
+        db_status: Status from database metadata.
+    """
+    with _indexing_lock:
+        active = _active_indexing.get(index_name)
+    if active is not None and active.is_alive():
+        result["status"] = "indexing"
+        if db_status != "indexing":
+            try:
+                set_index_status(index_name, "indexing")
+            except Exception:
+                pass
 
 
 def _register_with_git(index_name: str, project_path: str) -> None:
@@ -120,9 +162,8 @@ async def serve_dashboard(request) -> HTMLResponse:
 @mcp.custom_route("/api/stats", methods=["GET"])
 async def api_stats(request) -> JSONResponse:
     """Stats API endpoint for web dashboard and programmatic access."""
-    # Initialize CocoIndex (required for database connection)
     try:
-        cocoindex.init()
+        _ensure_cocoindex_init()
     except Exception as e:
         logger.warning(f"CocoIndex init failed: {e}")
         return JSONResponse(
@@ -141,19 +182,7 @@ async def api_stats(request) -> JSONResponse:
         try:
             stats = get_comprehensive_stats(index_name)
             result = stats.to_dict()
-            # Override status from thread liveness — the DB status may
-            # lag behind the actual indexing state due to race conditions.
-            with _indexing_lock:
-                active = _active_indexing.get(index_name)
-            if active is not None and active.is_alive():
-                result["status"] = "indexing"
-                # Correct DB so CLI reads consistent status (also refreshes updated_at
-                # to prevent auto_recover_stale_indexing from misfiring)
-                if stats.status != "indexing":
-                    try:
-                        set_index_status(index_name, "indexing")
-                    except Exception:
-                        pass
+            _apply_thread_liveness_status(index_name, result, stats.status)
             if include_failures:
                 result["parse_failures"] = get_parse_failures(index_name)
             return JSONResponse(
@@ -169,17 +198,7 @@ async def api_stats(request) -> JSONResponse:
             try:
                 stats = get_comprehensive_stats(idx["name"])
                 result = stats.to_dict()
-                # Override status from thread liveness
-                with _indexing_lock:
-                    active = _active_indexing.get(idx["name"])
-                if active is not None and active.is_alive():
-                    result["status"] = "indexing"
-                    # Correct DB so CLI reads consistent status
-                    if stats.status != "indexing":
-                        try:
-                            set_index_status(idx["name"], "indexing")
-                        except Exception:
-                            pass
+                _apply_thread_liveness_status(idx["name"], result, stats.status)
                 if include_failures:
                     result["parse_failures"] = get_parse_failures(idx["name"])
                 all_stats.append(result)
@@ -193,9 +212,8 @@ async def api_stats(request) -> JSONResponse:
 @mcp.custom_route("/api/stats/{index_name}", methods=["GET"])
 async def api_stats_single(request) -> JSONResponse:
     """Stats for a single index by name."""
-    # Initialize CocoIndex (required for database connection)
     try:
-        cocoindex.init()
+        _ensure_cocoindex_init()
     except Exception as e:
         logger.warning(f"CocoIndex init failed: {e}")
         return JSONResponse(
@@ -210,17 +228,7 @@ async def api_stats_single(request) -> JSONResponse:
     try:
         stats = get_comprehensive_stats(index_name)
         result = stats.to_dict()
-        # Override status from thread liveness
-        with _indexing_lock:
-            active = _active_indexing.get(index_name)
-        if active is not None and active.is_alive():
-            result["status"] = "indexing"
-            # Correct DB so CLI reads consistent status
-            if stats.status != "indexing":
-                try:
-                    set_index_status(index_name, "indexing")
-                except Exception:
-                    pass
+        _apply_thread_liveness_status(index_name, result, stats.status)
         if include_failures:
             result["parse_failures"] = get_parse_failures(index_name)
         return JSONResponse(
@@ -275,49 +283,49 @@ async def api_reindex(request) -> JSONResponse:
         except Exception as e:
             logger.warning(f"Auto-registration of metadata failed: {e}")
 
-    # Reject if a previous indexing thread is still alive
+    # Hold lock for entire check-and-start to prevent two threads
+    # from both starting indexing for the same index
     with _indexing_lock:
         prev = _active_indexing.get(index_name)
-    if prev is not None and prev.is_alive():
-        return JSONResponse(
-            {"error": "Previous indexing still completing. Try again shortly."},
-            status_code=409,
-        )
-
-    # Set status to indexing
-    try:
-        set_index_status(index_name, "indexing")
-    except Exception as e:
-        logger.warning(f"Failed to set indexing status for '{index_name}': {e}")
-
-    def _run():
-        failed = False
-        try:
-            cocoindex.init()
-            run_index(
-                index_name=index_name,
-                codebase_path=source_path,
-                config=IndexingConfig(),
-                fresh=fresh,
+        if prev is not None and prev.is_alive():
+            return JSONResponse(
+                {"error": "Previous indexing still completing. Try again shortly."},
+                status_code=409,
             )
-            _register_with_git(index_name, source_path)
-        except Exception as exc:
-            failed = True
-            logger.error(f"Background reindex failed: {exc}")
-        finally:
-            try:
-                current = get_index_metadata(index_name)
-                if current and current.get("status") == "indexing":
-                    set_index_status(index_name, "error" if failed else "indexed")
-            except Exception as e:
-                logger.warning(f"Failed to update status for '{index_name}': {e}")
-            with _indexing_lock:
-                _active_indexing.pop(index_name, None)
 
-    thread = threading.Thread(target=_run, daemon=True)
-    with _indexing_lock:
+        # Set status to indexing
+        try:
+            set_index_status(index_name, "indexing")
+        except Exception as e:
+            logger.warning(f"Failed to set indexing status for '{index_name}': {e}")
+
+        def _run():
+            failed = False
+            try:
+                _ensure_cocoindex_init()
+                run_index(
+                    index_name=index_name,
+                    codebase_path=source_path,
+                    config=IndexingConfig(),
+                    fresh=fresh,
+                )
+                _register_with_git(index_name, source_path)
+            except Exception as exc:
+                failed = True
+                logger.error(f"Background reindex failed: {exc}")
+            finally:
+                try:
+                    current = get_index_metadata(index_name)
+                    if current and current.get("status") == "indexing":
+                        set_index_status(index_name, "error" if failed else "indexed")
+                except Exception as e:
+                    logger.warning(f"Failed to update status for '{index_name}': {e}")
+                with _indexing_lock:
+                    _active_indexing.pop(index_name, None)
+
+        thread = threading.Thread(target=_run, daemon=True)
         _active_indexing[index_name] = thread
-    thread.start()
+        thread.start()
 
     action = "Fresh reindex" if fresh else "Reindex"
     return JSONResponse(
@@ -347,7 +355,7 @@ async def api_project(request) -> JSONResponse:
     path_collision = False
     collision_message = None
     try:
-        cocoindex.init()
+        _ensure_cocoindex_init()
         indexes = mgmt_list_indexes()
         index_names = {idx["name"] for idx in indexes}
         is_indexed = index_name in index_names
@@ -397,50 +405,50 @@ async def api_index(request) -> JSONResponse:
     if not index_name:
         index_name = derive_index_name(project_path)
 
-    # Reject if a previous indexing thread is still alive
+    # Hold lock for entire check-and-start to prevent two threads
+    # from both starting indexing for the same index
     with _indexing_lock:
         prev = _active_indexing.get(index_name)
-    if prev is not None and prev.is_alive():
-        return JSONResponse(
-            {"error": "Previous indexing still completing. Try again shortly."},
-            status_code=409,
-        )
-
-    # Register metadata before starting
-    try:
-        ensure_metadata_table()
-        _register_with_git(index_name, project_path)
-        set_index_status(index_name, "indexing")
-    except Exception as e:
-        logger.warning(f"Metadata registration failed: {e}")
-
-    def _run():
-        failed = False
-        try:
-            cocoindex.init()
-            run_index(
-                index_name=index_name,
-                codebase_path=project_path,
-                config=IndexingConfig(),
+        if prev is not None and prev.is_alive():
+            return JSONResponse(
+                {"error": "Previous indexing still completing. Try again shortly."},
+                status_code=409,
             )
-            _register_with_git(index_name, project_path)
-        except Exception as exc:
-            failed = True
-            logger.error(f"Background indexing failed: {exc}")
-        finally:
-            try:
-                current = get_index_metadata(index_name)
-                if current and current.get("status") == "indexing":
-                    set_index_status(index_name, "error" if failed else "indexed")
-            except Exception as e:
-                logger.warning(f"Failed to update status for '{index_name}': {e}")
-            with _indexing_lock:
-                _active_indexing.pop(index_name, None)
 
-    thread = threading.Thread(target=_run, daemon=True)
-    with _indexing_lock:
+        # Register metadata before starting
+        try:
+            ensure_metadata_table()
+            _register_with_git(index_name, project_path)
+            set_index_status(index_name, "indexing")
+        except Exception as e:
+            logger.warning(f"Metadata registration failed: {e}")
+
+        def _run():
+            failed = False
+            try:
+                _ensure_cocoindex_init()
+                run_index(
+                    index_name=index_name,
+                    codebase_path=project_path,
+                    config=IndexingConfig(),
+                )
+                _register_with_git(index_name, project_path)
+            except Exception as exc:
+                failed = True
+                logger.error(f"Background indexing failed: {exc}")
+            finally:
+                try:
+                    current = get_index_metadata(index_name)
+                    if current and current.get("status") == "indexing":
+                        set_index_status(index_name, "error" if failed else "indexed")
+                except Exception as e:
+                    logger.warning(f"Failed to update status for '{index_name}': {e}")
+                with _indexing_lock:
+                    _active_indexing.pop(index_name, None)
+
+        thread = threading.Thread(target=_run, daemon=True)
         _active_indexing[index_name] = thread
-    thread.start()
+        thread.start()
 
     return JSONResponse(
         {
@@ -539,7 +547,7 @@ async def api_search(request) -> JSONResponse:
     use_hybrid = body.get("use_hybrid")
 
     try:
-        cocoindex.init()
+        _ensure_cocoindex_init()
     except Exception as e:
         logger.warning(f"CocoIndex init failed: {e}")
         return JSONResponse(
@@ -770,7 +778,7 @@ async def search_code(
 
     # Initialize CocoIndex (required for embedding generation)
     try:
-        cocoindex.init()
+        _ensure_cocoindex_init()
     except Exception as e:
         logger.warning(f"CocoIndex init failed: {e}")
         return [
@@ -813,71 +821,73 @@ async def search_code(
             search_header["last_indexed_at"] = str(metadata["updated_at"])
         output.append(search_header)
 
-    # Convert results to dicts with line numbers, content, and context
-    for r in results:
-        start_line = byte_to_line(r.filename, r.start_byte)
-        end_line = byte_to_line(r.filename, r.end_byte)
-        content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+    # Convert results to dicts with line numbers, content, and context.
+    # Wrap in try/finally to ensure expander cache is always cleared,
+    # preventing LRU cache leaks (up to 128 files) on exceptions.
+    try:
+        for r in results:
+            start_line = byte_to_line(r.filename, r.start_byte)
+            end_line = byte_to_line(r.filename, r.end_byte)
+            content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
 
-        # Get context if requested or smart context enabled
-        context_before_text = ""
-        context_after_text = ""
+            # Get context if requested or smart context enabled
+            context_before_text = ""
+            context_after_text = ""
 
-        if context_before is not None or context_after is not None or smart_context:
-            # Determine language for smart expansion
-            ext = os.path.splitext(r.filename)[1].lstrip(".")
-            language_name = _get_treesitter_language(ext)
+            if context_before is not None or context_after is not None or smart_context:
+                # Determine language for smart expansion
+                ext = os.path.splitext(r.filename)[1].lstrip(".")
+                language_name = _get_treesitter_language(ext)
 
-            before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
-                expander.get_context_lines(
-                    r.filename,
-                    start_line,
-                    end_line,
-                    context_before=context_before or 0,
-                    context_after=context_after or 0,
-                    smart=smart_context
-                    and (context_before is None and context_after is None),
-                    language=language_name,
+                before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
+                    expander.get_context_lines(
+                        r.filename,
+                        start_line,
+                        end_line,
+                        context_before=context_before or 0,
+                        context_after=context_after or 0,
+                        smart=smart_context
+                        and (context_before is None and context_after is None),
+                        language=language_name,
+                    )
                 )
-            )
 
-            # Format context as strings (newline-separated)
-            context_before_text = "\n".join(line for _, line in before_lines)
-            context_after_text = "\n".join(line for _, line in after_lines)
+                # Format context as strings (newline-separated)
+                context_before_text = "\n".join(line for _, line in before_lines)
+                context_after_text = "\n".join(line for _, line in after_lines)
 
-        # Build result dict
-        result_dict = {
-            "file_path": r.filename,
-            "start_line": start_line,
-            "end_line": end_line,
-            "score": r.score,
-            "content": content,
-            "block_type": r.block_type,
-            "hierarchy": r.hierarchy,
-            "language_id": r.language_id,
-            # Symbol metadata (always included, None if not available)
-            "symbol_type": r.symbol_type,
-            "symbol_name": r.symbol_name,
-            "symbol_signature": r.symbol_signature,
-        }
+            # Build result dict
+            result_dict = {
+                "file_path": r.filename,
+                "start_line": start_line,
+                "end_line": end_line,
+                "score": r.score,
+                "content": content,
+                "block_type": r.block_type,
+                "hierarchy": r.hierarchy,
+                "language_id": r.language_id,
+                # Symbol metadata (always included, None if not available)
+                "symbol_type": r.symbol_type,
+                "symbol_name": r.symbol_name,
+                "symbol_signature": r.symbol_signature,
+            }
 
-        # Include context fields when context was requested
-        if context_before_text or context_after_text:
-            result_dict["context_before"] = context_before_text
-            result_dict["context_after"] = context_after_text
+            # Include context fields when context was requested
+            if context_before_text or context_after_text:
+                result_dict["context_before"] = context_before_text
+                result_dict["context_after"] = context_after_text
 
-        # Include hybrid search fields when available
-        if r.match_type:
-            result_dict["match_type"] = r.match_type
-        if r.vector_score is not None:
-            result_dict["vector_score"] = r.vector_score
-        if r.keyword_score is not None:
-            result_dict["keyword_score"] = r.keyword_score
+            # Include hybrid search fields when available
+            if r.match_type:
+                result_dict["match_type"] = r.match_type
+            if r.vector_score is not None:
+                result_dict["vector_score"] = r.vector_score
+            if r.keyword_score is not None:
+                result_dict["keyword_score"] = r.keyword_score
 
-        output.append(result_dict)
-
-    # Clear cache after processing
-    expander.clear_cache()
+            output.append(result_dict)
+    finally:
+        expander.clear_cache()
 
     # Add hint for clients without Roots support
     if auto_detected_source in ("env", "cwd"):
@@ -985,9 +995,8 @@ def index_stats(
     If index_name is provided, returns stats for that index only.
     Otherwise, returns stats for all indexes.
     """
-    # Initialize CocoIndex (required for database connection)
     try:
-        cocoindex.init()
+        _ensure_cocoindex_init()
     except Exception as e:
         logger.warning(f"CocoIndex init failed (fresh database?): {e}")
         return {
@@ -1055,8 +1064,7 @@ def index_codebase(
     If the index already exists, it will be updated with any changes.
     """
     try:
-        # Initialize CocoIndex
-        cocoindex.init()
+        _ensure_cocoindex_init()
 
         # Derive index name if not provided
         if not index_name:
@@ -1154,6 +1162,13 @@ def run_server(
     # Dashboard auto-open (opt-out via COCOSEARCH_NO_DASHBOARD=1)
     no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
 
+    # Initialize CocoIndex before the event loop starts to avoid
+    # "sync API called inside existing event loop" RuntimeWarning
+    try:
+        _ensure_cocoindex_init()
+    except Exception as e:
+        logger.warning(f"CocoIndex pre-init failed (will retry on demand): {e}")
+
     if transport == "stdio":
         if port != 3000:  # Non-default port specified
             logger.warning("--port is ignored with stdio transport")
@@ -1168,6 +1183,8 @@ def run_server(
 
         mcp.run(transport="stdio")
     elif transport == "sse":
+        # Suppress verbose per-request access logs from uvicorn
+        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
         # Configure host/port for network transport
         mcp.settings.host = host
         mcp.settings.port = port
@@ -1180,6 +1197,8 @@ def run_server(
 
         mcp.run(transport="sse")
     elif transport == "http":
+        # Suppress verbose per-request access logs from uvicorn
+        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
         # Configure host/port for network transport
         mcp.settings.host = host
         mcp.settings.port = port
