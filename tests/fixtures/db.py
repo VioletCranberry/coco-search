@@ -12,20 +12,25 @@ from tests.mocks.db import MockConnectionPool, MockCursor, MockConnection
 
 @pytest.fixture(autouse=True)
 def reset_search_module_state():
-    """Reset search module state and patch check_column_exists.
+    """Reset search module state and patch DB-dependent column checks.
 
     Autouse fixture that:
     1. Patches check_column_exists to return True (simulates v1.7+ index)
-    2. Resets module-level flags after each test
-    3. Clears the query cache to prevent test pollution
+    2. Patches check_symbol_columns_exist to return True (simulates v1.7+ index)
+    3. Resets module-level flags after each test
+    4. Clears the query cache and symbol columns cache to prevent test pollution
 
-    This prevents the hybrid column check from hitting a real database
+    This prevents column checks from hitting a real database
     and ensures test isolation for module-level state.
     """
     import cocosearch.search.query as query_module
     import cocosearch.search.cache as cache_module
+    import cocosearch.search.db as db_module
 
-    with patch.object(query_module, "check_column_exists", return_value=True):
+    with (
+        patch.object(query_module, "check_column_exists", return_value=True),
+        patch.object(query_module, "check_symbol_columns_exist", return_value=False),
+    ):
         yield
 
     # Reset all module-level flags after test
@@ -34,6 +39,9 @@ def reset_search_module_state():
 
     # Clear query cache singleton to prevent test pollution
     cache_module._query_cache = None
+
+    # Clear symbol columns cache to prevent cross-test pollution
+    db_module._symbol_columns_available = {}
 
 
 @pytest.fixture

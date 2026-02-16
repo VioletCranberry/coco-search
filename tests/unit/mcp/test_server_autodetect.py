@@ -369,10 +369,12 @@ class TestIndexCodebasePathRegistration:
                 mock_run.return_value = MagicMock(stats={})
                 with patch("cocosearch.mcp.server._register_with_git") as mock_register:
                     mock_register.side_effect = ValueError("Collision!")
-                    with patch("cocosearch.mcp.server.logger") as mock_logger:
-                        result = index_codebase(
-                            path=str(tmp_codebase), index_name="myindex"
-                        )
+                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                        with patch("cocosearch.mcp.server.set_index_status"):
+                            with patch("cocosearch.mcp.server.logger") as mock_logger:
+                                result = index_codebase(
+                                    path=str(tmp_codebase), index_name="myindex"
+                                )
 
         # Should succeed (indexing worked)
         assert result["success"] is True

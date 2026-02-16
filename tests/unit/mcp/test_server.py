@@ -383,10 +383,12 @@ class TestIndexCodebase:
                     }
                 )
                 with patch("cocosearch.mcp.server._register_with_git"):
-                    result = index_codebase(
-                        path=str(tmp_codebase),
-                        index_name="testindex",
-                    )
+                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                        with patch("cocosearch.mcp.server.set_index_status"):
+                            result = index_codebase(
+                                path=str(tmp_codebase),
+                                index_name="testindex",
+                            )
 
         assert result["success"] is True
         assert result["index_name"] == "testindex"
@@ -398,10 +400,12 @@ class TestIndexCodebase:
             with patch("cocosearch.mcp.server.run_index") as mock_run:
                 mock_run.return_value = MagicMock(stats={})
                 with patch("cocosearch.mcp.server._register_with_git"):
-                    result = index_codebase(
-                        path=str(tmp_codebase),
-                        index_name=None,  # Should be derived
-                    )
+                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                        with patch("cocosearch.mcp.server.set_index_status"):
+                            result = index_codebase(
+                                path=str(tmp_codebase),
+                                index_name=None,  # Should be derived
+                            )
 
         assert result["success"] is True
         assert result["index_name"] == "codebase"  # tmp_codebase creates "codebase" dir
@@ -409,13 +413,16 @@ class TestIndexCodebase:
     def test_returns_error_on_failure(self, tmp_codebase):
         """Returns error dict on indexing failure."""
         with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.mcp.server.run_index", side_effect=ValueError("Flow error")
-            ):
-                result = index_codebase(
-                    path=str(tmp_codebase),
-                    index_name="testindex",
-                )
+            with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                with patch("cocosearch.mcp.server.set_index_status"):
+                    with patch(
+                        "cocosearch.mcp.server.run_index",
+                        side_effect=ValueError("Flow error"),
+                    ):
+                        result = index_codebase(
+                            path=str(tmp_codebase),
+                            index_name="testindex",
+                        )
 
         assert result["success"] is False
         assert "error" in result
@@ -679,10 +686,12 @@ class TestRegisterWithGit:
             with patch("cocosearch.mcp.server.run_index") as mock_run:
                 mock_run.return_value = MagicMock(stats={})
                 with patch("cocosearch.mcp.server._register_with_git") as mock_rwg:
-                    result = index_codebase(
-                        path=str(tmp_codebase),
-                        index_name="testindex",
-                    )
+                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                        with patch("cocosearch.mcp.server.set_index_status"):
+                            result = index_codebase(
+                                path=str(tmp_codebase),
+                                index_name="testindex",
+                            )
 
         assert result["success"] is True
         # _register_with_git called twice: pre-start and post-index
