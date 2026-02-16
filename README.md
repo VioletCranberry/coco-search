@@ -58,7 +58,21 @@ Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vec
 
 Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 31+ languages with symbol-level filtering for 14+, plus domain-specific grammars for structured config files.
 
-[Supported Languages (31+)](#supported-languages) | [Supported Grammars](#supported-grammars)
+## 📑 Table of Contents
+
+- [⚠️ Disclaimer](#disclaimer)
+- [🚀 Quick Start](#quick-start)
+- [✨ Features](#features)
+- [🖥️ Interfaces](#interfaces)
+- [🏆 Where MCP Wins](#where-mcp-wins)
+- [📚 Useful Documentation](#useful-documentation)
+- [🧩 Components](#components)
+- [⚙️ How Search Works](#how-search-works)
+- [🌐 Supported Languages](#supported-languages)
+- [📝 Supported Grammars](#supported-grammars)
+- [🔧 Configuration](#configuration)
+- [🧪 Testing](#testing)
+- [🛠️ Troubleshooting](#troubleshooting)
 
 ## Disclaimer
 
