@@ -62,7 +62,7 @@ Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.git
 
 ## Disclaimer
 
-A personal initiative, originally scaffolded with [GSD](https://github.com/glittercowboy/get-shit-done) and refined by hand. Built as a local-first, private tool for accelerating self-onboarding and exploring spec-driven development. Ships with a CLI, MCP tools, dashboards (TUI/WEB), a status API, and reusable [Claude SKILLS](https://code.claude.com/docs/en/skills).
+This project was originally built for personal use — a solo experiment in local-first, privacy-focused code search to accelerate self-onboarding to new codebases and explore spec-driven development. Initially scaffolded with [GSD](https://github.com/glittercowboy/get-shit-done) and refined by hand. Ships with a CLI, MCP tools, dashboards (TUI/WEB), a status API, reusable [Claude SKILLS](https://code.claude.com/docs/en/skills), and a [Claude Code plugin](https://code.claude.com/docs/en/plugins) for one-command setup.
 
 ## Quick Start
 
