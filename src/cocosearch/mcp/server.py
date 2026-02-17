@@ -1359,6 +1359,7 @@ def index_stats(
         if index_name:
             stats = get_comprehensive_stats(index_name)
             result = stats.to_dict()
+            _apply_thread_liveness_status(index_name, result, stats.status)
             if include_failures:
                 result["parse_failures"] = get_parse_failures(index_name)
             return result
@@ -1370,6 +1371,7 @@ def index_stats(
                 try:
                     stats = get_comprehensive_stats(idx["name"])
                     result = stats.to_dict()
+                    _apply_thread_liveness_status(idx["name"], result, stats.status)
                     if include_failures:
                         result["parse_failures"] = get_parse_failures(idx["name"])
                     all_stats.append(result)

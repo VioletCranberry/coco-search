@@ -1,5 +1,7 @@
 """Tests for cocosearch MCP server tools."""
 
+import threading
+
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -232,6 +234,15 @@ class TestListIndexes:
 class TestIndexStats:
     """Tests for index_stats MCP tool."""
 
+    @pytest.fixture(autouse=True)
+    def _clear_active_indexing(self):
+        """Clear module-level _active_indexing between tests."""
+        from cocosearch.mcp import server as srv
+
+        srv._active_indexing.clear()
+        yield
+        srv._active_indexing.clear()
+
     def test_returns_stats_for_specific_index(self):
         """Returns stats dict for named index."""
         mock_stats = IndexStats(
@@ -316,6 +327,135 @@ class TestIndexStats:
                     result = index_stats(index_name=None)
 
         assert isinstance(result, list)
+
+    def test_single_index_returns_indexing_when_thread_alive(self):
+        """Status overridden to 'indexing' when a live thread exists."""
+        from cocosearch.mcp import server as srv
+
+        mock_stats = IndexStats(
+            name="myindex",
+            file_count=10,
+            chunk_count=50,
+            storage_size=1024,
+            storage_size_pretty="1.0 KB",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=-1,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status="indexed",
+            indexing_elapsed_seconds=None,
+            repo_url=None,
+        )
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        try:
+            srv._active_indexing["myindex"] = thread
+
+            with patch("cocoindex.init"):
+                with patch(
+                    "cocosearch.mcp.server.get_comprehensive_stats",
+                    return_value=mock_stats,
+                ):
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        result = index_stats(index_name="myindex")
+
+            assert result["status"] == "indexing"
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    def test_all_indexes_returns_indexing_when_thread_alive(self, mock_db_pool):
+        """All-indexes path overrides status when a live thread exists."""
+        from cocosearch.mcp import server as srv
+
+        mock_stats = IndexStats(
+            name="proj1",
+            file_count=5,
+            chunk_count=20,
+            storage_size=512,
+            storage_size_pretty="512 B",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=-1,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status="indexed",
+            indexing_elapsed_seconds=None,
+            repo_url=None,
+        )
+
+        pool, cursor, _conn = mock_db_pool(
+            results=[
+                ("codeindex_proj1__proj1_chunks",),
+            ]
+        )
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        try:
+            srv._active_indexing["proj1"] = thread
+
+            with patch("cocoindex.init"):
+                with patch(
+                    "cocosearch.management.discovery.get_connection_pool",
+                    return_value=pool,
+                ):
+                    with patch(
+                        "cocosearch.mcp.server.get_comprehensive_stats",
+                        return_value=mock_stats,
+                    ):
+                        with patch("cocosearch.mcp.server.set_index_status"):
+                            result = index_stats(index_name=None)
+
+            assert isinstance(result, list)
+            assert len(result) == 1
+            assert result[0]["status"] == "indexing"
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    def test_single_index_returns_db_status_when_no_thread(self):
+        """DB status passes through when no active indexing thread."""
+        mock_stats = IndexStats(
+            name="myindex",
+            file_count=10,
+            chunk_count=50,
+            storage_size=1024,
+            storage_size_pretty="1.0 KB",
+            created_at=None,
+            updated_at=None,
+            is_stale=False,
+            staleness_days=-1,
+            languages=[],
+            symbols={},
+            warnings=[],
+            parse_stats={},
+            source_path=None,
+            status="indexed",
+            indexing_elapsed_seconds=None,
+            repo_url=None,
+        )
+
+        with patch("cocoindex.init"):
+            with patch(
+                "cocosearch.mcp.server.get_comprehensive_stats",
+                return_value=mock_stats,
+            ):
+                result = index_stats(index_name="myindex")
+
+        assert result["status"] == "indexed"
 
 
 class TestClearIndex:
