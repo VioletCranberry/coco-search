@@ -12,6 +12,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
   validate:
     name: Validate Tag
@@ -44,15 +47,16 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Ruff check
+        run: uvx ruff check src/ tests/
+
+      - name: Ruff format check
+        run: uvx ruff format --check src/ tests/
 
       - name: Install dependencies
         run: uv sync --frozen
-
-      - name: Ruff check
-        run: uv run ruff check src/ tests/
-
-      - name: Ruff format check
-        run: uv run ruff format --check src/ tests/
 
       - name: Run unit tests
         run: uv run pytest
@@ -69,6 +73,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: uv sync --frozen
@@ -98,6 +103,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: uv sync --frozen
@@ -131,11 +137,24 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set version
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: uv version "$VERSION"
+
+      - name: Sync version to all files
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/cocosearch/__init__.py
+
+          jq --arg v "$VERSION" '.version = $v' .claude-plugin/plugin.json > .claude-plugin/plugin.json.tmp
+          mv .claude-plugin/plugin.json.tmp .claude-plugin/plugin.json
+
+          jq --arg v "$VERSION" '.metadata.version = $v | .plugins[0].version = $v' .claude-plugin/marketplace.json > .claude-plugin/marketplace.json.tmp
+          mv .claude-plugin/marketplace.json.tmp .claude-plugin/marketplace.json
 
       - name: Commit and push version bump
         env:
@@ -144,7 +163,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add pyproject.toml uv.lock
+          git add pyproject.toml uv.lock src/cocosearch/__init__.py .claude-plugin/plugin.json .claude-plugin/marketplace.json
 
           if git diff --cached --quiet; then
             echo "No version change detected, skipping commit."

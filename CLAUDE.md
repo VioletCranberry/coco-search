@@ -45,6 +45,8 @@ uv run ruff format src/ tests/          # Format code
 uv run cocosearch index .
 uv run cocosearch search "query"
 uv run cocosearch search -i          # Interactive REPL
+uv run cocosearch analyze "query"    # Pipeline analysis with diagnostics
+uv run cocosearch analyze "query" --json  # JSON pipeline analysis
 uv run cocosearch stats
 uv run cocosearch list
 uv run cocosearch clear <index>
@@ -69,16 +71,17 @@ uv run cocosearch mcp --project-from-cwd
 - **`cli.py`** — Argparse CLI orchestrating all subcommands
 - **`exceptions.py`** — Structured exception hierarchy: `CocoSearchError` (base), `IndexNotFoundError`, `IndexValidationError`, `SearchError`, `InfrastructureError`. Inherits from `ValueError` where needed for backward compatibility.
 - **`validation.py`** — Input validation guards: `validate_index_name()` (SQL injection protection for dynamic table names), `validate_query()` (resource exhaustion protection, max 10,000 chars)
-- **`mcp/server.py`** — MCP server exposing tools (search_code, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE)
+- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (15 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py`), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
-- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries (`context_expander.py`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), interactive REPL (`repl.py`), result formatting (`formatter.py`)
+- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries (`context_expander.py`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), interactive REPL (`repl.py`), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics (`analyze.py`)
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution (`env_substitution.py`), Pydantic schema validation (`schema.py` with `extra="forbid"`, `strict=True`), user-friendly error formatting with fuzzy field suggestions (`errors.py`), env var validation (`env_validation.py`)
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py`), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection and status tracking (`metadata.py`), project root detection (`context.py`)
 - **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash, Scala, Groovy) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose, Kubernetes) with autodiscovery registry
 - **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards
+- **`.claude-plugin/`** — Claude Code plugin metadata: `plugin.json` (MCP server definition, version, keywords) and `marketplace.json` (marketplace listing). Versions must match `pyproject.toml` — the release workflow syncs them automatically.
 
 **Data flow:** Files → Tree-sitter parse → symbol extraction → chunking → Ollama embeddings → PostgreSQL (pgvector). Search queries → embedding → hybrid RRF (vector similarity + tsvector keyword) → context expansion → results.
 
@@ -144,6 +147,7 @@ Project config via `cocosearch.yaml` (no leading dot) in project root. The `inde
 - **docs/** — Update relevant docs (`architecture.md`, `how-it-works.md`, `retrieval.md`, `adding-languages.md`) when changing the systems they describe
 - **Test count assertions** — Update handler/grammar count assertions in `tests/unit/handlers/test_registry.py` and `tests/unit/handlers/test_grammar_registry.py` when adding handlers
 - **README.md** — Update feature lists, usage examples, or screenshots when user-facing behavior changes
+- **`.claude-plugin/`** — Plugin version files (`plugin.json`, `marketplace.json`) and `src/cocosearch/__init__.py` must stay in sync with `pyproject.toml`. The release workflow handles this automatically. If editing `marketplace.json` descriptions or `plugin.json` metadata manually, ensure accuracy (skill count, server command).
 
 Documentation updates should be part of the same change, not deferred to a follow-up.
 
@@ -154,6 +158,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 ### MCP Tools
 
 - `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`.
+- `analyze_query` — Pipeline diagnostics: see why a query returns specific results (stage timings, mode selection, RRF fusion breakdown)
 - `index_codebase` — Index a directory for search
 - `list_indexes` — List all available indexes
 - `index_stats` — Statistics and health for an index

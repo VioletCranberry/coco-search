@@ -7,6 +7,7 @@ Also provides hybrid search combining vector and keyword matching for
 improved results on code identifier queries.
 """
 
+from cocosearch.search.analyze import AnalysisResult, analyze
 from cocosearch.search.query import SearchResult, search
 from cocosearch.search.utils import byte_to_line, read_chunk_content
 
@@ -17,6 +18,9 @@ __all__ = [
     # Core search
     "search",
     "SearchResult",
+    # Pipeline analysis
+    "analyze",
+    "AnalysisResult",
     # Result utilities
     "byte_to_line",
     "read_chunk_content",

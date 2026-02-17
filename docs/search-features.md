@@ -120,3 +120,27 @@ uv run cocosearch search "parse config" -C 5 --no-smart --pretty
 | Both         | `-C <n>`     | (set both)          | Show n lines before and after     |
 | Smart expand | (default)    | (default)           | Expand to function/class boundary |
 | No smart     | `--no-smart` | (explicit lines)    | Disable smart expansion           |
+
+### Pipeline Analysis
+
+**When to use:** Debugging why a query returns unexpected results, understanding how the search pipeline processes your query, or optimizing search parameters.
+
+The `analyze` command runs the same pipeline as `search` but captures and displays diagnostics at each stage:
+
+```bash
+# See full pipeline breakdown for a query
+uv run cocosearch analyze "getUserById"
+
+# JSON output for programmatic inspection
+uv run cocosearch analyze "getUserById" --json
+```
+
+**What it shows:**
+
+- **Query Analysis** — identifier detection, normalized keyword form, search mode decision
+- **Cache** — hit/miss status and cache key
+- **Vector Search** — result count, score range, top results
+- **Keyword Search** — whether executed, ts_rank scores, top results
+- **RRF Fusion** — match type breakdown (both/semantic-only/keyword-only), fused scores
+- **Definition Boost** — how many results were boosted and rank changes
+- **Timings** — per-stage timing with visual bar chart

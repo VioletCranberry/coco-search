@@ -296,4 +296,15 @@ search_code(query="database transaction", smart_context=True)
 search_code(query="error handling", context_before=10, context_after=10)
 ```
 
+**Pattern 5: Pipeline analysis for search debugging**
+
+When search results are unexpected, use `analyze_query` to see the full pipeline breakdown:
+
+```
+# See why a query returns specific results
+analyze_query(query="getUserById")
+```
+
+Returns stage-by-stage diagnostics: identifier detection, hybrid mode decision, vector/keyword search results, RRF fusion breakdown (both/semantic-only/keyword-only counts), definition boost effects, and per-stage timings.
+
 For installation instructions, see `skills/README.md`.

@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Local-first hybrid semantic code search with MCP tools and workflow skills",
-    "version": "0.1.0"
+    "version": "0.1.3"
   },
   "plugins": [
     {
       "name": "cocosearch",
-      "description": "Semantic code search MCP server with 7 workflow skills (quickstart, onboarding, explore, debugging, refactoring, new-feature, subway map)",
-      "version": "0.1.0",
+      "description": "Local-first hybrid semantic code search with MCP tools and workflow skills",
+      "version": "0.1.3",
       "source": "./"
     }
   ]
