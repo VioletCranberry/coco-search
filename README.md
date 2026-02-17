@@ -142,6 +142,7 @@ This project was originally built for personal use — a solo experiment in loca
 - 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter, so you see complete units of code.
 - ⚡ **Query caching** -- exact and semantic cache for fast repeated queries (0.95 cosine threshold).
 - 🩺 **Parse health tracking** -- per-language parse status, failure details, and staleness warnings when the index drifts from your branch.
+- 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool.
 - 🔒 **Privacy-first** -- everything runs locally. No external API calls, no telemetry.
 
 ## Interfaces
@@ -166,6 +167,9 @@ uvx cocosearch search "authentication flow" --pretty
 
 # Serve CocoSearch WEB dashboard
 uvx cocosearch dashboard
+
+# Analyze search pipeline (debug why results rank the way they do)
+uvx cocosearch analyze "getUserById"
 
 # Start interactive REPL
 uvx cocosearch search --interactive
@@ -310,6 +314,7 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 
 - `index_codebase` -- index a directory for semantic search
 - `search_code` -- search indexed code with natural language queries
+- `analyze_query` -- pipeline diagnostics: understand why a query returns specific results
 - `list_indexes` -- list all available indexes
 - `index_stats` -- get statistics and parse health for an index
 - `clear_index` -- remove an index from the database

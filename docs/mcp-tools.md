@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-CocoSearch provides 5 Model Context Protocol (MCP) tools for semantic code search and index management. These tools enable AI agents and LLMs to search indexed codebases, manage indexes, and retrieve statistics programmatically.
+CocoSearch provides 6 Model Context Protocol (MCP) tools for semantic code search and index management. These tools enable AI agents and LLMs to search indexed codebases, manage indexes, analyze search pipelines, and retrieve statistics programmatically.
 
 **Available transports:** stdio, SSE, streamable HTTP
 
@@ -75,6 +75,110 @@ This will search the auto-detected index for code chunks related to JWT token va
 ```
 
 **Note:** Response may include a search_context header (when auto-detecting index) and a staleness_warning footer (when index is older than 7 days).
+
+---
+
+## analyze_query
+
+Analyze the search pipeline for a query with stage-by-stage diagnostics. Runs the same pipeline as `search_code` but captures diagnostics at each stage: query analysis, mode selection, cache status, vector search, keyword search, RRF fusion, definition boost, filtering, and per-stage timing breakdown.
+
+Use this to understand WHY a query returns specific results.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| query | string | Yes | - | Search query to analyze |
+| index_name | string \| null | No | null | Name of the index. Auto-detects if not provided. |
+| limit | integer | No | 10 | Maximum results to return |
+| language | string \| null | No | null | Filter by language. Comma-separated for multiple. |
+| use_hybrid_search | boolean \| null | No | null | None=auto, True=always hybrid, False=vector-only |
+| symbol_type | string \| array\<string\> \| null | No | null | Filter by symbol type |
+| symbol_name | string \| null | No | null | Filter by symbol name pattern (glob) |
+
+### Natural Language Example
+
+"Why does searching for getUserById not return the right function?"
+
+### JSON Request
+
+```json
+{
+  "query": "getUserById",
+  "index_name": "my-api-server"
+}
+```
+
+### JSON Response
+
+```json
+{
+  "query_analysis": {
+    "original_query": "getUserById",
+    "has_identifier": true,
+    "normalized_keyword_query": "getUserById get User By Id"
+  },
+  "search_mode": {
+    "mode": "hybrid",
+    "reason": "Auto-detected identifier pattern in query",
+    "use_hybrid_flag": null,
+    "has_content_text_column": true,
+    "has_identifier_pattern": true
+  },
+  "cache": {
+    "checked": false,
+    "hit": false,
+    "hit_type": "miss",
+    "cache_key_prefix": "a1b2c3d4e5f67890"
+  },
+  "vector_search": {
+    "result_count": 12,
+    "top_score": 0.872,
+    "bottom_score": 0.534
+  },
+  "keyword_search": {
+    "executed": true,
+    "normalized_query": "getUserById get User By Id",
+    "result_count": 8,
+    "top_ts_rank": 0.098
+  },
+  "fusion": {
+    "executed": true,
+    "k_constant": 60,
+    "vector_only_count": 8,
+    "keyword_only_count": 4,
+    "both_count": 4,
+    "total_fused": 16
+  },
+  "definition_boost": {
+    "executed": true,
+    "boost_multiplier": 2.0,
+    "boosted_count": 3,
+    "rank_changes": 1
+  },
+  "filtering": {
+    "language_filter": null,
+    "symbol_type_filter": null,
+    "symbol_name_filter": null,
+    "min_score": 0.0,
+    "pre_filter_count": 10,
+    "post_filter_count": 10
+  },
+  "timings": {
+    "query_analysis_ms": 0.1,
+    "cache_check_ms": 0.0,
+    "embedding_ms": 0.0,
+    "vector_search_ms": 12.3,
+    "keyword_search_ms": 2.1,
+    "rrf_fusion_ms": 0.3,
+    "definition_boost_ms": 0.1,
+    "total_ms": 15.2
+  },
+  "results": []
+}
+```
+
+**Note:** The `results` array contains full `SearchResult` objects (same format as `search_code`). Cache is always bypassed for analysis.
 
 ---
 

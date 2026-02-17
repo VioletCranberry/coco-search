@@ -58,6 +58,7 @@ from cocosearch.management.stats import (  # noqa: E402
     get_parse_failures,
 )
 from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
+from cocosearch.search.analyze import analyze as run_analyze  # noqa: E402
 from cocosearch.search.context_expander import ContextExpander  # noqa: E402
 
 
@@ -1203,6 +1204,112 @@ async def search_code(
         )
 
     return output
+
+
+@mcp.tool()
+async def analyze_query(
+    query: Annotated[str, Field(description="Search query to analyze")],
+    ctx: Context,
+    index_name: Annotated[
+        str | None,
+        Field(
+            description="Name of the index to search. If not provided, auto-detects from current working directory."
+        ),
+    ] = None,
+    limit: Annotated[int, Field(description="Maximum results to return")] = 10,
+    language: Annotated[
+        str | None,
+        Field(
+            description="Filter by language (e.g., python, typescript, hcl). "
+            "Comma-separated for multiple."
+        ),
+    ] = None,
+    use_hybrid_search: Annotated[
+        bool | None,
+        Field(
+            description="Enable hybrid search. "
+            "None=auto, True=always hybrid, False=vector-only"
+        ),
+    ] = None,
+    symbol_type: Annotated[
+        str | list[str] | None,
+        Field(
+            description="Filter by symbol type: 'function', 'class', 'method', 'interface'"
+        ),
+    ] = None,
+    symbol_name: Annotated[
+        str | None,
+        Field(
+            description="Filter by symbol name pattern (glob). Examples: 'get*', '*Handler'"
+        ),
+    ] = None,
+) -> dict:
+    """Analyze the search pipeline for a query with stage-by-stage diagnostics.
+
+    Runs the same pipeline as search_code but captures diagnostics at each stage:
+    query analysis, mode selection, cache status, vector search, keyword search,
+    RRF fusion, definition boost, filtering, and per-stage timing breakdown.
+
+    Use this to understand WHY a query returns specific results — which identifiers
+    were detected, whether hybrid mode kicked in, how RRF scored results, or
+    where time was spent.
+    """
+    # Auto-detect index if not provided (same logic as search_code)
+    if index_name is None:
+        detected_path, source = await _detect_project(ctx)
+        root_path = detected_path
+
+        from cocosearch.management.context import find_project_root
+
+        project_root, detection_method = find_project_root(detected_path)
+        if project_root is not None:
+            root_path = project_root
+
+        index_name = resolve_index_name(
+            root_path, detection_method if project_root else None
+        )
+
+        # Check if index exists
+        indexes = mgmt_list_indexes()
+        index_names = {idx["name"] for idx in indexes}
+
+        if index_name not in index_names:
+            return {
+                "error": "Index not found",
+                "message": (
+                    f"Project detected at {root_path} but not indexed. "
+                    f"Index first: index_codebase(path='{root_path}')"
+                ),
+            }
+
+    # Initialize CocoIndex
+    try:
+        _ensure_cocoindex_init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed: {e}")
+        return {
+            "error": "Database not initialized",
+            "message": "Index a codebase first using index_codebase(path='.')",
+        }
+
+    # Run analysis
+    try:
+        result = run_analyze(
+            query=query,
+            index_name=index_name,
+            limit=limit,
+            language_filter=language,
+            use_hybrid=use_hybrid_search,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            no_cache=True,  # Always bypass cache for analysis
+        )
+        return result.to_dict()
+    except ValueError as e:
+        return {"error": "Analysis failed", "message": str(e)}
+    except Exception as e:
+        logger.error(f"Analyze failed: {e}")
+        return {"error": "Analysis failed", "message": str(e)}
 
 
 @mcp.tool()

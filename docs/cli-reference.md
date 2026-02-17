@@ -61,6 +61,37 @@ uv run cocosearch search "database connection lang:go"
 uv run cocosearch search --interactive
 ```
 
+### Pipeline Analysis
+
+`uv run cocosearch analyze <query> [options]`
+
+Run the search pipeline with stage-by-stage diagnostics. Shows query analysis, mode selection, cache status, vector search results, keyword search results, RRF fusion breakdown, definition boost effects, filtering, and timing.
+
+| Flag              | Description                        | Default              |
+| ----------------- | ---------------------------------- | -------------------- |
+| `-n, --index`     | Index to search                    | Auto-detect from cwd |
+| `-l, --limit`     | Max results                        | 10                   |
+| `--lang`          | Filter by language                 | None                 |
+| `--min-score`     | Minimum similarity (0-1)           | 0.3                  |
+| `--hybrid`        | Force hybrid search                | Auto-detect          |
+| `--symbol-type`   | Filter by symbol type (repeatable) | None                 |
+| `--symbol-name`   | Filter by symbol name pattern      | None                 |
+| `--no-cache`      | Bypass query cache                 | Off                  |
+| `--json`          | Output as JSON (default: Rich)     | Off                  |
+
+**Examples:**
+
+```bash
+# Analyze why a query returns specific results
+uv run cocosearch analyze "getUserById"
+
+# JSON output for scripting
+uv run cocosearch analyze "database connection pool" --json
+
+# Analyze with language filter
+uv run cocosearch analyze "error handling" --lang python
+```
+
 ### Managing Indexes
 
 **List indexes:** `uv run cocosearch list [--pretty]`

@@ -43,6 +43,11 @@ from cocosearch.management import (
     set_index_status,
 )
 from cocosearch.search import search
+from cocosearch.search.analyze import (
+    analyze,
+    format_analysis_json,
+    format_analysis_pretty,
+)
 from cocosearch.search.formatter import format_json, format_pretty
 from cocosearch.search.query import (
     LANGUAGE_EXTENSIONS,
@@ -488,6 +493,99 @@ def search_command(args: argparse.Namespace) -> int:
                 smart_context=smart_context,
             )
         )
+
+    return 0
+
+
+def analyze_command(args: argparse.Namespace) -> int:
+    """Execute the analyze command.
+
+    Runs the search pipeline with diagnostics at each stage.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, 1 for error).
+    """
+    console = Console()
+
+    # Initialize CocoIndex (required for embedding generation)
+    try:
+        cocoindex.init()
+    except Exception:
+        console.print("[dim]No indexes found. Index a codebase first:[/dim]")
+        console.print("  cocosearch index <path>")
+        return 1
+
+    # Load config
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+
+    # Resolve search settings
+    limit, _ = resolver.resolve(
+        "search.resultLimit",
+        cli_value=args.limit if args.limit != 10 else None,
+        env_var="COCOSEARCH_SEARCH_RESULT_LIMIT",
+    )
+    min_score, _ = resolver.resolve(
+        "search.minScore",
+        cli_value=args.min_score if args.min_score != 0.3 else None,
+        env_var="COCOSEARCH_SEARCH_MIN_SCORE",
+    )
+
+    if not args.query:
+        console.print("[bold red]Error:[/bold red] Query required")
+        return 1
+
+    # Parse query for inline filters
+    query, inline_lang = parse_query_filters(args.query)
+    lang_filter = args.lang or inline_lang
+
+    # Determine hybrid mode
+    use_hybrid = True if getattr(args, "hybrid", None) else None
+
+    # Symbol filters
+    symbol_type = getattr(args, "symbol_type", None)
+    symbol_name = getattr(args, "symbol_name", None)
+
+    # Cache bypass
+    no_cache = getattr(args, "no_cache", False)
+
+    # Execute analysis
+    try:
+        result = analyze(
+            query=query,
+            index_name=index_name,
+            limit=limit,
+            min_score=min_score,
+            language_filter=lang_filter,
+            use_hybrid=use_hybrid,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            no_cache=no_cache,
+        )
+    except Exception as e:
+        if args.json:
+            print(json.dumps({"error": str(e)}))
+        else:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    # Output
+    if args.json:
+        print(format_analysis_json(result))
+    else:
+        format_analysis_pretty(result, index_name)
 
     return 0
 
@@ -1768,6 +1866,73 @@ def main() -> None:
         help="Bypass query cache (force fresh search)",
     )
 
+    # Analyze subcommand
+    analyze_parser = subparsers.add_parser(
+        "analyze",
+        help="Analyze the search pipeline for a query",
+        description="Run the search pipeline with diagnostics showing each stage: "
+        "query analysis, mode selection, cache, vector search, keyword search, "
+        "RRF fusion, definition boost, filtering, and timing breakdown.",
+    )
+    analyze_parser.add_argument(
+        "query",
+        help="Search query to analyze",
+    )
+    add_config_arg(
+        analyze_parser,
+        "-n",
+        "--index",
+        config_key="indexName",
+        help_text="Index name (default: auto-detect from cwd)",
+    )
+    add_config_arg(
+        analyze_parser,
+        "-l",
+        "--limit",
+        config_key="search.resultLimit",
+        help_text="Maximum results (default: 10)",
+        type=int,
+        default=10,
+    )
+    analyze_parser.add_argument(
+        "--lang",
+        help="Filter by language (e.g., python, typescript, hcl)",
+    )
+    add_config_arg(
+        analyze_parser,
+        "--min-score",
+        config_key="search.minScore",
+        help_text="Minimum similarity score 0-1 (default: 0.3)",
+        type=float,
+        default=0.3,
+    )
+    analyze_parser.add_argument(
+        "--hybrid",
+        action="store_true",
+        default=None,
+        help="Force hybrid search mode",
+    )
+    analyze_parser.add_argument(
+        "--symbol-type",
+        help="Filter by symbol type (function, class, method, interface)",
+        action="append",
+        dest="symbol_type",
+    )
+    analyze_parser.add_argument(
+        "--symbol-name",
+        help="Filter by symbol name pattern (glob)",
+    )
+    analyze_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass query cache",
+    )
+    analyze_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON (default: Rich panels)",
+    )
+
     # List subcommand
     list_parser = subparsers.add_parser(
         "list",
@@ -1967,6 +2132,7 @@ def main() -> None:
     known_subcommands = (
         "index",
         "search",
+        "analyze",
         "list",
         "stats",
         "languages",
@@ -1984,7 +2150,7 @@ def main() -> None:
     # e.g., `cocosearch helm_charts stats` → `cocosearch stats helm_charts`
     # e.g., `cocosearch helm_charts search "query"` → `cocosearch search -n helm_charts "query"`
     index_positional_subcommands = {"stats", "clear"}
-    index_flag_subcommands = {"search", "index"}
+    index_flag_subcommands = {"search", "analyze", "index"}
     index_aware_subcommands = index_positional_subcommands | index_flag_subcommands
 
     if (
@@ -2018,6 +2184,7 @@ def main() -> None:
     _command_registry: dict[str, Any] = {
         "index": index_command,
         "search": search_command,
+        "analyze": analyze_command,
         "list": list_command,
         "stats": stats_command,
         "languages": languages_command,
