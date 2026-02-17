@@ -81,48 +81,59 @@ This project was originally built for personal use — a solo experiment in loca
 
 ## Quick Start
 
-```bash
-# 1. Clone this repository and start infrastructure:
-git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
-# Docker volumes are bind-mounted to ./docker_data/ inside the repository,
-# so infrastructure must be started from the cloned repo directory.
-docker compose up -d
-# 2. Verify services are ready.
-uvx cocosearch config check
-# 3. Index your project (or use WEB dashboard).
-uvx cocosearch index .
-# 4. Register with your AI assistant (pick one):
-```
+- **Services**:
 
-**Option A — Plugin (recommended):**
+  ```bash
+  # 1. Clone this repository and start infrastructure:
+  git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
+  # Docker volumes are bind-mounted to ./docker_data/ inside the repository,
+  # so infrastructure must be started from the cloned repo directory.
+  docker compose up -d
+  # 2. Verify services are ready.
+  uvx cocosearch config check
+  ```
 
-```bash
-claude plugin marketplace add VioletCranberry/coco-s
-claude plugin install cocosearch@cocosearch
-# All 7 skills + MCP server configured automatically
-```
+- **Indexing your projects**:
 
-<p align="center">
-  <img src="./docs/plugin-examples.png" alt="CocoSearch plugin skills in Claude Code" width="720">
-</p>
+  ```bash
+  # 3.1 Use WEB Dashboard:
+  uvx cocosearch dashboard
+  # 3.2 Use CLI:
+  uvx cocosearch index .
+  # 3.3 Use AI and MCP - see below.
+  ```
 
-**Option B — Manual MCP registration:**
+- **Register with your AI assistant (pick one)**:
 
-```bash
-claude mcp add --scope user cocosearch -- \
-  uvx cocosearch mcp --project-from-cwd
-```
+  **Option A — Plugin (recommended):**
 
-> **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
+  ```bash
+  claude plugin marketplace add VioletCranberry/coco-s
+  claude plugin install cocosearch@cocosearch
+  # All 7 skills + MCP server configured automatically
+  ```
 
-Install skills manually (for development):
+  <p align="center">
+    <img src="./docs/plugin-examples.png" alt="CocoSearch plugin skills in Claude Code" width="720">
+  </p>
 
-```bash
-mkdir -p .claude/skills
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway; do
-    ln -sfn "../../skills/$skill" ".claude/skills/$skill"
-done
-```
+  **Option B — Manual MCP registration:**
+
+  ```bash
+  claude mcp add --scope user cocosearch -- \
+    uvx cocosearch mcp --project-from-cwd
+  ```
+
+  > **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
+
+  Install skills manually (for development):
+
+  ```bash
+  mkdir -p .claude/skills
+  for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway; do
+      ln -sfn "../../skills/$skill" ".claude/skills/$skill"
+  done
+  ```
 
 ## Features
 

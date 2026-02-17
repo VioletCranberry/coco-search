@@ -68,6 +68,44 @@ class TestHasIdentifierPattern:
         """Test whitespace-only query."""
         assert has_identifier_pattern("   ") is False
 
+    def test_no_match_for_proper_nouns_short(self):
+        """Test that short proper nouns with mixed case don't trigger detection."""
+        assert has_identifier_pattern("How do I publish to PyPi?") is False
+        assert has_identifier_pattern("macOS compatibility") is False
+        assert has_identifier_pattern("How does GitHub Actions work?") is False
+        assert has_identifier_pattern("setup FastAPI server") is False
+
+    def test_still_matches_long_pascal_case(self):
+        """Test that long PascalCase words (8+ chars) still match as identifiers."""
+        assert has_identifier_pattern("JavaScript ecosystem") is True
+        assert has_identifier_pattern("PostgreSQL connection") is True
+        assert has_identifier_pattern("how to use CocoIndex") is True
+
+    def test_camelcase_requires_lowercase_start(self):
+        """Test that camelCase detection requires word to start lowercase."""
+        assert has_identifier_pattern("getUserById") is True
+        assert has_identifier_pattern("isValid") is True
+        assert has_identifier_pattern("httpGet") is True
+        # These start uppercase — not camelCase
+        assert has_identifier_pattern("PyPi") is False
+        assert has_identifier_pattern("macOS") is False
+
+    def test_camelcase_requires_min_length(self):
+        """Test that camelCase detection requires 6+ character words."""
+        assert has_identifier_pattern("myVar") is False  # 5 chars
+        assert has_identifier_pattern("isOk") is False  # 4 chars
+        assert has_identifier_pattern("myFunc") is True  # 6 chars
+        assert has_identifier_pattern("isValid") is True  # 7 chars
+
+    def test_pascal_case_requires_min_length(self):
+        """Test that PascalCase detection requires 8+ character words."""
+        assert has_identifier_pattern("PyPi") is False  # 4 chars
+        assert has_identifier_pattern("GitHub") is False  # 6 chars
+        assert has_identifier_pattern("FastAPI") is False  # 7 chars
+        assert has_identifier_pattern("HttpClient") is True  # 10 chars
+        assert has_identifier_pattern("UserRepository") is True  # 14 chars
+        assert has_identifier_pattern("MyClassName") is True  # 11 chars
+
 
 class TestNormalizeQueryForKeyword:
     """Tests for normalize_query_for_keyword function."""

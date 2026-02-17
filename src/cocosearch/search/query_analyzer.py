@@ -18,14 +18,18 @@ def has_identifier_pattern(query: str) -> bool:
     """Detect if query contains code identifier patterns.
 
     Returns True if query contains:
-    - camelCase: getUserById, myFunction
-    - PascalCase: UserRepository, HttpClient
-    - snake_case: get_user_by_id, my_function
+    - camelCase: getUserById, myFunction (must start lowercase, 6+ chars)
+    - PascalCase: UserRepository, HttpClient (8+ chars)
+    - snake_case: get_user_by_id, my_function (any length)
 
     Returns False for:
     - Plain English: "authentication handler", "database connection"
     - Single words: "user", "auth"
     - Acronyms alone: "HTTP", "API"
+    - Proper nouns with mixed case: "PyPi", "GitHub", "FastAPI", "macOS"
+
+    Works on individual words to avoid false positives from proper nouns
+    that resemble code identifiers.
 
     Args:
         query: Search query string
@@ -43,26 +47,40 @@ def has_identifier_pattern(query: str) -> bool:
         False
         >>> has_identifier_pattern("find getUserById function")
         True
+        >>> has_identifier_pattern("How do I publish to PyPi?")
+        False
     """
-    # Pattern for camelCase: lowercase followed by uppercase
-    # e.g., "getUser" has "tU" transition
+    # Pattern for camelCase: must start with lowercase AND contain
+    # a lowercase-to-uppercase transition AND be 6+ chars.
+    # Filters out proper nouns like PyPi, macOS that start uppercase.
     camel_case_pattern = re.compile(r"[a-z][A-Z]")
 
-    # Pattern for PascalCase with multiple words: Uppercase followed by
-    # lowercase, then another uppercase (e.g., UserRepository)
+    # Pattern for PascalCase: uppercase followed by lowercase, then another
+    # uppercase (e.g., UserRepository). Word must be 8+ chars to filter
+    # short proper nouns like PyPi (4), GitHub (6), FastAPI (7).
     pascal_case_pattern = re.compile(r"[A-Z][a-z]+[A-Z]")
 
-    # Pattern for snake_case: word characters separated by underscore
-    # Must have at least one underscore between alphanumeric parts
+    # Pattern for snake_case: word characters separated by underscore.
+    # Any length — underscores are a strong code signal.
     snake_case_pattern = re.compile(r"[a-zA-Z0-9]+_[a-zA-Z0-9]+")
 
-    # Check for any identifier pattern
-    if camel_case_pattern.search(query):
-        return True
-    if pascal_case_pattern.search(query):
-        return True
-    if snake_case_pattern.search(query):
-        return True
+    # Extract words (sequences of word characters) and check each individually
+    word_pattern = re.compile(r"[a-zA-Z0-9_]+")
+
+    for match in word_pattern.finditer(query):
+        word = match.group()
+
+        # snake_case: any word with underscore between alphanumeric parts
+        if snake_case_pattern.search(word):
+            return True
+
+        # camelCase: word starts lowercase, has lc→UC transition, 6+ chars
+        if len(word) >= 6 and word[0].islower() and camel_case_pattern.search(word):
+            return True
+
+        # PascalCase: has UC→lc→UC pattern, 8+ chars
+        if len(word) >= 8 and pascal_case_pattern.search(word):
+            return True
 
     return False
 
