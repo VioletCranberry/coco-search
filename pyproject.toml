@@ -1,6 +1,6 @@
 [project]
 name = "cocosearch"
-version = "0.1.1"
+version = "0.1.3"
 description = "Local-first code search via MCP/CLI"
 readme = "README.md"
 authors = [
