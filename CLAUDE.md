@@ -69,7 +69,7 @@ uv run cocosearch mcp --project-from-cwd
 - **`cli.py`** — Argparse CLI orchestrating all subcommands
 - **`exceptions.py`** — Structured exception hierarchy: `CocoSearchError` (base), `IndexNotFoundError`, `IndexValidationError`, `SearchError`, `InfrastructureError`. Inherits from `ValueError` where needed for backward compatibility.
 - **`validation.py`** — Input validation guards: `validate_index_name()` (SQL injection protection for dynamic table names), `validate_query()` (resource exhaustion protection, max 10,000 chars)
-- **`mcp/server.py`** — MCP server exposing tools (search_code, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/health`, `/api/heartbeat` SSE)
+- **`mcp/server.py`** — MCP server exposing tools (search_code, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (15 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py`), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
@@ -107,6 +107,7 @@ Symbol extraction tests live in `tests/unit/indexer/symbols/` (one file per lang
 Three independent systems — a language can use any combination. See `docs/adding-languages.md` for the full guide.
 
 **Language Handler** (custom chunking for languages not in CocoIndex's built-in list):
+
 1. Copy `src/cocosearch/handlers/_template.py` to `<language>.py`
 2. Define `EXTENSIONS`, `SEPARATOR_SPEC` (using `CustomLanguageSpec`), and `extract_metadata()`
 3. Add file extensions to `include_patterns` in `src/cocosearch/indexer/config.py`
@@ -114,11 +115,13 @@ Three independent systems — a language can use any combination. See `docs/addi
 5. Create `tests/unit/handlers/test_<language>.py`
 
 **Symbol Extraction** (enables `--symbol-type`/`--symbol-name` filtering):
+
 1. Create `src/cocosearch/indexer/queries/<language>.scm` with tree-sitter queries
 2. Add the language to `LANGUAGE_MAP` in `src/cocosearch/indexer/symbols.py`
 3. Create `tests/unit/indexer/symbols/test_<language>.py`
 
 **Grammar Handler** (domain-specific chunking within a base language, e.g. GitHub Actions within YAML):
+
 1. Copy `src/cocosearch/handlers/grammars/_template.py` to `<grammar>.py`
 2. Define path patterns, content matchers, separators, and metadata extraction
 3. Create `tests/unit/handlers/test_<grammar>.py`
@@ -131,7 +134,7 @@ When exploring or searching this codebase, prefer CocoSearch MCP tools (`search_
 
 ## Configuration
 
-Project config via `cocosearch.yaml` (no leading dot) in project root. The `indexName` field sets the index name used by all commands. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). Config keys map to env vars via camelCase→UPPER_SNAKE conversion (e.g., `indexName` → `COCOSEARCH_INDEX_NAME`). See `.env.example` for available options.
+Project config via `cocosearch.yaml` (no leading dot) in project root. The `indexName` field sets the index name used by all commands. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). Config keys map to env vars via camelCase→UPPER_SNAKE conversion (e.g., `indexName` → `COCOSEARCH_INDEX_NAME`). `COCOSEARCH_EDITOR` is a runtime env var (not a config field) for the dashboard's "Open in Editor" feature — falls back to `$EDITOR` then `$VISUAL`. See `.env.example` for available options.
 
 ## Documentation Policy
 
@@ -149,6 +152,7 @@ Documentation updates should be part of the same change, not deferred to a follo
 When this plugin is active, you have access to MCP tools and workflow skills for code search.
 
 ### MCP Tools
+
 - `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`.
 - `index_codebase` — Index a directory for search
 - `list_indexes` — List all available indexes
@@ -156,6 +160,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 - `clear_index` — Remove an index
 
 ### Search Best Practices
+
 - Always check `cocosearch.yaml` for `indexName` first — use it for all operations
 - `use_hybrid_search=True` — combines semantic + keyword via RRF fusion
 - `smart_context=True` — expands to full function/class boundaries via Tree-sitter
@@ -164,6 +169,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 - Prefer CocoSearch tools over Grep/Glob for semantic and intent-based queries
 
 ### Workflow Skills
+
 - `/cocosearch:cocosearch-quickstart` — First-time setup and verification
 - `/cocosearch:cocosearch-onboarding` — Guided codebase tour
 - `/cocosearch:cocosearch-explore` — "How does X work?" (autonomous or interactive)
@@ -173,4 +179,5 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 - `/cocosearch:cocosearch-subway` — Codebase visualization as subway map
 
 ### Prerequisites
+
 Docker running PostgreSQL 17 (pgvector) on port 5432 and Ollama on port 11434. Use `/cocosearch:cocosearch-quickstart` to verify.

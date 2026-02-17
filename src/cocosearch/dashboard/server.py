@@ -60,6 +60,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith("/api/stats/"):
             index_name = self.path.split("/api/stats/", 1)[1].split("?")[0]
             self._serve_single_stats(index_name)
+        elif self.path.startswith("/api/file-content"):
+            self._handle_file_content()
         else:
             self.send_error(404)
 
@@ -74,6 +76,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._handle_delete_index()
         elif self.path == "/api/search":
             self._handle_search()
+        elif self.path == "/api/open-in-editor":
+            self._handle_open_in_editor()
         else:
             self.send_error(404)
 
@@ -86,6 +90,82 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._json_response({"error": "Invalid JSON body"}, status=400)
             return None
+
+    def _handle_open_in_editor(self):
+        import subprocess
+        from cocosearch.mcp.server import (
+            _validate_file_path,
+            _resolve_editor,
+            _build_editor_command,
+        )
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        file_path = body.get("file_path", "")
+        line = body.get("line")
+
+        path_error = _validate_file_path(file_path)
+        if path_error:
+            self._json_response({"error": path_error}, status=400)
+            return
+
+        editor = _resolve_editor()
+        if not editor:
+            self._json_response(
+                {
+                    "error": "No editor configured. Set COCOSEARCH_EDITOR, EDITOR, or VISUAL environment variable."
+                },
+                status=400,
+            )
+            return
+
+        try:
+            cmd = _build_editor_command(editor, file_path, line)
+            subprocess.Popen(cmd)  # noqa: S603
+            self._json_response({"success": True})
+        except Exception as e:
+            self._json_response({"error": f"Failed to open editor: {e}"}, status=500)
+
+    def _handle_file_content(self):
+        from urllib.parse import urlparse, parse_qs
+        from cocosearch.mcp.server import _validate_file_path, _get_prism_language
+
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        file_path = params.get("path", [""])[0]
+
+        path_error = _validate_file_path(file_path)
+        if path_error:
+            self._json_response({"error": path_error}, status=400)
+            return
+
+        max_lines = 50_000
+        try:
+            with open(file_path, encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+
+            truncated = len(lines) > max_lines
+            if truncated:
+                lines = lines[:max_lines]
+
+            content = "".join(lines)
+            language = _get_prism_language(file_path)
+            total_lines = len(lines)
+
+            result = {
+                "content": content,
+                "language": language,
+                "lines": total_lines,
+            }
+            if truncated:
+                result["truncated"] = True
+                result["message"] = f"File truncated to {max_lines:,} lines"
+
+            self._json_response(result)
+        except Exception as e:
+            self._json_response({"error": f"Failed to read file: {e}"}, status=500)
 
     def _handle_search(self):
         import time

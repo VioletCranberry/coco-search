@@ -14,7 +14,7 @@
     "cocosearch": {
       "command": "uvx",
       "args": [
-        "--from", "git+https://github.com/VioletCranberry/coco-s",
+        "--from", "cocosearch",
         "cocosearch", "mcp", "--project-from-cwd"
       ]
     }

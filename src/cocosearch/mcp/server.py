@@ -614,6 +614,80 @@ async def api_search(request) -> JSONResponse:
     )
 
 
+@mcp.custom_route("/api/open-in-editor", methods=["POST"])
+async def api_open_in_editor(request) -> JSONResponse:
+    """Open a file in the user's configured editor with optional line jump."""
+    import subprocess
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    file_path = body.get("file_path", "")
+    line = body.get("line")
+
+    # Validate path
+    path_error = _validate_file_path(file_path)
+    if path_error:
+        return JSONResponse({"error": path_error}, status_code=400)
+
+    # Resolve editor
+    editor = _resolve_editor()
+    if not editor:
+        return JSONResponse(
+            {
+                "error": "No editor configured. Set COCOSEARCH_EDITOR, EDITOR, or VISUAL environment variable."
+            },
+            status_code=400,
+        )
+
+    # Build and run command
+    try:
+        cmd = _build_editor_command(editor, file_path, line)
+        subprocess.Popen(cmd)  # noqa: S603 — fire-and-forget, path validated above
+        return JSONResponse({"success": True})
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to open editor: {e}"}, status_code=500)
+
+
+@mcp.custom_route("/api/file-content", methods=["GET"])
+async def api_file_content(request) -> JSONResponse:
+    """Read a file and return its content with language detection for syntax highlighting."""
+    file_path = request.query_params.get("path", "")
+
+    # Validate path
+    path_error = _validate_file_path(file_path)
+    if path_error:
+        return JSONResponse({"error": path_error}, status_code=400)
+
+    max_lines = 50_000
+    try:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+
+        truncated = len(lines) > max_lines
+        if truncated:
+            lines = lines[:max_lines]
+
+        content = "".join(lines)
+        language = _get_prism_language(file_path)
+        total_lines = len(lines)
+
+        result = {
+            "content": content,
+            "language": language,
+            "lines": total_lines,
+        }
+        if truncated:
+            result["truncated"] = True
+            result["message"] = f"File truncated to {max_lines:,} lines"
+
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to read file: {e}"}, status_code=500)
+
+
 def _get_treesitter_language(ext: str) -> str | None:
     """Map file extension to tree-sitter language name."""
     mapping = {
@@ -630,6 +704,176 @@ def _get_treesitter_language(ext: str) -> str | None:
         "rs": "rust",
     }
     return mapping.get(ext)
+
+
+# Extended mapping for Prism.js syntax highlighting (superset of tree-sitter mapping)
+_EXT_TO_PRISM_LANGUAGE: dict[str, str] = {
+    "py": "python",
+    "js": "javascript",
+    "jsx": "jsx",
+    "mjs": "javascript",
+    "cjs": "javascript",
+    "ts": "typescript",
+    "tsx": "tsx",
+    "mts": "typescript",
+    "cts": "typescript",
+    "go": "go",
+    "rs": "rust",
+    "rb": "ruby",
+    "java": "java",
+    "kt": "kotlin",
+    "kts": "kotlin",
+    "scala": "scala",
+    "cs": "csharp",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "c": "c",
+    "h": "c",
+    "hpp": "cpp",
+    "swift": "swift",
+    "php": "php",
+    "lua": "lua",
+    "r": "r",
+    "R": "r",
+    "sh": "bash",
+    "bash": "bash",
+    "zsh": "bash",
+    "fish": "bash",
+    "ps1": "powershell",
+    "sql": "sql",
+    "html": "html",
+    "htm": "html",
+    "css": "css",
+    "scss": "scss",
+    "sass": "sass",
+    "less": "less",
+    "json": "json",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "toml": "toml",
+    "xml": "xml",
+    "md": "markdown",
+    "markdown": "markdown",
+    "tf": "hcl",
+    "hcl": "hcl",
+    "dockerfile": "docker",
+    "Dockerfile": "docker",
+    "proto": "protobuf",
+    "graphql": "graphql",
+    "gql": "graphql",
+    "vim": "vim",
+    "el": "lisp",
+    "clj": "clojure",
+    "ex": "elixir",
+    "exs": "elixir",
+    "erl": "erlang",
+    "hs": "haskell",
+    "ml": "ocaml",
+    "mli": "ocaml",
+    "dart": "dart",
+    "groovy": "groovy",
+    "gradle": "groovy",
+    "pl": "perl",
+    "pm": "perl",
+    "ini": "ini",
+    "cfg": "ini",
+    "conf": "ini",
+    "diff": "diff",
+    "patch": "diff",
+    "makefile": "makefile",
+    "Makefile": "makefile",
+    "cmake": "cmake",
+}
+
+
+def _get_prism_language(file_path: str) -> str:
+    """Detect Prism.js language from file path. Returns 'plain' as fallback."""
+    name = os.path.basename(file_path)
+    # Handle dotfiles/exact names
+    lower = name.lower()
+    if lower in ("dockerfile", "makefile", "cmakelists.txt"):
+        special = {
+            "dockerfile": "docker",
+            "makefile": "makefile",
+            "cmakelists.txt": "cmake",
+        }
+        return special.get(lower, "plain")
+    ext = name.rsplit(".", 1)[-1] if "." in name else ""
+    return _EXT_TO_PRISM_LANGUAGE.get(ext, "plain")
+
+
+def _validate_file_path(file_path: str) -> str | None:
+    """Validate a file path for security. Returns error message or None if valid."""
+    if not file_path:
+        return "file_path is required"
+    if not os.path.isabs(file_path):
+        return "file_path must be absolute"
+    if ".." in Path(file_path).parts:
+        return "path traversal not allowed"
+    if not os.path.isfile(file_path):
+        return "file not found"
+    return None
+
+
+def _resolve_editor() -> str | None:
+    """Resolve editor from env var chain: COCOSEARCH_EDITOR → EDITOR → VISUAL."""
+    return (
+        os.environ.get("COCOSEARCH_EDITOR")
+        or os.environ.get("EDITOR")
+        or os.environ.get("VISUAL")
+        or None
+    )
+
+
+def _build_editor_command(editor: str, file_path: str, line: int | None) -> list[str]:
+    """Build editor command with line-number flag based on known editor patterns."""
+    import shutil
+
+    # Get the base editor name (handle paths like /usr/bin/vim)
+    editor_base = os.path.basename(editor).lower()
+
+    # Resolve editor binary path
+    editor_path = shutil.which(editor) or editor
+
+    if line is None or line < 1:
+        return [editor_path, file_path]
+
+    # VS Code family
+    if editor_base in ("code", "code-insiders"):
+        return [editor_path, "--goto", f"{file_path}:{line}"]
+
+    # Vim family
+    if editor_base in ("vim", "nvim", "vi"):
+        return [editor_path, f"+{line}", file_path]
+
+    # Nano
+    if editor_base == "nano":
+        return [editor_path, f"+{line}", file_path]
+
+    # Emacs family
+    if editor_base in ("emacs", "emacsclient"):
+        return [editor_path, f"+{line}", file_path]
+
+    # Sublime Text
+    if editor_base in ("subl", "sublime", "sublime_text"):
+        return [editor_path, f"{file_path}:{line}"]
+
+    # JetBrains family
+    if editor_base in (
+        "idea",
+        "goland",
+        "pycharm",
+        "webstorm",
+        "phpstorm",
+        "rubymine",
+        "clion",
+        "rider",
+    ):
+        return [editor_path, "--line", str(line), file_path]
+
+    # Unknown editor — no line jump
+    return [editor_path, file_path]
 
 
 @mcp.tool()

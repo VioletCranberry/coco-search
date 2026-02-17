@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://pypi.org/project/cocosearch/"><img src="https://img.shields.io/pypi/v/cocosearch?color=blue&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-%3E%3D3.11-blue?logo=python&logoColor=white" alt="Python >= 3.11"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
@@ -87,9 +88,9 @@ git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
 # so infrastructure must be started from the cloned repo directory.
 docker compose up -d
 # 2. Verify services are ready.
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch config check
+uvx cocosearch config check
 # 3. Index your project (or use WEB dashboard).
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index .
+uvx cocosearch index .
 # 4. Register with your AI assistant (pick one):
 ```
 
@@ -109,7 +110,7 @@ claude plugin install cocosearch@cocosearch
 
 ```bash
 claude mcp add --scope user cocosearch -- \
-  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+  uvx cocosearch mcp --project-from-cwd
 ```
 
 > **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
@@ -147,19 +148,19 @@ Search your code four ways — pick what fits your workflow:
 
 ```bash
 # Index a project
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch index /path/to/project
+uvx cocosearch index /path/to/project
 
 # Search with natural language
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search "authentication flow" --pretty
+uvx cocosearch search "authentication flow" --pretty
 
 # Serve CocoSearch WEB dashboard
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch dashboard
+uvx cocosearch dashboard
 
 # Start interactive REPL
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch search --interactive
+uvx cocosearch search --interactive
 
 # View index stats with parse health
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --pretty
+uvx cocosearch stats --pretty
 
 ❯ uv run cocosearch stats --pretty
 
@@ -208,10 +209,10 @@ Parse health: 100.0% clean (162/162 files)
 └──────────┴───────┴─────┴─────────┴───────┴────────────┘
 
 # View index stats with parse health live
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch stats --live
+uvx cocosearch stats --live
 
 # List all indexes
-uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch list --pretty
+uvx cocosearch list --pretty
 
 ┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
 ┃ Name       ┃ Table                                      ┃ Branch                  ┃ Status  ┃
@@ -237,6 +238,12 @@ For the full list of commands and flags, see [CLI Reference](./docs/cli-referenc
   <img src="./docs/dashboard-dark.png" alt="CocoSearch dashboard — dark theme" width="480">
   &nbsp;&nbsp;
   <img src="./docs/dashboard-light.png" alt="CocoSearch dashboard — light theme" width="480">
+</p>
+
+<p align="center">
+  <img src="./docs/dashboard-search-light.png" alt="CocoSearch dashboard — search results with file actions" width="480">
+  &nbsp;&nbsp;
+  <img src="./docs/dashboard-open-file-dark.png" alt="CocoSearch dashboard — file viewer modal" width="480">
 </p>
 
 </details>

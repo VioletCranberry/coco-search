@@ -6,6 +6,11 @@
     <title>Coco[-S]earch</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%23f0a060' stroke-width='5'/%3E%3Cline x1='38' y1='38' x2='58' y2='58' stroke='%23e07840' stroke-width='6' stroke-linecap='round'/%3E%3Ctext x='24' y='31' text-anchor='middle' font-family='Courier New,Courier,monospace' font-size='18' fill='%23f0a060' font-weight='bold'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
     <style>
         :root {
             --bg-primary: #ffffff;
@@ -777,6 +782,128 @@
 
         .search-result-actions button:hover {
             background: var(--bg-secondary);
+        }
+
+        /* Clickable file path */
+        .search-result-path.clickable {
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+
+        .search-result-path.clickable:hover {
+            text-decoration: underline;
+        }
+
+        .search-result-path.clickable.copied {
+            color: var(--accent-green);
+        }
+
+        /* File viewer modal */
+        .file-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-modal-backdrop.visible {
+            display: flex;
+        }
+
+        .file-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            width: 90vw;
+            height: 85vh;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .file-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .file-modal-header .file-info {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--accent-blue);
+            word-break: break-all;
+        }
+
+        .file-modal-header .file-info .line-count {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-left: 12px;
+        }
+
+        .file-modal-close {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 2px 10px;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+
+        .file-modal-close:hover {
+            background: var(--bg-secondary);
+        }
+
+        .file-modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+        }
+
+        .file-modal-body pre {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+            border-radius: 0;
+            background: var(--bg-card) !important;
+        }
+
+        .file-modal-body pre code {
+            background: none !important;
+        }
+
+        .file-modal-body .line-highlight {
+            background: rgba(255, 200, 50, 0.15) !important;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--accent-red);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 10001;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .toast.visible {
+            opacity: 1;
         }
 
         @media (max-width: 768px) {
@@ -2075,6 +2202,7 @@
                 const matchBadge = r.match_type ? `<span class="search-result-badge badge-match">${escapeHtml(r.match_type)}</span>` : '';
                 const langBadge = r.language_id ? `<span class="search-result-badge badge-lang">${escapeHtml(r.language_id)}</span>` : '';
                 const lineRange = r.start_line && r.end_line ? `Lines ${r.start_line}-${r.end_line}` : '';
+                const escapedPath = escapeHtml(r.file_path).replace(/'/g, "\\'");
 
                 let symbolHtml = '';
                 if (r.symbol_type || r.symbol_name) {
@@ -2092,7 +2220,7 @@
 
                 return `<div class="search-result-card">
                     <div class="search-result-header">
-                        <span class="search-result-path">${escapeHtml(r.file_path)}</span>
+                        <span class="search-result-path clickable" onclick="copyPathWithFeedback(this, '${escapedPath}')" title="Click to copy path">${escapeHtml(r.file_path)}</span>
                         <div class="search-result-meta">
                             <span style="font-size: 12px; color: var(--text-muted);">${escapeHtml(lineRange)}</span>
                             <span class="search-result-badge ${scoreClass}">${r.score.toFixed(2)}</span>
@@ -2106,8 +2234,10 @@
                         ${hasMore ? `<button class="expand-btn" onclick="toggleCodeExpand(${i}, this)" data-full="${fullText.replace(/"/g, '&quot;')}" data-preview="${previewText.replace(/"/g, '&quot;')}">Show all ${lines.length} lines</button>` : ''}
                     </div>
                     <div class="search-result-actions">
-                        <button onclick="copyToClipboard('${escapeHtml(r.file_path).replace(/'/g, "\\'")}')">Copy Path</button>
+                        <button onclick="copyToClipboard('${escapedPath}')">Copy Path</button>
                         <button onclick="copyToClipboard(document.getElementById('code-preview-${i}').textContent)">Copy Code</button>
+                        <button onclick="openInEditor('${escapedPath}', ${r.start_line || 1})">Open</button>
+                        <button onclick="viewFile('${escapedPath}', ${r.start_line || 1}, ${r.end_line || r.start_line || 1})">View File</button>
                     </div>
                 </div>`;
             }).join('');
@@ -2139,6 +2269,135 @@
             });
         }
 
+        // --- Clickable path with visual feedback ---
+        function copyPathWithFeedback(el, path) {
+            copyToClipboard(path);
+            // Flash green + show toast
+            el.classList.add('copied');
+            showToast('Copied!', 1500, 'success');
+            setTimeout(() => el.classList.remove('copied'), 1200);
+        }
+
+        // --- Toast notification ---
+        let toastTimer = null;
+        function showToast(message, duration = 3000, type = 'error') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'success' ? 'var(--accent-green)' : 'var(--accent-red)';
+            toast.classList.add('visible');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('visible'), duration);
+        }
+
+        // --- Resolve relative file paths to absolute ---
+        function resolveFilePath(filePath) {
+            if (filePath.startsWith('/')) return filePath;
+            // Get source path from current index stats or project context
+            const select = document.getElementById('indexSelect');
+            const idx = parseInt(select.value);
+            const stats = allIndexes[idx];
+            const basePath = (stats && stats.source_path)
+                || (projectContext && projectContext.project_path)
+                || '';
+            if (basePath) {
+                return basePath.replace(/\/$/, '') + '/' + filePath;
+            }
+            return filePath;
+        }
+
+        // --- Open in Editor ---
+        async function openInEditor(filePath, line) {
+            filePath = resolveFilePath(filePath);
+            try {
+                const resp = await fetch('/api/open-in-editor', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ file_path: filePath, line: line })
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    showToast(data.error || 'Failed to open editor');
+                }
+            } catch (err) {
+                showToast('Failed to open editor: ' + err.message);
+            }
+        }
+
+        // --- View File Modal ---
+        async function viewFile(filePath, startLine, endLine) {
+            filePath = resolveFilePath(filePath);
+            const backdrop = document.getElementById('fileModalBackdrop');
+            const pathEl = document.getElementById('fileModalPath');
+            const linesEl = document.getElementById('fileModalLines');
+            const codeEl = document.getElementById('fileModalCode');
+            const bodyEl = document.getElementById('fileModalBody');
+
+            // Show modal with loading state
+            pathEl.textContent = filePath;
+            linesEl.textContent = '';
+            codeEl.textContent = 'Loading...';
+            codeEl.className = '';
+            backdrop.classList.add('visible');
+
+            try {
+                const resp = await fetch('/api/file-content?path=' + encodeURIComponent(filePath));
+                const data = await resp.json();
+                if (!resp.ok) {
+                    codeEl.textContent = 'Error: ' + (data.error || 'Failed to load file');
+                    return;
+                }
+
+                linesEl.textContent = data.lines + ' lines' + (data.truncated ? ' (truncated)' : '');
+                const langClass = data.language && data.language !== 'plain' ? 'language-' + data.language : '';
+                codeEl.className = langClass;
+                codeEl.textContent = data.content;
+
+                // Re-run Prism highlighting
+                if (typeof Prism !== 'undefined') {
+                    Prism.highlightElement(codeEl);
+                }
+
+                // Scroll to matched line range and highlight
+                if (startLine && startLine > 0) {
+                    setTimeout(() => {
+                        highlightAndScrollToLine(bodyEl, startLine, endLine);
+                    }, 100);
+                }
+            } catch (err) {
+                codeEl.textContent = 'Error: ' + err.message;
+            }
+        }
+
+        function highlightAndScrollToLine(container, startLine, endLine) {
+            // Find line number elements from Prism line-numbers plugin
+            const lineRows = container.querySelectorAll('.line-numbers-rows > span');
+            if (lineRows.length > 0 && startLine <= lineRows.length) {
+                // Highlight the range by adding background
+                const start = Math.max(0, startLine - 1);
+                const end = Math.min(lineRows.length - 1, (endLine || startLine) - 1);
+                for (let i = start; i <= end; i++) {
+                    lineRows[i].style.background = 'rgba(255, 200, 50, 0.15)';
+                }
+                // Scroll the start line into view
+                lineRows[start].scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } else {
+                // Fallback: estimate line height and scroll
+                const pre = container.querySelector('pre');
+                if (pre) {
+                    const lineHeight = parseFloat(getComputedStyle(pre).lineHeight) || 20;
+                    container.scrollTop = (startLine - 1) * lineHeight - container.clientHeight / 3;
+                }
+            }
+        }
+
+        function closeFileModal() {
+            document.getElementById('fileModalBackdrop').classList.remove('visible');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeFileModal();
+        });
+
         // --- Server heartbeat (auto-close on disconnect) ---
         let isUnloading = false;
         window.addEventListener('beforeunload', () => { isUnloading = true; });
@@ -2167,6 +2426,25 @@
         // Initialize dashboard
         loadIndexList();
     </script>
+
+    <!-- File Viewer Modal -->
+    <div id="fileModalBackdrop" class="file-modal-backdrop" onclick="if(event.target===this)closeFileModal()">
+        <div class="file-modal">
+            <div class="file-modal-header">
+                <div class="file-info">
+                    <span id="fileModalPath"></span>
+                    <span id="fileModalLines" class="line-count"></span>
+                </div>
+                <button class="file-modal-close" onclick="closeFileModal()" title="Close (Esc)">&times;</button>
+            </div>
+            <div class="file-modal-body" id="fileModalBody">
+                <pre class="line-numbers"><code id="fileModalCode"></code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast for error messages -->
+    <div id="toast" class="toast"></div>
 
     <div id="disconnectOverlay" style="display:none; position:fixed; inset:0;
          background:rgba(0,0,0,0.85); z-index:9999; align-items:center;
