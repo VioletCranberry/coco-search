@@ -1094,12 +1094,13 @@
                 <div class="search-advanced-content">
                     <label>Min score: <input type="range" id="searchMinScore" min="0" max="1" step="0.05" value="0.3"> <span id="minScoreValue">0.3</span></label>
                     <label>Limit: <input type="number" id="searchLimit" min="1" max="50" value="10"></label>
-                    <label>Hybrid search:
+                    <label title="Combines semantic (vector) and keyword (tsvector) search via RRF fusion. Auto enables it only for code identifiers (camelCase, snake_case, PascalCase).">Hybrid search:
                         <select id="searchHybrid">
                             <option value="auto" selected>Auto</option>
                             <option value="on">On</option>
                             <option value="off">Off</option>
                         </select>
+                        <span style="font-size: 11px; color: var(--text-secondary); font-style: italic;">Auto = on for code identifiers only</span>
                     </label>
                 </div>
             </details>
@@ -1813,7 +1814,8 @@
                             select.value = String(selectedIndex);
                         }
                     } else {
-                        // Project not indexed — show the banner
+                        // Project not indexed — show the banner, hide loading
+                        document.getElementById('loadingMessage').style.display = 'none';
                         const banner = document.getElementById('notIndexedBanner');
                         document.getElementById('notIndexedPath').textContent = projectContext.project_path;
                         banner.style.display = 'block';
@@ -2003,9 +2005,12 @@
                     btn.disabled = false;
                     return;
                 }
-                // Hide the not-indexed banner
+                // Hide the not-indexed banner and loading message
                 document.getElementById('notIndexedBanner').style.display = 'none';
+                document.getElementById('loadingMessage').style.display = 'none';
                 showStatusBanner(data.message, 'info');
+                // Show dashboard immediately with indexing-in-progress state
+                document.getElementById('dashboardContent').style.display = 'block';
                 setButtonsDisabled(true);
                 // Immediately reflect indexing status in the Status card
                 const statusEl = document.getElementById('indexStatus');
@@ -2041,6 +2046,9 @@
                                 `<option value="${i}">${idx.name}</option>`
                             ).join('');
                             select.value = String(matchIdx);
+                            // Ensure dashboard is visible (may already be from indexCurrentProject)
+                            document.getElementById('loadingMessage').style.display = 'none';
+                            document.getElementById('dashboardContent').style.display = 'block';
                             updateDashboard(allIndexes[matchIdx]);
 
                             const status = allIndexes[matchIdx].status || 'indexed';
@@ -2049,9 +2057,6 @@
                                 setButtonsDisabled(false);
                                 showStatusBanner('Indexing complete', 'success');
                                 setTimeout(hideStatusBanner, 5000);
-                                // Show dashboard content now that we have data
-                                document.getElementById('loadingMessage').style.display = 'none';
-                                document.getElementById('dashboardContent').style.display = 'block';
                             }
                             return;
                         }

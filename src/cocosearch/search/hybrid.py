@@ -522,20 +522,21 @@ def hybrid_search(
             where_parts.append(symbol_where)
             where_params.extend(symbol_params)
 
-    # Add language filter conditions (handler language_id + filename-based)
+    # Add language filter conditions (handler/grammar language_id + filename-based)
     if language_filter:
         from cocosearch.search.query import (
             LANGUAGE_EXTENSIONS,
-            HANDLER_LANGUAGES,
+            _get_language_id_map,
             get_extension_patterns,
         )
 
+        lang_id_map = _get_language_id_map()
         languages = [lang.strip() for lang in language_filter.split(",")]
         lang_conditions = []
         for lang in languages:
-            if lang in HANDLER_LANGUAGES:
+            if lang in lang_id_map:
                 lang_conditions.append("language_id = %s")
-                where_params.append(HANDLER_LANGUAGES[lang])
+                where_params.append(lang_id_map[lang])
             elif lang in LANGUAGE_EXTENSIONS:
                 extensions = get_extension_patterns(lang)
                 ext_parts = ["filename LIKE %s" for _ in extensions]

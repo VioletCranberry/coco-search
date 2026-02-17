@@ -125,7 +125,56 @@ LANGUAGE_ALIASES = {
 
 # Combined set of all recognized language names for validation/suggestions.
 # Alias keys are NOT included -- they are resolved before validation.
-ALL_LANGUAGES = set(LANGUAGE_EXTENSIONS.keys()) | set(HANDLER_LANGUAGES.keys())
+# Grammar names (e.g., github-actions, docker-compose) are added lazily
+# via _get_all_languages() to avoid heavy imports at module level.
+_ALL_LANGUAGES_CACHE: set[str] | None = None
+_LANGUAGE_ID_MAP_CACHE: dict[str, str] | None = None
+
+
+def _get_grammar_names() -> list[str]:
+    """Get grammar handler names from the autodiscovery registry.
+
+    Returns an empty list if handlers can't be imported (e.g., cocoindex
+    not available).
+    """
+    try:
+        from cocosearch.handlers import get_registered_grammars
+
+        return [g.GRAMMAR_NAME for g in get_registered_grammars()]
+    except Exception:
+        return []
+
+
+def _get_all_languages() -> set[str]:
+    """Get all recognized language names including grammar handler names.
+
+    Lazily includes grammar names from the autodiscovery registry to avoid
+    importing the handler module (and cocoindex) at module load time.
+    """
+    global _ALL_LANGUAGES_CACHE
+    if _ALL_LANGUAGES_CACHE is None:
+        base = set(LANGUAGE_EXTENSIONS.keys()) | set(HANDLER_LANGUAGES.keys())
+        for name in _get_grammar_names():
+            base.add(name)
+        _ALL_LANGUAGES_CACHE = base
+    return _ALL_LANGUAGES_CACHE
+
+
+def _get_language_id_map() -> dict[str, str]:
+    """Get mapping of language names to language_id values in the database.
+
+    Includes both handler languages (hcl, dockerfile, bash) and grammar
+    handler names (github-actions, docker-compose, etc.) which all use
+    the language_id column for filtering.
+    """
+    global _LANGUAGE_ID_MAP_CACHE
+    if _LANGUAGE_ID_MAP_CACHE is None:
+        result = dict(HANDLER_LANGUAGES)
+        for name in _get_grammar_names():
+            result[name] = name
+        _LANGUAGE_ID_MAP_CACHE = result
+    return _LANGUAGE_ID_MAP_CACHE
+
 
 # Module-level flag for hybrid search column availability (pre-v1.7 graceful degradation)
 _has_content_text_column = True
@@ -168,9 +217,9 @@ def validate_language_filter(lang_str: str) -> list[str]:
         resolved.append(canonical)
 
     # Validate all resolved names
-    unknown = [lang for lang in resolved if lang not in ALL_LANGUAGES]
+    unknown = [lang for lang in resolved if lang not in _get_all_languages()]
     if unknown:
-        available = sorted(ALL_LANGUAGES)
+        available = sorted(_get_all_languages())
         raise ValueError(
             f"Unknown language(s): {', '.join(unknown)}. "
             f"Available: {', '.join(available)}"
@@ -367,12 +416,13 @@ def search(
     where_parts = []
     filter_params = []
     if validated_languages:
+        lang_id_map = _get_language_id_map()
         lang_conditions = []
         for lang in validated_languages:
-            if lang in HANDLER_LANGUAGES:
-                # Handler language: filter by language_id column
+            if lang in lang_id_map:
+                # Handler/grammar language: filter by language_id column
                 lang_conditions.append("language_id = %s")
-                filter_params.append(HANDLER_LANGUAGES[lang])
+                filter_params.append(lang_id_map[lang])
             elif lang in LANGUAGE_EXTENSIONS:
                 # Extension-based language: filter by filename LIKE
                 extensions = get_extension_patterns(lang)
