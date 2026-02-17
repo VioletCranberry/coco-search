@@ -33,6 +33,7 @@ dev = [
     "pytest-httpx>=0.36.0",
     "pytest-mock>=3.15.1",
     "pytest-subprocess>=1.5.3",
+    "pytest-timeout>=2.3.1",
     "ruff>=0.14.14",
 ]
 
@@ -42,6 +43,7 @@ asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
+timeout = 5
 addopts = "-v --tb=short --strict-markers -m unit"
 markers = [
     "unit: marks tests as unit tests (use mocks, no infrastructure)",
