@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Coco[-S]earch</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%23f0a060' stroke-width='5'/%3E%3Cline x1='38' y1='38' x2='58' y2='58' stroke='%23e07840' stroke-width='6' stroke-linecap='round'/%3E%3Ctext x='24' y='31' text-anchor='middle' font-family='Courier New,Courier,monospace' font-size='18' fill='%23f0a060' font-weight='bold'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
+    <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%23f0a060' stroke-width='5'/%3E%3Cline x1='38' y1='38' x2='58' y2='58' stroke='%23e07840' stroke-width='6' stroke-linecap='round'/%3E%3Ctext x='24' y='31' text-anchor='middle' font-family='Courier New,Courier,monospace' font-size='18' fill='%23f0a060' font-weight='bold'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet">
@@ -1313,6 +1313,33 @@
             return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + time;
         }
 
+        function updateTabStatus(status) {
+            const colorMap = {
+                indexing: { primary: '#FF9800', secondary: '#e07840' },
+                indexed:  { primary: '#4CAF50', secondary: '#388E3C' },
+                error:    { primary: '#f44336', secondary: '#d32f2f' },
+            };
+            const defaultColors = { primary: '#f0a060', secondary: '#e07840' };
+            const colors = colorMap[status] || defaultColors;
+
+            const titleMap = {
+                indexing: 'Indexing\u2026 \u00b7 Coco[-S]earch',
+                indexed:  'Indexed \u00b7 Coco[-S]earch',
+                error:    'Error \u00b7 Coco[-S]earch',
+            };
+            document.title = titleMap[status] || 'Coco[-S]earch';
+
+            const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>`
+                + `<circle cx='24' cy='24' r='20' fill='none' stroke='${colors.primary}' stroke-width='5'/>`
+                + `<line x1='38' y1='38' x2='58' y2='58' stroke='${colors.secondary}' stroke-width='6' stroke-linecap='round'/>`
+                + `<text x='24' y='31' text-anchor='middle' font-family='Courier New,Courier,monospace' font-size='18' fill='${colors.primary}' font-weight='bold'>&lt;/&gt;</text>`
+                + `</svg>`;
+            const favicon = document.getElementById('favicon');
+            if (favicon) {
+                favicon.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+            }
+        }
+
         function updateSummaryCards(stats) {
             document.getElementById('fileCount').textContent = formatNumber(stats.file_count);
             document.getElementById('chunkCount').textContent = formatNumber(stats.chunk_count);
@@ -1379,6 +1406,7 @@
                 statusEl.style.color = 'var(--accent-green)';
                 statusLabelEl.textContent = 'Ready to search';
             }
+            updateTabStatus(status);
 
             // Parse Health
             const parseHealthEl = document.getElementById('parseHealth');
@@ -2420,6 +2448,7 @@
                     setTimeout(startHeartbeat, 1000 * retries);
                     return;
                 }
+                updateTabStatus(null);
                 document.getElementById('disconnectOverlay').style.display = 'flex';
                 window.close();
             };
