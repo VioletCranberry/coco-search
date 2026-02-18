@@ -55,6 +55,7 @@ from cocosearch.mcp.project_detection import (  # noqa: E402
 from cocosearch.management.stats import (  # noqa: E402
     check_staleness,
     get_comprehensive_stats,
+    get_grammar_failures,
     get_parse_failures,
 )
 from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
@@ -118,6 +119,46 @@ def _register_with_git(index_name: str, project_path: str) -> None:
     )
 
 
+def build_all_stats(include_failures: bool = False) -> list[dict]:
+    """Build stats for all indexes.
+
+    Shared by MCP API routes and the background DashboardHandler.
+    Calls _ensure_cocoindex_init() internally.
+    """
+    _ensure_cocoindex_init()
+    indexes = mgmt_list_indexes()
+    all_stats = []
+    for idx in indexes:
+        try:
+            stats = get_comprehensive_stats(idx["name"])
+            result = stats.to_dict()
+            _apply_thread_liveness_status(idx["name"], result, stats.status)
+            if include_failures:
+                result["parse_failures"] = get_parse_failures(idx["name"])
+                result["grammar_failures"] = get_grammar_failures(idx["name"])
+            all_stats.append(result)
+        except ValueError:
+            continue
+    return all_stats
+
+
+def build_single_stats(index_name: str, include_failures: bool = False) -> dict:
+    """Build stats for a single index.
+
+    Shared by MCP API routes and the background DashboardHandler.
+    Calls _ensure_cocoindex_init() internally.
+    Raises ValueError if the index is not found.
+    """
+    _ensure_cocoindex_init()
+    stats = get_comprehensive_stats(index_name)
+    result = stats.to_dict()
+    _apply_thread_liveness_status(index_name, result, stats.status)
+    if include_failures:
+        result["parse_failures"] = get_parse_failures(index_name)
+        result["grammar_failures"] = get_grammar_failures(index_name)
+    return result
+
+
 # Create FastMCP server instance
 mcp = FastMCP("cocosearch")
 register_roots_notification(mcp)
@@ -163,80 +204,53 @@ async def serve_dashboard(request) -> HTMLResponse:
 @mcp.custom_route("/api/stats", methods=["GET"])
 async def api_stats(request) -> JSONResponse:
     """Stats API endpoint for web dashboard and programmatic access."""
-    try:
-        _ensure_cocoindex_init()
-    except Exception as e:
-        logger.warning(f"CocoIndex init failed: {e}")
-        return JSONResponse(
-            {"error": "Database not initialized. Index a codebase first."},
-            status_code=503,
-        )
-
     index_name = request.query_params.get("index")
-
     include_failures = (
         request.query_params.get("include_failures", "").lower() == "true"
     )
 
-    if index_name:
-        # Single index stats
-        try:
-            stats = get_comprehensive_stats(index_name)
-            result = stats.to_dict()
-            _apply_thread_liveness_status(index_name, result, stats.status)
-            if include_failures:
-                result["parse_failures"] = get_parse_failures(index_name)
+    try:
+        if index_name:
+            result = build_single_stats(index_name, include_failures)
             return JSONResponse(
                 result, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
             )
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=404)
-    else:
-        # All indexes stats
-        indexes = mgmt_list_indexes()
-        all_stats = []
-        for idx in indexes:
-            try:
-                stats = get_comprehensive_stats(idx["name"])
-                result = stats.to_dict()
-                _apply_thread_liveness_status(idx["name"], result, stats.status)
-                if include_failures:
-                    result["parse_failures"] = get_parse_failures(idx["name"])
-                all_stats.append(result)
-            except ValueError:
-                continue
+        else:
+            all_stats = build_all_stats(include_failures)
+            return JSONResponse(
+                all_stats,
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception as e:
+        logger.warning(f"Stats failed: {e}")
         return JSONResponse(
-            all_stats, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+            {"error": "Database not initialized. Index a codebase first."},
+            status_code=503,
         )
 
 
 @mcp.custom_route("/api/stats/{index_name}", methods=["GET"])
 async def api_stats_single(request) -> JSONResponse:
     """Stats for a single index by name."""
-    try:
-        _ensure_cocoindex_init()
-    except Exception as e:
-        logger.warning(f"CocoIndex init failed: {e}")
-        return JSONResponse(
-            {"error": "Database not initialized. Index a codebase first."},
-            status_code=503,
-        )
-
     index_name = request.path_params["index_name"]
     include_failures = (
         request.query_params.get("include_failures", "").lower() == "true"
     )
     try:
-        stats = get_comprehensive_stats(index_name)
-        result = stats.to_dict()
-        _apply_thread_liveness_status(index_name, result, stats.status)
-        if include_failures:
-            result["parse_failures"] = get_parse_failures(index_name)
+        result = build_single_stats(index_name, include_failures)
         return JSONResponse(
             result, headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception as e:
+        logger.warning(f"Stats failed: {e}")
+        return JSONResponse(
+            {"error": "Database not initialized. Index a codebase first."},
+            status_code=503,
+        )
 
 
 @mcp.custom_route("/api/reindex", methods=["POST"])
@@ -1481,39 +1495,18 @@ def index_stats(
     Otherwise, returns stats for all indexes.
     """
     try:
-        _ensure_cocoindex_init()
+        if index_name:
+            return build_single_stats(index_name, include_failures)
+        else:
+            return build_all_stats(include_failures)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
     except Exception as e:
         logger.warning(f"CocoIndex init failed (fresh database?): {e}")
         return {
             "success": False,
             "error": "Database not initialized. Index a codebase first: index_codebase(path='.')",
         }
-
-    try:
-        if index_name:
-            stats = get_comprehensive_stats(index_name)
-            result = stats.to_dict()
-            _apply_thread_liveness_status(index_name, result, stats.status)
-            if include_failures:
-                result["parse_failures"] = get_parse_failures(index_name)
-            return result
-        else:
-            # Get stats for all indexes
-            indexes = mgmt_list_indexes()
-            all_stats = []
-            for idx in indexes:
-                try:
-                    stats = get_comprehensive_stats(idx["name"])
-                    result = stats.to_dict()
-                    _apply_thread_liveness_status(idx["name"], result, stats.status)
-                    if include_failures:
-                        result["parse_failures"] = get_parse_failures(idx["name"])
-                    all_stats.append(result)
-                except ValueError:
-                    pass
-            return all_stats
-    except ValueError as e:
-        return {"success": False, "error": str(e)}
 
 
 @mcp.tool()

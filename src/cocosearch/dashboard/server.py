@@ -17,30 +17,18 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 logger = logging.getLogger(__name__)
 
-# Track active indexing threads (mirrors mcp/server.py's _active_indexing)
-_active_indexing: dict[str, threading.Thread] = {}
-_indexing_lock = threading.Lock()
-
-
-def _register_with_git(index_name: str, project_path: str) -> None:
-    """Register index path with current git branch/commit metadata."""
-    from cocosearch.management import register_index_path
-    from cocosearch.management.git import (
-        get_current_branch,
-        get_commit_hash,
-        get_branch_commit_count,
-    )
-
-    branch = get_current_branch(project_path)
-    commit_hash = get_commit_hash(project_path)
-    branch_commit_count = get_branch_commit_count(project_path)
-    register_index_path(
-        index_name,
-        project_path,
-        branch=branch,
-        commit_hash=commit_hash,
-        branch_commit_count=branch_commit_count,
-    )
+# Import shared state and helpers from the MCP server module.
+# This ensures the background DashboardHandler (used in stdio mode) and
+# the MCP custom routes share the same indexing thread registry and
+# produce identical stats output.
+from cocosearch.mcp.server import (  # noqa: E402
+    _active_indexing,
+    _ensure_cocoindex_init,
+    _indexing_lock,
+    _register_with_git,
+    build_all_stats,
+    build_single_stats,
+)
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -181,7 +169,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _handle_search(self):
         import time
-        import cocoindex
         from cocosearch.search import byte_to_line, read_chunk_content, search
 
         body = self._read_json_body()
@@ -206,7 +193,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         use_hybrid = body.get("use_hybrid")
 
         try:
-            cocoindex.init()
+            _ensure_cocoindex_init()
         except Exception:
             self._json_response(
                 {"error": "Database not initialized. Index a codebase first."},
@@ -275,7 +262,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_reindex(self):
-        import cocoindex
         from cocosearch.indexer import IndexingConfig, run_index
         from cocosearch.management import (
             get_index_metadata,
@@ -322,7 +308,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         def _run():
             failed = False
             try:
-                cocoindex.init()
+                _ensure_cocoindex_init()
                 run_index(
                     index_name=index_name,
                     codebase_path=source_path,
@@ -354,7 +340,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_index(self):
-        import cocoindex
         from cocosearch.management.context import derive_index_name
         from cocosearch.indexer import IndexingConfig, run_index
         from cocosearch.management import (
@@ -398,7 +383,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         def _run():
             failed = False
             try:
-                cocoindex.init()
+                _ensure_cocoindex_init()
                 run_index(
                     index_name=index_name,
                     codebase_path=project_path,
@@ -658,7 +643,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
     def _serve_project_context(self):
-        import cocoindex
         from pathlib import Path
         from cocosearch.management import (
             resolve_index_name,
@@ -683,7 +667,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         path_collision = False
         collision_message = None
         try:
-            cocoindex.init()
+            _ensure_cocoindex_init()
             indexes = mgmt_list_indexes()
             index_names = {idx["name"] for idx in indexes}
             is_indexed = index_name in index_names
@@ -724,90 +708,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(html.encode())
 
     def _serve_all_stats(self):
-        import cocoindex
-        from cocosearch.management import list_indexes as mgmt_list_indexes
-        from cocosearch.management import (
-            get_comprehensive_stats,
-            get_grammar_failures,
-            get_parse_failures,
-        )
-
-        try:
-            cocoindex.init()
-        except Exception:
-            pass
-
         include_failures = "include_failures=true" in self.path.lower()
-        indexes = mgmt_list_indexes()
-        all_stats = []
-        for idx in indexes:
-            try:
-                stats = get_comprehensive_stats(idx["name"])
-                result = stats.to_dict()
-                # Override status from thread liveness — the DB status may
-                # lag behind the actual indexing state due to race conditions.
-                with _indexing_lock:
-                    active = _active_indexing.get(idx["name"])
-                if active is not None and active.is_alive():
-                    result["status"] = "indexing"
-                    # Correct DB so CLI reads consistent status. Use
-                    # update_timestamp=False to preserve the original
-                    # updated_at — otherwise staleness checks reset.
-                    if stats.status != "indexing":
-                        try:
-                            from cocosearch.management import set_index_status
-
-                            set_index_status(
-                                idx["name"], "indexing", update_timestamp=False
-                            )
-                        except Exception:
-                            pass
-                if include_failures:
-                    result["parse_failures"] = get_parse_failures(idx["name"])
-                    result["grammar_failures"] = get_grammar_failures(idx["name"])
-                all_stats.append(result)
-            except ValueError:
-                continue
-        self._json_response(all_stats)
+        try:
+            self._json_response(build_all_stats(include_failures))
+        except Exception:
+            self._json_response([])
 
     def _serve_single_stats(self, index_name: str):
-        import cocoindex
-        from cocosearch.management import (
-            get_comprehensive_stats,
-            get_grammar_failures,
-            get_parse_failures,
-        )
-
-        try:
-            cocoindex.init()
-        except Exception:
-            pass
-
         include_failures = "include_failures=true" in self.path.lower()
         try:
-            stats = get_comprehensive_stats(index_name)
-            result = stats.to_dict()
-            # Override status from thread liveness
-            with _indexing_lock:
-                active = _active_indexing.get(index_name)
-            if active is not None and active.is_alive():
-                result["status"] = "indexing"
-                # Correct DB so CLI reads consistent status. Use
-                # update_timestamp=False to preserve the original
-                # updated_at — otherwise staleness checks reset.
-                if stats.status != "indexing":
-                    try:
-                        from cocosearch.management import set_index_status
-
-                        set_index_status(index_name, "indexing", update_timestamp=False)
-                    except Exception:
-                        pass
-            if include_failures:
-                result["parse_failures"] = get_parse_failures(index_name)
-                result["grammar_failures"] = get_grammar_failures(index_name)
-            self._json_response(result)
+            self._json_response(build_single_stats(index_name, include_failures))
         except ValueError as e:
             self._json_response({"error": str(e)}, status=404)
+        except Exception:
+            self._json_response({"error": "Database not initialized"}, status=503)
 
     def _json_response(self, data, status: int = 200):
         body = json.dumps(data).encode()

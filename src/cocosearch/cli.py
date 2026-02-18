@@ -1695,6 +1695,9 @@ def dashboard_command(args: argparse.Namespace) -> int:
         timer.daemon = True
         timer.start()
 
+    # Suppress run_server()'s own browser open — we already opened above
+    os.environ["COCOSEARCH_NO_DASHBOARD"] = "1"
+
     # Use MCP server with SSE transport (provides HTTP routes)
     try:
         run_server(transport="sse", host=args.host, port=port)
