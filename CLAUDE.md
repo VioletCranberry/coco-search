@@ -21,7 +21,7 @@ uv run cocosearch index .               # Index the codebase
 
 **Infrastructure:** PostgreSQL 17 (pgvector) on port 5432, Ollama on port 11434. Defaults require no `.env` file.
 
-**Optional AI chat:** `uv pip install "cocosearch[web-chat]"` installs `claude-agent-sdk` for the dashboard AI chat feature. Requires `claude` CLI on PATH (Claude Code users).
+**Optional AI chat:** `uv sync --extra web-chat` installs `claude-agent-sdk` for the dashboard AI chat feature. Requires `claude` CLI on PATH (Claude Code users).
 
 ## Commands
 
