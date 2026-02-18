@@ -19,6 +19,9 @@ dependencies = [
     "tree-sitter-language-pack>=0.13.0",
 ]
 
+[project.optional-dependencies]
+web-chat = ["claude-agent-sdk>=0.0.14"]
+
 [project.scripts]
 cocosearch = "cocosearch.cli:main"
 
