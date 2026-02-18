@@ -21,6 +21,8 @@ uv run cocosearch index .               # Index the codebase
 
 **Infrastructure:** PostgreSQL 17 (pgvector) on port 5432, Ollama on port 11434. Defaults require no `.env` file.
 
+**Optional AI chat:** `uv pip install "cocosearch[web-chat]"` installs `claude-agent-sdk` for the dashboard AI chat feature. Requires `claude` CLI on PATH (Claude Code users).
+
 ## Commands
 
 ```bash
@@ -71,7 +73,7 @@ uv run cocosearch mcp --project-from-cwd
 - **`cli.py`** — Argparse CLI orchestrating all subcommands
 - **`exceptions.py`** — Structured exception hierarchy: `CocoSearchError` (base), `IndexNotFoundError`, `IndexValidationError`, `SearchError`, `InfrastructureError`. Inherits from `ValueError` where needed for backward compatibility.
 - **`validation.py`** — Input validation guards: `validate_index_name()` (SQL injection protection for dynamic table names), `validate_query()` (resource exhaustion protection, max 10,000 chars)
-- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE)
+- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE, `/api/ai-chat/*` AI chat)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (15 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py`), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
@@ -80,7 +82,8 @@ uv run cocosearch mcp --project-from-cwd
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution (`env_substitution.py`), Pydantic schema validation (`schema.py` with `extra="forbid"`, `strict=True`), user-friendly error formatting with fuzzy field suggestions (`errors.py`), env var validation (`env_validation.py`)
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py`), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection and status tracking (`metadata.py`), project root detection (`context.py`)
 - **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash, Scala, Groovy) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose, Kubernetes) with autodiscovery registry
-- **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards
+- **`chat/`** — Optional AI chat module powered by the Claude Agent SDK (`claude-agent-sdk`). `ChatSession` wraps `ClaudeSDKClient` in a private asyncio event loop thread; `ChatSessionManager` is a singleton managing up to 10 concurrent sessions with 30-minute idle timeout. The agent has access to Read, Grep, Glob and a custom `search_codebase` MCP tool wrapping `cocosearch.search.search()`. Requires `cocosearch[web-chat]` optional dependency and `claude` CLI on PATH.
+- **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards with optional AI chat (inline `[Search] [Ask AI]` toggle with markdown rendering, tool use display, and session stats)
 - **`.claude-plugin/`** — Claude Code plugin metadata: `plugin.json` (MCP server definition, version, keywords) and `marketplace.json` (marketplace listing). Versions must match `pyproject.toml` — the release workflow syncs them automatically.
 
 **Data flow:** Files → Tree-sitter parse → symbol extraction → chunking → Ollama embeddings → PostgreSQL (pgvector). Search queries → embedding → hybrid RRF (vector similarity + tsvector keyword) → context expansion → results.

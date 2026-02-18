@@ -55,6 +55,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._serve_heartbeat()
         elif self.path == "/api/project":
             self._serve_project_context()
+        elif self.path == "/api/ai-chat/status":
+            self._handle_ai_chat_status()
+        elif self.path.startswith("/api/ai-chat/stream"):
+            self._handle_ai_chat_stream()
         elif self.path == "/api/stats" or self.path.startswith("/api/stats?"):
             self._serve_all_stats()
         elif self.path.startswith("/api/stats/"):
@@ -78,6 +82,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._handle_search()
         elif self.path == "/api/open-in-editor":
             self._handle_open_in_editor()
+        elif self.path == "/api/ai-chat/start":
+            self._handle_ai_chat_start()
+        else:
+            self.send_error(404)
+
+    def do_DELETE(self):  # noqa: N802
+        if self.path == "/api/ai-chat/session":
+            self._handle_ai_chat_session_delete()
         else:
             self.send_error(404)
 
@@ -481,6 +493,152 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json_response({"error": str(e)}, status=404)
         except Exception as e:
             self._json_response({"error": f"Failed to delete index: {e}"}, status=500)
+
+    # ------------------------------------------------------------------
+    # AI Chat handlers
+    # ------------------------------------------------------------------
+
+    def _handle_ai_chat_status(self):
+        try:
+            from cocosearch.chat import check_cli_available, is_chat_available
+        except ImportError:
+            self._json_response(
+                {"available": False, "reason": "claude-agent-sdk not installed"}
+            )
+            return
+
+        if not is_chat_available():
+            self._json_response(
+                {"available": False, "reason": "claude-agent-sdk not installed"}
+            )
+            return
+        cli_found = check_cli_available()
+        if not cli_found:
+            self._json_response(
+                {"available": False, "reason": "claude CLI not found on PATH"}
+            )
+            return
+        self._json_response({"available": True, "cli_found": True})
+
+    def _handle_ai_chat_start(self):
+        try:
+            from cocosearch.chat import get_session_manager, is_chat_available
+        except ImportError:
+            self._json_response({"error": "AI chat not available"}, status=503)
+            return
+
+        if not is_chat_available():
+            self._json_response({"error": "AI chat not available"}, status=503)
+            return
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        index_name = body.get("index_name")
+        project_path = body.get("project_path")
+        if not index_name or not project_path:
+            self._json_response(
+                {"error": "index_name and project_path are required"}, status=400
+            )
+            return
+
+        mgr = get_session_manager()
+        session = mgr.create_session(index_name, project_path)
+        if session is None:
+            self._json_response(
+                {"error": "Maximum concurrent chat sessions reached"}, status=503
+            )
+            return
+        self._json_response({"session_id": session.session_id})
+
+    def _handle_ai_chat_stream(self):
+        """SSE stream for AI chat. Blocking read from queue is fine because
+        ThreadingHTTPServer gives each request its own thread."""
+        import queue as _queue
+        from urllib.parse import parse_qs, urlparse
+
+        try:
+            from cocosearch.chat import get_session_manager, is_chat_available
+        except ImportError:
+            self._sse_send({"type": "error", "error": "AI chat not available"})
+            return
+
+        if not is_chat_available():
+            self._sse_send({"type": "error", "error": "AI chat not available"})
+            return
+
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        session_id = params.get("session_id", [""])[0]
+        message = params.get("message", [""])[0]
+
+        mgr = get_session_manager()
+        session = mgr.get_session(session_id)
+
+        if session is None:
+            self._sse_send({"type": "error", "error": "Session not found"})
+            return
+        if not message:
+            self._sse_send({"type": "error", "error": "message parameter is required"})
+            return
+
+        # Set up SSE headers
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        response_queue: _queue.Queue = _queue.Queue()
+        session.send_message(message, response_queue)
+
+        try:
+            while True:
+                try:
+                    item = response_queue.get(timeout=120)
+                except _queue.Empty:
+                    item = {"type": "error", "error": "Timeout waiting for response"}
+
+                data = json.dumps(item)
+                self.wfile.write(f"data: {data}\n\n".encode())
+                self.wfile.flush()
+
+                if item.get("type") in ("done", "error"):
+                    return
+        except (BrokenPipeError, ConnectionError, OSError):
+            return
+
+    def _handle_ai_chat_session_delete(self):
+        try:
+            from cocosearch.chat import get_session_manager, is_chat_available
+        except ImportError:
+            self._json_response({"error": "AI chat not available"}, status=503)
+            return
+
+        if not is_chat_available():
+            self._json_response({"error": "AI chat not available"}, status=503)
+            return
+
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        session_id = body.get("session_id", "")
+        mgr = get_session_manager()
+        if mgr.close_session(session_id):
+            self._json_response({"success": True})
+        else:
+            self._json_response({"error": "Session not found"}, status=404)
+
+    def _sse_send(self, data_dict):
+        """Helper: send a single SSE event and close."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(f"data: {json.dumps(data_dict)}\n\n".encode())
+        self.wfile.flush()
 
     def _serve_heartbeat(self):
         """SSE heartbeat stream for dashboard disconnect detection."""

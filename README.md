@@ -57,13 +57,13 @@
 
 Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, [PostgreSQL](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) for storage, and [Ollama](https://ollama.com/) for local embeddings. No external APIs — everything runs on your machine.
 
-Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 31+ languages with symbol-level filtering for 14+, plus domain-specific grammars for structured config files.
+Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 31+ languages with symbol-level filtering for 14+, plus domain-specific grammars for structured config files.
 
 ## 📑 Table of Contents
 
 - [⚠️ Disclaimer](#disclaimer)
-- [🚀 Quick Start](#quick-start)
 - [✨ Features](#features)
+- [🚀 Quick Start](#quick-start)
 - [🖥️ Interfaces](#interfaces)
 - [🏆 Where MCP Wins](#where-mcp-wins)
 - [📚 Useful Documentation](#useful-documentation)
@@ -78,6 +78,35 @@ Available as a CLI, MCP server, or interactive REPL. Incremental indexing, `.git
 ## Disclaimer
 
 This project was originally built for personal use — a solo experiment in local-first, privacy-focused code search to accelerate self-onboarding to new codebases and explore spec-driven development. Initially scaffolded with [GSD](https://github.com/glittercowboy/get-shit-done) and refined by hand. Ships with a CLI, MCP tools, dashboards (TUI/WEB), a status API, reusable [Claude SKILLS](https://code.claude.com/docs/en/skills), and a [Claude Code plugin](https://code.claude.com/docs/en/plugins) for one-command setup.
+
+## Features
+
+- 💬 **Web AI Chat** -- ask questions about your codebase directly from the web dashboard via a `[Search] [Ask AI]` toggle. Powered by the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview) — uses your existing Claude Code authentication, no extra API keys needed. The agent has access to semantic search, file reading, and grep. Chat responses render full markdown with syntax-highlighted code blocks, show tool invocations in collapsible panels, and display session stats (turns, tokens, cost). Optional: install with `uv pip install "cocosearch[web-chat]"`.
+
+- 🔍 **Hybrid search** -- combines semantic similarity and keyword matching via RRF fusion to find code by meaning and by text.
+- 🏷️ **Symbol filtering** -- narrow results to functions, classes, methods, or interfaces; match symbol names with glob patterns.
+- 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter, so you see complete units of code.
+- ⚡ **Query caching** -- exact and semantic cache for fast repeated queries (0.95 cosine threshold).
+- 🩺 **Parse health tracking** -- per-language parse status, failure details, and staleness warnings when the index drifts from your branch.
+- 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool.
+- 🔒 **Privacy-first** -- everything runs locally. No external API calls, no telemetry. AI Chat is the only feature that calls an external API (Anthropic), and it's opt-in.
+
+<details>
+<summary>Screenshots</summary>
+
+<p align="center">
+  <img src="./docs/dashboard-example-dark.png" alt="CocoSearch dashboard — dark theme" width="480">
+  &nbsp;&nbsp;
+  <img src="./docs/dashboard-example-light.png" alt="CocoSearch dashboard — light theme" width="480">
+</p>
+
+<p align="center">
+  <img src="./docs/ai-search-example-dark.png" alt="CocoSearch AI chat — dark theme" width="480">
+  &nbsp;&nbsp;
+  <img src="./docs/search-example-light.png" alt="CocoSearch search results — light theme" width="480">
+</p>
+
+</details>
 
 ## Quick Start
 
@@ -135,15 +164,15 @@ This project was originally built for personal use — a solo experiment in loca
   done
   ```
 
-## Features
+- **AI Chat from the dashboard** (optional):
 
-- 🔍 **Hybrid search** -- combines semantic similarity and keyword matching via RRF fusion to find code by meaning and by text.
-- 🏷️ **Symbol filtering** -- narrow results to functions, classes, methods, or interfaces; match symbol names with glob patterns.
-- 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter, so you see complete units of code.
-- ⚡ **Query caching** -- exact and semantic cache for fast repeated queries (0.95 cosine threshold).
-- 🩺 **Parse health tracking** -- per-language parse status, failure details, and staleness warnings when the index drifts from your branch.
-- 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool.
-- 🔒 **Privacy-first** -- everything runs locally. No external API calls, no telemetry.
+  ```bash
+  # Install the web-chat extra (adds claude-agent-sdk):
+  uv pip install "cocosearch[web-chat]"
+  # Requires `claude` CLI on PATH (Claude Code users).
+  # Then open the dashboard and switch to the "Ask AI" tab.
+  uvx cocosearch dashboard
+  ```
 
 ## Interfaces
 
@@ -244,24 +273,8 @@ For the full list of commands and flags, see [CLI Reference](./docs/cli-referenc
 
 - **Code search** — natural language queries with language, symbol type, and hybrid search filters. Results show syntax-highlighted snippets, score badges, match type, and symbol metadata.
 - **Index management** — create, reindex (incremental or fresh), and delete indexes from the browser.
+- **AI Chat** — integrated `[Search] [Ask AI]` pill toggle within the search section. Streaming responses with markdown rendering, syntax-highlighted code blocks (Prism.js), collapsible tool use display, and a stats bar showing turns, tokens, and cost. Requires `cocosearch[web-chat]` and `claude` CLI on PATH (Claude Code users only).
 - **Observability** — language distribution charts, parse health breakdown, staleness warnings, storage metrics.
-
-<details>
-<summary>Dashboard screenshots</summary>
-
-<p align="center">
-  <img src="./docs/dashboard-dark.png" alt="CocoSearch dashboard — dark theme" width="480">
-  &nbsp;&nbsp;
-  <img src="./docs/dashboard-light.png" alt="CocoSearch dashboard — light theme" width="480">
-</p>
-
-<p align="center">
-  <img src="./docs/dashboard-search-light.png" alt="CocoSearch dashboard — search results with file actions" width="480">
-  &nbsp;&nbsp;
-  <img src="./docs/dashboard-open-file-dark.png" alt="CocoSearch dashboard — file viewer modal" width="480">
-</p>
-
-</details>
 
 ### Interactive REPL
 
