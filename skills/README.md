@@ -13,6 +13,7 @@ Reusable AI coding assistant skills that leverage CocoSearch's semantic and symb
 | [cocosearch-refactoring](./cocosearch-refactoring/SKILL.md) | Safe refactoring: full impact analysis, dependency mapping, step-by-step execution | Yes |
 | [cocosearch-new-feature](./cocosearch-new-feature/SKILL.md) | Add new functionality: find patterns, match conventions, integrate | Yes |
 | [cocosearch-subway](./cocosearch-subway/SKILL.md) | Visualize codebase as an interactive London Underground-style subway map | Yes |
+| [cocosearch-add-language](./cocosearch-add-language/SKILL.md) | Add language support: handlers, symbol extraction, grammars, context expansion | Yes |
 
 ## Installation
 
@@ -23,7 +24,7 @@ claude plugin marketplace add VioletCranberry/coco-s
 claude plugin install cocosearch@cocosearch
 ```
 
-This automatically configures the MCP server and all 7 skills. No symlinks or manual setup needed.
+This automatically configures the MCP server and all 8 skills. No symlinks or manual setup needed.
 
 ### Claude Code (project-local)
 
@@ -31,7 +32,7 @@ Symlink skills from a cloned CocoSearch repo into your project:
 
 ```bash
 mkdir -p .claude/skills
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language; do
     ln -sfn "../../skills/$skill" ".claude/skills/$skill"
 done
 ```
@@ -41,7 +42,7 @@ done
 Copy skills to your global Claude config:
 
 ```bash
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language; do
     mkdir -p ~/.claude/skills/$skill
     cp skills/$skill/SKILL.md ~/.claude/skills/$skill/SKILL.md
 done
@@ -52,7 +53,7 @@ done
 Copy skills to your OpenCode config:
 
 ```bash
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language; do
     mkdir -p ~/.config/opencode/skills/$skill
     cp skills/$skill/SKILL.md ~/.config/opencode/skills/$skill/SKILL.md
 done

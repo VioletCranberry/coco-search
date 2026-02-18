@@ -185,6 +185,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 - `/cocosearch:cocosearch-refactoring` — Impact analysis and safe refactoring
 - `/cocosearch:cocosearch-new-feature` — Pattern-matching feature development
 - `/cocosearch:cocosearch-subway` — Codebase visualization as subway map
+- `/cocosearch:cocosearch-add-language` — Add language support (handlers, symbols, grammars, context expansion)
 
 ### Prerequisites
 

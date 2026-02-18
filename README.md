@@ -225,65 +225,14 @@ uvx cocosearch analyze "getUserById"
 uvx cocosearch search --interactive
 
 # View index stats with parse health
+# Shows language/grammar distribution, symbol statistics, and parse health
 uvx cocosearch stats --pretty
-
-❯ uv run cocosearch stats --pretty
-
-Index: cocosearch
-Source: GIT/personal/coco-s
-Branch: main (0b6050b) · up to date
-Status: Indexed
-Files: 192 | Chunks: 2,023 | Size: 15.0 MB
-Created: 2026-02-09 18:30
-Last Updated: 2026-02-14 12:36 (0 days ago)
-
-                        Language Distribution
-┏━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ Language     ┃  Files ┃   Chunks ┃ Distribution                   ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ py           │    162 │     1648 │ ██████████████████████████████ │
-│ md           │     22 │      267 │ ████▊                          │
-│ html         │      1 │      100 │ █▊                             │
-│ json         │      3 │        3 │                                │
-│ toml         │      1 │        2 │                                │
-│ yaml         │      2 │        2 │                                │
-│ docker-comp… │      1 │        1 │                                │
-└──────────────┴────────┴──────────┴────────────────────────────────┘
-
-                             Grammar Distribution
-┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
-┃ Grammar              ┃ Base Language  ┃  Files ┃   Chunks ┃  Recognition % ┃
-┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
-│ docker-compose       │ yaml           │      1 │        1 │         100.0% │
-└──────────────────────┴────────────────┴────────┴──────────┴────────────────┘
-
- Symbol Statistics
-┏━━━━━━━━━━┳━━━━━━━┓
-┃ Type     ┃ Count ┃
-┡━━━━━━━━━━╇━━━━━━━┩
-│ function │   927 │
-│ class    │   229 │
-└──────────┴───────┘
-
-Parse health: 100.0% clean (162/162 files)
-                Parse Status by Language
-┏━━━━━━━━━━┳━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┓
-┃ Language ┃ Files ┃  OK ┃ Partial ┃ Error ┃ No Grammar ┃
-┡━━━━━━━━━━╇━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━┩
-│ python   │   162 │ 162 │       0 │     0 │          0 │
-└──────────┴───────┴─────┴─────────┴───────┴────────────┘
 
 # View index stats with parse health live
 uvx cocosearch stats --live
 
 # List all indexes
 uvx cocosearch list --pretty
-
-┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┓
-┃ Name       ┃ Table                                      ┃ Branch                  ┃ Status  ┃
-┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━┩
-│ cocosearch │ codeindex_cocosearch__cocosearch_chunks     │ main (ed00733)          │ Indexed │
-└────────────┴────────────────────────────────────────────┴─────────────────────────┴─────────┘
 ```
 
 For the full list of commands and flags, see [CLI Reference](./docs/cli-reference.md).
