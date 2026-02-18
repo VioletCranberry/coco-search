@@ -139,12 +139,21 @@ This project was originally built for personal use — a solo experiment in loca
   ```bash
   claude plugin marketplace add VioletCranberry/coco-s
   claude plugin install cocosearch@cocosearch
-  # All 7 skills + MCP server configured automatically
-  ```
+  # All 7 skills + MCP server configured automatically:
 
-  <p align="center">
-    <img src="./docs/plugin-examples.png" alt="CocoSearch plugin skills in Claude Code" width="720">
-  </p>
+  ❯ skills
+
+  ⏺ Here are the available skills:
+
+    CocoSearch
+
+    - /cocosearch:cocosearch-quickstart — First-time setup and verification
+    - /cocosearch:cocosearch-onboarding — Guided codebase tour
+    - /cocosearch:cocosearch-debugging — Root cause analysis using CocoSearch
+    - /cocosearch:cocosearch-refactoring — Impact analysis and safe refactoring
+    - /cocosearch:cocosearch-new-feature — Pattern-matching feature development
+    - /cocosearch:cocosearch-subway — Codebase visualization as subway map
+  ```
 
   **Option B — Manual MCP registration:**
 
@@ -165,6 +174,8 @@ This project was originally built for personal use — a solo experiment in loca
   ```
 
 - **AI Chat from the dashboard** (optional):
+
+  > **Note:** AI Chat is only available when running `cocosearch dashboard` directly. It is not available through the MCP server.
 
   ```bash
   # Install the web-chat extra (adds claude-agent-sdk):
