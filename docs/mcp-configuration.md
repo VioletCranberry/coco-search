@@ -26,7 +26,7 @@ Register CocoSearch once for all your projects using Claude Code:
 
 ```bash
 claude mcp add --scope user cocosearch -- \
-  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+  uvx --from cocosearch cocosearch mcp --project-from-cwd
 ```
 
 **What these flags do:**
@@ -61,7 +61,7 @@ Add CocoSearch to your config:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/VioletCranberry/coco-s",
+        "cocosearch",
         "cocosearch",
         "mcp",
         "--project-from-cwd"
@@ -89,7 +89,7 @@ After saving, restart Claude Desktop. You should see the hammer icon in the chat
       "command": [
         "uvx",
         "--from",
-        "git+https://github.com/VioletCranberry/coco-s",
+        "cocosearch",
         "cocosearch",
         "mcp",
         "--project-from-cwd"
@@ -114,7 +114,7 @@ If you are connecting to a different PostgreSQL instance, set `COCOSEARCH_DATABA
 claude mcp add --scope user \
   --env COCOSEARCH_DATABASE_URL=postgresql://user:pass@host:5432/dbname \
   cocosearch -- \
-  uvx --from git+https://github.com/VioletCranberry/coco-s cocosearch mcp --project-from-cwd
+  uvx --from cocosearch cocosearch mcp --project-from-cwd
 ```
 
 **Claude Desktop / OpenCode (JSON config):**

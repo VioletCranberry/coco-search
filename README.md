@@ -81,7 +81,7 @@ This project was originally built for personal use — a solo experiment in loca
 
 ## Features
 
-- 💬 **Web AI Chat** -- ask questions about your codebase directly from the web dashboard via a `[Search] [Ask AI]` toggle. Powered by the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview) — uses your existing Claude Code authentication, no extra API keys needed. The agent has access to semantic search, file reading, and grep. Chat responses render full markdown with syntax-highlighted code blocks, show tool invocations in collapsible panels, and display session stats (turns, tokens, cost). Optional: install with `uv sync --extra web-chat`.
+- 💬 **Web AI Chat** -- ask questions about your codebase directly from the web dashboard via a `[Search] [Ask AI]` toggle. Powered by the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview) — uses your existing Claude Code authentication, no extra API keys needed. The agent has access to semantic search, file reading, and grep. Chat responses render full markdown with syntax-highlighted code blocks, show tool invocations in collapsible panels, and display session stats (turns, tokens, cost). Optional: install with `pip install "cocosearch[web-chat]"`.
 
 - 🔍 **Hybrid search** -- combines semantic similarity and keyword matching via RRF fusion to find code by meaning and by text.
 - 🏷️ **Symbol filtering** -- narrow results to functions, classes, methods, or interfaces; match symbol names with glob patterns.
@@ -168,10 +168,10 @@ This project was originally built for personal use — a solo experiment in loca
 
   ```bash
   # Install the web-chat extra (adds claude-agent-sdk):
-  uv sync --extra web-chat
+  pip install "cocosearch[web-chat]"
   # Requires `claude` CLI on PATH (Claude Code users).
   # Then open the dashboard and switch to the "Ask AI" tab.
-  uv run cocosearch dashboard
+  cocosearch dashboard
   ```
 
 ## Interfaces
