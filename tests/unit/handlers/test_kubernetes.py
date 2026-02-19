@@ -205,11 +205,13 @@ class TestKubernetesHandlerExtractMetadata:
         assert m["hierarchy"] == "kind:Service"
 
     def test_document_separator_before_top_key(self):
-        """Document separator before top-level key is stripped."""
+        """Document separator before top-level key falls through to document."""
         handler = KubernetesHandler()
         m = handler.extract_metadata("---\n# comment\nspec:\n  replicas: 3")
-        assert m["block_type"] == "spec"
-        assert m["hierarchy"] == "spec"
+        # _strip_comments skips '---' line (it's not a comment, but has no key),
+        # then skips '# comment', landing on 'spec:' which is top-level
+        assert m["block_type"] == "document"
+        assert m["hierarchy"] == "document"
 
     def test_list_item_key(self):
         """YAML list item with key produces correct metadata."""
@@ -230,20 +232,20 @@ class TestKubernetesHandlerExtractMetadata:
         assert m["block_type"] == "list-item"
         assert m["hierarchy"] == "list-item:name"
 
-    def test_indented_key_recognized_as_top_level(self):
-        """Indented key becomes top-level after _strip_comments lstrip."""
+    def test_indented_key_recognized_as_nested(self):
+        """4-space indented key is nested-key (indentation preserved)."""
         handler = KubernetesHandler()
         m = handler.extract_metadata("    containers:\n      - name: web")
-        assert m["block_type"] == "containers"
-        assert m["hierarchy"] == "containers"
+        assert m["block_type"] == "nested-key"
+        assert m["hierarchy"] == "nested-key:containers"
         assert m["language_id"] == "kubernetes"
 
-    def test_deep_indented_key_recognized(self):
-        """Deeply indented key becomes top-level after lstrip."""
+    def test_deep_indented_key_recognized_as_nested(self):
+        """Deeply indented key is nested-key (indentation preserved)."""
         handler = KubernetesHandler()
         m = handler.extract_metadata("          endpoint: localhost:4317")
-        assert m["block_type"] == "endpoint"
-        assert m["hierarchy"] == "endpoint"
+        assert m["block_type"] == "nested-key"
+        assert m["hierarchy"] == "nested-key:endpoint"
 
     def test_value_continuation(self):
         """Value-only chunks should be recognized as value."""

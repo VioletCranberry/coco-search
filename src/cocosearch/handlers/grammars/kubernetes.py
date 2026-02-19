@@ -51,11 +51,37 @@ class KubernetesHandler:
     # Match top-level section key (at start of line, not indented)
     _TOP_KEY_RE = re.compile(r"^([a-zA-Z_][\w-]*):", re.MULTILINE)
 
+    # Section key (2-space indented key, e.g., containers:, ports:)
+    _ITEM_RE = re.compile(r"^  ([a-zA-Z_][\w-]*):", re.MULTILINE)
+
+    # Nested key (4+ space indented key, e.g., image:, containerPort:)
+    _NESTED_KEY_RE = re.compile(r"^\s{4,}([a-zA-Z_][\w-]*):", re.MULTILINE)
+
     # Match YAML list item key (e.g., "- name: value", "  - name: value")
     _LIST_ITEM_KEY_RE = re.compile(r"^\s*-\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
 
-    # Match indented YAML key (any indentation level)
-    _NESTED_KEY_RE = re.compile(r"^\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
+    # Kubernetes top-level keywords (not section names)
+    _TOP_LEVEL_KEYS = frozenset(
+        {
+            "apiVersion",
+            "kind",
+            "metadata",
+            "spec",
+            "data",
+            "stringData",
+            "status",
+            "type",
+            "rules",
+            "subjects",
+            "roleRef",
+            "webhooks",
+            "template",
+            "parameters",
+            "provisioner",
+            "allowVolumeExpansion",
+            "reclaimPolicy",
+        }
+    )
 
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if file is a Kubernetes manifest.
@@ -85,7 +111,7 @@ class KubernetesHandler:
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from Kubernetes manifest chunk.
 
-        Identifies K8s resource kinds, top-level sections, nested keys,
+        Identifies K8s resource kinds, section keys, nested keys,
         list items, and value continuations.
 
         Args:
@@ -96,8 +122,8 @@ class KubernetesHandler:
 
         Examples:
             Kind chunk: block_type="Deployment", hierarchy="kind:Deployment"
-            Section chunk: block_type="spec", hierarchy="spec"
-            Nested: block_type="nested-key", hierarchy="nested-key:containers"
+            Section key: block_type="section-key", hierarchy="section-key:containers"
+            Nested: block_type="nested-key", hierarchy="nested-key:image"
             List item: block_type="list-item", hierarchy="list-item:name"
         """
         stripped = self._strip_comments(text)
@@ -112,13 +138,23 @@ class KubernetesHandler:
                 "language_id": self.GRAMMAR_NAME,
             }
 
-        # Check for top-level section key
-        top_match = self._TOP_KEY_RE.match(stripped)
-        if top_match:
-            key = top_match.group(1)
+        # Check for section key (2-space indented)
+        item_match = self._ITEM_RE.match(stripped)
+        if item_match:
+            key = item_match.group(1)
             return {
-                "block_type": key,
-                "hierarchy": key,
+                "block_type": "section-key",
+                "hierarchy": f"section-key:{key}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for nested key (4+ space indented)
+        nested_match = self._NESTED_KEY_RE.match(stripped)
+        if nested_match:
+            key = nested_match.group(1)
+            return {
+                "block_type": "nested-key",
+                "hierarchy": f"nested-key:{key}",
                 "language_id": self.GRAMMAR_NAME,
             }
 
@@ -132,13 +168,13 @@ class KubernetesHandler:
                 "language_id": self.GRAMMAR_NAME,
             }
 
-        # Check for nested/indented key
-        nested_match = self._NESTED_KEY_RE.match(stripped)
-        if nested_match:
-            key = nested_match.group(1)
+        # Check for top-level section key
+        top_match = self._TOP_KEY_RE.match(stripped)
+        if top_match:
+            key = top_match.group(1)
             return {
-                "block_type": "nested-key",
-                "hierarchy": f"nested-key:{key}",
+                "block_type": key,
+                "hierarchy": key,
                 "language_id": self.GRAMMAR_NAME,
             }
 
@@ -165,7 +201,9 @@ class KubernetesHandler:
         }
 
     def _strip_comments(self, text: str) -> str:
-        """Strip leading comments and document separators from chunk text."""
-        from cocosearch.handlers.utils import strip_leading_comments
-
-        return strip_leading_comments(text, [self._COMMENT_LINE], skip_strings=["---"])
+        """Strip leading comments from chunk text, preserving indentation."""
+        lines = text.lstrip("\n").split("\n")
+        for i, line in enumerate(lines):
+            if line.strip() and not self._COMMENT_LINE.match(line):
+                return "\n".join(lines[i:])
+        return ""
