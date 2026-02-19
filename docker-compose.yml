@@ -18,6 +18,33 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  app:
+    profiles: ["app"]
+    build: .
+    container_name: cocosearch-app
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    ports:
+      - "${COCOSEARCH_MCP_PORT:-3000}:${COCOSEARCH_MCP_PORT:-3000}"
+    environment:
+      COCOSEARCH_DATABASE_URL: postgresql://cocosearch:cocosearch@db:5432/cocosearch
+      COCOSEARCH_OLLAMA_URL: http://ollama:11434
+      COCOSEARCH_NO_DASHBOARD: "1"
+      COCOSEARCH_MCP_PORT: ${COCOSEARCH_MCP_PORT:-3000}
+      COCOSEARCH_PROJECTS_DIR: /projects
+    volumes:
+      - ${PROJECTS_DIR:-.}:/projects:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:$${COCOSEARCH_MCP_PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:latest
     container_name: cocosearch-ollama

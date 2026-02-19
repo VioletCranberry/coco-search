@@ -21,7 +21,7 @@ Reusable AI coding assistant skills that leverage CocoSearch's semantic and symb
 ### Claude Code Plugin (Recommended)
 
 ```bash
-claude plugin marketplace add VioletCranberry/coco-s
+claude plugin marketplace add VioletCranberry/coco-search
 claude plugin install cocosearch@cocosearch
 ```
 

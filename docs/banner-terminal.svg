@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 195" width="960" height="195">
+  <!-- Background -->
+  <rect width="960" height="195" fill="#0a0806"/>
+  <rect x="0.5" y="0.5" width="959" height="194" fill="none" stroke="rgba(240,160,96,0.3)" stroke-width="1"/>
+
+  <!-- Progress bar at top -->
+  <rect x="16" y="16" width="928" height="2" fill="#120e0a"/>
+  <rect x="16" y="16" width="928" height="2" fill="#e07840"/>
+
+  <!-- Title: Coco[-S]earch -->
+  <text x="24" y="60" font-family="'VT323', 'Courier New', monospace" font-size="42" fill="#e07840" letter-spacing="0.05">
+    Coco[-S]earch
+  </text>
+
+  <!-- Subtitle -->
+  <text x="24" y="82" font-family="'IBM Plex Mono', 'Courier New', monospace" font-size="14" fill="#806040" letter-spacing="0.1">
+    Local-first hybrid semantic code search
+  </text>
+
+  <!-- Feature pills (bracketed style) -->
+  <text x="24" y="115" font-family="'IBM Plex Mono', 'Courier New', monospace" font-size="13" fill="#806040">
+    [vector+keyword]  [Tree-sitter]  [MCP]  [pgvector]  [Ollama]
+  </text>
+
+  <!-- Status line -->
+  <line x1="16" y1="140" x2="944" y2="140" stroke="rgba(240,160,96,0.3)" stroke-width="1"/>
+  <text x="24" y="158" font-family="'IBM Plex Mono', 'Courier New', monospace" font-size="12" fill="#806040">
+    STATUS: <tspan fill="#c0a060">ONLINE</tspan>  UPTIME: 00:00:00
+  </text>
+</svg>

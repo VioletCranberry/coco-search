@@ -70,10 +70,11 @@ uv run cocosearch mcp --project-from-cwd
 
 **Module structure:**
 
-- **`cli.py`** — Argparse CLI orchestrating all subcommands
+- **`cli.py`** — Argparse CLI orchestrating all subcommands. When `COCOSEARCH_SERVER_URL` is set, dispatches to `client.py` instead of local execution.
+- **`client.py`** — HTTP client for remote server mode. `CocoSearchClient` forwards CLI commands to a running CocoSearch server via HTTP API (`/api/search`, `/api/index`, `/api/stats`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/delete-index`). Path translation via `COCOSEARCH_PATH_PREFIX` rewrites host↔container paths.
 - **`exceptions.py`** — Structured exception hierarchy: `CocoSearchError` (base), `IndexNotFoundError`, `IndexValidationError`, `SearchError`, `InfrastructureError`. Inherits from `ValueError` where needed for backward compatibility.
 - **`validation.py`** — Input validation guards: `validate_index_name()` (SQL injection protection for dynamic table names), `validate_query()` (resource exhaustion protection, max 10,000 chars)
-- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE, `/api/ai-chat/*` AI chat)
+- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/projects`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE, `/api/ai-chat/*` AI chat)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (15 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py`), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
@@ -141,6 +142,25 @@ When exploring or searching this codebase, prefer CocoSearch MCP tools (`search_
 ## Configuration
 
 Project config via `cocosearch.yaml` (no leading dot) in project root. The `indexName` field sets the index name used by all commands. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). Config keys map to env vars via camelCase→UPPER_SNAKE conversion (e.g., `indexName` → `COCOSEARCH_INDEX_NAME`). `COCOSEARCH_EDITOR` is a runtime env var (not a config field) for the dashboard's "Open in Editor" feature — falls back to `$EDITOR` then `$VISUAL`. See `.env.example` for available options.
+
+**Docker / client mode env vars:**
+- `COCOSEARCH_SERVER_URL` — When set, CLI forwards commands to the remote server instead of running locally (e.g., `http://localhost:3000`)
+- `COCOSEARCH_PATH_PREFIX` — Host↔container path rewriting for client mode (e.g., `~/GIT:/projects`)
+- `COCOSEARCH_PROJECTS_DIR` — Directory to scan for available projects. Dashboard shows unindexed projects with an "Index Now" option. Defaults to `.` in `cocosearch dashboard`; set to `/projects` in docker-compose.yml. Override with `--projects-dir` flag.
+- `PROJECTS_DIR` — Docker Compose variable: directory to mount into the app container as `/projects` (default: `.`)
+- `COCOSEARCH_MCP_PORT` — Server port, used by both CLI and Docker Compose (default: `3000`)
+
+**Docker deployment:**
+```bash
+docker compose --profile app up --build          # Full stack (db + ollama + app)
+PROJECTS_DIR=~/GIT docker compose --profile app up  # Mount projects directory
+docker compose up -d                              # Infrastructure only (unchanged)
+```
+
+**Docker MCP (SSE transport):** The container runs an SSE-based MCP server. Connect AI assistants directly via URL instead of spawning a local process:
+```bash
+claude mcp add --scope user cocosearch --url http://localhost:3000/sse
+```
 
 ## Documentation Policy
 

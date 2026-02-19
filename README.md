@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/banner.svg" alt="Coco[-S]earch — Local-first hybrid semantic code search" width="960">
+  <img src="./docs/banner-terminal.svg" alt="Coco[-S]earch — Local-first hybrid semantic code search" width="960">
 </p>
 
 <p align="center">
@@ -60,11 +60,29 @@ Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vec
 
 Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 31+ languages with symbol-level filtering for 14+, plus domain-specific grammars for structured config files.
 
+<details>
+<summary>Screenshots</summary>
+
+<p align="center">
+  <img src="./screenshots/dashboard.png" alt="CocoSearch dashboard" width="960">
+</p>
+
+<p align="center">
+  <img src="./screenshots/dashboard_search.png" alt="CocoSearch search results" width="960">
+</p>
+
+<p align="center">
+  <img src="./screenshots/dashboard_ai.png" alt="CocoSearch AI chat" width="960">
+</p>
+
+</details>
+
 ## 📑 Table of Contents
 
 - [⚠️ Disclaimer](#disclaimer)
 - [✨ Features](#features)
 - [🚀 Quick Start](#quick-start)
+- [🐳 Running in Docker](#running-in-docker)
 - [🖥️ Interfaces](#interfaces)
 - [🏆 Where MCP Wins](#where-mcp-wins)
 - [📚 Useful Documentation](#useful-documentation)
@@ -100,30 +118,13 @@ This project was originally built for personal use — a solo experiment in loca
 
 - 🔒 **Privacy-first** -- everything runs on your machine — Ollama generates embeddings locally, PostgreSQL stores vectors locally, no telemetry, no external API calls. Your code never leaves your machine. AI Chat is the only feature that calls an external API (Anthropic), and it's fully opt-in — requires a separate install (`cocosearch[web-chat]`).
 
-<details>
-<summary>Screenshots</summary>
-
-<p align="center">
-  <img src="./docs/dashboard-example-dark.png" alt="CocoSearch dashboard — dark theme" width="480">
-  &nbsp;&nbsp;
-  <img src="./docs/dashboard-example-light.png" alt="CocoSearch dashboard — light theme" width="480">
-</p>
-
-<p align="center">
-  <img src="./docs/ai-search-example-dark.png" alt="CocoSearch AI chat — dark theme" width="480">
-  &nbsp;&nbsp;
-  <img src="./docs/search-example-light.png" alt="CocoSearch search results — light theme" width="480">
-</p>
-
-</details>
-
 ## Quick Start
 
 - **Services**:
 
 ```bash
 # 1. Clone this repository and start infrastructure:
-git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
+git clone https://github.com/VioletCranberry/coco-search.git && cd coco-search
 # Docker volumes are bind-mounted to ./docker_data/ inside the repository,
 # so infrastructure must be started from the cloned repo directory.
 docker compose up -d
@@ -146,7 +147,7 @@ uvx cocosearch index .
 **Option A — Plugin (recommended):**
 
 ```bash
-claude plugin marketplace add VioletCranberry/coco-s
+claude plugin marketplace add VioletCranberry/coco-search
 claude plugin install cocosearch@cocosearch
 # All skills + MCP server configured automatically
 ```
@@ -175,6 +176,77 @@ cocosearch dashboard
 # Then open the dashboard and switch to the "Ask AI" tab.
 ```
 
+## Running in Docker
+
+Run CocoSearch as a centralized service — the host CLI forwards commands transparently over HTTP. The app container is opt-in via the `app` profile; `docker compose up` without it continues to start only PostgreSQL and Ollama, unchanged.
+
+```bash
+# Start the full stack (PostgreSQL + Ollama + CocoSearch app) detached.
+# PROJECTS_DIR sets which host directory is mounted as /projects inside the container.
+PROJECTS_DIR=~/GIT docker compose --profile app up --build --detach
+
+# Point the host CLI at the running server (no local Postgres/Ollama needed).
+# PATH_PREFIX rewrites host paths ↔ container paths in requests and results.
+export COCOSEARCH_SERVER_URL=http://localhost:3000
+export COCOSEARCH_PATH_PREFIX=~/GIT:/projects
+
+cocosearch index ~/GIT/myapp
+cocosearch search "authentication flow" -n myapp
+
+# Web dashboard is available at the same URL.
+# It auto-discovers projects under PROJECTS_DIR and lets you index them with one click.
+open http://localhost:3000/dashboard
+```
+
+> **Note:** The dashboard's "Ask AI" chat feature is not available in Docker mode.
+> It requires the `claude` CLI, which is only available on the host.
+> Search, indexing, and all other dashboard features work normally.
+
+> **Tip:** The dashboard auto-discovers projects in the current directory. To scan
+> a different directory, use `--projects-dir`:
+>
+> ```bash
+> cocosearch dashboard --projects-dir ~/GIT
+> ```
+
+### MCP with Docker
+
+The Docker container runs an SSE-based MCP server. Connect your AI assistant directly to it instead of spawning a local process:
+
+**Claude Code:**
+
+```bash
+claude mcp add --scope user cocosearch --url http://localhost:3000/sse
+```
+
+**Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "cocosearch": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
+
+**OpenCode** (`opencode.json`):
+
+```json
+{
+  "mcp": {
+    "cocosearch": {
+      "type": "remote",
+      "url": "http://localhost:3000/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+> **Note:** Replace `3000` with your `COCOSEARCH_MCP_PORT` if customized.
+
 ## Interfaces
 
 Search your code four ways — pick what fits your workflow:
@@ -183,7 +255,7 @@ Search your code four ways — pick what fits your workflow:
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | **CLI**              | One-off searches, scripting, CI                                                                                                                                   | `cocosearch search "auth flow"`     |
 | **Interactive REPL** | Exploratory sessions — tweak filters, switch indexes, iterate on queries without restarting                                                                       | `cocosearch search --interactive`   |
-| **Web Dashboard**    | Visual search + index management in the browser — filters, syntax-highlighted results, charts, dark/light theme                                                   | `cocosearch dashboard`              |
+| **Web Dashboard**    | Visual search + index management in the browser — multi-project discovery, filters, syntax-highlighted results, charts, open-in-editor, retro terminal theme       | `cocosearch dashboard`              |
 | **MCP Server**       | AI assistant integration ([Claude Code](https://claude.com/product/claude-code), [Claude Desktop](https://claude.com/download), [OpenCode](https://opencode.ai/)) | `cocosearch mcp --project-from-cwd` |
 
 ### CLI
@@ -221,7 +293,8 @@ For the full list of commands and flags, see [CLI Reference](./docs/cli-referenc
 
 `cocosearch dashboard` opens a browser UI at `http://localhost:8080` with:
 
-- **Code search** — natural language queries with language, symbol type, and hybrid search filters. Results show syntax-highlighted snippets, score badges, match type, and symbol metadata.
+- **Multi-project management** — auto-discovers projects under `--projects-dir` (or current directory). Switch between indexed projects via a dropdown; unindexed projects appear with an "Index Now" option. In Docker mode, mount your projects directory and manage everything from one dashboard.
+- **Code search** — natural language queries with language, symbol type, and hybrid search filters. Results show syntax-highlighted snippets, score badges, match type, and symbol metadata. Click any result to open it in your editor (`COCOSEARCH_EDITOR`, `$EDITOR`, or `$VISUAL`).
 - **Index management** — create, reindex (incremental or fresh), and delete indexes from the browser.
 - **AI Chat** — integrated `[Search] [Ask AI]` pill toggle within the search section. Streaming responses with markdown rendering, syntax-highlighted code blocks (Prism.js), collapsible tool use display, and a stats bar showing turns, tokens, and cost. Requires `cocosearch[web-chat]` and `claude` CLI on PATH (Claude Code users only).
 - **Observability** — language distribution charts, parse health breakdown, staleness warnings, storage metrics.

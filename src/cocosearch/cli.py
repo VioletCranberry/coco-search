@@ -1668,6 +1668,12 @@ def dashboard_command(args: argparse.Namespace) -> int:
     # Set project path so dashboard API has project context (same as --project-from-cwd in mcp command)
     os.environ["COCOSEARCH_PROJECT_PATH"] = os.getcwd()
 
+    # Resolve projects dir: CLI flag > env var > current directory
+    projects_dir = args.projects_dir or os.environ.get("COCOSEARCH_PROJECTS_DIR") or "."
+    os.environ["COCOSEARCH_PROJECTS_DIR"] = str(
+        Path(projects_dir).expanduser().resolve()
+    )
+
     # Resolve port: CLI > env > default
     if args.port is not None:
         port = args.port
@@ -2140,6 +2146,11 @@ def main() -> None:
         default="127.0.0.1",
         help="Host to bind to (default: 127.0.0.1)",
     )
+    dashboard_parser.add_argument(
+        "--projects-dir",
+        default=None,
+        help="Directory to scan for projects (default: current directory). [env: COCOSEARCH_PROJECTS_DIR]",
+    )
 
     # Known subcommands for routing
     known_subcommands = (
@@ -2188,6 +2199,13 @@ def main() -> None:
 
     # Parse args
     args = parser.parse_args()
+
+    # Client mode: forward commands to remote server if COCOSEARCH_SERVER_URL is set
+    server_url = os.environ.get("COCOSEARCH_SERVER_URL")
+    if server_url and hasattr(args, "command") and args.command:
+        from cocosearch.client import run_client_command
+
+        sys.exit(run_client_command(args, server_url))
 
     # Ensure database URL default and CocoIndex bridge are set early
     from cocosearch.config.env_validation import get_database_url

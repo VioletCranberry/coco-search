@@ -688,7 +688,7 @@ class TestDashboardCommand:
         monkeypatch.setattr("os.getcwd", lambda: fake_cwd)
 
         with patch("cocosearch.mcp.run_server"):
-            args = argparse.Namespace(port=8080, host="localhost")
+            args = argparse.Namespace(port=8080, host="localhost", projects_dir=None)
             dashboard_command(args)
 
         import os
