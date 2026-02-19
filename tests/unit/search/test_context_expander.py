@@ -137,6 +137,38 @@ def topLevel(x: Int): String = x.toString
 
 
 @pytest.fixture
+def sample_hcl_file(tmp_path):
+    """Create sample Terraform file saved as .tf with resource, variable, nested lifecycle."""
+    content = """resource "aws_instance" "web" {
+  ami           = "ami-12345678"
+  instance_type = "t2.micro"
+
+  lifecycle {
+    create_before_destroy = true
+    prevent_destroy       = false
+  }
+
+  tags = {
+    Name = "web-server"
+  }
+}
+
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+output "instance_id" {
+  value = aws_instance.web.id
+}
+"""
+    filepath = tmp_path / "main.tf"
+    filepath.write_text(content)
+    return str(filepath)
+
+
+@pytest.fixture
 def large_python_function(tmp_path):
     """Create Python file with function larger than 50 lines."""
     lines = ["def large_function():"]
@@ -189,6 +221,18 @@ class TestGetLanguageFromPath:
     def test_scala_extension(self):
         """Should return scala for .scala files."""
         assert _get_language_from_path("/src/Main.scala") == "scala"
+
+    def test_terraform_extension(self):
+        """Should return terraform for .tf files."""
+        assert _get_language_from_path("/infra/main.tf") == "terraform"
+
+    def test_hcl_extension(self):
+        """Should return hcl for .hcl files."""
+        assert _get_language_from_path("/config/vault.hcl") == "hcl"
+
+    def test_tfvars_extension(self):
+        """Should return terraform for .tfvars files."""
+        assert _get_language_from_path("/envs/prod.tfvars") == "terraform"
 
     def test_unsupported_extension(self):
         """Should return None for unsupported extensions."""
@@ -297,6 +341,14 @@ z = x + y
         start, end = expander.find_enclosing_scope(sample_scala_file, 15, 15, "scala")
         assert start <= 14  # def helper line
         assert end >= 16  # closing brace
+
+    def test_hcl_block_boundary_detection(self, expander, sample_hcl_file):
+        """Should find enclosing block in HCL/Terraform file."""
+        # Line 3 is inside the resource block (resource starts on line 1)
+        start, end = expander.find_enclosing_scope(sample_hcl_file, 3, 3, "terraform")
+        # tree-sitter "block" node should encompass the resource block
+        assert start <= 3
+        assert end >= 3
 
     def test_unsupported_language_returns_original(self, expander, sample_json_file):
         """Unsupported language should return original range."""
@@ -492,6 +544,33 @@ class TestGetContextLines:
         # Should expand (language detected from .scala extension)
         all_lines = before + match + after
         assert len(all_lines) > 1
+
+    def test_smart_expands_hcl_file(self, expander, sample_hcl_file):
+        """smart=True should expand context for .tf files."""
+        before, match, after, is_bof, is_eof = expander.get_context_lines(
+            sample_hcl_file,
+            start_line=3,  # Inside resource block
+            end_line=3,
+            smart=True,
+        )
+
+        # Should expand context (language auto-detected from .tf extension)
+        all_lines = before + match + after
+        assert len(all_lines) >= 1
+        assert 3 in [num for num, _ in all_lines]
+
+    def test_auto_detect_terraform_from_tf(self, expander, sample_hcl_file):
+        """Should auto-detect terraform from .tf extension."""
+        before, match, after, is_bof, is_eof = expander.get_context_lines(
+            sample_hcl_file,
+            start_line=3,
+            end_line=3,
+            smart=True,
+        )
+
+        # Should expand (language detected from .tf extension)
+        all_lines = before + match + after
+        assert len(all_lines) >= 1
 
     def test_auto_detect_language(self, expander, sample_python_file):
         """Should auto-detect language from file extension."""

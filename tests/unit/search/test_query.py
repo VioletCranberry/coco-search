@@ -126,9 +126,9 @@ class TestValidateLanguageFilter:
         assert validate_language_filter("dockerfile") == ["dockerfile"]
         assert validate_language_filter("bash") == ["bash"]
 
-    def test_alias_terraform_resolves_to_hcl(self):
-        """Alias 'terraform' should resolve to 'hcl'."""
-        assert validate_language_filter("terraform") == ["hcl"]
+    def test_terraform_resolves_as_first_class_grammar(self):
+        """'terraform' is a first-class grammar, not an alias."""
+        assert validate_language_filter("terraform") == ["terraform"]
 
     def test_alias_shell_resolves_to_bash(self):
         """Alias 'shell' should resolve to 'bash'."""
@@ -140,7 +140,7 @@ class TestValidateLanguageFilter:
 
     def test_mixed_alias_and_canonical(self):
         """Mixed aliases and canonical names should resolve correctly."""
-        assert validate_language_filter("terraform,bash") == ["hcl", "bash"]
+        assert validate_language_filter("terraform,bash") == ["terraform", "bash"]
 
     def test_unknown_raises_valueerror(self):
         """Unknown language should raise ValueError with suggestions."""
@@ -395,7 +395,7 @@ class TestHandlerLanguageFilter:
             search(query="s3", index_name="testindex", language_filter="terraform")
 
         cursor.assert_query_contains("language_id")
-        cursor.assert_called_with_param("hcl")
+        cursor.assert_called_with_param("terraform")
 
 
 class TestSymbolFilters:

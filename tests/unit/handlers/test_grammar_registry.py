@@ -17,8 +17,8 @@ class TestGrammarRegistryDiscovery:
     """Tests for grammar handler autodiscovery."""
 
     def test_discover_finds_all_grammars(self):
-        """_GRAMMAR_REGISTRY should have 5 grammar handlers."""
-        assert len(_GRAMMAR_REGISTRY) == 6
+        """_GRAMMAR_REGISTRY should have 7 grammar handlers."""
+        assert len(_GRAMMAR_REGISTRY) == 7
 
     def test_grammar_names(self):
         """All expected grammar names should be registered."""
@@ -29,6 +29,7 @@ class TestGrammarRegistryDiscovery:
         assert "helm-template" in names
         assert "helm-values" in names
         assert "kubernetes" in names
+        assert "terraform" in names
 
     def test_all_grammars_have_base_language(self):
         """All grammars should declare a BASE_LANGUAGE."""
@@ -101,6 +102,16 @@ class TestDetectGrammar:
         result = detect_grammar("mychart/templates/deployment.yaml", content)
         assert result == "helm-template"
 
+    def test_detects_terraform(self):
+        """detect_grammar should identify Terraform .tf files."""
+        result = detect_grammar("main.tf", 'resource "aws_s3_bucket" "data" {')
+        assert result == "terraform"
+
+    def test_detects_terraform_tfvars(self):
+        """detect_grammar should identify Terraform .tfvars files."""
+        result = detect_grammar("prod.tfvars", 'region = "us-east-1"')
+        assert result == "terraform"
+
     def test_returns_none_for_non_yaml(self):
         """detect_grammar should return None for non-YAML files."""
         result = detect_grammar("main.py", "def hello(): pass")
@@ -147,6 +158,12 @@ class TestGetGrammarHandler:
         assert handler is not None
         assert handler.GRAMMAR_NAME == "kubernetes"
 
+    def test_get_terraform(self):
+        """get_grammar_handler returns handler for 'terraform'."""
+        handler = get_grammar_handler("terraform")
+        assert handler is not None
+        assert handler.GRAMMAR_NAME == "terraform"
+
     def test_returns_none_for_unknown(self):
         """get_grammar_handler returns None for unknown grammar."""
         assert get_grammar_handler("unknown-grammar") is None
@@ -156,10 +173,10 @@ class TestGetGrammarHandler:
 class TestGetCustomLanguagesWithGrammars:
     """Tests for get_custom_languages() including grammar specs."""
 
-    def test_returns_twelve_specs(self):
-        """get_custom_languages() should return 12 specs (6 language + 6 grammar)."""
+    def test_returns_thirteen_specs(self):
+        """get_custom_languages() should return 13 specs (6 language + 7 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 12
+        assert len(specs) == 13
 
     def test_includes_grammar_specs(self):
         """get_custom_languages() should include grammar language names."""
@@ -171,6 +188,7 @@ class TestGetCustomLanguagesWithGrammars:
         assert "helm-template" in language_names
         assert "helm-values" in language_names
         assert "kubernetes" in language_names
+        assert "terraform" in language_names
 
     def test_still_includes_language_specs(self):
         """get_custom_languages() should still include language handler specs."""
@@ -197,10 +215,10 @@ class TestGetRegisteredGrammars:
         grammars = get_registered_grammars()
         assert isinstance(grammars, list)
 
-    def test_returns_five_grammars(self):
-        """get_registered_grammars() should return 5 grammars."""
+    def test_returns_seven_grammars(self):
+        """get_registered_grammars() should return 7 grammars."""
         grammars = get_registered_grammars()
-        assert len(grammars) == 6
+        assert len(grammars) == 7
 
 
 @pytest.mark.unit
@@ -237,9 +255,17 @@ class TestExtractChunkMetadataGrammarDispatch:
         assert result.block_type == "Deployment"
         assert result.hierarchy == "kind:Deployment"
 
+    def test_dispatches_to_terraform(self):
+        """extract_chunk_metadata dispatches to Terraform handler."""
+        text = 'resource "aws_s3_bucket" "data" {'
+        result = extract_chunk_metadata(text, "terraform")
+        assert result.language_id == "terraform"
+        assert result.block_type == "resource"
+        assert result.hierarchy == "resource.aws_s3_bucket.data"
+
     def test_still_dispatches_to_language_handler(self):
         """extract_chunk_metadata still works for language handlers."""
-        text = 'resource "aws_s3_bucket" "data" {'
-        result = extract_chunk_metadata(text, "tf")
+        text = 'listener "http" {'
+        result = extract_chunk_metadata(text, "hcl")
         assert result.language_id == "hcl"
-        assert result.block_type == "resource"
+        assert result.block_type == "listener"

@@ -105,6 +105,7 @@ SYMBOL_AWARE_LANGUAGES = {
     "ruby",
     "php",
     "hcl",
+    "terraform",
     "bash",
     "scala",
     "css",
@@ -119,7 +120,6 @@ HANDLER_LANGUAGES = {
 
 # Alias mapping for REQ-20 compatibility (resolved silently before validation)
 LANGUAGE_ALIASES = {
-    "terraform": "hcl",
     "shell": "bash",
     "sh": "bash",
 }

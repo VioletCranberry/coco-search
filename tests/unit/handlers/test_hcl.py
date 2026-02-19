@@ -9,13 +9,21 @@ from cocosearch.handlers.hcl import HclHandler
 class TestHclHandlerExtensions:
     """Tests for HclHandler EXTENSIONS."""
 
-    def test_extensions_contains_tf_hcl_tfvars(self):
-        """EXTENSIONS should contain .tf, .hcl, and .tfvars."""
+    def test_extensions_contains_hcl_only(self):
+        """EXTENSIONS should contain only .hcl."""
         handler = HclHandler()
-        assert ".tf" in handler.EXTENSIONS
-        assert ".hcl" in handler.EXTENSIONS
-        assert ".tfvars" in handler.EXTENSIONS
-        assert len(handler.EXTENSIONS) == 3
+        assert handler.EXTENSIONS == [".hcl"]
+        assert len(handler.EXTENSIONS) == 1
+
+    def test_does_not_contain_tf(self):
+        """EXTENSIONS should not contain .tf (handled by Terraform grammar)."""
+        handler = HclHandler()
+        assert ".tf" not in handler.EXTENSIONS
+
+    def test_does_not_contain_tfvars(self):
+        """EXTENSIONS should not contain .tfvars (handled by Terraform grammar)."""
+        handler = HclHandler()
+        assert ".tfvars" not in handler.EXTENSIONS
 
 
 @pytest.mark.unit
@@ -27,38 +35,25 @@ class TestHclHandlerSeparatorSpec:
         handler = HclHandler()
         assert handler.SEPARATOR_SPEC.language_name == "hcl"
 
-    def test_aliases_contains_tf_tfvars(self):
-        """SEPARATOR_SPEC.aliases should contain tf and tfvars."""
+    def test_aliases_is_empty(self):
+        """SEPARATOR_SPEC.aliases should be empty (no tf/tfvars aliases)."""
         handler = HclHandler()
-        assert handler.SEPARATOR_SPEC.aliases == ["tf", "tfvars"]
+        assert handler.SEPARATOR_SPEC.aliases == []
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = HclHandler()
         assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
 
-    def test_level1_contains_all_block_keywords(self):
-        """Level 1 separator should include all 12 top-level HCL block keywords."""
+    def test_level1_is_generic_block_pattern(self):
+        """Level 1 separator should be a generic identifier pattern, not Terraform keywords."""
         handler = HclHandler()
         level1 = handler.SEPARATOR_SPEC.separators_regex[0]
-        expected_keywords = [
-            "resource",
-            "data",
-            "variable",
-            "output",
-            "locals",
-            "module",
-            "provider",
-            "terraform",
-            "import",
-            "moved",
-            "removed",
-            "check",
-        ]
-        for keyword in expected_keywords:
-            assert keyword in level1, (
-                f"Missing HCL keyword '{keyword}' in Level 1 separator"
-            )
+        # Should be a generic pattern matching any identifier
+        assert "[a-z_]" in level1
+        # Should NOT contain specific Terraform keywords
+        assert "resource" not in level1
+        assert "variable" not in level1
 
     def test_no_lookaheads_in_separators(self):
         """HCL separators must not contain lookahead or lookbehind patterns."""
@@ -76,142 +71,108 @@ class TestHclHandlerSeparatorSpec:
 class TestHclHandlerExtractMetadata:
     """Tests for HclHandler.extract_metadata()."""
 
-    def test_resource_two_labels(self):
-        """resource with two labels produces correct block_type and hierarchy."""
+    def test_generic_block_with_label(self):
+        """Generic block with one label produces correct hierarchy."""
         handler = HclHandler()
-        m = handler.extract_metadata('resource "aws_s3_bucket" "data" {')
-        assert m["block_type"] == "resource"
-        assert m["hierarchy"] == "resource.aws_s3_bucket.data"
+        m = handler.extract_metadata('listener "http" {')
+        assert m["block_type"] == "listener"
+        assert m["hierarchy"] == "listener.http"
         assert m["language_id"] == "hcl"
 
-    def test_data_two_labels(self):
-        """data with two labels produces correct hierarchy."""
+    def test_generic_block_with_two_labels(self):
+        """Generic block with two labels produces correct hierarchy."""
         handler = HclHandler()
-        m = handler.extract_metadata('data "aws_iam_policy" "admin" {')
-        assert m["block_type"] == "data"
-        assert m["hierarchy"] == "data.aws_iam_policy.admin"
+        m = handler.extract_metadata('backend "consul" "primary" {')
+        assert m["block_type"] == "backend"
+        assert m["hierarchy"] == "backend.consul.primary"
         assert m["language_id"] == "hcl"
 
-    def test_module_one_label(self):
-        """module with one label produces correct hierarchy."""
+    def test_generic_block_no_labels(self):
+        """Generic block with no labels produces block_type-only hierarchy."""
         handler = HclHandler()
-        m = handler.extract_metadata('module "vpc" {')
-        assert m["block_type"] == "module"
-        assert m["hierarchy"] == "module.vpc"
+        m = handler.extract_metadata("defaults {")
+        assert m["block_type"] == "defaults"
+        assert m["hierarchy"] == "defaults"
         assert m["language_id"] == "hcl"
 
-    def test_variable_one_label(self):
-        """variable with one label produces correct hierarchy."""
+    def test_nested_block(self):
+        """Nested block (indented with brace) produces block metadata."""
         handler = HclHandler()
-        m = handler.extract_metadata('variable "name" {')
-        assert m["block_type"] == "variable"
-        assert m["hierarchy"] == "variable.name"
+        m = handler.extract_metadata('  backend "file" {')
+        assert m["block_type"] == "block"
+        assert m["hierarchy"] == "block.backend.file"
         assert m["language_id"] == "hcl"
 
-    def test_output_one_label(self):
-        """output with one label produces correct hierarchy."""
+    def test_nested_block_no_label(self):
+        """Nested block without label produces block metadata."""
         handler = HclHandler()
-        m = handler.extract_metadata('output "id" {')
-        assert m["block_type"] == "output"
-        assert m["hierarchy"] == "output.id"
+        m = handler.extract_metadata("  retry {")
+        assert m["block_type"] == "block"
+        assert m["hierarchy"] == "block.retry"
         assert m["language_id"] == "hcl"
 
-    def test_provider_one_label(self):
-        """provider with one label produces correct hierarchy."""
+    def test_attribute_assignment(self):
+        """Attribute assignment produces attribute metadata."""
         handler = HclHandler()
-        m = handler.extract_metadata('provider "aws" {')
-        assert m["block_type"] == "provider"
-        assert m["hierarchy"] == "provider.aws"
-        assert m["language_id"] == "hcl"
-
-    def test_check_one_label(self):
-        """check with one label produces correct hierarchy."""
-        handler = HclHandler()
-        m = handler.extract_metadata('check "health" {')
-        assert m["block_type"] == "check"
-        assert m["hierarchy"] == "check.health"
-        assert m["language_id"] == "hcl"
-
-    def test_terraform_no_labels(self):
-        """terraform with no labels produces block_type-only hierarchy."""
-        handler = HclHandler()
-        m = handler.extract_metadata("terraform {")
-        assert m["block_type"] == "terraform"
-        assert m["hierarchy"] == "terraform"
-        assert m["language_id"] == "hcl"
-
-    def test_locals_no_labels(self):
-        """locals with no labels produces block_type-only hierarchy."""
-        handler = HclHandler()
-        m = handler.extract_metadata("locals {")
-        assert m["block_type"] == "locals"
-        assert m["hierarchy"] == "locals"
-        assert m["language_id"] == "hcl"
-
-    def test_import_no_labels(self):
-        """import with no labels produces block_type-only hierarchy."""
-        handler = HclHandler()
-        m = handler.extract_metadata("import {")
-        assert m["block_type"] == "import"
-        assert m["hierarchy"] == "import"
-        assert m["language_id"] == "hcl"
-
-    def test_moved_no_labels(self):
-        """moved with no labels produces block_type-only hierarchy."""
-        handler = HclHandler()
-        m = handler.extract_metadata("moved {")
-        assert m["block_type"] == "moved"
-        assert m["hierarchy"] == "moved"
-        assert m["language_id"] == "hcl"
-
-    def test_removed_no_labels(self):
-        """removed with no labels produces block_type-only hierarchy."""
-        handler = HclHandler()
-        m = handler.extract_metadata("removed {")
-        assert m["block_type"] == "removed"
-        assert m["hierarchy"] == "removed"
+        m = handler.extract_metadata("  max_retries = 3")
+        assert m["block_type"] == "attribute"
+        assert m["hierarchy"] == "attribute.max_retries"
         assert m["language_id"] == "hcl"
 
     def test_comment_before_block(self):
         """Comment line before block keyword is correctly skipped."""
         handler = HclHandler()
-        m = handler.extract_metadata(
-            '# This resource\nresource "aws_s3_bucket" "data" {'
-        )
-        assert m["block_type"] == "resource"
-        assert m["hierarchy"] == "resource.aws_s3_bucket.data"
+        m = handler.extract_metadata('# This block\nlistener "http" {')
+        assert m["block_type"] == "listener"
+        assert m["hierarchy"] == "listener.http"
         assert m["language_id"] == "hcl"
 
     def test_inline_comment_before_block(self):
         """HCL // comment before block is correctly skipped."""
         handler = HclHandler()
-        m = handler.extract_metadata(
-            '// resource declaration\nresource "type" "name" {'
-        )
-        assert m["block_type"] == "resource"
-        assert m["hierarchy"] == "resource.type.name"
+        m = handler.extract_metadata('// listener config\nlistener "http" {')
+        assert m["block_type"] == "listener"
+        assert m["hierarchy"] == "listener.http"
         assert m["language_id"] == "hcl"
 
     def test_block_comment_before_block(self):
         """HCL /* block comment */ before block is correctly skipped."""
         handler = HclHandler()
-        m = handler.extract_metadata('/* block comment */\nresource "type" "name" {')
-        assert m["block_type"] == "resource"
-        assert m["hierarchy"] == "resource.type.name"
+        m = handler.extract_metadata('/* block comment */\nlistener "http" {')
+        assert m["block_type"] == "listener"
+        assert m["hierarchy"] == "listener.http"
+        assert m["language_id"] == "hcl"
+
+    def test_multiline_block_comment(self):
+        """Multi-line /* */ comment before block is correctly skipped."""
+        handler = HclHandler()
+        m = handler.extract_metadata(
+            '/*\n * Listener configuration\n */\nlistener "http" {'
+        )
+        assert m["block_type"] == "listener"
+        assert m["hierarchy"] == "listener.http"
         assert m["language_id"] == "hcl"
 
     def test_leading_newline(self):
         """Leading newline from separator split is handled."""
         handler = HclHandler()
-        m = handler.extract_metadata('\nresource "aws_s3_bucket" "data" {')
-        assert m["block_type"] == "resource"
-        assert m["hierarchy"] == "resource.aws_s3_bucket.data"
+        m = handler.extract_metadata('\nlistener "http" {')
+        assert m["block_type"] == "listener"
+        assert m["hierarchy"] == "listener.http"
         assert m["language_id"] == "hcl"
 
     def test_unrecognized_content_returns_empty(self):
         """Unrecognized content produces empty block_type and hierarchy."""
         handler = HclHandler()
-        m = handler.extract_metadata("unknown_block {")
+        m = handler.extract_metadata("some random text without structure")
+        assert m["block_type"] == ""
+        assert m["hierarchy"] == ""
+        assert m["language_id"] == "hcl"
+
+    def test_empty_content(self):
+        """Empty content returns empty block_type and hierarchy."""
+        handler = HclHandler()
+        m = handler.extract_metadata("")
         assert m["block_type"] == ""
         assert m["hierarchy"] == ""
         assert m["language_id"] == "hcl"
@@ -219,7 +180,7 @@ class TestHclHandlerExtractMetadata:
     def test_comment_with_keyword_no_block(self):
         """Comment containing block keyword does not produce false positive."""
         handler = HclHandler()
-        m = handler.extract_metadata("# This resource was replaced\nsome_other_content")
+        m = handler.extract_metadata("# This listener was replaced\nsome_other_content")
         assert m["block_type"] == ""
         assert m["hierarchy"] == ""
         assert m["language_id"] == "hcl"

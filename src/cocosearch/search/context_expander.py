@@ -51,6 +51,8 @@ DEFINITION_NODE_TYPES: dict[str, set[str]] = {
         "object_definition",
         "function_definition",
     },
+    "hcl": {"block"},
+    "terraform": {"block"},
 }
 
 # Languages that support smart context expansion (derived from DEFINITION_NODE_TYPES)
@@ -76,6 +78,10 @@ EXTENSION_TO_LANGUAGE: dict[str, str] = {
     ".rs": "rust",
     # Scala
     ".scala": "scala",
+    # HCL / Terraform
+    ".tf": "terraform",
+    ".hcl": "hcl",
+    ".tfvars": "terraform",
 }
 
 

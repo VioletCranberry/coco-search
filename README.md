@@ -53,6 +53,7 @@
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Helm_Template-0F1689?logo=helm&logoColor=white" alt="Helm Template"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Helm_Values-0F1689?logo=helm&logoColor=white" alt="Helm Values"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white" alt="Kubernetes"></a>
+  <a href="#supported-grammars"><img src="https://img.shields.io/badge/Terraform-844FBA?logo=terraform&logoColor=white" alt="Terraform"></a>
 </p>
 
 Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, [PostgreSQL](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) for storage, and [Ollama](https://ollama.com/) for local embeddings. No external APIs — everything runs on your machine.
@@ -381,7 +382,7 @@ CocoSearch indexes 31 programming languages. Symbol-aware languages support `--s
 │ YAML       │ .yaml, .yml                 │    ✗    │    ✗    │
 │ Bash       │ .sh, .bash, .zsh            │    ✓    │    ✗    │
 │ Dockerfile │ Dockerfile                  │    ✗    │    ✗    │
-│ HCL        │ .tf, .hcl, .tfvars          │    ✓    │    ✗    │
+│ HCL        │ .hcl                        │    ✓    │    ✓    │
 └────────────┴─────────────────────────────┴─────────┴─────────┘
 ```
 
@@ -404,7 +405,7 @@ See [Adding Languages](./docs/adding-languages.md) for details on how these tier
 
 ## Supported Grammars
 
-Beyond language-level support, CocoSearch recognizes **grammars** — domain-specific schemas within a base language. A **language** is matched by file extension (e.g., `.yaml` -> YAML), while a **grammar** is matched by file path and content patterns (e.g., `.github/workflows/ci.yml` containing `on:` + `jobs:` -> GitHub Actions). Grammars provide structured chunking and richer metadata compared to generic text chunking.
+Beyond language-level support, CocoSearch recognizes **grammars** — domain-specific schemas within a base language. A **language** is matched by file extension (e.g., `.yaml` -> YAML, `.hcl` -> HCL), while a **grammar** is matched by file path and content patterns (e.g., `.github/workflows/ci.yml` containing `on:` + `jobs:` -> GitHub Actions, `*.tf` -> Terraform). Grammars provide structured chunking and richer metadata compared to generic text chunking.
 
 ```
 ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -417,6 +418,7 @@ Beyond language-level support, CocoSearch recognizes **grammars** — domain-spe
 │                │             │ **/templates/**/*.yml                                                            │
 │ helm-values    │ yaml        │ **/values.yaml, **/values-*.yaml                                                 │
 │ kubernetes     │ yaml        │ *.yaml, *.yml                                                                    │
+│ terraform      │ hcl         │ **/*.tf, **/*.tfvars                                                             │
 └────────────────┴─────────────┴──────────────────────────────────────────────────────────────────────────────────┘
 ```
 

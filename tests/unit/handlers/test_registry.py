@@ -19,8 +19,8 @@ class TestHandlerRegistryDiscovery:
 
     def test_discover_finds_all_handlers(self):
         """_HANDLER_REGISTRY should have at least 4 handlers registered."""
-        # Should have .tf, .hcl, .tfvars, .dockerfile, .sh, .bash, .zsh, .tpl, .gotmpl
-        assert len(_HANDLER_REGISTRY) >= 9
+        # Should have .hcl, .dockerfile, .sh, .bash, .zsh, .tpl, .gotmpl
+        assert len(_HANDLER_REGISTRY) >= 7
 
     def test_template_excluded_from_discovery(self):
         """_template.py should be excluded from discovery."""
@@ -31,10 +31,10 @@ class TestHandlerRegistryDiscovery:
             )
 
     def test_hcl_extensions_registered(self):
-        """.tf, .hcl, and .tfvars should be in registry."""
-        assert ".tf" in _HANDLER_REGISTRY
+        """.hcl should be in registry (.tf/.tfvars handled by Terraform grammar)."""
         assert ".hcl" in _HANDLER_REGISTRY
-        assert ".tfvars" in _HANDLER_REGISTRY
+        assert ".tf" not in _HANDLER_REGISTRY
+        assert ".tfvars" not in _HANDLER_REGISTRY
 
     def test_dockerfile_extension_registered(self):
         """.dockerfile should be in registry."""
@@ -45,14 +45,6 @@ class TestHandlerRegistryDiscovery:
         assert ".sh" in _HANDLER_REGISTRY
         assert ".bash" in _HANDLER_REGISTRY
         assert ".zsh" in _HANDLER_REGISTRY
-
-    def test_all_hcl_extensions_map_to_same_handler(self):
-        """All HCL extensions should map to the same handler instance."""
-        handler_tf = _HANDLER_REGISTRY[".tf"]
-        handler_hcl = _HANDLER_REGISTRY[".hcl"]
-        handler_tfvars = _HANDLER_REGISTRY[".tfvars"]
-        assert handler_tf is handler_hcl
-        assert handler_hcl is handler_tfvars
 
     def test_all_bash_extensions_map_to_same_handler(self):
         """All Bash extensions should map to the same handler instance."""
@@ -67,20 +59,20 @@ class TestHandlerRegistryDiscovery:
 class TestGetHandler:
     """Tests for get_handler() public API."""
 
-    def test_get_handler_tf_returns_hcl_handler(self):
-        """get_handler('.tf') should return HclHandler."""
-        handler = get_handler(".tf")
-        assert isinstance(handler, HclHandler)
-
     def test_get_handler_hcl_returns_hcl_handler(self):
         """get_handler('.hcl') should return HclHandler."""
         handler = get_handler(".hcl")
         assert isinstance(handler, HclHandler)
 
-    def test_get_handler_tfvars_returns_hcl_handler(self):
-        """get_handler('.tfvars') should return HclHandler."""
+    def test_get_handler_tf_returns_text_handler(self):
+        """get_handler('.tf') should return TextHandler (Terraform handled by grammar)."""
+        handler = get_handler(".tf")
+        assert isinstance(handler, TextHandler)
+
+    def test_get_handler_tfvars_returns_text_handler(self):
+        """get_handler('.tfvars') should return TextHandler (Terraform handled by grammar)."""
         handler = get_handler(".tfvars")
-        assert isinstance(handler, HclHandler)
+        assert isinstance(handler, TextHandler)
 
     def test_get_handler_dockerfile_returns_dockerfile_handler(self):
         """get_handler('.dockerfile') should return DockerfileHandler."""
@@ -127,10 +119,10 @@ class TestGetCustomLanguages:
         specs = get_custom_languages()
         assert isinstance(specs, list)
 
-    def test_returns_twelve_specs(self):
-        """get_custom_languages() should return 12 specs (6 language + 6 grammar)."""
+    def test_returns_thirteen_specs(self):
+        """get_custom_languages() should return 13 specs (6 language + 7 grammar)."""
         specs = get_custom_languages()
-        assert len(specs) == 12
+        assert len(specs) == 13
 
     def test_all_specs_have_language_name(self):
         """All specs should have language_name attribute."""

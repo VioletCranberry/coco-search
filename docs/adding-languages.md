@@ -235,7 +235,7 @@ Priority: Grammar match > Language match > TextHandler fallback.
 
 ## Path E: Adding Context Expansion (Smart Boundaries)
 
-Use this when you want `smart_context=True` to expand search results to enclosing function/class boundaries for a language. Currently supported: Python, JavaScript, TypeScript, Go, Rust.
+Use this when you want `smart_context=True` to expand search results to enclosing function/class boundaries for a language. Currently supported: Python, JavaScript, TypeScript, Go, Rust, Scala, HCL/Terraform.
 
 ### Steps
 
