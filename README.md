@@ -68,6 +68,8 @@ Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental 
 - [🏆 Where MCP Wins](#where-mcp-wins)
 - [📚 Useful Documentation](#useful-documentation)
 - [🧩 Components](#components)
+  - [Available MCP Tools](#available-mcp-tools)
+  - [Available Skills](#available-skills)
 - [⚙️ How Search Works](#how-search-works)
 - [🌐 Supported Languages](#supported-languages)
 - [📝 Supported Grammars](#supported-grammars)
@@ -118,82 +120,59 @@ This project was originally built for personal use — a solo experiment in loca
 
 - **Services**:
 
-  ```bash
-  # 1. Clone this repository and start infrastructure:
-  git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
-  # Docker volumes are bind-mounted to ./docker_data/ inside the repository,
-  # so infrastructure must be started from the cloned repo directory.
-  docker compose up -d
-  # 2. Verify services are ready.
-  uvx cocosearch config check
-  ```
+```bash
+# 1. Clone this repository and start infrastructure:
+git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
+# Docker volumes are bind-mounted to ./docker_data/ inside the repository,
+# so infrastructure must be started from the cloned repo directory.
+docker compose up -d
+# 2. Verify services are ready.
+uvx cocosearch config check
+```
 
 - **Indexing your projects**:
 
-  ```bash
-  # 3.1 Use WEB Dashboard:
-  uvx cocosearch dashboard
-  # 3.2 Use CLI:
-  uvx cocosearch index .
-  # 3.3 Use AI and MCP - see below.
-  ```
+```bash
+# 3.1 Use WEB Dashboard:
+uvx cocosearch dashboard
+# 3.2 Use CLI:
+uvx cocosearch index .
+# 3.3 Use AI and MCP - see below.
+```
 
 - **Register with your AI assistant (pick one)**:
 
-  **Option A — Plugin (recommended):**
+**Option A — Plugin (recommended):**
 
-  ```bash
-  claude plugin marketplace add VioletCranberry/coco-s
-  claude plugin install cocosearch@cocosearch
-  # All 7 skills + MCP server configured automatically:
+```bash
+claude plugin marketplace add VioletCranberry/coco-s
+claude plugin install cocosearch@cocosearch
+# All skills + MCP server configured automatically
+```
 
-  ❯ skills
+**Option B — Manual MCP registration:**
 
-  ⏺ Here are the available skills:
+```bash
+claude mcp add --scope user cocosearch -- uvx cocosearch mcp --project-from-cwd
+```
 
-    CocoSearch
-
-    - /cocosearch:cocosearch-quickstart — First-time setup and verification
-    - /cocosearch:cocosearch-onboarding — Guided codebase tour
-    - /cocosearch:cocosearch-debugging — Root cause analysis using CocoSearch
-    - /cocosearch:cocosearch-refactoring — Impact analysis and safe refactoring
-    - /cocosearch:cocosearch-new-feature — Pattern-matching feature development
-    - /cocosearch:cocosearch-subway — Codebase visualization as subway map
-  ```
-
-  **Option B — Manual MCP registration:**
-
-  ```bash
-  claude mcp add --scope user cocosearch -- \
-    uvx cocosearch mcp --project-from-cwd
-  ```
-
-  > **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
-
-  Install skills manually (for development):
-
-  ```bash
-  mkdir -p .claude/skills
-  for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway; do
-      ln -sfn "../../skills/$skill" ".claude/skills/$skill"
-  done
-  ```
+> **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
 
 - **AI Chat from the dashboard** (optional):
 
-  > **Note:** AI Chat is only available when running `cocosearch dashboard` directly. It is not available through the MCP server.
+> **Note:** AI Chat is only available when running `cocosearch dashboard` directly. It is not available through the MCP server.
 
-  ```bash
-  # Option A — run directly (no persistent install):
-  uvx "cocosearch[web-chat]" dashboard
+```bash
+# Option A — run directly (no persistent install):
+uvx "cocosearch[web-chat]" dashboard
 
-  # Option B — install persistently, then run:
-  uv tool install "cocosearch[web-chat]"
-  cocosearch dashboard
+# Option B — install persistently, then run:
+uv tool install "cocosearch[web-chat]"
+cocosearch dashboard
 
-  # Requires `claude` CLI on PATH (Claude Code users).
-  # Then open the dashboard and switch to the "Ask AI" tab.
-  ```
+# Requires `claude` CLI on PATH (Claude Code users).
+# Then open the dashboard and switch to the "Ask AI" tab.
+```
 
 ## Interfaces
 
@@ -311,6 +290,8 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 - **cocosearch-new-feature** ([SKILL.md](./skills/cocosearch-new-feature/SKILL.md)): Use when adding new functionality — a new command, endpoint, module, handler, or capability. Guides placement, pattern matching, and integration using CocoSearch.
 - **cocosearch-explore** ([SKILL.md](./skills/cocosearch-explore/SKILL.md)): Use for codebase exploration — answering questions about how code works, tracing flows, or researching a topic. Autonomous mode for subagent/plan mode research; interactive mode for user-facing "how does X work?" explanations.
 - **cocosearch-subway** ([SKILL.md](./skills/cocosearch-subway/SKILL.md)): Use when the user wants to visualize codebase structure as an interactive London Underground-style subway map. AI-generated visualization using CocoSearch tools for exploration.
+- **cocosearch-add-language** ([SKILL.md](./skills/cocosearch-add-language/SKILL.md)): Use when adding support for a new programming language or config format. Guides through handlers, symbol extraction, and context expansion with registration checklists.
+- **cocosearch-add-grammar** ([SKILL.md](./skills/cocosearch-add-grammar/SKILL.md)): Use when adding a grammar handler for domain-specific formats within a base language (e.g., GitHub Actions within YAML). Guides matches() design, separator spec, metadata extraction, and testing.
 
 ## How Search Works
 
