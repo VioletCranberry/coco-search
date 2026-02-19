@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Local-first hybrid semantic code search with MCP tools and workflow skills",
-    "version": "0.1.11"
+    "version": "0.1.12"
   },
   "plugins": [
     {
       "name": "cocosearch",
       "description": "Local-first hybrid semantic code search with MCP tools and workflow skills",
-      "version": "0.1.11",
+      "version": "0.1.12",
       "source": "./"
     }
   ]
