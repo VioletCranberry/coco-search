@@ -26,7 +26,9 @@ class TestClientModeDispatch:
         monkeypatch.setenv("COCOSEARCH_SERVER_URL", "http://localhost:3000")
         monkeypatch.setattr("sys.argv", ["cocosearch", "search", "test query"])
 
-        with patch("cocosearch.client.run_client_command", return_value=0) as mock_client:
+        with patch(
+            "cocosearch.client.run_client_command", return_value=0
+        ) as mock_client:
             with pytest.raises(SystemExit) as exc_info:
                 from cocosearch.cli import main
 
@@ -85,7 +87,9 @@ class TestClientModeDispatch:
         monkeypatch.setenv("COCOSEARCH_SERVER_URL", "http://localhost:3000")
         monkeypatch.setattr("sys.argv", ["cocosearch", "stats"])
 
-        with patch("cocosearch.client.run_client_command", return_value=1) as mock_client:
+        with patch(
+            "cocosearch.client.run_client_command", return_value=1
+        ) as mock_client:
             with pytest.raises(SystemExit) as exc_info:
                 from cocosearch.cli import main
 

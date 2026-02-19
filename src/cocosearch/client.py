@@ -39,7 +39,7 @@ class CocoSearchClient:
         host_prefix, container_prefix = parts
         host_prefix = os.path.expanduser(host_prefix)
         if path.startswith(host_prefix):
-            return container_prefix + path[len(host_prefix):]
+            return container_prefix + path[len(host_prefix) :]
         return path
 
     def _translate_path_to_host(self, path: str) -> str:
@@ -52,12 +52,10 @@ class CocoSearchClient:
         host_prefix, container_prefix = parts
         host_prefix = os.path.expanduser(host_prefix)
         if path.startswith(container_prefix):
-            return host_prefix + path[len(container_prefix):]
+            return host_prefix + path[len(container_prefix) :]
         return path
 
-    def _request(
-        self, method: str, path: str, body: dict | None = None
-    ) -> dict | list:
+    def _request(self, method: str, path: str, body: dict | None = None) -> dict | list:
         """Make an HTTP request to the server."""
         url = f"{self.server_url}{path}"
 
@@ -483,8 +481,12 @@ def _client_languages(client: CocoSearchClient, args, console) -> int:
         table.add_column("Context", justify="center")
         for lang in languages:
             exts = ", ".join(lang.get("extensions", []))
-            sym = "[green]\u2713[/green]" if lang.get("symbols") else "[dim]\u2717[/dim]"
-            ctx = "[green]\u2713[/green]" if lang.get("context") else "[dim]\u2717[/dim]"
+            sym = (
+                "[green]\u2713[/green]" if lang.get("symbols") else "[dim]\u2717[/dim]"
+            )
+            ctx = (
+                "[green]\u2713[/green]" if lang.get("context") else "[dim]\u2717[/dim]"
+            )
             table.add_row(lang.get("name", ""), exts, sym, ctx)
         console.print(table)
     return 0

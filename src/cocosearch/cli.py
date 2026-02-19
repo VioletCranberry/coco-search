@@ -1670,7 +1670,9 @@ def dashboard_command(args: argparse.Namespace) -> int:
 
     # Resolve projects dir: CLI flag > env var > current directory
     projects_dir = args.projects_dir or os.environ.get("COCOSEARCH_PROJECTS_DIR") or "."
-    os.environ["COCOSEARCH_PROJECTS_DIR"] = str(Path(projects_dir).expanduser().resolve())
+    os.environ["COCOSEARCH_PROJECTS_DIR"] = str(
+        Path(projects_dir).expanduser().resolve()
+    )
 
     # Resolve port: CLI > env > default
     if args.port is not None:

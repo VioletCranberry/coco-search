@@ -43,7 +43,9 @@ class TestRequest:
         client = CocoSearchClient("http://localhost:8080")
         payload = {"ok": True}
 
-        with patch("urllib.request.urlopen", return_value=mock_urlopen_response(payload)) as mock_open:
+        with patch(
+            "urllib.request.urlopen", return_value=mock_urlopen_response(payload)
+        ) as mock_open:
             result = client._request("GET", "/api/stats")
 
         assert result == payload
@@ -58,7 +60,9 @@ class TestRequest:
         body = {"query": "hello", "index_name": "myindex"}
         response_data = {"results": [], "total": 0}
 
-        with patch("urllib.request.urlopen", return_value=mock_urlopen_response(response_data)) as mock_open:
+        with patch(
+            "urllib.request.urlopen", return_value=mock_urlopen_response(response_data)
+        ) as mock_open:
             result = client._request("POST", "/api/search", body)
 
         assert result == response_data
@@ -214,20 +218,24 @@ class TestSearch:
                 context_after=3,
             )
 
-        mock_req.assert_called_once_with("POST", "/api/search", {
-            "query": "hello world",
-            "index_name": "myindex",
-            "limit": 5,
-            "min_score": 0.5,
-            "language": "python",
-            "use_hybrid": True,
-            "symbol_type": ["function"],
-            "symbol_name": "main*",
-            "no_cache": True,
-            "smart_context": True,
-            "context_before": 3,
-            "context_after": 3,
-        })
+        mock_req.assert_called_once_with(
+            "POST",
+            "/api/search",
+            {
+                "query": "hello world",
+                "index_name": "myindex",
+                "limit": 5,
+                "min_score": 0.5,
+                "language": "python",
+                "use_hybrid": True,
+                "symbol_type": ["function"],
+                "symbol_name": "main*",
+                "no_cache": True,
+                "smart_context": True,
+                "context_before": 3,
+                "context_after": 3,
+            },
+        )
         assert result == response_data
 
     def test_search_omits_optional_fields_when_none(self):
@@ -293,8 +301,10 @@ class TestIndex:
                 return stats_response
             raise AssertionError(f"Unexpected request: {method} {path}")
 
-        with patch.object(client, "_request", side_effect=fake_request) as mock_req, \
-             patch("time.sleep"):
+        with (
+            patch.object(client, "_request", side_effect=fake_request) as mock_req,
+            patch("time.sleep"),
+        ):
             result = client.index(
                 project_path="/home/user/myapp",
                 index_name="myindex",
@@ -326,8 +336,10 @@ class TestIndex:
 
         index_response = {"index_name": "myapp", "status": "indexed"}
 
-        with patch.object(client, "_request", return_value=index_response) as mock_req, \
-             patch("time.sleep"):
+        with (
+            patch.object(client, "_request", return_value=index_response) as mock_req,
+            patch("time.sleep"),
+        ):
             client.index(project_path="/home/user/GIT/myapp")
 
         first_call = mock_req.call_args_list[0]
@@ -354,8 +366,10 @@ class TestIndex:
                 return next(poll_iter)
             raise AssertionError(f"Unexpected: {method} {path}")
 
-        with patch.object(client, "_request", side_effect=fake_request), \
-             patch("time.sleep") as mock_sleep:
+        with (
+            patch.object(client, "_request", side_effect=fake_request),
+            patch("time.sleep") as mock_sleep,
+        ):
             result = client.index(
                 project_path="/some/path",
                 index_name="myindex",
@@ -375,8 +389,10 @@ class TestIndex:
         # No index_name in response and no index_name passed
         index_response = {"status": "accepted"}
 
-        with patch.object(client, "_request", return_value=index_response), \
-             patch("time.sleep"):
+        with (
+            patch.object(client, "_request", return_value=index_response),
+            patch("time.sleep"),
+        ):
             result = client.index(project_path="/some/path")
 
         assert result == index_response
@@ -397,8 +413,10 @@ class TestIndex:
             call_count += 1
             raise CocoSearchClientError("Server error")
 
-        with patch.object(client, "_request", side_effect=fake_request), \
-             patch("time.sleep"):
+        with (
+            patch.object(client, "_request", side_effect=fake_request),
+            patch("time.sleep"),
+        ):
             result = client.index(project_path="/some/path", index_name="myindex")
 
         # Returns the initial POST result since polling broke
@@ -513,16 +531,20 @@ class TestAnalyze:
                 symbol_name="MyClass*",
             )
 
-        mock_req.assert_called_once_with("POST", "/api/analyze", {
-            "query": "search query",
-            "index_name": "myindex",
-            "limit": 20,
-            "min_score": 0.1,
-            "language": "python",
-            "use_hybrid": True,
-            "symbol_type": ["class"],
-            "symbol_name": "MyClass*",
-        })
+        mock_req.assert_called_once_with(
+            "POST",
+            "/api/analyze",
+            {
+                "query": "search query",
+                "index_name": "myindex",
+                "limit": 20,
+                "min_score": 0.1,
+                "language": "python",
+                "use_hybrid": True,
+                "symbol_type": ["class"],
+                "symbol_name": "MyClass*",
+            },
+        )
         assert result == response
 
     def test_analyze_omits_optional_fields_when_none(self):
@@ -532,12 +554,16 @@ class TestAnalyze:
         with patch.object(client, "_request", return_value={}) as mock_req:
             client.analyze(query="test", index_name="idx")
 
-        mock_req.assert_called_once_with("POST", "/api/analyze", {
-            "query": "test",
-            "index_name": "idx",
-            "limit": 10,
-            "min_score": 0.3,
-        })
+        mock_req.assert_called_once_with(
+            "POST",
+            "/api/analyze",
+            {
+                "query": "test",
+                "index_name": "idx",
+                "limit": 10,
+                "min_score": 0.3,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -584,7 +610,11 @@ class TestGrammars:
         """grammars() calls GET /api/grammars and returns the list."""
         client = CocoSearchClient("http://localhost:8080")
         grammar_data = [
-            {"name": "GitHub Actions", "base_language": "yaml", "path_patterns": [".github/workflows/*.yml"]},
+            {
+                "name": "GitHub Actions",
+                "base_language": "yaml",
+                "path_patterns": [".github/workflows/*.yml"],
+            },
             {"name": "Terraform", "base_language": "hcl", "path_patterns": ["*.tf"]},
         ]
 
