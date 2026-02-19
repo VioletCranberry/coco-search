@@ -23,13 +23,19 @@ class GitLabCIHandler:
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
         language_name="gitlab-ci",
         separators_regex=[
-            # Level 1: Top-level job/stage boundaries
-            r"\n[a-zA-Z_.][\w./-]*:",
-            # Level 2: Blank lines
+            # Level 1: YAML document separator
+            r"\n---",
+            # Level 2: Top-level keys (jobs, keywords, templates) with newline
+            r"\n[a-zA-Z_.][\w./-]*:\s*\n",
+            # Level 3: Job-level keys (2-space indented: script:, stage:, image:)
+            r"\n  [a-zA-Z_][\w-]*:",
+            # Level 4: Nested keys (4-space indented: only:, except:, rules:)
+            r"\n    [a-zA-Z_][\w-]*:",
+            # Level 5: Blank lines
             r"\n\n+",
-            # Level 3: Single newlines
+            # Level 6: Single newlines
             r"\n",
-            # Level 4: Whitespace (last resort)
+            # Level 7: Whitespace (last resort)
             r" ",
         ],
         aliases=[],
@@ -38,13 +44,23 @@ class GitLabCIHandler:
     _COMMENT_LINE = re.compile(r"^\s*#.*$", re.MULTILINE)
 
     # Top-level key (job name or keyword) at start of line
+    # Supports . prefix (templates) and / in names (deploy/staging)
     _TOP_KEY_RE = re.compile(r"^([a-zA-Z_.][\w./-]*):\s*", re.MULTILINE)
 
-    # stage: value under a job
-    _STAGE_RE = re.compile(r"^\s+stage:\s*(.+)$", re.MULTILINE)
+    # Job-level key (2-space indented key: script:, stage:, image:)
+    _ITEM_RE = re.compile(r"^  ([a-zA-Z_][\w-]*):", re.MULTILINE)
 
-    # GitLab CI global keywords (not job names)
-    _GLOBAL_KEYWORDS = frozenset(
+    # Nested key (4+ space indented key: only:, except:, variables:)
+    _NESTED_KEY_RE = re.compile(r"^\s{4,}([a-zA-Z_][\w-]*):", re.MULTILINE)
+
+    # YAML list item key (e.g., "- project: mygroup/myproject", "- local: /path")
+    _LIST_ITEM_KEY_RE = re.compile(r"^\s*-\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
+
+    # Script line (e.g., "- echo hello", "  - make build")
+    _SCRIPT_LINE_RE = re.compile(r"^\s*-\s+(.+)$", re.MULTILINE)
+
+    # GitLab CI top-level keywords (not job names)
+    _TOP_LEVEL_KEYS = frozenset(
         {
             "stages",
             "variables",
@@ -64,7 +80,8 @@ class GitLabCIHandler:
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if file is a GitLab CI configuration.
 
-        Uses basename matching so nested .gitlab-ci.yml files are detected.
+        Uses fnmatch with */{pattern} idiom so nested .gitlab-ci.yml files
+        are detected at any depth.
 
         Args:
             filepath: Relative file path within the project.
@@ -73,9 +90,10 @@ class GitLabCIHandler:
         Returns:
             True if this is a GitLab CI configuration file.
         """
-        basename = filepath.rsplit("/", 1)[-1] if "/" in filepath else filepath
         for pattern in self.PATH_PATTERNS:
-            if fnmatch.fnmatch(basename, pattern):
+            if fnmatch.fnmatch(filepath, pattern) or fnmatch.fnmatch(
+                filepath, f"*/{pattern}"
+            ):
                 if content is not None:
                     has_stages = "stages:" in content
                     has_script_combo = "script:" in content and (
@@ -88,7 +106,8 @@ class GitLabCIHandler:
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from GitLab CI chunk.
 
-        Identifies jobs, stages, and global keywords.
+        Identifies jobs, job-level keys, nested keys, list items,
+        templates, global keywords, and value continuations.
 
         Args:
             text: The chunk text content.
@@ -98,54 +117,96 @@ class GitLabCIHandler:
 
         Examples:
             Job chunk: block_type="job", hierarchy="job:build"
-            Stages block: block_type="stages", hierarchy="stages"
+            Job key: block_type="job-key", hierarchy="job-key:script"
+            Template: block_type="template", hierarchy="template:.base_job"
+            Nested key: block_type="nested-key", hierarchy="nested-key:only"
+            List item: block_type="list-item", hierarchy="list-item:project"
         """
         stripped = self._strip_comments(text)
 
+        # Check for job-level key (2-space indented key)
+        item_match = self._ITEM_RE.match(stripped)
+        if item_match:
+            key = item_match.group(1)
+            return {
+                "block_type": "job-key",
+                "hierarchy": f"job-key:{key}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for nested key (4+ space indented)
+        nested_match = self._NESTED_KEY_RE.match(stripped)
+        if nested_match:
+            key = nested_match.group(1)
+            return {
+                "block_type": "nested-key",
+                "hierarchy": f"nested-key:{key}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for YAML list item key (e.g., "- project: value")
+        list_match = self._LIST_ITEM_KEY_RE.match(stripped)
+        if list_match:
+            key = list_match.group(1)
+            return {
+                "block_type": "list-item",
+                "hierarchy": f"list-item:{key}",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Check for top-level keys
         top_match = self._TOP_KEY_RE.match(stripped)
-        if not top_match:
-            return {
-                "block_type": "",
-                "hierarchy": "",
-                "language_id": self.GRAMMAR_NAME,
-            }
+        if top_match:
+            key = top_match.group(1)
 
-        key = top_match.group(1)
+            # Hidden jobs/templates (start with .)
+            if key.startswith("."):
+                return {
+                    "block_type": "template",
+                    "hierarchy": f"template:{key}",
+                    "language_id": self.GRAMMAR_NAME,
+                }
 
-        # Global keywords
-        if key in self._GLOBAL_KEYWORDS:
-            return {
-                "block_type": key,
-                "hierarchy": key,
-                "language_id": self.GRAMMAR_NAME,
-            }
+            # Global keywords
+            if key in self._TOP_LEVEL_KEYS:
+                return {
+                    "block_type": key,
+                    "hierarchy": key,
+                    "language_id": self.GRAMMAR_NAME,
+                }
 
-        # Hidden jobs/templates (start with .)
-        if key.startswith("."):
-            return {
-                "block_type": "template",
-                "hierarchy": f"template:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
-
-        # Regular job — try to extract stage
-        stage_match = self._STAGE_RE.search(stripped)
-        if stage_match:
+            # Regular job
             return {
                 "block_type": "job",
                 "hierarchy": f"job:{key}",
                 "language_id": self.GRAMMAR_NAME,
             }
 
+        # YAML document separator (--- chunks)
+        if "---" in text:
+            return {
+                "block_type": "document",
+                "hierarchy": "document",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
+        # Value continuation (chunk has content but no recognizable key)
+        if stripped:
+            return {
+                "block_type": "value",
+                "hierarchy": "value",
+                "language_id": self.GRAMMAR_NAME,
+            }
+
         return {
-            "block_type": "job",
-            "hierarchy": f"job:{key}",
+            "block_type": "",
+            "hierarchy": "",
             "language_id": self.GRAMMAR_NAME,
         }
 
     def _strip_comments(self, text: str) -> str:
-        """Strip leading comments from chunk text."""
-        lines = text.lstrip().split("\n")
+        """Strip leading comments from chunk text, preserving indentation."""
+        lines = text.lstrip("\n").split("\n")
         for i, line in enumerate(lines):
             if line.strip() and not self._COMMENT_LINE.match(line):
                 return "\n".join(lines[i:])
