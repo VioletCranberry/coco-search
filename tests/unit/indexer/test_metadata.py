@@ -236,10 +236,10 @@ class TestExtractHclMetadata:
         assert m.hierarchy == "resource.aws_s3_bucket.data"
 
     def test_unrecognized_content(self):
-        """Unrecognized content produces empty block_type and hierarchy."""
+        """Generic block keyword produces block_type from the identifier."""
         m = extract_hcl_metadata("unknown_block {")
-        assert m.block_type == ""
-        assert m.hierarchy == ""
+        assert m.block_type == "unknown_block"
+        assert m.hierarchy == "unknown_block"
         assert m.language_id == "hcl"
 
     def test_hcl_inline_comment(self):

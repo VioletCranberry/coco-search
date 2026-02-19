@@ -123,16 +123,16 @@ class TestExtractLanguage:
     """
 
     def test_hcl_tf_extension(self):
-        """Routes .tf files by extension."""
+        """Routes .tf files via Terraform grammar handler."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("main.tf", "resource {}") == "tf"
+        assert extract_language("main.tf", "resource {}") == "terraform"
 
     def test_hcl_tfvars_extension(self):
-        """Routes .tfvars files by extension."""
+        """Routes .tfvars files via Terraform grammar handler."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("variables.tfvars", "var = 1") == "tfvars"
+        assert extract_language("variables.tfvars", "var = 1") == "terraform"
 
     def test_hcl_hcl_extension(self):
         """Routes .hcl files by extension."""
@@ -207,10 +207,10 @@ class TestExtractLanguage:
         assert extract_language("/path/to/Dockerfile.dev", "FROM node") == "dockerfile"
 
     def test_full_path_hcl(self):
-        """Routes .tf from full path."""
+        """Routes .tf from full path via Terraform grammar handler."""
         from cocosearch.indexer.embedder import extract_language
 
-        assert extract_language("/infra/main.tf", "resource {}") == "tf"
+        assert extract_language("/infra/main.tf", "resource {}") == "terraform"
 
     # Grammar-aware routing tests
 

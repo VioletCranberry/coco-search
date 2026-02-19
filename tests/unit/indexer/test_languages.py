@@ -24,34 +24,19 @@ class TestHclLanguage:
         assert HCL_LANGUAGE.language_name == "hcl"
 
     def test_aliases(self):
-        """HCL spec should have tf and tfvars as aliases."""
-        assert HCL_LANGUAGE.aliases == ["tf", "tfvars"]
+        """HCL spec should have empty aliases (tf/tfvars handled by Terraform grammar)."""
+        assert HCL_LANGUAGE.aliases == []
 
     def test_has_separators(self):
         """HCL spec should have a non-empty separators_regex list."""
         assert len(HCL_LANGUAGE.separators_regex) > 0
 
-    def test_level1_contains_all_block_keywords(self):
-        """Level 1 separator should include all 12 top-level HCL block keywords."""
+    def test_level1_is_generic_block_pattern(self):
+        """Level 1 separator should be a generic identifier pattern."""
         level1 = HCL_LANGUAGE.separators_regex[0]
-        expected_keywords = [
-            "resource",
-            "data",
-            "variable",
-            "output",
-            "locals",
-            "module",
-            "provider",
-            "terraform",
-            "import",
-            "moved",
-            "removed",
-            "check",
-        ]
-        for keyword in expected_keywords:
-            assert keyword in level1, (
-                f"Missing HCL keyword '{keyword}' in Level 1 separator"
-            )
+        # Should be a generic pattern matching any identifier, not Terraform keywords
+        assert "[a-z_]" in level1
+        assert "resource" not in level1
 
     def test_no_lookaheads_in_separators(self):
         """HCL separators must not contain lookahead or lookbehind patterns."""
@@ -128,8 +113,8 @@ class TestDevopsCustomLanguages:
     """Tests for HANDLER_CUSTOM_LANGUAGES aggregated list."""
 
     def test_contains_all_specs(self):
-        """HANDLER_CUSTOM_LANGUAGES should contain 9 specs (4 language + 5 grammar)."""
-        assert len(HANDLER_CUSTOM_LANGUAGES) == 12
+        """HANDLER_CUSTOM_LANGUAGES should contain 13 specs (6 language + 7 grammar)."""
+        assert len(HANDLER_CUSTOM_LANGUAGES) == 13
 
     def test_contains_hcl(self):
         """HANDLER_CUSTOM_LANGUAGES should contain the HCL spec."""
