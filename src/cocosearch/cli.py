@@ -2189,6 +2189,13 @@ def main() -> None:
     # Parse args
     args = parser.parse_args()
 
+    # Client mode: forward commands to remote server if COCOSEARCH_SERVER_URL is set
+    server_url = os.environ.get("COCOSEARCH_SERVER_URL")
+    if server_url and hasattr(args, "command") and args.command:
+        from cocosearch.client import run_client_command
+
+        sys.exit(run_client_command(args, server_url))
+
     # Ensure database URL default and CocoIndex bridge are set early
     from cocosearch.config.env_validation import get_database_url
 

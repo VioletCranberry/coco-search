@@ -412,6 +412,10 @@ async def api_index(request) -> JSONResponse:
 
     project_path = body.get("project_path")
     index_name = body.get("index_name")
+    include_patterns = body.get("include_patterns")
+    exclude_patterns = body.get("exclude_patterns")
+    no_gitignore = body.get("no_gitignore", False)
+    fresh = body.get("fresh", False)
 
     if not project_path:
         return JSONResponse({"error": "project_path is required"}, status_code=400)
@@ -419,6 +423,14 @@ async def api_index(request) -> JSONResponse:
     # Derive index name if not provided
     if not index_name:
         index_name = derive_index_name(project_path)
+
+    # Build indexing config from request parameters
+    config_kwargs: dict = {}
+    if include_patterns:
+        config_kwargs["include_patterns"] = include_patterns
+    if exclude_patterns:
+        config_kwargs["exclude_patterns"] = exclude_patterns
+    indexing_config = IndexingConfig(**config_kwargs)
 
     # Hold lock for entire check-and-start to prevent two threads
     # from both starting indexing for the same index
@@ -445,7 +457,9 @@ async def api_index(request) -> JSONResponse:
                 run_index(
                     index_name=index_name,
                     codebase_path=project_path,
-                    config=IndexingConfig(),
+                    config=indexing_config,
+                    respect_gitignore=not no_gitignore,
+                    fresh=fresh,
                 )
                 _register_with_git(index_name, project_path)
             except Exception as exc:
@@ -536,6 +550,140 @@ async def api_delete_index(request) -> JSONResponse:
         return JSONResponse({"error": f"Failed to delete index: {e}"}, status_code=500)
 
 
+@mcp.custom_route("/api/list", methods=["GET"])
+async def api_list(request) -> JSONResponse:
+    """List all indexes with metadata."""
+    try:
+        _ensure_cocoindex_init()
+        indexes = mgmt_list_indexes()
+    except Exception:
+        return JSONResponse([])
+
+    enriched = []
+    for idx in indexes:
+        entry = {"name": idx["name"], "table_name": idx["table_name"]}
+        try:
+            meta = get_index_metadata(idx["name"])
+            if meta:
+                entry["branch"] = meta.get("branch")
+                entry["commit_hash"] = meta.get("commit_hash")
+                entry["status"] = meta.get("status")
+                entry["canonical_path"] = meta.get("canonical_path")
+        except Exception:
+            pass
+        enriched.append(entry)
+
+    return JSONResponse(enriched)
+
+
+@mcp.custom_route("/api/analyze", methods=["POST"])
+async def api_analyze(request) -> JSONResponse:
+    """Analyze the search pipeline for a query."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    query = body.get("query", "").strip()
+    index_name = body.get("index_name")
+
+    if not query:
+        return JSONResponse({"error": "query is required"}, status_code=400)
+    if not index_name:
+        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    limit = body.get("limit", 10)
+    min_score = body.get("min_score", 0.3)
+    language = body.get("language") or None
+    use_hybrid = body.get("use_hybrid")
+    symbol_type = body.get("symbol_type") or None
+    symbol_name = body.get("symbol_name") or None
+    no_cache = body.get("no_cache", True)
+
+    try:
+        _ensure_cocoindex_init()
+    except Exception as e:
+        logger.warning(f"CocoIndex init failed: {e}")
+        return JSONResponse(
+            {"error": "Database not initialized. Index a codebase first."},
+            status_code=503,
+        )
+
+    try:
+        result = run_analyze(
+            query=query,
+            index_name=index_name,
+            limit=limit,
+            min_score=min_score,
+            language_filter=language,
+            use_hybrid=use_hybrid,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            no_cache=no_cache,
+        )
+        return JSONResponse({"success": True, **result.to_dict()})
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        logger.error(f"Analyze failed: {e}")
+        return JSONResponse({"error": f"Analysis failed: {e}"}, status_code=500)
+
+
+@mcp.custom_route("/api/languages", methods=["GET"])
+async def api_languages(request) -> JSONResponse:
+    """List supported languages with extensions and capabilities."""
+    from cocosearch.handlers import get_registered_handlers
+    from cocosearch.search.context_expander import CONTEXT_EXPANSION_LANGUAGES
+    from cocosearch.search.query import LANGUAGE_EXTENSIONS, SYMBOL_AWARE_LANGUAGES
+
+    languages = []
+
+    for lang, exts in sorted(LANGUAGE_EXTENSIONS.items()):
+        languages.append(
+            {
+                "name": lang,
+                "extensions": list(exts),
+                "symbols": lang in SYMBOL_AWARE_LANGUAGES,
+                "context": lang in CONTEXT_EXPANSION_LANGUAGES,
+                "source": "builtin",
+            }
+        )
+
+    for handler in sorted(
+        get_registered_handlers(), key=lambda h: h.SEPARATOR_SPEC.language_name
+    ):
+        lang = handler.SEPARATOR_SPEC.language_name
+        languages.append(
+            {
+                "name": lang,
+                "extensions": list(handler.EXTENSIONS),
+                "symbols": lang in SYMBOL_AWARE_LANGUAGES,
+                "context": lang in CONTEXT_EXPANSION_LANGUAGES,
+                "source": "handler",
+            }
+        )
+
+    return JSONResponse(languages)
+
+
+@mcp.custom_route("/api/grammars", methods=["GET"])
+async def api_grammars(request) -> JSONResponse:
+    """List supported grammars with path patterns."""
+    from cocosearch.handlers import get_registered_grammars
+
+    grammars = []
+    for handler in sorted(get_registered_grammars(), key=lambda h: h.GRAMMAR_NAME):
+        grammars.append(
+            {
+                "name": handler.GRAMMAR_NAME,
+                "base_language": handler.BASE_LANGUAGE,
+                "path_patterns": handler.PATH_PATTERNS,
+            }
+        )
+
+    return JSONResponse(grammars)
+
+
 @mcp.custom_route("/api/search", methods=["POST"])
 async def api_search(request) -> JSONResponse:
     """Search indexed code via the dashboard API."""
@@ -560,6 +708,10 @@ async def api_search(request) -> JSONResponse:
     symbol_name = body.get("symbol_name") or None
     min_score = body.get("min_score", 0.3)
     use_hybrid = body.get("use_hybrid")
+    no_cache = body.get("no_cache", False)
+    smart_context = body.get("smart_context", False)
+    context_before = body.get("context_before")
+    context_after = body.get("context_after")
 
     try:
         _ensure_cocoindex_init()
@@ -581,6 +733,7 @@ async def api_search(request) -> JSONResponse:
             use_hybrid=use_hybrid,
             symbol_type=symbol_type,
             symbol_name=symbol_name,
+            no_cache=no_cache,
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
@@ -590,34 +743,67 @@ async def api_search(request) -> JSONResponse:
 
     query_time_ms = round((time.monotonic() - start_time) * 1000)
 
+    # Create context expander if context is requested
+    expander = None
+    if smart_context or context_before is not None or context_after is not None:
+        expander = ContextExpander()
+
     output = []
-    for r in results:
-        start_line = byte_to_line(r.filename, r.start_byte)
-        end_line = byte_to_line(r.filename, r.end_byte)
-        content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+    try:
+        for r in results:
+            start_line = byte_to_line(r.filename, r.start_byte)
+            end_line = byte_to_line(r.filename, r.end_byte)
+            content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
 
-        result_dict = {
-            "file_path": r.filename,
-            "start_line": start_line,
-            "end_line": end_line,
-            "score": r.score,
-            "content": content,
-            "block_type": r.block_type,
-            "hierarchy": r.hierarchy,
-            "language_id": r.language_id,
-            "symbol_type": r.symbol_type,
-            "symbol_name": r.symbol_name,
-            "symbol_signature": r.symbol_signature,
-        }
+            result_dict = {
+                "file_path": r.filename,
+                "start_line": start_line,
+                "end_line": end_line,
+                "score": r.score,
+                "content": content,
+                "block_type": r.block_type,
+                "hierarchy": r.hierarchy,
+                "language_id": r.language_id,
+                "symbol_type": r.symbol_type,
+                "symbol_name": r.symbol_name,
+                "symbol_signature": r.symbol_signature,
+            }
 
-        if r.match_type:
-            result_dict["match_type"] = r.match_type
-        if r.vector_score is not None:
-            result_dict["vector_score"] = r.vector_score
-        if r.keyword_score is not None:
-            result_dict["keyword_score"] = r.keyword_score
+            # Apply context expansion if requested
+            if expander is not None:
+                ext = os.path.splitext(r.filename)[1].lstrip(".")
+                language_name = _get_treesitter_language(ext)
 
-        output.append(result_dict)
+                before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
+                    expander.get_context_lines(
+                        r.filename,
+                        start_line,
+                        end_line,
+                        context_before=context_before or 0,
+                        context_after=context_after or 0,
+                        smart=smart_context
+                        and (context_before is None and context_after is None),
+                        language=language_name,
+                    )
+                )
+
+                context_before_text = "\n".join(line for _, line in before_lines)
+                context_after_text = "\n".join(line for _, line in after_lines)
+                if context_before_text or context_after_text:
+                    result_dict["context_before"] = context_before_text
+                    result_dict["context_after"] = context_after_text
+
+            if r.match_type:
+                result_dict["match_type"] = r.match_type
+            if r.vector_score is not None:
+                result_dict["vector_score"] = r.vector_score
+            if r.keyword_score is not None:
+                result_dict["keyword_score"] = r.keyword_score
+
+            output.append(result_dict)
+    finally:
+        if expander is not None:
+            expander.clear_cache()
 
     return JSONResponse(
         {
