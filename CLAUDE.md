@@ -74,7 +74,7 @@ uv run cocosearch mcp --project-from-cwd
 - **`client.py`** — HTTP client for remote server mode. `CocoSearchClient` forwards CLI commands to a running CocoSearch server via HTTP API (`/api/search`, `/api/index`, `/api/stats`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/delete-index`). Path translation via `COCOSEARCH_PATH_PREFIX` rewrites host↔container paths.
 - **`exceptions.py`** — Structured exception hierarchy: `CocoSearchError` (base), `IndexNotFoundError`, `IndexValidationError`, `SearchError`, `InfrastructureError`. Inherits from `ValueError` where needed for backward compatibility.
 - **`validation.py`** — Input validation guards: `validate_index_name()` (SQL injection protection for dynamic table names), `validate_query()` (resource exhaustion protection, max 10,000 chars)
-- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE, `/api/ai-chat/*` AI chat)
+- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/projects`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE, `/api/ai-chat/*` AI chat)
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (15 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py`), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
@@ -146,6 +146,7 @@ Project config via `cocosearch.yaml` (no leading dot) in project root. The `inde
 **Docker / client mode env vars:**
 - `COCOSEARCH_SERVER_URL` — When set, CLI forwards commands to the remote server instead of running locally (e.g., `http://localhost:3000`)
 - `COCOSEARCH_PATH_PREFIX` — Host↔container path rewriting for client mode (e.g., `~/GIT:/projects`)
+- `COCOSEARCH_PROJECTS_DIR` — Directory to scan for available projects in Docker mode. Dashboard shows unindexed projects with an "Index Now" option. Set to `/projects` in docker-compose.yml.
 - `PROJECTS_DIR` — Docker Compose variable: directory to mount into the app container as `/projects` (default: `.`)
 - `COCOSEARCH_MCP_PORT` — Server port, used by both CLI and Docker Compose (default: `3000`)
 

@@ -1508,6 +1508,7 @@
         let symbolChart = null;
         let grammarChart = null;
         let allIndexes = [];
+        let allProjects = [];
         let projectContext = null;
         let parseFailuresData = [];
         let grammarFailuresData = [];
@@ -1551,6 +1552,14 @@
                 const data = await resp.json();
                 return data.has_project ? data : null;
             } catch { return null; }
+        }
+
+        async function fetchProjects() {
+            try {
+                const resp = await fetch('/api/projects');
+                if (!resp.ok) return [];
+                return await resp.json();
+            } catch { return []; }
         }
 
         async function fetchStats(indexName = null) {
@@ -2097,18 +2106,47 @@
 
         async function loadIndexList() {
             try {
-                // Load project context and stats in parallel
-                const [ctx, data] = await Promise.all([
+                // Load project context, stats, and discovered projects in parallel
+                const [ctx, data, projects] = await Promise.all([
                     loadProjectContext(),
                     fetchStats(),
+                    fetchProjects(),
                 ]);
                 projectContext = ctx;
                 allIndexes = Array.isArray(data) ? data : [data];
+                allProjects = projects;
+
+                // Find unindexed projects (not already in allIndexes)
+                const indexedNames = new Set(allIndexes.map(idx => idx.name));
+                const unindexedProjects = allProjects.filter(p => !p.is_indexed && !indexedNames.has(p.index_name));
 
                 const select = document.getElementById('indexSelect');
-                select.innerHTML = allIndexes.map((idx, i) =>
-                    `<option value="${i}">${idx.name}</option>`
-                ).join('');
+                let html = '';
+                if (allIndexes.length > 0 && unindexedProjects.length > 0) {
+                    // Use optgroups when both indexed and unindexed exist
+                    html += '<optgroup label="Indexed">';
+                    html += allIndexes.map((idx, i) =>
+                        `<option value="${i}">${idx.name}</option>`
+                    ).join('');
+                    html += '</optgroup>';
+                    html += '<optgroup label="Available (not indexed)">';
+                    html += unindexedProjects.map(p =>
+                        `<option value="project:${p.index_name}" data-project-path="${p.path}">${p.name}</option>`
+                    ).join('');
+                    html += '</optgroup>';
+                } else {
+                    html = allIndexes.map((idx, i) =>
+                        `<option value="${i}">${idx.name}</option>`
+                    ).join('');
+                    if (unindexedProjects.length > 0) {
+                        html += '<optgroup label="Available (not indexed)">';
+                        html += unindexedProjects.map(p =>
+                            `<option value="project:${p.index_name}" data-project-path="${p.path}">${p.name}</option>`
+                        ).join('');
+                        html += '</optgroup>';
+                    }
+                }
+                select.innerHTML = html;
 
                 // Determine which index to select
                 let selectedIndex = 0;
@@ -2142,6 +2180,9 @@
                         showStatusBanner('Indexing in progress...', 'info');
                         startPolling();
                     }
+                } else if (unindexedProjects.length > 0) {
+                    // No indexed projects but discovered projects available
+                    document.getElementById('loadingMessage').style.display = 'none';
                 }
             } catch (error) {
                 showError(`Failed to load index list: ${error.message}`);
@@ -2168,8 +2209,30 @@
 
         // Index selector change handler
         document.getElementById('indexSelect').addEventListener('change', (e) => {
-            const indexIndex = parseInt(e.target.value);
-            loadDashboard(indexIndex);
+            const val = e.target.value;
+            if (val.startsWith('project:')) {
+                // Selected an unindexed project — show the not-indexed banner
+                const option = e.target.selectedOptions[0];
+                const projectPath = option.dataset.projectPath;
+                const indexName = val.slice('project:'.length);
+                document.getElementById('dashboardContent').style.display = 'none';
+                document.getElementById('loadingMessage').style.display = 'none';
+                const banner = document.getElementById('notIndexedBanner');
+                document.getElementById('notIndexedPath').textContent = projectPath;
+                banner.style.display = 'block';
+                // Set projectContext so indexCurrentProject() works
+                projectContext = {
+                    has_project: true,
+                    project_path: projectPath,
+                    index_name: indexName,
+                    is_indexed: false,
+                };
+            } else {
+                // Selected an existing index
+                document.getElementById('notIndexedBanner').style.display = 'none';
+                const indexIndex = parseInt(val);
+                loadDashboard(indexIndex);
+            }
         });
 
         let pollInterval = null;

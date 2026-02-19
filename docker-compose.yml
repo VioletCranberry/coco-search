@@ -34,6 +34,7 @@ services:
       COCOSEARCH_OLLAMA_URL: http://ollama:11434
       COCOSEARCH_NO_DASHBOARD: "1"
       COCOSEARCH_MCP_PORT: ${COCOSEARCH_MCP_PORT:-3000}
+      COCOSEARCH_PROJECTS_DIR: /projects
     volumes:
       - ${PROJECTS_DIR:-.}:/projects:ro
     healthcheck:

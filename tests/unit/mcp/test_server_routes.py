@@ -81,9 +81,7 @@ class TestApiList:
             return None
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
-            with patch(
-                "cocosearch.mcp.server.mgmt_list_indexes", return_value=indexes
-            ):
+            with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=indexes):
                 with patch(
                     "cocosearch.mcp.server.get_index_metadata",
                     side_effect=mock_get_metadata,
@@ -116,9 +114,7 @@ class TestApiList:
         indexes = [{"name": "proj1", "table_name": "codeindex_proj1__proj1_chunks"}]
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
-            with patch(
-                "cocosearch.mcp.server.mgmt_list_indexes", return_value=indexes
-            ):
+            with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=indexes):
                 with patch(
                     "cocosearch.mcp.server.get_index_metadata",
                     side_effect=Exception("metadata table missing"),
@@ -308,9 +304,7 @@ class TestApiAnalyze:
         """Returns 500 when run_analyze raises unexpected error."""
         from cocosearch.mcp.server import api_analyze
 
-        request = _make_mock_request(
-            body={"query": "test", "index_name": "myindex"}
-        )
+        request = _make_mock_request(body={"query": "test", "index_name": "myindex"})
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
             with patch(
@@ -431,9 +425,7 @@ class TestApiLanguages:
                         response = await api_languages(request)
 
         body = _parse_response(response)
-        dockerfile_entry = next(
-            lang for lang in body if lang["name"] == "dockerfile"
-        )
+        dockerfile_entry = next(lang for lang in body if lang["name"] == "dockerfile")
         assert dockerfile_entry["source"] == "handler"
         assert dockerfile_entry["symbols"] is False
         assert dockerfile_entry["context"] is False
@@ -597,12 +589,8 @@ class TestApiSearchEnhanced:
         )
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
-            with patch(
-                "cocosearch.mcp.server.search", return_value=[mock_result]
-            ):
-                with patch(
-                    "cocosearch.mcp.server.byte_to_line", return_value=1
-                ):
+            with patch("cocosearch.mcp.server.search", return_value=[mock_result]):
+                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
                     with patch(
                         "cocosearch.mcp.server.read_chunk_content",
                         return_value="code",
@@ -659,12 +647,8 @@ class TestApiSearchEnhanced:
         )
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
-            with patch(
-                "cocosearch.mcp.server.search", return_value=[mock_result]
-            ):
-                with patch(
-                    "cocosearch.mcp.server.byte_to_line", return_value=1
-                ):
+            with patch("cocosearch.mcp.server.search", return_value=[mock_result]):
+                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
                     with patch(
                         "cocosearch.mcp.server.read_chunk_content",
                         return_value="code",
@@ -731,9 +715,7 @@ class TestApiSearchEnhanced:
         """Returns 400 when query is missing."""
         from cocosearch.mcp.server import api_search
 
-        request = _make_mock_request(
-            body={"index_name": "myindex"}
-        )
+        request = _make_mock_request(body={"index_name": "myindex"})
         response = await api_search(request)
 
         body = _parse_response(response)
@@ -745,9 +727,7 @@ class TestApiSearchEnhanced:
         """Returns 400 when index_name is missing."""
         from cocosearch.mcp.server import api_search
 
-        request = _make_mock_request(
-            body={"query": "test"}
-        )
+        request = _make_mock_request(body={"query": "test"})
         response = await api_search(request)
 
         body = _parse_response(response)
@@ -759,9 +739,7 @@ class TestApiSearchEnhanced:
         """Returns 400 when search raises ValueError."""
         from cocosearch.mcp.server import api_search
 
-        request = _make_mock_request(
-            body={"query": "test", "index_name": "myindex"}
-        )
+        request = _make_mock_request(body={"query": "test", "index_name": "myindex"})
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
             with patch(
@@ -777,9 +755,7 @@ class TestApiSearchEnhanced:
         """Returns 500 when search raises unexpected error."""
         from cocosearch.mcp.server import api_search
 
-        request = _make_mock_request(
-            body={"query": "test", "index_name": "myindex"}
-        )
+        request = _make_mock_request(body={"query": "test", "index_name": "myindex"})
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
             with patch(
@@ -838,9 +814,7 @@ class TestApiIndexEnhanced:
         assert body["success"] is True
 
         # Verify IndexingConfig was called with include_patterns
-        mock_config_cls.assert_called_once_with(
-            include_patterns=["*.py", "*.js"]
-        )
+        mock_config_cls.assert_called_once_with(include_patterns=["*.py", "*.js"])
 
     @pytest.mark.asyncio
     async def test_exclude_patterns_passed_to_config(self):
@@ -980,9 +954,7 @@ class TestApiIndexEnhanced:
         """Returns 400 when project_path is missing."""
         from cocosearch.mcp.server import api_index
 
-        request = _make_mock_request(
-            body={"index_name": "myindex"}
-        )
+        request = _make_mock_request(body={"index_name": "myindex"})
         response = await api_index(request)
 
         body = _parse_response(response)
@@ -994,9 +966,7 @@ class TestApiIndexEnhanced:
         """Auto-derives index name from project_path when not provided."""
         from cocosearch.mcp.server import api_index
 
-        request = _make_mock_request(
-            body={"project_path": "/projects/myrepo"}
-        )
+        request = _make_mock_request(body={"project_path": "/projects/myrepo"})
 
         with patch("cocosearch.mcp.server.ensure_metadata_table"):
             with patch("cocosearch.mcp.server._register_with_git"):
@@ -1120,3 +1090,162 @@ class TestApiIndexEnhanced:
         body = _parse_response(response)
         assert "myindex" in body["message"]
         assert "/projects/myrepo" in body["message"]
+
+
+class TestApiProjects:
+    """Tests for GET /api/projects endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_env_var(self):
+        """Returns empty list when COCOSEARCH_PROJECTS_DIR is not set."""
+        from cocosearch.mcp.server import api_projects
+
+        request = _make_mock_request()
+
+        with patch.dict("os.environ", {}, clear=True):
+            response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert body == []
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_dir_does_not_exist(self):
+        """Returns empty list when COCOSEARCH_PROJECTS_DIR doesn't exist."""
+        from cocosearch.mcp.server import api_projects
+
+        request = _make_mock_request()
+
+        with patch.dict("os.environ", {"COCOSEARCH_PROJECTS_DIR": "/nonexistent/path"}):
+            response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert body == []
+
+    @pytest.mark.asyncio
+    async def test_discovers_projects_with_git(self, tmp_path):
+        """Discovers projects that have .git directories."""
+        from cocosearch.mcp.server import api_projects
+
+        # Create project dirs with .git
+        proj1 = tmp_path / "project-a"
+        proj1.mkdir()
+        (proj1 / ".git").mkdir()
+
+        proj2 = tmp_path / "project-b"
+        proj2.mkdir()
+        (proj2 / ".git").mkdir()
+
+        # Create non-project dir (no .git or cocosearch.yaml)
+        non_project = tmp_path / "random-dir"
+        non_project.mkdir()
+
+        request = _make_mock_request()
+
+        with patch.dict("os.environ", {"COCOSEARCH_PROJECTS_DIR": str(tmp_path)}):
+            with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
+                with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
+                    response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert len(body) == 2
+        names = [p["name"] for p in body]
+        assert "project-a" in names
+        assert "project-b" in names
+        assert all(p["is_indexed"] is False for p in body)
+        assert all(p["detection_method"] == "git" for p in body)
+
+    @pytest.mark.asyncio
+    async def test_discovers_projects_with_cocosearch_yaml(self, tmp_path):
+        """Discovers projects that have cocosearch.yaml."""
+        from cocosearch.mcp.server import api_projects
+
+        proj = tmp_path / "my-project"
+        proj.mkdir()
+        (proj / "cocosearch.yaml").write_text("indexName: custom_name\n")
+
+        request = _make_mock_request()
+
+        with patch.dict("os.environ", {"COCOSEARCH_PROJECTS_DIR": str(tmp_path)}):
+            with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
+                with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
+                    response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert len(body) == 1
+        assert body[0]["name"] == "my-project"
+        assert body[0]["detection_method"] == "config"
+
+    @pytest.mark.asyncio
+    async def test_marks_indexed_projects(self, tmp_path):
+        """Projects whose index_name exists in the database are marked as indexed."""
+        from cocosearch.mcp.server import api_projects
+
+        proj = tmp_path / "my-repo"
+        proj.mkdir()
+        (proj / ".git").mkdir()
+
+        request = _make_mock_request()
+        indexes = [
+            {"name": "my_repo", "table_name": "codeindex_my_repo__my_repo_chunks"}
+        ]
+
+        with patch.dict("os.environ", {"COCOSEARCH_PROJECTS_DIR": str(tmp_path)}):
+            with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
+                with patch(
+                    "cocosearch.mcp.server.mgmt_list_indexes",
+                    return_value=indexes,
+                ):
+                    response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert len(body) == 1
+        assert body[0]["is_indexed"] is True
+        assert body[0]["index_name"] == "my_repo"
+
+    @pytest.mark.asyncio
+    async def test_skips_hidden_directories(self, tmp_path):
+        """Directories starting with . are skipped."""
+        from cocosearch.mcp.server import api_projects
+
+        hidden = tmp_path / ".hidden-project"
+        hidden.mkdir()
+        (hidden / ".git").mkdir()
+
+        request = _make_mock_request()
+
+        with patch.dict("os.environ", {"COCOSEARCH_PROJECTS_DIR": str(tmp_path)}):
+            with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
+                with patch("cocosearch.mcp.server.mgmt_list_indexes", return_value=[]):
+                    response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert body == []
+
+    @pytest.mark.asyncio
+    async def test_handles_db_init_failure_gracefully(self, tmp_path):
+        """Projects are still returned even if DB init fails (all marked not indexed)."""
+        from cocosearch.mcp.server import api_projects
+
+        proj = tmp_path / "my-app"
+        proj.mkdir()
+        (proj / ".git").mkdir()
+
+        request = _make_mock_request()
+
+        with patch.dict("os.environ", {"COCOSEARCH_PROJECTS_DIR": str(tmp_path)}):
+            with patch(
+                "cocosearch.mcp.server._ensure_cocoindex_init",
+                side_effect=Exception("DB down"),
+            ):
+                response = await api_projects(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert len(body) == 1
+        assert body[0]["is_indexed"] is False

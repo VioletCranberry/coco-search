@@ -181,9 +181,9 @@ cocosearch dashboard
 Run CocoSearch as a centralized service — the host CLI forwards commands transparently over HTTP. The app container is opt-in via the `app` profile; `docker compose up` without it continues to start only PostgreSQL and Ollama, unchanged.
 
 ```bash
-# Start the full stack (PostgreSQL + Ollama + CocoSearch app).
+# Start the full stack (PostgreSQL + Ollama + CocoSearch app) detached.
 # PROJECTS_DIR sets which host directory is mounted as /projects inside the container.
-PROJECTS_DIR=~/GIT docker compose --profile app up --build
+PROJECTS_DIR=~/GIT docker compose --profile app up --build --detach
 
 # Point the host CLI at the running server (no local Postgres/Ollama needed).
 # PATH_PREFIX rewrites host paths ↔ container paths in requests and results.
@@ -193,7 +193,8 @@ export COCOSEARCH_PATH_PREFIX=~/GIT:/projects
 cocosearch index ~/GIT/myapp
 cocosearch search "authentication flow" -n myapp
 
-# Web dashboard is available at the same URL
+# Web dashboard is available at the same URL.
+# It auto-discovers projects under PROJECTS_DIR and lets you index them with one click.
 open http://localhost:3000/dashboard
 ```
 

@@ -576,6 +576,64 @@ async def api_list(request) -> JSONResponse:
     return JSONResponse(enriched)
 
 
+@mcp.custom_route("/api/projects", methods=["GET"])
+async def api_projects(request) -> JSONResponse:
+    """Discover projects from COCOSEARCH_PROJECTS_DIR.
+
+    Scans the directory for subdirectories that look like projects
+    (contain .git or cocosearch.yaml) and returns them with indexing status.
+    """
+    from cocosearch.management.context import find_project_root, resolve_index_name
+
+    projects_dir = os.environ.get("COCOSEARCH_PROJECTS_DIR")
+    if not projects_dir:
+        return JSONResponse([])
+
+    projects_path = Path(projects_dir)
+    if not projects_path.is_dir():
+        return JSONResponse([])
+
+    # Get existing indexes for status checking
+    existing_indexes: set[str] = set()
+    try:
+        _ensure_cocoindex_init()
+        for idx in mgmt_list_indexes():
+            existing_indexes.add(idx["name"])
+    except Exception:
+        pass
+
+    projects = []
+    try:
+        for entry in sorted(projects_path.iterdir()):
+            if not entry.is_dir() or entry.name.startswith("."):
+                continue
+
+            # Check if it looks like a project
+            project_root, detection_method = find_project_root(entry)
+            if project_root is None:
+                continue
+            # Only include direct children (not deeply nested projects)
+            if project_root != entry.resolve():
+                continue
+
+            index_name = resolve_index_name(project_root, detection_method)
+            is_indexed = index_name in existing_indexes
+
+            projects.append(
+                {
+                    "name": entry.name,
+                    "path": str(entry),
+                    "index_name": index_name,
+                    "is_indexed": is_indexed,
+                    "detection_method": detection_method,
+                }
+            )
+    except PermissionError:
+        pass
+
+    return JSONResponse(projects)
+
+
 @mcp.custom_route("/api/analyze", methods=["POST"])
 async def api_analyze(request) -> JSONResponse:
     """Analyze the search pipeline for a query."""
