@@ -80,7 +80,8 @@ class HelmValuesHandler:
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if file is a Helm values file.
 
-        Matches by path pattern and verifies content has 3+ common Helm keys.
+        Uses fnmatch with */{pattern} idiom so values.yaml files are
+        detected at any depth.
 
         Args:
             filepath: Relative file path within the project.
@@ -90,7 +91,9 @@ class HelmValuesHandler:
             True if this is a Helm values file.
         """
         for pattern in self.PATH_PATTERNS:
-            if fnmatch.fnmatch(filepath, pattern):
+            if fnmatch.fnmatch(filepath, pattern) or fnmatch.fnmatch(
+                filepath, f"*/{pattern}"
+            ):
                 if content is not None:
                     return self._has_helm_keys(content)
                 return True
@@ -120,7 +123,7 @@ class HelmValuesHandler:
             List item: block_type="list-item", hierarchy="list-item:name"
             Value: block_type="value", hierarchy="value"
         """
-        stripped = self._strip_comments_for_key(text)
+        stripped = self._strip_comments(text)
 
         # Check for @section annotation
         section_match = self._SECTION_RE.search(text)
@@ -184,18 +187,8 @@ class HelmValuesHandler:
             "language_id": self.GRAMMAR_NAME,
         }
 
-    def _strip_comments_for_key(self, text: str) -> str:
-        """Strip leading comments for key detection (not section detection).
-
-        Preserves indentation so that indented keys are not matched as
-        top-level keys by _TOP_KEY_RE.
-
-        Args:
-            text: The chunk text content.
-
-        Returns:
-            Text from first non-comment, non-blank line onward
-        """
+    def _strip_comments(self, text: str) -> str:
+        """Strip leading comments from chunk text, preserving indentation."""
         lines = text.lstrip("\n").split("\n")
         for i, line in enumerate(lines):
             if line.strip() and not self._COMMENT_LINE.match(line):
