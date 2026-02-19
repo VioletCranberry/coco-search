@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coco[-S]earch</title>
+    <title>Coco[-S]earch Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
     <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%23f0a060' stroke-width='5'/%3E%3Cline x1='38' y1='38' x2='58' y2='58' stroke='%23e07840' stroke-width='6' stroke-linecap='round'/%3E%3Ctext x='24' y='31' text-anchor='middle' font-family='Courier New,Courier,monospace' font-size='18' fill='%23f0a060' font-weight='bold'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
@@ -14,50 +15,39 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
     <style>
+        /* Terminal/Retro Theme - Coco Orange Phosphor */
         :root {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f5f5f5;
-            --bg-card: #ffffff;
-            --border-color: #e0e0e0;
-            --text-primary: #1a1a1a;
-            --text-secondary: #666666;
-            --text-muted: #999999;
-            --accent-blue: #2196F3;
-            --accent-green: #4CAF50;
-            --accent-orange: #FF9800;
-            --accent-red: #f44336;
-            --shadow: rgba(0, 0, 0, 0.1);
+            /* Coco Orange Phosphor Palette */
+            --bg-primary: #0a0806;
+            --bg-secondary: #120e0a;
+            --bg-card: #1a1410;
+            --border-color: rgba(240, 160, 96, 0.3);
+            --text-primary: #f0d0b0;
+            --text-secondary: #d0b090;
+            --text-muted: #806040;
+            --accent-blue: #f0a060;
+            --accent-green: #c0a060;
+            --accent-orange: #e07840;
+            --accent-red: #d06040;
+            --shadow: rgba(240, 160, 96, 0.15);
+            --font-mono: 'IBM Plex Mono', monospace;
+            --font-display: 'VT323', monospace;
         }
 
+        /* Dark mode same as terminal theme */
         :root[data-theme="dark"] {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #2d2d2d;
-            --bg-card: #252525;
-            --border-color: #404040;
-            --text-primary: #e0e0e0;
-            --text-secondary: #b0b0b0;
-            --text-muted: #707070;
-            --accent-blue: #64B5F6;
-            --accent-green: #81C784;
-            --accent-orange: #FFB74D;
-            --accent-red: #E57373;
-            --shadow: rgba(0, 0, 0, 0.3);
-        }
-
-        .theme-toggle {
-            padding: 4px 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: var(--bg-secondary);
-            color: var(--text-secondary);
-            font-size: 16px;
-            cursor: pointer;
-            transition: opacity 0.2s;
-            line-height: 1;
-        }
-
-        .theme-toggle:hover {
-            opacity: 0.8;
+            --bg-primary: #0a0806;
+            --bg-secondary: #120e0a;
+            --bg-card: #1a1410;
+            --border-color: rgba(240, 160, 96, 0.3);
+            --text-primary: #f0d0b0;
+            --text-secondary: #d0b090;
+            --text-muted: #806040;
+            --accent-blue: #f0a060;
+            --accent-green: #c0a060;
+            --accent-orange: #e07840;
+            --accent-red: #d06040;
+            --shadow: rgba(240, 160, 96, 0.15);
         }
 
         * {
@@ -67,11 +57,41 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+            font-family: 'IBM Plex Mono', monospace;
             background: var(--bg-primary);
             color: var(--text-primary);
-            line-height: 1.6;
+            line-height: 1.5;
             padding: 20px;
+            letter-spacing: 0.02em;
+            position: relative;
+            font-size: 16px;
+        }
+
+        /* CRT Scanline Effect */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.3) 2px,
+                rgba(0, 0, 0, 0.3) 4px
+            );
+            opacity: 0.12;
+        }
+
+        /* CRT Vignette Effect */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9998;
+            background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.5) 100%);
         }
 
         .container {
@@ -86,19 +106,96 @@
 
         .banner-container {
             position: relative;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            border-radius: 0;
         }
 
         .banner-container svg {
             width: 100%;
             height: auto;
             display: block;
-            border-radius: 12px;
+            border-radius: 0;
         }
 
-        .banner-container .theme-toggle {
-            position: absolute;
-            top: 12px;
-            right: 12px;
+        /* Terminal Header Styles */
+        .terminal-header {
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            padding: 16px;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .terminal-banner-top {
+            margin-bottom: 12px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 2px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-orange);
+            width: 100%;
+            box-shadow: 0 0 8px rgba(240, 160, 96, 0.4);
+        }
+
+        .terminal-title {
+            margin-bottom: 12px;
+        }
+
+        .terminal-title h1 {
+            font-family: 'VT323', monospace;
+            font-size: 42px;
+            color: var(--accent-orange);
+            margin-bottom: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .terminal-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            letter-spacing: 0.1em;
+        }
+
+        .terminal-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .feature-pill {
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 2px 8px;
+            border: 1px solid var(--border-color);
+            letter-spacing: 0.05em;
+        }
+
+        .terminal-status-line {
+            border-top: 1px solid var(--border-color);
+            padding-top: 8px;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .terminal-status-line .status-ok {
+            color: var(--accent-green);
+        }
+
+        /* Phosphor glow utility */
+        .phosphor-glow {
+            text-shadow: 0 0 4px rgba(240, 160, 96, 0.4), 0 0 8px rgba(240, 160, 96, 0.2);
         }
 
         .controls-grid {
@@ -117,16 +214,17 @@
             width: 100%;
             padding: 8px 12px;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: var(--bg-card);
+            border-radius: 0;
+            background: var(--bg-secondary);
             color: var(--text-primary);
             font-size: 14px;
             cursor: pointer;
             margin-top: 4px;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .controls-grid .source-path {
-            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-family: 'IBM Plex Mono', monospace;
             font-size: 12px;
             color: var(--text-muted);
             margin-top: 8px;
@@ -142,7 +240,7 @@
         .controls-grid .repo-link a {
             color: var(--accent-blue);
             text-decoration: none;
-            font-size: 13px;
+            font-size: 15px;
         }
 
         .controls-grid .repo-link a:hover {
@@ -163,19 +261,19 @@
         }
 
         .controls-grid .branch-display .branch-name {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 600;
             color: var(--text-primary);
         }
 
         .controls-grid .branch-display .branch-behind {
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 500;
             color: var(--text-secondary);
         }
 
         .controls-grid .branch-display .branch-count {
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 500;
             color: var(--text-secondary);
         }
@@ -206,7 +304,7 @@
         }
 
         .warning-banner h3 {
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 8px;
         }
 
@@ -217,7 +315,7 @@
 
         .warning-banner li {
             padding: 4px 0;
-            font-size: 14px;
+            font-size: 16px;
         }
 
         .warning-banner li:before {
@@ -235,25 +333,26 @@
         .summary-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px var(--shadow);
+            border-radius: 0;
+            padding: 16px;
+            box-shadow: none;
         }
 
         .summary-card h3 {
-            font-size: 14px;
-            color: var(--text-secondary);
+            font-size: 13px;
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            letter-spacing: 0.1em;
+            margin-bottom: 12px;
             font-weight: 500;
         }
 
         .summary-card .value {
             font-size: 32px;
             font-weight: 600;
-            color: var(--text-primary);
+            color: var(--accent-orange);
             margin-bottom: 4px;
+            text-shadow: 0 0 8px rgba(240, 160, 96, 0.3);
         }
 
         .summary-card .label {
@@ -271,16 +370,18 @@
         .chart-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px var(--shadow);
+            border-radius: 0;
+            padding: 16px;
+            box-shadow: none;
         }
 
         .chart-card h2 {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
             margin-bottom: 16px;
-            color: var(--text-primary);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         .chart-container {
@@ -292,7 +393,7 @@
             text-align: center;
             padding: 40px;
             color: var(--text-secondary);
-            font-size: 16px;
+            font-size: 18px;
         }
 
         .error {
@@ -301,6 +402,7 @@
             padding: 16px;
             border-radius: 8px;
             margin: 20px 0;
+            font-size: 16px;
         }
 
         footer {
@@ -309,40 +411,55 @@
             border-top: 1px solid var(--border-color);
             text-align: center;
             color: var(--text-muted);
-            font-size: 13px;
+            font-size: 11px;
+        }
+
+        /* Select dropdown terminal styling */
+        select {
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .action-btn {
-            padding: 8px 18px;
-            border: 1px solid var(--accent-blue);
-            border-radius: 6px;
-            background: var(--accent-blue);
-            color: white;
-            font-size: 14px;
+            padding: 8px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 0;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             font-weight: 500;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.15s;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .action-btn:hover:not(:disabled) {
-            opacity: 0.85;
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+            box-shadow: 0 0 8px rgba(240, 160, 96, 0.3);
         }
 
         .action-btn:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
         }
 
         .action-btn.danger {
-            background: var(--accent-red);
+            color: var(--accent-red);
             border-color: var(--accent-red);
+        }
+
+        .action-btn.danger:hover {
+            border-color: var(--accent-red);
+            box-shadow: 0 0 8px rgba(208, 96, 64, 0.3);
         }
 
         .status-banner {
             padding: 10px 16px;
             border-radius: 8px;
             margin-bottom: 16px;
-            font-size: 14px;
+            font-size: 16px;
             display: none;
         }
 
@@ -374,12 +491,12 @@
         }
 
         .not-indexed-banner h3 {
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 6px;
         }
 
         .not-indexed-banner p {
-            font-size: 14px;
+            font-size: 16px;
             margin-top: 6px;
         }
 
@@ -394,22 +511,22 @@
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 16px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .parse-table th {
             text-align: left;
-            padding: 10px 12px;
+            padding: 8px 12px;
             border-bottom: 2px solid var(--border-color);
-            color: var(--text-secondary);
+            color: var(--text-muted);
             font-weight: 500;
-            font-size: 13px;
+            font-size: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.1em;
         }
 
         .parse-table td {
-            padding: 8px 12px;
+            padding: 6px 12px;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -436,7 +553,7 @@
             padding: 10px 0;
             font-weight: 500;
             color: var(--text-secondary);
-            font-size: 14px;
+            font-size: 16px;
             list-style: none;
         }
 
@@ -460,7 +577,7 @@
         .failure-list table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
+            font-size: 15px;
         }
 
         .failure-list th {
@@ -469,7 +586,7 @@
             border-bottom: 2px solid var(--border-color);
             color: var(--text-secondary);
             font-weight: 500;
-            font-size: 12px;
+            font-size: 14px;
             text-transform: uppercase;
             letter-spacing: 0.3px;
         }
@@ -536,17 +653,19 @@
         .search-section {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: 0;
+            padding: 16px;
             margin-bottom: 24px;
-            box-shadow: 0 2px 4px var(--shadow);
+            box-shadow: none;
         }
 
         .search-section h2 {
-            font-size: 18px;
+            font-size: 14px;
             font-weight: 600;
             margin-bottom: 12px;
-            color: var(--text-primary);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         .search-mode-toggle {
@@ -555,26 +674,29 @@
             margin-bottom: 14px;
         }
         .search-mode-toggle button {
-            padding: 8px 18px;
+            padding: 6px 14px;
             border: 1px solid var(--border-color);
             background: var(--bg-secondary);
             color: var(--text-secondary);
-            font-size: 14px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.15s, color 0.15s;
+            transition: all 0.15s;
+            font-family: 'IBM Plex Mono', monospace;
         }
         .search-mode-toggle button:first-child {
-            border-radius: 6px 0 0 6px;
+            border-radius: 0;
         }
         .search-mode-toggle button:last-child {
-            border-radius: 0 6px 6px 0;
+            border-radius: 0;
             border-left: none;
         }
         .search-mode-toggle button.active {
-            background: var(--accent-blue);
-            color: white;
-            border-color: var(--accent-blue);
+            background: var(--accent-orange);
+            color: var(--bg-primary);
+            border-color: var(--accent-orange);
         }
         .search-mode-toggle button.active + button {
             border-left: 1px solid var(--border-color);
@@ -594,17 +716,18 @@
             flex: 1;
             padding: 10px 14px;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 0;
             background: var(--bg-secondary);
             color: var(--text-primary);
-            font-size: 14px;
-            font-family: inherit;
+            font-size: 15px;
+            font-family: 'IBM Plex Mono', monospace;
             outline: none;
             transition: border-color 0.2s;
         }
 
         .search-bar input[type="text"]:focus {
-            border-color: var(--accent-blue);
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 4px rgba(240, 160, 96, 0.2);
         }
 
         .search-bar input[type="text"]::placeholder {
@@ -622,15 +745,17 @@
         .search-filters label {
             font-size: 13px;
             color: var(--text-secondary);
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .search-filters select {
-            padding: 6px 10px;
+            padding: 4px 8px;
             border: 1px solid var(--border-color);
-            border-radius: 4px;
+            border-radius: 0;
             background: var(--bg-secondary);
             color: var(--text-primary);
             font-size: 13px;
+            font-family: 'IBM Plex Mono', monospace;
             cursor: pointer;
         }
 
@@ -640,7 +765,7 @@
 
         .search-advanced summary {
             cursor: pointer;
-            font-size: 13px;
+            font-size: 15px;
             color: var(--text-secondary);
             list-style: none;
             user-select: none;
@@ -671,7 +796,7 @@
         }
 
         .search-advanced-content label {
-            font-size: 13px;
+            font-size: 15px;
             color: var(--text-secondary);
             display: flex;
             align-items: center;
@@ -689,7 +814,7 @@
             border-radius: 4px;
             background: var(--bg-secondary);
             color: var(--text-primary);
-            font-size: 13px;
+            font-size: 15px;
         }
 
         .search-results-area {
@@ -697,7 +822,7 @@
         }
 
         .search-results-info {
-            font-size: 13px;
+            font-size: 15px;
             color: var(--text-secondary);
             margin-bottom: 12px;
         }
@@ -713,7 +838,7 @@
             text-align: center;
             padding: 20px;
             color: var(--text-muted);
-            font-size: 14px;
+            font-size: 16px;
             display: none;
         }
 
@@ -722,7 +847,7 @@
             color: white;
             padding: 12px 16px;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 16px;
             display: none;
         }
 
@@ -763,7 +888,7 @@
             display: inline-block;
             padding: 2px 8px;
             border-radius: 10px;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 600;
             text-transform: uppercase;
         }
@@ -776,7 +901,7 @@
 
         .search-result-symbol {
             padding: 6px 14px;
-            font-size: 13px;
+            font-size: 15px;
             color: var(--text-secondary);
             border-bottom: 1px solid var(--border-color);
             font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
@@ -791,7 +916,7 @@
         .search-result-code pre {
             margin: 0;
             font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 14px;
             line-height: 1.5;
             color: var(--text-primary);
             white-space: pre-wrap;
@@ -801,7 +926,7 @@
         .search-result-code .expand-btn {
             display: inline-block;
             margin-top: 4px;
-            font-size: 12px;
+            font-size: 14px;
             color: var(--accent-blue);
             cursor: pointer;
             background: none;
@@ -889,14 +1014,14 @@
 
         .file-modal-header .file-info {
             font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-            font-size: 13px;
+            font-size: 15px;
             color: var(--accent-blue);
             word-break: break-all;
         }
 
         .file-modal-header .file-info .line-count {
             color: var(--text-muted);
-            font-size: 12px;
+            font-size: 14px;
             margin-left: 12px;
         }
 
@@ -925,7 +1050,7 @@
 
         .file-modal-body pre {
             margin: 0;
-            font-size: 13px;
+            font-size: 15px;
             line-height: 1.5;
             border-radius: 0;
             background: var(--bg-card) !important;
@@ -948,7 +1073,7 @@
             color: white;
             padding: 10px 18px;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 15px;
             z-index: 10001;
             opacity: 0;
             transition: opacity 0.2s;
@@ -985,17 +1110,22 @@
             margin-bottom: 8px;
         }
         .chat-new-btn {
-            background: none;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            color: var(--text-secondary);
+            background: transparent;
+            border: 2px solid var(--border-color);
+            border-radius: 0;
+            color: var(--text-primary);
             cursor: pointer;
             font-size: 12px;
+            font-family: 'IBM Plex Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             padding: 4px 10px;
+            transition: all 0.15s;
         }
         .chat-new-btn:hover {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+            box-shadow: 0 0 8px rgba(240, 160, 96, 0.3);
         }
 
         .chat-inline-bar {
@@ -1009,7 +1139,7 @@
             border: 1px solid var(--border-color);
             border-radius: 6px;
             padding: 10px 14px;
-            font-size: 14px;
+            font-size: 16px;
             font-family: inherit;
             background: var(--bg-secondary);
             color: var(--text-primary);
@@ -1032,7 +1162,7 @@
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 500;
             transition: opacity 0.15s;
         }
@@ -1057,7 +1187,7 @@
             max-width: 88%;
             padding: 10px 14px;
             border-radius: 12px;
-            font-size: 13px;
+            font-size: 15px;
             line-height: 1.5;
             word-break: break-word;
         }
@@ -1078,7 +1208,7 @@
             align-self: center;
             background: var(--accent-red);
             color: white;
-            font-size: 12px;
+            font-size: 14px;
             opacity: 0.9;
         }
 
@@ -1088,7 +1218,7 @@
             padding: 10px 14px;
             background: var(--bg-secondary);
             border-radius: 12px;
-            font-size: 13px;
+            font-size: 15px;
             color: var(--text-muted);
         }
         .chat-typing.active { display: block; }
@@ -1105,7 +1235,7 @@
         .chat-tool-use {
             align-self: flex-start;
             max-width: 88%;
-            font-size: 12px;
+            font-size: 14px;
             color: var(--text-secondary);
         }
         .chat-tool-use summary {
@@ -1123,7 +1253,7 @@
         }
         .chat-tool-use summary::before {
             content: "\25B6\00a0";
-            font-size: 9px;
+            font-size: 11px;
         }
         .chat-tool-use[open] summary::before {
             content: "\25BC\00a0";
@@ -1135,7 +1265,7 @@
             border: 1px solid var(--border-color);
             border-radius: 4px;
             font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-            font-size: 11px;
+            font-size: 13px;
             white-space: pre-wrap;
             word-break: break-all;
             color: var(--text-primary);
@@ -1143,7 +1273,7 @@
 
         .chat-stats-bar {
             display: none;
-            font-size: 12px;
+            font-size: 14px;
             color: var(--text-muted);
             padding: 6px 0;
             border-top: 1px solid var(--border-color);
@@ -1165,11 +1295,11 @@
             border: 1px solid var(--border-color);
             border-radius: 4px;
             overflow-x: auto;
-            font-size: 12px;
+            font-size: 14px;
         }
         .chat-msg.assistant code {
             font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 14px;
         }
         .chat-msg.assistant code:not(pre code) {
             background: var(--bg-primary);
@@ -1180,7 +1310,7 @@
         .chat-msg.assistant p { margin: 4px 0; }
         .chat-msg.assistant ul, .chat-msg.assistant ol { margin: 4px 0; padding-left: 20px; }
         .chat-msg.assistant h1, .chat-msg.assistant h2, .chat-msg.assistant h3 {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
             margin: 8px 0 4px;
         }
@@ -1195,111 +1325,27 @@
 <body>
     <div class="container">
         <header>
-            <div class="banner-container">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 195">
-                    <!-- Background -->
-                    <rect width="960" height="195" rx="12" fill="var(--bg-card)"/>
-                    <rect x=".5" y=".5" width="959" height="194" rx="11.5" fill="none" stroke="var(--border-color)"/>
-
-                    <!-- Background: faint vector-embedding network -->
-                    <g opacity=".06" fill="var(--accent-blue)" stroke="var(--accent-blue)" stroke-width=".5">
-                        <circle cx="700" cy="30" r="2.5"/><circle cx="780" cy="55" r="2"/>
-                        <circle cx="840" cy="25" r="2.5"/><circle cx="900" cy="60" r="2.5"/>
-                        <circle cx="650" cy="70" r="2"/><circle cx="920" cy="100" r="2"/>
-                        <line x1="700" y1="30" x2="780" y2="55"/>
-                        <line x1="780" y1="55" x2="840" y2="25"/>
-                        <line x1="840" y1="25" x2="900" y2="60"/>
-                        <line x1="650" y1="70" x2="700" y2="30"/>
-                        <line x1="900" y1="60" x2="920" y2="100"/>
-                    </g>
-
-                    <!-- Subtle glow behind icon -->
-                    <circle cx="90" cy="65" r="50" fill="#f0a060" opacity=".025"/>
-
-                    <!-- Magnifying glass icon -->
-                    <g transform="translate(45,22)">
-                        <circle cx="45" cy="45" r="34" fill="none" stroke="#f0a060" stroke-width="4" opacity=".9"/>
-                        <line x1="70" y1="70" x2="92" y2="92" stroke="#e07840" stroke-width="5" stroke-linecap="round" opacity=".9"/>
-                        <text x="45" y="53" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="22" fill="#f0a060" font-weight="bold" opacity=".85">&lt;/&gt;</text>
-                    </g>
-
-                    <!-- Title: Coco[-S]earch -->
-                    <text x="195" y="68" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="44" font-weight="bold" letter-spacing="-0.5">
-                        <tspan fill="var(--text-primary)">Coco</tspan><tspan fill="#f0a060">[-S]</tspan><tspan fill="var(--text-primary)">earch</tspan>
-                    </text>
-
-                    <!-- Tagline -->
-                    <text x="197" y="95" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" fill="var(--text-secondary)" letter-spacing=".3">
-                        Local-first hybrid semantic code search
-                    </text>
-
-                    <!-- Powered by CocoIndex -->
-                    <a href="https://cocoindex.io/" target="_blank">
-                        <text x="197" y="116" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="var(--text-secondary)" letter-spacing=".2" cursor="pointer">
-                            Powered by
-                        </text>
-                        <g transform="translate(266, 102) scale(0.22)" cursor="pointer">
-                            <path d="M33.4042 3.79296C34.9133 5.91332 34.7839 7.4124 34.7839 7.4124L33.8438 6.63876L33.0059 5.96402L31.2349 4.47686L29.7071 3.11444C29.7071 3.11444 28.9421 2.42034 28.6474 2.19864C28.3529 1.97695 28.7162 1.1693 29.3688 0.888341C30.0215 0.60739 30.6482 1.12314 30.6482 1.12314C30.6482 1.12314 31.8953 1.67259 33.4042 3.79296Z" fill="#532638"/>
-                            <path d="M37.5571 2.80507C31.1215 6.77707 29.1611 9.55316 26.6719 14.8408C26.6719 14.8408 41.7846 21.0814 43.3814 21.0814C44.9781 21.0814 48.9255 21.0635 52.1916 18.6036C55.4579 16.1439 58.3907 11.301 60.9087 5.67751C55.5736 1.67877 53.6973 0.100496 46.7475 0.00268351C43.0769 0.186756 40.4667 1.15692 37.5571 2.80507Z" fill="#27E62B" fill-opacity="0.75"/>
-                            <path d="M50.3753 3.53458C50.2853 4.64109 49.2159 5.45604 47.9867 5.35479C46.7574 5.25355 45.834 4.27447 45.924 3.16796C46.0141 2.06143 47.0835 1.24649 48.3127 1.34773C49.5419 1.44898 50.4653 2.42806 50.3753 3.53458Z" fill="#F6F4E9"/>
-                            <path d="M31.6743 64C47.8704 64 61 50.8704 61 34.6743C61 18.4782 47.8704 5.34863 31.6743 5.34863C15.4782 5.34863 2.34863 18.4782 2.34863 34.6743C2.34863 50.8704 15.4782 64 31.6743 64Z" fill="#BE5133"/>
-                            <path d="M15.5909 9.8732C11.0784 12.8518 7.63052 16.3702 5.42887 21.8039C3.22726 27.2378 8.9263 35.1807 16.5577 39.1685C23.9127 42.4567 28.0337 42.8053 35.3819 42.3579C41.7961 41.775 46.7476 40.3498 51.4831 36.6878C56.2189 33.0259 60.2441 25.8202 57.9947 21.2133C55.7453 16.6064 53.1406 13.2989 48.0498 9.99134C42.959 6.68378 37.2567 5.14819 31.2383 5.14819C25.0128 5.18257 20.7807 6.44761 15.5909 9.8732Z" fill="#FCF3D8"/>
-                            <path d="M17.5403 11.9046C13.6044 14.3555 10.5968 17.2503 8.67642 21.7211C6.75612 26.192 11.7271 32.7274 18.3835 36.0084C24.7989 38.7139 28.3934 39.0008 34.8029 38.6326C40.3977 38.153 44.7166 36.9803 48.8472 33.9674C52.9778 30.9544 56.489 25.0256 54.5268 21.2352C52.5648 17.4447 50.2929 14.7233 45.8525 12.0018C41.412 9.28054 36.4382 8.01697 31.1886 8.01697C25.7585 8.04531 22.067 9.08614 17.5403 11.9046Z" fill="#E59A63"/>
-                            <path d="M19.6169 15.5315C21.2266 15.243 22.4381 14.4881 22.3229 13.8452C22.2078 13.2024 20.8095 12.9151 19.1998 13.2036C17.5901 13.492 16.3785 14.2469 16.4937 14.8898C16.6089 15.5326 18.0072 15.8199 19.6169 15.5315Z" fill="#401D30"/>
-                            <path d="M44.1057 15.3863C45.7267 15.602 47.1107 15.2521 47.1968 14.6047C47.2829 13.9574 46.0386 13.2577 44.4176 13.042C42.7965 12.8263 41.4126 13.1763 41.3265 13.8236C41.2403 14.471 42.4846 15.1707 44.1057 15.3863Z" fill="#401D30"/>
-                            <path d="M15.5914 32.8493C17.5506 32.8493 19.1389 32.0022 19.1389 30.9573C19.1389 29.9124 17.5506 29.0653 15.5914 29.0653C13.6322 29.0653 12.0439 29.9124 12.0439 30.9573C12.0439 32.0022 13.6322 32.8493 15.5914 32.8493Z" fill="#FB6A76"/>
-                            <path d="M47.9938 32.8493C49.953 32.8493 51.5412 32.0022 51.5412 30.9573C51.5412 29.9124 49.953 29.0653 47.9938 29.0653C46.0345 29.0653 44.4463 29.9124 44.4463 30.9573C44.4463 32.0022 46.0345 32.8493 47.9938 32.8493Z" fill="#FB6A76"/>
-                            <path d="M19.6133 28.8288C22.6174 28.8288 25.0527 26.3935 25.0527 23.3894C25.0527 20.3853 22.6174 17.95 19.6133 17.95C16.6092 17.95 14.1738 20.3853 14.1738 23.3894C14.1738 26.3935 16.6092 28.8288 19.6133 28.8288Z" fill="#401D30"/>
-                            <path d="M18.2233 23.2782C19.4378 23.2782 20.4223 22.4333 20.4223 21.3911C20.4223 20.3488 19.4378 19.5039 18.2233 19.5039C17.0089 19.5039 16.0244 20.3488 16.0244 21.3911C16.0244 22.4333 17.0089 23.2782 18.2233 23.2782Z" fill="#F6F4E9"/>
-                            <path d="M43.7363 28.8288C46.7404 28.8288 49.1758 26.3935 49.1758 23.3894C49.1758 20.3853 46.7404 17.95 43.7363 17.95C40.7322 17.95 38.2969 20.3853 38.2969 23.3894C38.2969 26.3935 40.7322 28.8288 43.7363 28.8288Z" fill="#401D30"/>
-                            <path d="M42.3454 23.2782C43.5599 23.2782 44.5443 22.4333 44.5443 21.3911C44.5443 20.3488 43.5599 19.5039 42.3454 19.5039C41.131 19.5039 40.1465 20.3488 40.1465 21.3911C40.1465 22.4333 41.131 23.2782 42.3454 23.2782Z" fill="#F6F4E9"/>
-                            <path d="M29.8696 58.9869C28.9046 58.8637 26.5628 52.2516 27.741 47.2803C28.7819 46.4149 29.3351 46.6899 29.5148 47.7533C28.6018 53.5402 29.582 55.2282 31.4068 58.1593C31.1188 58.9953 30.8345 59.1103 29.8696 58.9869Z" fill="#6A1E23"/>
-                            <path d="M52.8392 42.5597C52.9484 41.49 50.8299 40.5119 50.9472 42.5597C51.0645 44.6074 48.9879 51.68 48.2275 52.7291C47.467 53.7783 48.7004 54.6213 49.8829 53.7933C51.0655 52.9654 52.7299 43.6293 52.8392 42.5597Z" fill="#7A2826"/>
-                            <path d="M13.2275 46.6747C13.4907 45.4299 14.5282 45.2557 14.883 46.32C15.2377 47.3842 16.1988 50.3787 17.9574 53.1783C19.613 55.0704 20.614 55.289 22.3327 56.2529C22.6213 56.8188 22.2145 57.5537 21.7414 57.6718C21.2684 57.7901 19.2582 56.8441 17.8392 55.4251C16.8573 54.2907 16.3012 53.7482 15.356 51.9959C14.347 50.0524 13.8211 48.9327 13.2275 46.6747Z" fill="#6A1E23"/>
-                            <path d="M28.6378 24.378L28.6164 24.3595C28.4103 24.1852 28.0484 24.2038 27.7978 24.3041C27.6929 24.3461 27.6029 24.4183 27.5391 24.5116L27.5278 24.528C27.4557 24.6335 27.417 24.7585 27.417 24.8865V25.0448C27.417 25.3572 27.4766 25.6668 27.5927 25.9569L27.6535 26.109L27.7639 26.3021C28.004 26.7224 28.3161 27.1053 28.6779 27.427C29.0146 27.7262 29.4003 27.9759 29.812 28.1589C30.1064 28.2897 30.4144 28.3877 30.7304 28.4508L30.9722 28.4992C31.2817 28.5611 31.5964 28.5923 31.9119 28.5923H31.93C32.3097 28.5923 32.688 28.5456 33.0564 28.4536C33.3168 28.3885 33.5711 28.3009 33.8163 28.1919L34.0646 28.0816C34.3613 27.9497 34.6372 27.7755 34.8837 27.5642C35.1853 27.3056 35.4384 26.9955 35.6314 26.6482L35.756 26.424C35.872 26.2149 35.9604 25.9915 36.0183 25.7595L36.0897 25.4742C36.1409 25.2694 36.146 25.0556 36.1046 24.8485L36.0762 24.7069C36.0584 24.6177 36.0232 24.5329 35.9728 24.4572C35.8702 24.3034 35.7109 24.1967 35.5297 24.1605L35.4845 24.1514C35.314 24.1173 35.137 24.141 34.9816 24.2188L34.9434 24.2379C34.8169 24.3012 34.7142 24.4037 34.6509 24.5303C34.6372 24.5579 34.6253 24.5865 34.6155 24.6159L34.5757 24.7351C34.5335 24.8619 34.512 24.9946 34.512 25.1282C34.512 25.2299 34.4994 25.3312 34.4749 25.4297L34.4664 25.4631C34.4184 25.6553 34.3325 25.8359 34.2137 25.9944C34.0983 26.1481 33.9542 26.2781 33.7894 26.377L33.6601 26.4546C33.5189 26.5393 33.3689 26.6083 33.2128 26.6603L32.9847 26.7363C32.8206 26.7911 32.6526 26.8328 32.482 26.8612C32.1813 26.9114 31.875 26.9197 31.572 26.886L31.3313 26.8593C31.0877 26.8323 30.8484 26.775 30.6188 26.6889L30.5298 26.6555C30.1928 26.5292 29.8868 26.3321 29.6323 26.0776C29.4185 25.8638 29.2449 25.6133 29.1198 25.338L28.7631 24.5534C28.7331 24.4874 28.6921 24.426 28.6378 24.378Z" fill="#401E2B"/>
-                        </g>
-                        <text x="282" y="116" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#f0a060" letter-spacing=".2" cursor="pointer">
-                            CocoIndex
-                        </text>
-                    </a>
-
-                    <!-- Feature pills (horizontal row) -->
-                    <g font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="11" fill="var(--text-secondary)">
-                        <rect x="30" y="140" width="110" height="26" rx="13" fill="none" stroke="var(--border-color)"/>
-                        <text x="85" y="157" text-anchor="middle">Vector + Keyword</text>
-
-                        <a href="https://tree-sitter.github.io/tree-sitter/" target="_blank">
-                            <rect x="150" y="140" width="95" height="26" rx="13" fill="none" stroke="var(--border-color)" cursor="pointer"/>
-                            <text x="197" y="157" text-anchor="middle" cursor="pointer">Tree-sitter</text>
-                        </a>
-
-                        <a href="https://modelcontextprotocol.io/" target="_blank">
-                            <rect x="255" y="140" width="65" height="26" rx="13" fill="none" stroke="var(--border-color)" cursor="pointer"/>
-                            <text x="287" y="157" text-anchor="middle" cursor="pointer">MCP</text>
-                        </a>
-
-                        <a href="https://github.com/pgvector/pgvector" target="_blank">
-                            <rect x="330" y="140" width="80" height="26" rx="13" fill="none" stroke="var(--border-color)" cursor="pointer"/>
-                            <text x="370" y="157" text-anchor="middle" cursor="pointer">pgvector</text>
-                        </a>
-
-                        <a href="https://ollama.com/" target="_blank">
-                            <rect x="420" y="140" width="75" height="26" rx="13" fill="none" stroke="var(--border-color)" cursor="pointer"/>
-                            <text x="457" y="157" text-anchor="middle" cursor="pointer">Ollama</text>
-                        </a>
-
-                        <a href="https://www.postgresql.org/" target="_blank">
-                            <rect x="505" y="140" width="95" height="26" rx="13" fill="none" stroke="var(--border-color)" cursor="pointer"/>
-                            <text x="552" y="157" text-anchor="middle" cursor="pointer">PostgreSQL</text>
-                        </a>
-
-                        <a href="https://www.docker.com/" target="_blank">
-                            <rect x="610" y="140" width="75" height="26" rx="13" fill="none" stroke="var(--border-color)" cursor="pointer"/>
-                            <text x="647" y="157" text-anchor="middle" cursor="pointer">Docker</text>
-                        </a>
-                    </g>
-                </svg>
-                <button id="themeToggle" class="theme-toggle" onclick="cycleTheme()" title="Theme: System"></button>
+            <div class="terminal-header">
+                <div class="terminal-banner-top">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+                <div class="terminal-title">
+                    <h1 class="terminal-display phosphor-glow">Coco[-S]earch Terminal</h1>
+                    <div class="terminal-subtitle">Local-first hybrid semantic code search</div>
+                </div>
+                <div class="terminal-features">
+                    <span class="feature-pill">[vector+keyword]</span>
+                    <span class="feature-pill">[Tree-sitter]</span>
+                    <span class="feature-pill">[MCP]</span>
+                    <span class="feature-pill">[pgvector]</span>
+                    <span class="feature-pill">[Ollama]</span>
+                </div>
+                <div class="terminal-status-line">
+                    <span>STATUS: <span class="status-ok">ONLINE</span></span>
+                    <span id="uptime">UPTIME: --:--:--</span>
+                </div>
             </div>
         </header>
 
@@ -1528,36 +1574,8 @@
         let grammarFailuresData = [];
 
         function isDarkMode() {
-            return document.documentElement.getAttribute('data-theme') === 'dark';
+            return true; // Always dark for terminal theme
         }
-
-        function applyTheme(mode) {
-            document.documentElement.setAttribute('data-theme', mode);
-            const btn = document.getElementById('themeToggle');
-            btn.textContent = mode === 'dark' ? '\u{1F319}' : '\u2600\uFE0F';
-            btn.title = 'Switch to ' + (mode === 'dark' ? 'light' : 'dark') + ' theme';
-        }
-
-        function cycleTheme() {
-            const next = isDarkMode() ? 'light' : 'dark';
-            localStorage.setItem('cocosearch-theme', next);
-            applyTheme(next);
-            // Refresh charts with new colors
-            const select = document.getElementById('indexSelect');
-            const indexIndex = parseInt(select.value);
-            if (!isNaN(indexIndex) && allIndexes[indexIndex]) {
-                updateDashboard(allIndexes[indexIndex]);
-            }
-        }
-
-        // Apply saved theme (default to OS preference on first visit)
-        (function() {
-            let saved = localStorage.getItem('cocosearch-theme');
-            if (!saved) {
-                saved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-            applyTheme(saved);
-        })();
 
         async function loadProjectContext() {
             try {
@@ -1769,9 +1787,9 @@
                 languageChart.destroy();
             }
 
-            const isDark = isDarkMode();
-            const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
-            const gridColor = isDark ? '#404040' : '#e0e0e0';
+            // Terminal chart colors
+            const textColor = '#d0b090';
+            const gridColor = 'rgba(240, 160, 96, 0.15)';
 
             languageChart = new Chart(ctx, {
                 type: 'bar',
@@ -1780,8 +1798,8 @@
                     datasets: [{
                         label: 'Chunks',
                         data: data,
-                        backgroundColor: 'rgba(33, 150, 243, 0.7)',
-                        borderColor: 'rgba(33, 150, 243, 1)',
+                        backgroundColor: 'rgba(240, 160, 96, 0.6)',
+                        borderColor: '#f0a060',
                         borderWidth: 1
                     }]
                 },
@@ -1797,15 +1815,18 @@
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                color: textColor
+                                color: textColor,
+                                font: { family: "'IBM Plex Mono', monospace", size: 10 }
                             },
                             grid: {
-                                color: gridColor
+                                color: gridColor,
+                                borderDash: [4, 4]
                             }
                         },
                         x: {
                             ticks: {
-                                color: textColor
+                                color: textColor,
+                                font: { family: "'IBM Plex Mono', monospace", size: 10 }
                             },
                             grid: {
                                 color: gridColor
@@ -1838,9 +1859,9 @@
                 symbolChart.destroy();
             }
 
-            const isDark = isDarkMode();
-            const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
-            const gridColor = isDark ? '#404040' : '#e0e0e0';
+            // Terminal chart colors
+            const textColor = '#d0b090';
+            const gridColor = 'rgba(240, 160, 96, 0.15)';
 
             symbolChart = new Chart(ctx, {
                 type: 'bar',
@@ -1849,8 +1870,8 @@
                     datasets: [{
                         label: 'Count',
                         data: data,
-                        backgroundColor: 'rgba(76, 175, 80, 0.7)',
-                        borderColor: 'rgba(76, 175, 80, 1)',
+                        backgroundColor: 'rgba(192, 160, 96, 0.6)',
+                        borderColor: '#c0a060',
                         borderWidth: 1
                     }]
                 },
@@ -1866,15 +1887,18 @@
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                color: textColor
+                                color: textColor,
+                                font: { family: "'IBM Plex Mono', monospace", size: 10 }
                             },
                             grid: {
-                                color: gridColor
+                                color: gridColor,
+                                borderDash: [4, 4]
                             }
                         },
                         x: {
                             ticks: {
-                                color: textColor
+                                color: textColor,
+                                font: { family: "'IBM Plex Mono', monospace", size: 10 }
                             },
                             grid: {
                                 color: gridColor
@@ -2010,9 +2034,9 @@
                 grammarChart.destroy();
             }
 
-            const isDark = isDarkMode();
-            const textColor = isDark ? '#e0e0e0' : '#1a1a1a';
-            const gridColor = isDark ? '#404040' : '#e0e0e0';
+            // Terminal chart colors
+            const textColor = '#d0b090';
+            const gridColor = 'rgba(240, 160, 96, 0.15)';
 
             grammarChart = new Chart(ctx, {
                 type: 'bar',
@@ -2021,8 +2045,8 @@
                     datasets: [{
                         label: 'Chunks',
                         data: data,
-                        backgroundColor: 'rgba(255, 152, 0, 0.7)',
-                        borderColor: 'rgba(255, 152, 0, 1)',
+                        backgroundColor: 'rgba(224, 120, 64, 0.6)',
+                        borderColor: '#e07840',
                         borderWidth: 1
                     }]
                 },
@@ -2031,8 +2055,8 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { beginAtZero: true, ticks: { color: textColor }, grid: { color: gridColor } },
-                        x: { ticks: { color: textColor }, grid: { color: gridColor } }
+                        y: { beginAtZero: true, ticks: { color: textColor, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: gridColor, borderDash: [4, 4] } },
+                        x: { ticks: { color: textColor, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: gridColor } }
                     }
                 }
             });
@@ -3114,6 +3138,25 @@
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
+
+        // Uptime Clock
+        function updateUptime() {
+            const uptime = document.getElementById('uptime');
+            if (!uptime) return;
+
+            const now = Date.now();
+            const start = window.performance.timing.navigationStart;
+            const diff = now - start;
+
+            const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
+            const mins = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+            const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+
+            uptime.textContent = `UPTIME: ${hours}:${mins}:${secs}`;
+        }
+
+        setInterval(updateUptime, 1000);
+        updateUptime();
 
         initChatPanel();
     </script>

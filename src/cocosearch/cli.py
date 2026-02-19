@@ -1668,6 +1668,10 @@ def dashboard_command(args: argparse.Namespace) -> int:
     # Set project path so dashboard API has project context (same as --project-from-cwd in mcp command)
     os.environ["COCOSEARCH_PROJECT_PATH"] = os.getcwd()
 
+    # Resolve projects dir: CLI flag > env var > current directory
+    projects_dir = args.projects_dir or os.environ.get("COCOSEARCH_PROJECTS_DIR") or "."
+    os.environ["COCOSEARCH_PROJECTS_DIR"] = str(Path(projects_dir).expanduser().resolve())
+
     # Resolve port: CLI > env > default
     if args.port is not None:
         port = args.port
@@ -2139,6 +2143,11 @@ def main() -> None:
         "--host",
         default="127.0.0.1",
         help="Host to bind to (default: 127.0.0.1)",
+    )
+    dashboard_parser.add_argument(
+        "--projects-dir",
+        default=None,
+        help="Directory to scan for projects (default: current directory). [env: COCOSEARCH_PROJECTS_DIR]",
     )
 
     # Known subcommands for routing

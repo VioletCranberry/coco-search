@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/banner.svg" alt="Coco[-S]earch — Local-first hybrid semantic code search" width="960">
+  <img src="./docs/banner-terminal.svg" alt="Coco[-S]earch — Local-first hybrid semantic code search" width="960">
 </p>
 
 <p align="center">
@@ -197,6 +197,55 @@ cocosearch search "authentication flow" -n myapp
 # It auto-discovers projects under PROJECTS_DIR and lets you index them with one click.
 open http://localhost:3000/dashboard
 ```
+
+> **Note:** The dashboard's "Ask AI" chat feature is not available in Docker mode.
+> It requires the `claude` CLI, which is only available on the host.
+> Search, indexing, and all other dashboard features work normally.
+
+> **Tip:** The dashboard auto-discovers projects in the current directory. To scan
+> a different directory, use `--projects-dir`:
+>
+> ```bash
+> cocosearch dashboard --projects-dir ~/GIT
+> ```
+
+### MCP with Docker
+
+The Docker container runs an SSE-based MCP server. Connect your AI assistant directly to it instead of spawning a local process:
+
+**Claude Code:**
+
+```bash
+claude mcp add --scope user cocosearch --url http://localhost:3000/sse
+```
+
+**Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "cocosearch": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
+
+**OpenCode** (`opencode.json`):
+
+```json
+{
+  "mcp": {
+    "cocosearch": {
+      "type": "remote",
+      "url": "http://localhost:3000/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+> **Note:** Replace `3000` with your `COCOSEARCH_MCP_PORT` if customized.
 
 ## Interfaces
 
