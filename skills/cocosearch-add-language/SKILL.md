@@ -1,6 +1,6 @@
 ---
 name: cocosearch-add-language
-description: Use when adding support for a new programming language, config format, or grammar to CocoSearch. Guides through all paths (handler, symbol extraction, grammar, context expansion) with registration checklists.
+description: Use when adding support for a new programming language or config format to CocoSearch. Guides through all paths (handler, symbol extraction, context expansion) with registration checklists. For grammar handlers, use cocosearch-add-grammar.
 ---
 
 # Add Language Support with CocoSearch
@@ -10,14 +10,6 @@ A structured workflow for adding language support to CocoSearch. Navigates up to
 **Philosophy:** The most common failure when adding language support is missing a registration step. This skill makes that impossible by tracking every step explicitly.
 
 **Reference:** `docs/adding-languages.md` is the authoritative technical guide. This skill wraps it in an interactive workflow.
-
-## Pre-flight Check
-
-1. Read `cocosearch.yaml` for `indexName` (critical -- use this for all operations)
-2. `list_indexes()` to confirm project is indexed
-3. `index_stats(index_name="<configured-name>")` to check freshness
-- No index -> offer to index before proceeding
-- Stale (>7 days) -> warn: "Index is X days old -- I may miss recent patterns. Want me to reindex first?"
 
 ## Step 1: Identify the Language
 
@@ -309,48 +301,13 @@ Create `tests/unit/indexer/symbols/test_<language>.py` covering:
 
 > **Skip this step** unless the language is a domain-specific schema sharing a base language extension.
 
-### 5a. Find the Best Analog Grammar
+For grammar handler implementation, use the dedicated skill:
 
-| Grammar Type | Analog | Why |
-|-------------|--------|-----|
-| CI/CD pipeline (YAML) | `github_actions.py` or `gitlab_ci.py` | Jobs/stages/steps structure |
-| Container orchestration (YAML) | `docker_compose.py` or `kubernetes.py` | Services/resources structure |
-| Template (YAML) | `helm_template.py` or `helm_values.py` | Template directives + values |
+**Invoke:** `/cocosearch:cocosearch-add-grammar`
 
-Search for the analog:
+This skill provides in-depth guidance for `matches()` design, separator spec, metadata extraction, conflict avoidance, and grammar-specific testing.
 
-```
-search_code(
-    query="<analog-grammar> grammar handler GRAMMAR_NAME matches",
-    symbol_type="class",
-    use_hybrid_search=True,
-    smart_context=True
-)
-```
-
-### 5b. Create the Grammar Handler File
-
-1. **Create** `src/cocosearch/handlers/grammars/<grammar>.py` (copy `_template.py`)
-2. **Set** `GRAMMAR_NAME` -- unique lowercase hyphenated identifier
-3. **Set** `BASE_LANGUAGE` -- the base language (e.g., `"yaml"`)
-4. **Set** `PATH_PATTERNS` -- glob patterns matching file paths
-5. **Implement** `matches(filepath, content)` -- path + content detection
-6. **Define** `SEPARATOR_SPEC` with `CustomLanguageSpec` (or `None` for base language defaults)
-7. **Implement** `extract_metadata(text)` returning `block_type`, `hierarchy`, and `language_id`
-
-The grammar is autodiscovered at import time; no registration code needed.
-
-### 5c. Create Grammar Tests
-
-Create `tests/unit/handlers/grammars/test_<grammar>.py` covering:
-- Grammar properties (name, base language, path patterns)
-- Separator spec
-- Path matching (positive and negative cases)
-- Content matching (positive and negative cases)
-- Metadata extraction
-- Edge cases (no content provided, wrong path, wrong content markers)
-
-**Checkpoint with user:** "Grammar handler created for [grammar]. Tests pass. Ready for documentation updates?"
+After completing the grammar skill, return here for Step 7 (count assertions) and Step 8 (documentation).
 
 ## Step 6: Context Expansion (Path E)
 
