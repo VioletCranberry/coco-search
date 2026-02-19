@@ -1,5 +1,9 @@
 # Adding Language Support
 
+> **Claude Code users:** Interactive skills guide you through these steps with checklists and validation:
+> - `/cocosearch:cocosearch-add-language` — language handlers, symbol extraction, context expansion
+> - `/cocosearch:cocosearch-add-grammar` — grammar handlers for domain-specific formats
+
 ## Chunking Tiers
 
 Every indexed file is chunked by CocoIndex's `SplitRecursively`. The chunking strategy depends on what the `language` parameter resolves to:
