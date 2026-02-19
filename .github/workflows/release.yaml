@@ -67,11 +67,10 @@ jobs:
       - name: Run unit tests
         run: uv run pytest
 
-  publish-testpypi:
-    name: Publish to TestPyPI
-    needs: [validate, test]
+  build:
+    name: Build Package
+    needs: validate
     runs-on: ubuntu-latest
-    environment: testpypi
     steps:
       - uses: actions/checkout@v4
 
@@ -81,37 +80,54 @@ jobs:
       - name: Set version
         env:
           VERSION: ${{ needs.validate.outputs.version }}
-        run: uv version "$VERSION"
+        run: sed -i "s/^version = .*/version = \"${VERSION}\"/" pyproject.toml
 
       - name: Build package
         run: uv build
 
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: [validate, test, build]
+    runs-on: ubuntu-latest
+    environment: testpypi
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
       - name: Publish to TestPyPI
-        run: uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/cocosearch/
+        run: uv publish --publish-url https://test.pypi.org/legacy/ --check-url https://test.pypi.org/simple/cocosearch/ dist/*
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [validate, test, publish-testpypi]
+    needs: [validate, publish-testpypi]
     runs-on: ubuntu-latest
     environment: pypi
     steps:
-      - uses: actions/checkout@v4
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Set version
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
-        run: uv version "$VERSION"
-
-      - name: Build package
-        run: uv build
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
       - name: Publish to PyPI
-        run: uv publish --check-url https://pypi.org/simple/cocosearch/
+        run: uv publish --check-url https://pypi.org/simple/cocosearch/ dist/*
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -133,7 +149,7 @@ jobs:
       - name: Set version
         env:
           VERSION: ${{ needs.validate.outputs.version }}
-        run: uv version "$VERSION"
+        run: uv version "$VERSION" --no-sync
 
       - name: Sync version to all files
         env:
