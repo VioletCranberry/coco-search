@@ -146,7 +146,7 @@ Project config via `cocosearch.yaml` (no leading dot) in project root. The `inde
 **Docker / client mode env vars:**
 - `COCOSEARCH_SERVER_URL` — When set, CLI forwards commands to the remote server instead of running locally (e.g., `http://localhost:3000`)
 - `COCOSEARCH_PATH_PREFIX` — Host↔container path rewriting for client mode (e.g., `~/GIT:/projects`)
-- `COCOSEARCH_PROJECTS_DIR` — Directory to scan for available projects in Docker mode. Dashboard shows unindexed projects with an "Index Now" option. Set to `/projects` in docker-compose.yml.
+- `COCOSEARCH_PROJECTS_DIR` — Directory to scan for available projects. Dashboard shows unindexed projects with an "Index Now" option. Defaults to `.` in `cocosearch dashboard`; set to `/projects` in docker-compose.yml. Override with `--projects-dir` flag.
 - `PROJECTS_DIR` — Docker Compose variable: directory to mount into the app container as `/projects` (default: `.`)
 - `COCOSEARCH_MCP_PORT` — Server port, used by both CLI and Docker Compose (default: `3000`)
 
@@ -155,6 +155,11 @@ Project config via `cocosearch.yaml` (no leading dot) in project root. The `inde
 docker compose --profile app up --build          # Full stack (db + ollama + app)
 PROJECTS_DIR=~/GIT docker compose --profile app up  # Mount projects directory
 docker compose up -d                              # Infrastructure only (unchanged)
+```
+
+**Docker MCP (SSE transport):** The container runs an SSE-based MCP server. Connect AI assistants directly via URL instead of spawning a local process:
+```bash
+claude mcp add --scope user cocosearch --url http://localhost:3000/sse
 ```
 
 ## Documentation Policy

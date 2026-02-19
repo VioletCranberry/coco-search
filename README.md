@@ -124,7 +124,7 @@ This project was originally built for personal use — a solo experiment in loca
 
 ```bash
 # 1. Clone this repository and start infrastructure:
-git clone https://github.com/VioletCranberry/coco-s.git && cd coco-s
+git clone https://github.com/VioletCranberry/coco-search.git && cd coco-search
 # Docker volumes are bind-mounted to ./docker_data/ inside the repository,
 # so infrastructure must be started from the cloned repo directory.
 docker compose up -d
@@ -147,7 +147,7 @@ uvx cocosearch index .
 **Option A — Plugin (recommended):**
 
 ```bash
-claude plugin marketplace add VioletCranberry/coco-s
+claude plugin marketplace add VioletCranberry/coco-search
 claude plugin install cocosearch@cocosearch
 # All skills + MCP server configured automatically
 ```

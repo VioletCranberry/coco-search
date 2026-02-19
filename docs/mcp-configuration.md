@@ -102,6 +102,44 @@ After saving, restart Claude Desktop. You should see the hammer icon in the chat
 
 OpenCode config differs from Claude configs: it uses `"type": "local"`, `command` is an array (not separate command/args), and it requires an explicit `"enabled": true`.
 
+### Docker (SSE Transport)
+
+When running CocoSearch as a Docker container (`docker compose --profile app up`), the MCP server uses SSE transport on port 3000. Connect your AI assistant directly to the container URL instead of spawning a local process.
+
+**Claude Code:**
+
+```bash
+claude mcp add --scope user cocosearch --url http://localhost:3000/sse
+```
+
+**Claude Desktop:**
+
+```json
+{
+  "mcpServers": {
+    "cocosearch": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
+
+**OpenCode:**
+
+```json
+{
+  "mcp": {
+    "cocosearch": {
+      "type": "remote",
+      "url": "http://localhost:3000/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+Replace `3000` with your `COCOSEARCH_MCP_PORT` if customized. No local Python installation, Ollama, or PostgreSQL needed — the container handles everything.
+
 ### Custom Database Connection
 
 By default, CocoSearch connects to `postgresql://cocosearch:cocosearch@localhost:5432/cocosearch`. This matches the Docker Compose credentials, so no configuration is needed for the standard setup.
