@@ -79,6 +79,8 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
    - Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
    - The handler is autodiscovered at import time; no registration code needed
 
+5. **Add language_id to `_SKIP_PARSE_EXTENSIONS`** in `src/cocosearch/indexer/parse_tracking.py` if the language has no tree-sitter grammar. This prevents false `no_grammar` reports in parse tracking stats. (Languages with tree-sitter support don't need this.)
+
 5. **Add tests:**
    ```bash
    # Create test file
@@ -97,6 +99,7 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
 | `src/cocosearch/handlers/<language>.py` | Create — handler class |
 | `src/cocosearch/indexer/config.py` | Modify — add extensions to `include_patterns` |
 | `tests/unit/handlers/test_<language>.py` | Create — handler tests |
+| `src/cocosearch/indexer/parse_tracking.py` | Modify — add language_id to `_SKIP_PARSE_EXTENSIONS` (only if no tree-sitter grammar) |
 | `src/cocosearch/cli.py` | Modify — `display_names` in `languages_command` (only if `.title()` casing is wrong) |
 
 See [handlers/README.md](../src/cocosearch/handlers/README.md) for the full handler protocol, separator design, and testing checklist.
@@ -281,6 +284,7 @@ When adding a new language handler, verify all registrations are complete:
 
 - [ ] **Handler** (if applicable): `handlers/<language>.py` created, extensions registered via autodiscovery
 - [ ] **include_patterns**: file extensions added to `IndexingConfig.include_patterns` in `indexer/config.py`
+- [ ] **_SKIP_PARSE_EXTENSIONS**: language_id added to `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py` (only if no tree-sitter grammar — prevents false `no_grammar` reports)
 - [ ] **LANGUAGE_MAP** (if symbol extraction): all file extensions mapped to tree-sitter language name
 - [ ] **Query file** (if symbol extraction): `indexer/queries/<language>.scm` created
 - [ ] **SYMBOL_AWARE_LANGUAGES**: language added to set in `search/query.py`

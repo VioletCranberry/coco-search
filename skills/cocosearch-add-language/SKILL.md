@@ -110,6 +110,8 @@ Copy from the template and implement:
 
 The handler is autodiscovered at import time; no registration code needed.
 
+6. **If the language has no tree-sitter grammar**, add the `language_id` to `_SKIP_PARSE_EXTENSIONS` in `src/cocosearch/indexer/parse_tracking.py`. This prevents false `no_grammar` reports in parse tracking stats.
+
 ### 3c. Register File Extensions
 
 Add the new extensions to `include_patterns` so CocoIndex picks up the files:
@@ -480,6 +482,7 @@ Complete checklist of all registration points. Check off each one as you complet
 **Language Handler (Path A):**
 - [ ] `src/cocosearch/handlers/<language>.py` created
 - [ ] Extensions added to `include_patterns` in `src/cocosearch/indexer/config.py`
+- [ ] `_SKIP_PARSE_EXTENSIONS` updated in `src/cocosearch/indexer/parse_tracking.py` (if no tree-sitter grammar)
 - [ ] Display name added to `cli.py` `languages_command` (if `.title()` casing is wrong)
 - [ ] `tests/unit/handlers/test_<language>.py` created
 
