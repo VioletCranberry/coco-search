@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_active_indexing: dict[str, threading.Thread] = {}
+_active_indexing: dict[str, tuple[threading.Thread, threading.Event]] = {}
 _indexing_lock = threading.Lock()
 _cocoindex_initialized = False
 _cocoindex_init_lock = threading.Lock()
@@ -93,14 +93,16 @@ def _apply_thread_liveness_status(
         db_status: Status from database metadata.
     """
     with _indexing_lock:
-        active = _active_indexing.get(index_name)
-    if active is not None and active.is_alive():
-        result["status"] = "indexing"
-        if db_status != "indexing":
-            try:
-                set_index_status(index_name, "indexing", update_timestamp=False)
-            except Exception:
-                pass
+        entry = _active_indexing.get(index_name)
+    if entry is not None:
+        thread, _cancel = entry
+        if thread.is_alive():
+            result["status"] = "indexing"
+            if db_status != "indexing":
+                try:
+                    set_index_status(index_name, "indexing", update_timestamp=False)
+                except Exception:
+                    pass
 
 
 def _register_with_git(index_name: str, project_path: str) -> None:
@@ -184,6 +186,50 @@ async def heartbeat(request) -> StreamingResponse:
                 await asyncio.sleep(5)
         except asyncio.CancelledError:
             return
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+# SSE log streaming endpoint for dashboard
+@mcp.custom_route("/api/logs", methods=["GET"])
+async def api_logs(request) -> StreamingResponse:
+    """SSE stream of server logs for the dashboard log panel."""
+    import asyncio
+    import json as _json
+
+    from cocosearch.mcp.log_stream import get_log_buffer
+
+    buf = get_log_buffer()
+
+    async def event_stream():
+        if buf is None:
+            yield "event: history_done\ndata: {}\n\n"
+            return
+
+        # Subscribe first, then replay history (prevents missed entries)
+        sub_id, q = buf.subscribe()
+        try:
+            # Replay history
+            for entry in buf.get_history():
+                yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'name': entry.name, 'msg': entry.message})}\n\n"
+            yield "event: history_done\ndata: {}\n\n"
+
+            # Stream live entries
+            while True:
+                try:
+                    entry = await asyncio.wait_for(q.get(), timeout=30)
+                    yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'name': entry.name, 'msg': entry.message})}\n\n"
+                except asyncio.TimeoutError:
+                    # Keepalive
+                    yield ": keepalive\n\n"
+                except asyncio.CancelledError:
+                    return
+        finally:
+            buf.unsubscribe(sub_id)
 
     return StreamingResponse(
         event_stream(),
@@ -302,11 +348,13 @@ async def api_reindex(request) -> JSONResponse:
     # from both starting indexing for the same index
     with _indexing_lock:
         prev = _active_indexing.get(index_name)
-        if prev is not None and prev.is_alive():
-            return JSONResponse(
-                {"error": "Previous indexing still completing. Try again shortly."},
-                status_code=409,
-            )
+        if prev is not None:
+            prev_thread, _prev_cancel = prev
+            if prev_thread.is_alive():
+                return JSONResponse(
+                    {"error": "Previous indexing still completing. Try again shortly."},
+                    status_code=409,
+                )
 
         # Set status to indexing
         try:
@@ -314,9 +362,13 @@ async def api_reindex(request) -> JSONResponse:
         except Exception as e:
             logger.warning(f"Failed to set indexing status for '{index_name}': {e}")
 
+        cancel_event = threading.Event()
+
         def _run():
             failed = False
             try:
+                if cancel_event.is_set():
+                    return
                 _ensure_cocoindex_init()
                 run_index(
                     index_name=index_name,
@@ -329,17 +381,24 @@ async def api_reindex(request) -> JSONResponse:
                 failed = True
                 logger.error(f"Background reindex failed: {exc}")
             finally:
-                try:
-                    current = get_index_metadata(index_name)
-                    if current and current.get("status") == "indexing":
-                        set_index_status(index_name, "error" if failed else "indexed")
-                except Exception as e:
-                    logger.warning(f"Failed to update status for '{index_name}': {e}")
+                if not cancel_event.is_set():
+                    try:
+                        current = get_index_metadata(index_name)
+                        if current and current.get("status") == "indexing":
+                            set_index_status(
+                                index_name, "error" if failed else "indexed"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to update status for '{index_name}': {e}"
+                        )
                 with _indexing_lock:
-                    _active_indexing.pop(index_name, None)
+                    entry = _active_indexing.get(index_name)
+                    if entry is not None and entry[1] is cancel_event:
+                        _active_indexing.pop(index_name, None)
 
         thread = threading.Thread(target=_run, daemon=True)
-        _active_indexing[index_name] = thread
+        _active_indexing[index_name] = (thread, cancel_event)
         thread.start()
 
     action = "Fresh reindex" if fresh else "Reindex"
@@ -436,11 +495,13 @@ async def api_index(request) -> JSONResponse:
     # from both starting indexing for the same index
     with _indexing_lock:
         prev = _active_indexing.get(index_name)
-        if prev is not None and prev.is_alive():
-            return JSONResponse(
-                {"error": "Previous indexing still completing. Try again shortly."},
-                status_code=409,
-            )
+        if prev is not None:
+            prev_thread, _prev_cancel = prev
+            if prev_thread.is_alive():
+                return JSONResponse(
+                    {"error": "Previous indexing still completing. Try again shortly."},
+                    status_code=409,
+                )
 
         # Register metadata before starting
         try:
@@ -450,9 +511,13 @@ async def api_index(request) -> JSONResponse:
         except Exception as e:
             logger.warning(f"Metadata registration failed: {e}")
 
+        cancel_event = threading.Event()
+
         def _run():
             failed = False
             try:
+                if cancel_event.is_set():
+                    return
                 _ensure_cocoindex_init()
                 run_index(
                     index_name=index_name,
@@ -466,17 +531,24 @@ async def api_index(request) -> JSONResponse:
                 failed = True
                 logger.error(f"Background indexing failed: {exc}")
             finally:
-                try:
-                    current = get_index_metadata(index_name)
-                    if current and current.get("status") == "indexing":
-                        set_index_status(index_name, "error" if failed else "indexed")
-                except Exception as e:
-                    logger.warning(f"Failed to update status for '{index_name}': {e}")
+                if not cancel_event.is_set():
+                    try:
+                        current = get_index_metadata(index_name)
+                        if current and current.get("status") == "indexing":
+                            set_index_status(
+                                index_name, "error" if failed else "indexed"
+                            )
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to update status for '{index_name}': {e}"
+                        )
                 with _indexing_lock:
-                    _active_indexing.pop(index_name, None)
+                    entry = _active_indexing.get(index_name)
+                    if entry is not None and entry[1] is cancel_event:
+                        _active_indexing.pop(index_name, None)
 
         thread = threading.Thread(target=_run, daemon=True)
-        _active_indexing[index_name] = thread
+        _active_indexing[index_name] = (thread, cancel_event)
         thread.start()
 
     return JSONResponse(
@@ -501,12 +573,24 @@ async def api_stop_indexing(request) -> JSONResponse:
         return JSONResponse({"error": "index_name is required"}, status_code=400)
 
     with _indexing_lock:
-        thread = _active_indexing.get(index_name)
-    if thread is None or not thread.is_alive():
-        return JSONResponse(
-            {"error": f"No active indexing found for '{index_name}'"},
-            status_code=404,
-        )
+        entry = _active_indexing.get(index_name)
+        if entry is None:
+            return JSONResponse(
+                {"error": f"No active indexing found for '{index_name}'"},
+                status_code=404,
+            )
+        thread, cancel_event = entry
+        if not thread.is_alive():
+            # Dead thread — clean up stale entry
+            _active_indexing.pop(index_name, None)
+            return JSONResponse(
+                {"error": f"No active indexing found for '{index_name}'"},
+                status_code=404,
+            )
+        # Signal thread not to overwrite status in its finally block
+        cancel_event.set()
+        # Remove from registry so _apply_thread_liveness_status won't override
+        _active_indexing.pop(index_name, None)
 
     try:
         set_index_status(index_name, "indexed")
@@ -532,14 +616,16 @@ async def api_delete_index(request) -> JSONResponse:
 
     # Reject if indexing is currently active for this index
     with _indexing_lock:
-        prev = _active_indexing.get(index_name)
-    if prev is not None and prev.is_alive():
-        return JSONResponse(
-            {
-                "error": f"Cannot delete '{index_name}' while indexing is active. Stop indexing first."
-            },
-            status_code=409,
-        )
+        entry = _active_indexing.get(index_name)
+    if entry is not None:
+        thread, _cancel = entry
+        if thread.is_alive():
+            return JSONResponse(
+                {
+                    "error": f"Cannot delete '{index_name}' while indexing is active. Stop indexing first."
+                },
+                status_code=409,
+            )
 
     try:
         result = mgmt_clear_index(index_name)
@@ -1882,6 +1968,11 @@ def run_server(
     """
     # Log startup info (always to stderr)
     logger.info(f"Starting MCP server with transport: {transport}")
+
+    # Start capturing logs for the dashboard log panel
+    from cocosearch.mcp.log_stream import setup_log_capture
+
+    setup_log_capture()
 
     # Dashboard auto-open (opt-out via COCOSEARCH_NO_DASHBOARD=1)
     no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
