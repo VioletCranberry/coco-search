@@ -122,7 +122,7 @@ def _register_with_git(index_name: str, project_path: str) -> None:
 def build_all_stats(include_failures: bool = False) -> list[dict]:
     """Build stats for all indexes.
 
-    Shared by MCP API routes and the background DashboardHandler.
+    Shared by MCP API routes and the background dashboard server.
     Calls _ensure_cocoindex_init() internally.
     """
     _ensure_cocoindex_init()
@@ -145,7 +145,7 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
 def build_single_stats(index_name: str, include_failures: bool = False) -> dict:
     """Build stats for a single index.
 
-    Shared by MCP API routes and the background DashboardHandler.
+    Shared by MCP API routes and the background dashboard server.
     Calls _ensure_cocoindex_init() internally.
     Raises ValueError if the index is not found.
     """
