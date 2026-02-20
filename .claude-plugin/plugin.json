@@ -1,6 +1,6 @@
 {
   "name": "cocosearch",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Local-first hybrid semantic code search with MCP tools and workflow skills. Powered by CocoIndex, Tree-sitter, pgvector, and Ollama.",
   "author": {
     "name": "VioletCranberry",
