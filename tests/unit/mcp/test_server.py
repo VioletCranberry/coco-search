@@ -356,7 +356,7 @@ class TestIndexStats:
         thread = threading.Thread(target=keep_alive.wait)
         thread.start()
         try:
-            srv._active_indexing["myindex"] = thread
+            srv._active_indexing["myindex"] = (thread, threading.Event())
 
             with patch("cocoindex.init"):
                 with patch(
@@ -405,7 +405,7 @@ class TestIndexStats:
         thread = threading.Thread(target=keep_alive.wait)
         thread.start()
         try:
-            srv._active_indexing["proj1"] = thread
+            srv._active_indexing["proj1"] = (thread, threading.Event())
 
             with patch("cocoindex.init"):
                 with patch(

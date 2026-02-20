@@ -1,6 +1,7 @@
 """Tests for new HTTP API routes in cocosearch MCP server."""
 
 import json
+import threading
 
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -1038,7 +1039,7 @@ class TestApiIndexEnhanced:
         thread = threading.Thread(target=keep_alive.wait)
         thread.start()
         try:
-            srv._active_indexing["myindex"] = thread
+            srv._active_indexing["myindex"] = (thread, threading.Event())
 
             with patch("cocosearch.mcp.server.ensure_metadata_table"):
                 with patch("cocosearch.mcp.server._register_with_git"):
@@ -1249,3 +1250,226 @@ class TestApiProjects:
         assert response.status_code == 200
         assert len(body) == 1
         assert body[0]["is_indexed"] is False
+
+
+class TestApiStopIndexing:
+    """Tests for POST /api/stop-indexing endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_active_indexing(self):
+        """Clear module-level _active_indexing between tests."""
+        from cocosearch.mcp import server as srv
+
+        srv._active_indexing.clear()
+        yield
+        srv._active_indexing.clear()
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_returns_400(self):
+        """Returns 400 when request body is not valid JSON."""
+        from cocosearch.mcp.server import api_stop_indexing
+
+        request = _make_mock_request()  # json() raises Exception
+        response = await api_stop_indexing(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 400
+        assert "Invalid JSON body" in body["error"]
+
+    @pytest.mark.asyncio
+    async def test_missing_index_name_returns_400(self):
+        """Returns 400 when index_name is missing."""
+        from cocosearch.mcp.server import api_stop_indexing
+
+        request = _make_mock_request(body={})
+        response = await api_stop_indexing(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 400
+        assert "index_name is required" in body["error"]
+
+    @pytest.mark.asyncio
+    async def test_no_active_indexing_returns_404(self):
+        """Returns 404 when no active indexing thread exists for the index."""
+        from cocosearch.mcp.server import api_stop_indexing
+
+        request = _make_mock_request(body={"index_name": "myindex"})
+        response = await api_stop_indexing(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 404
+        assert "No active indexing found" in body["error"]
+
+    @pytest.mark.asyncio
+    async def test_dead_thread_returns_404_and_cleans_up(self):
+        """Returns 404 and cleans up stale entry when thread is dead."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import api_stop_indexing
+
+        # Create a thread that has already finished
+        done_event = threading.Event()
+        done_event.set()
+        thread = threading.Thread(target=done_event.wait)
+        thread.start()
+        thread.join(timeout=1)  # Wait for it to finish
+
+        cancel_event = threading.Event()
+        srv._active_indexing["myindex"] = (thread, cancel_event)
+
+        request = _make_mock_request(body={"index_name": "myindex"})
+        response = await api_stop_indexing(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 404
+        assert "No active indexing found" in body["error"]
+        # Stale entry should be cleaned up
+        assert "myindex" not in srv._active_indexing
+
+    @pytest.mark.asyncio
+    async def test_stop_sets_cancel_event(self):
+        """Stop sets the cancel_event so the thread won't overwrite status."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import api_stop_indexing
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        cancel_event = threading.Event()
+        try:
+            srv._active_indexing["myindex"] = (thread, cancel_event)
+
+            request = _make_mock_request(body={"index_name": "myindex"})
+            with patch("cocosearch.mcp.server.set_index_status"):
+                response = await api_stop_indexing(request)
+
+            assert response.status_code == 200
+            assert cancel_event.is_set()
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_stop_removes_from_active_indexing(self):
+        """Stop removes the entry from _active_indexing registry."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import api_stop_indexing
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        cancel_event = threading.Event()
+        try:
+            srv._active_indexing["myindex"] = (thread, cancel_event)
+
+            request = _make_mock_request(body={"index_name": "myindex"})
+            with patch("cocosearch.mcp.server.set_index_status"):
+                response = await api_stop_indexing(request)
+
+            assert response.status_code == 200
+            assert "myindex" not in srv._active_indexing
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_stop_sets_status_to_indexed(self):
+        """Stop calls set_index_status with 'indexed'."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import api_stop_indexing
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        cancel_event = threading.Event()
+        try:
+            srv._active_indexing["myindex"] = (thread, cancel_event)
+
+            request = _make_mock_request(body={"index_name": "myindex"})
+            with patch("cocosearch.mcp.server.set_index_status") as mock_set:
+                response = await api_stop_indexing(request)
+
+            assert response.status_code == 200
+            mock_set.assert_called_once_with("myindex", "indexed")
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_stop_returns_success(self):
+        """Stop returns success response with message."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import api_stop_indexing
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        cancel_event = threading.Event()
+        try:
+            srv._active_indexing["myindex"] = (thread, cancel_event)
+
+            request = _make_mock_request(body={"index_name": "myindex"})
+            with patch("cocosearch.mcp.server.set_index_status"):
+                response = await api_stop_indexing(request)
+
+            body = _parse_response(response)
+            assert response.status_code == 200
+            assert body["success"] is True
+            assert "stopped" in body["message"].lower()
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_stop_prevents_liveness_override(self):
+        """After stop, _apply_thread_liveness_status doesn't override status."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import (
+            _apply_thread_liveness_status,
+            api_stop_indexing,
+        )
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        cancel_event = threading.Event()
+        try:
+            srv._active_indexing["myindex"] = (thread, cancel_event)
+
+            request = _make_mock_request(body={"index_name": "myindex"})
+            with patch("cocosearch.mcp.server.set_index_status"):
+                await api_stop_indexing(request)
+
+            # Now _apply_thread_liveness_status should be a no-op
+            result = {"status": "indexed"}
+            _apply_thread_liveness_status("myindex", result, "indexed")
+            assert result["status"] == "indexed"
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    @pytest.mark.asyncio
+    async def test_set_status_failure_returns_500(self):
+        """Returns 500 when set_index_status raises."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import api_stop_indexing
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        cancel_event = threading.Event()
+        try:
+            srv._active_indexing["myindex"] = (thread, cancel_event)
+
+            request = _make_mock_request(body={"index_name": "myindex"})
+            with patch(
+                "cocosearch.mcp.server.set_index_status",
+                side_effect=Exception("DB error"),
+            ):
+                response = await api_stop_indexing(request)
+
+            body = _parse_response(response)
+            assert response.status_code == 500
+            assert "Failed to update status" in body["error"]
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
