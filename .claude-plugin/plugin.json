@@ -22,6 +22,7 @@
     "cocosearch": {
       "command": "uvx",
       "args": [
+        "--refresh",
         "--from",
         "cocosearch",
         "cocosearch",
