@@ -47,6 +47,8 @@ _SKIP_PARSE_EXTENSIONS = frozenset(
         "properties",
         # Language handlers without a tree-sitter grammar
         "gotmpl",
+        "dockerfile",
+        "tpl",
     }
 )
 

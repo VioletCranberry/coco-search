@@ -133,6 +133,18 @@ class TestSkipParseExtensions:
 
         assert "gotmpl" in _SKIP_PARSE_EXTENSIONS
 
+    def test_dockerfile_in_skip_set(self):
+        """dockerfile has no tree-sitter grammar and should be skipped."""
+        from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
+
+        assert "dockerfile" in _SKIP_PARSE_EXTENSIONS
+
+    def test_tpl_in_skip_set(self):
+        """tpl has no tree-sitter grammar and should be skipped."""
+        from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
+
+        assert "tpl" in _SKIP_PARSE_EXTENSIONS
+
     def test_code_extensions_not_in_skip_set(self):
         from cocosearch.indexer.parse_tracking import _SKIP_PARSE_EXTENSIONS
 
