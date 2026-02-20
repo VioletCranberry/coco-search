@@ -40,7 +40,7 @@ class TestDetectParseStatus:
 
     def test_no_grammar_for_unknown_extension(self):
         """Returns ('no_grammar', None) for extensions not in LANGUAGE_MAP."""
-        status, msg = detect_parse_status("FROM ubuntu:latest", "dockerfile")
+        status, msg = detect_parse_status("some content", "xyz123")
         assert status == "no_grammar"
         assert msg is None
 

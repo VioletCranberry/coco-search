@@ -295,10 +295,10 @@ class TestExtractDockerfileMetadata:
         assert m.hierarchy == ""
 
     def test_env_instruction(self):
-        """ENV instruction produces empty hierarchy."""
+        """ENV instruction produces env:<key> hierarchy."""
         m = extract_dockerfile_metadata("ENV NODE_ENV=production")
         assert m.block_type == "ENV"
-        assert m.hierarchy == ""
+        assert m.hierarchy == "env:NODE_ENV"
 
     def test_comment_before_instruction(self):
         """Comment line before instruction is correctly skipped."""
