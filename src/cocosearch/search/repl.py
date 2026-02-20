@@ -6,7 +6,11 @@ needing to restart the CLI for each query.
 
 import cmd
 import re
-import readline  # noqa: F401 - Enables history/editing
+
+try:
+    import readline  # noqa: F401 - Enables history/editing in cmd.Cmd
+except ImportError:
+    pass  # readline unavailable on Windows; history/editing won't work
 
 from rich.console import Console
 
