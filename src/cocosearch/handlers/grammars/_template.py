@@ -9,13 +9,14 @@ Copy this file to <grammar_name>.py and implement the TODOs.
 For language handlers (matched by extension), see handlers/_template.py instead.
 """
 
-import fnmatch
 import re
 
 import cocoindex
 
+from cocosearch.handlers.grammars._base import YamlGrammarBase
 
-class TemplateGrammarHandler:
+
+class TemplateGrammarHandler(YamlGrammarBase):
     """Grammar handler for <GRAMMAR> files.
 
     TODO: Replace <GRAMMAR> with grammar name (e.g., "GitHub Actions").
@@ -24,8 +25,8 @@ class TemplateGrammarHandler:
     # TODO: Unique grammar identifier (lowercase, hyphenated)
     GRAMMAR_NAME = "template-grammar"
 
-    # TODO: Base language this grammar extends (e.g., "yaml", "json")
-    BASE_LANGUAGE = "yaml"
+    # TODO: Base language this grammar extends (override if not "yaml")
+    # BASE_LANGUAGE = "yaml"  # inherited from YamlGrammarBase
 
     # TODO: File path patterns that suggest this grammar (glob syntax)
     PATH_PATTERNS = ["**/example/*.yml"]
@@ -46,47 +47,35 @@ class TemplateGrammarHandler:
         aliases=[],
     )
 
-    # TODO: Define regex patterns for metadata extraction
+    # TODO: Define additional regex patterns for metadata extraction
     _BLOCK_RE = re.compile(r"^some_pattern")
-    _COMMENT_LINE = re.compile(r"^\s*#.*$", re.MULTILINE)
 
-    def matches(self, filepath: str, content: str | None = None) -> bool:
-        """Check if this grammar applies to the given file.
+    def _has_content_markers(self, content: str) -> bool:
+        """Check if file content has grammar-specific markers.
 
-        TODO: Implement matching logic:
-        1. Check filepath against PATH_PATTERNS
-        2. Optionally verify content markers
+        TODO: Implement content validation (e.g., check for required keys).
 
         Args:
-            filepath: Relative file path within the project.
-            content: Optional file content for deeper matching.
+            content: File content string.
 
         Returns:
-            True if this grammar should handle the file.
+            True if content matches this grammar's expectations.
         """
-        # Path-based matching
-        for pattern in self.PATH_PATTERNS:
-            if fnmatch.fnmatch(filepath, pattern):
-                # TODO: Optionally check content markers
-                return True
-        return False
+        return True  # TODO: Add content checks
 
-    def extract_metadata(self, text: str) -> dict:
-        """Extract metadata from <GRAMMAR> chunk.
+    def _extract_grammar_metadata(self, stripped: str, text: str) -> dict | None:
+        """Extract grammar-specific metadata from chunk text.
 
-        TODO: Implement metadata extraction logic.
+        TODO: Implement metadata extraction logic. Return a dict to stop
+        the fallback chain, or None to use the default (document/value/empty).
 
         Args:
-            text: The chunk text content.
+            stripped: Comment-stripped text.
+            text: Original text (for patterns that need comments/whitespace).
 
         Returns:
-            Dict with metadata fields:
-            - block_type: Type of block (e.g., "job", "service", "stage")
-            - hierarchy: Structured identifier (e.g., "job:build", "service:web")
-            - language_id: Grammar name (same as GRAMMAR_NAME)
+            Dict with block_type, hierarchy, language_id, or None for fallback.
         """
-        return {
-            "block_type": "",
-            "hierarchy": "",
-            "language_id": self.GRAMMAR_NAME,
-        }
+        # TODO: Add extraction logic using self._make_result()
+        # Example: return self._make_result("job", f"job:{name}")
+        return None

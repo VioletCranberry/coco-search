@@ -1,13 +1,13 @@
 ---
 name: cocosearch-add-grammar
-description: Use when adding a grammar handler for domain-specific file formats that share a base language extension (e.g., GitHub Actions within YAML). Guides through matches() design, separator spec, metadata extraction, tests, and registration.
+description: Use when adding a grammar handler for domain-specific file formats that share a base language extension (e.g., GitHub Actions within YAML). Guides through YamlGrammarBase inheritance, content validation, separator spec, metadata extraction, tests, and registration.
 ---
 
 # Add Grammar Handler with CocoSearch
 
 A structured workflow for adding a grammar handler to CocoSearch. Grammar handlers provide domain-specific chunking and metadata for files that share a base language extension but have distinct structure (e.g., GitHub Actions workflows are YAML files with a specific schema).
 
-**Philosophy:** The hardest part of a grammar handler is the `matches()` method — getting path/content detection right so it claims the right files without conflicting with other grammars. This skill provides a decision tree to get it right the first time.
+**Philosophy:** `YamlGrammarBase` handles the heavy lifting — `matches()`, `extract_metadata()`, comment stripping, and the fallback metadata chain are all inherited. Subclasses only implement `_has_content_markers(content)` for content validation and `_extract_grammar_metadata(stripped, text)` for grammar-specific metadata. Override `matches()` only for broad-pattern grammars that need mandatory content checks (like Kubernetes). This skill guides you through designing content validation and metadata extraction.
 
 **Reference:** `docs/adding-languages.md` covers grammar handlers alongside language handlers. This skill is the dedicated deep-dive for grammars.
 
@@ -36,7 +36,7 @@ Choose the closest existing grammar handler based on the grammar type:
 | Kubernetes manifest (YAML) | `kubernetes.py` | Content-heavy matching with exclusions |
 | Config values (YAML) | `helm_values.py` | Comment-based section markers |
 
-> **Non-YAML grammars:** The pattern applies equally to JSON, TOML, or XML base languages — adapt `PATH_PATTERNS` and content markers accordingly. All 6 existing grammars use YAML/gotmpl, but the handler structure is language-agnostic.
+> **Non-YAML grammars:** The pattern applies equally to JSON, TOML, or XML base languages — adapt `PATH_PATTERNS` and content markers accordingly. All 7 existing grammars inherit from `YamlGrammarBase`, which provides shared comment stripping, regex patterns (`_TOP_KEY_RE`, `_ITEM_RE`, etc.), `matches()` with path + content delegation, and metadata orchestration with fallback chain. The handler structure is language-agnostic.
 
 Search for and read the analog handler:
 
@@ -51,46 +51,60 @@ search_code(
 
 Read the analog handler fully before proceeding.
 
-## Step 3: Design the `matches()` Method
+## Step 3: Design Content Validation
 
-This is the critical step. Use the decision tree to determine the right matching strategy:
+Most grammars inherit `matches()` from `YamlGrammarBase` — it handles path matching via `fnmatch` with nested path support (`*/pattern`) and delegates content checks to your `_has_content_markers(content)`. You only override `matches()` for broad-pattern grammars that need mandatory content checks (rare — Kubernetes is the only current example).
+
+Use the decision tree to determine what you need to implement:
 
 ```
 Are your PATH_PATTERNS specific to this grammar?
 (e.g., ".github/workflows/*.yml", ".gitlab-ci.yml", "docker-compose*.yml")
 
-YES --> Path-specific matching
-  - fnmatch against PATH_PATTERNS (with nested path support via */pattern)
-  - Content check is OPTIONAL (confirmatory, improves accuracy)
-  - Return True when path matches and content is None
+YES --> Implement _has_content_markers() only
+  - Inherited matches() handles path matching and delegates to your method
+  - _has_content_markers() confirms content when available (optional validation)
+  - Returns True when path matches and content is None
   - Example: GitHubActionsHandler -- ".github/workflows/*.yml" is specific enough
 
 NO --> Broad patterns that match many files
 (e.g., "*.yaml", "*.yml")
 
-  - Content check is MANDATORY
-  - Return False when content is None (can't distinguish without content)
+  - Override matches() entirely (rare case)
+  - Content check is MANDATORY -- return False when content is None
   - Must check for positive markers (e.g., "apiVersion:" + "kind:")
-  - Must check for negative markers (exclude other grammars' files)
+  - Must check for negative markers (exclude competing grammars)
   - Example: KubernetesHandler -- "*.yaml" matches everything, so content is required
 ```
 
-### Path-specific matching pattern
+### Path-specific grammars (most cases)
+
+Inherited from `YamlGrammarBase` — shown for reference, **don't implement this**:
 
 ```python
+# This is in YamlGrammarBase — you get it for free
 def matches(self, filepath: str, content: str | None = None) -> bool:
     for pattern in self.PATH_PATTERNS:
         if fnmatch.fnmatch(filepath, pattern) or fnmatch.fnmatch(
             filepath, f"*/{pattern}"
         ):
             if content is not None:
-                # Optional: confirm with content markers
-                return "marker_a:" in content and "marker_b:" in content
-            return True  # Path is specific enough
+                return self._has_content_markers(content)
+            return True
     return False
 ```
 
-### Broad pattern matching (content required)
+**What you implement** — `_has_content_markers()` for content validation:
+
+```python
+def _has_content_markers(self, content: str) -> bool:
+    # Return True if content has grammar-specific markers
+    return "marker_a:" in content and "marker_b:" in content
+```
+
+### Broad pattern matching — rare case, override `matches()`
+
+Only when PATH_PATTERNS are too broad (e.g., `*.yaml`) and mandatory content checks are needed. Kubernetes is the only current example:
 
 ```python
 def matches(self, filepath: str, content: str | None = None) -> bool:
@@ -133,12 +147,13 @@ Review all existing grammar `PATH_PATTERNS` and `matches()` logic to ensure your
 
 1. **Copy** `src/cocosearch/handlers/grammars/_template.py` to `<grammar>.py`
 2. **Rename** the class to `<Grammar>Handler` (e.g., `AnsiblePlaybookHandler`)
-3. **Set** `GRAMMAR_NAME` -- unique lowercase hyphenated identifier (e.g., `ansible-playbook`)
-4. **Set** `BASE_LANGUAGE` -- the base language (e.g., `"yaml"`)
+3. **Inherit** from `YamlGrammarBase` (imported from `cocosearch.handlers.grammars._base`)
+4. **Set** `GRAMMAR_NAME` -- unique lowercase hyphenated identifier (e.g., `ansible-playbook`)
 5. **Set** `PATH_PATTERNS` -- glob patterns matching file paths
-6. **Implement** `matches(filepath, content)` -- per decision tree in Step 3
+6. **Override** `matches()` only for broad patterns (rare — see Step 3 decision tree)
 7. **Define** `SEPARATOR_SPEC` with `CustomLanguageSpec` -- hierarchical regex separators from coarsest to finest
-8. **Implement** `extract_metadata(text)` returning `block_type`, `hierarchy`, and `language_id`
+8. **Implement** `_has_content_markers(content)` -- return True if content has grammar-specific markers
+9. **Implement** `_extract_grammar_metadata(stripped, text)` -- return metadata dict or `None` for fallback chain
 
 **Separator constraints:** Use standard regex only -- no lookaheads/lookbehinds (CocoIndex uses Rust regex).
 
@@ -146,11 +161,12 @@ Review all existing grammar `PATH_PATTERNS` and `matches()` logic to ensure your
 
 ### Metadata extraction tips
 
-- Strip leading comments before analysis (use `strip_leading_comments` from `cocosearch.handlers.utils`)
+- Comment stripping is handled by inherited `_strip_comments()` — called automatically before `_extract_grammar_metadata()`
+- Use `self._make_result(block_type, hierarchy)` for result construction (sets `language_id` to `GRAMMAR_NAME`)
+- Return `None` from `_extract_grammar_metadata()` to trigger the fallback chain (document → value → empty)
+- Inherited regex patterns available for YAML parsing: `_TOP_KEY_RE`, `_ITEM_RE`, `_NESTED_KEY_RE`, `_LIST_ITEM_KEY_RE`
 - Identify the most meaningful block types (e.g., "job", "step", "service", "resource")
 - Build `hierarchy` as a structured path (e.g., `"job:build"`, `"service:web"`, `"kind:Deployment"`)
-- Always set `language_id` to `self.GRAMMAR_NAME`
-- Return empty strings for unrecognized content (not `None`)
 
 ## Step 5: Create Tests
 
@@ -174,9 +190,9 @@ Create `tests/unit/handlers/grammars/test_<grammar>.py` following the 4-class te
 ### TestExtractMetadata
 
 - Each block type returns correct `block_type` and `hierarchy`
-- Comments are stripped before analysis
-- Unrecognized content returns empty strings as fallback
-- `language_id` always equals `GRAMMAR_NAME`
+- Comments are stripped before analysis (`_strip_comments()` inherited from `YamlGrammarBase`)
+- Unrecognized content falls through to inherited fallback chain (document → value → empty)
+- `language_id` always equals `GRAMMAR_NAME` (set by inherited `_make_result()`)
 
 ### TestProtocol
 

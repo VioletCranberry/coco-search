@@ -73,7 +73,7 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
    - Define `SEPARATOR_SPEC` with `CustomLanguageSpec` — hierarchical regex separators from coarsest to finest
    - Implement `extract_metadata()` returning `block_type`, `hierarchy`, and `language_id`
 
-3. **Add file extensions to `include_patterns`** in `src/cocosearch/indexer/config.py` so CocoIndex's `LocalFile` source picks up the files.
+3. **Include patterns are auto-derived** — `IndexingConfig` automatically collects file extensions from handler `EXTENSIONS` and grammar `PATH_PATTERNS`. No manual `config.py` edit needed. For non-extension patterns (like `Dockerfile`), add an `INCLUDE_PATTERNS` class var to the handler.
 
 4. **Important constraints:**
    - Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
@@ -97,7 +97,6 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
 | File | Action |
 |------|--------|
 | `src/cocosearch/handlers/<language>.py` | Create — handler class |
-| `src/cocosearch/indexer/config.py` | Modify — add extensions to `include_patterns` |
 | `tests/unit/handlers/test_<language>.py` | Create — handler tests |
 | `src/cocosearch/indexer/parse_tracking.py` | Modify — add language_id to `_SKIP_PARSE_EXTENSIONS` (only if no tree-sitter grammar) |
 | `src/cocosearch/cli.py` | Modify — `display_names` in `languages_command` (only if `.title()` casing is wrong) |
@@ -205,17 +204,20 @@ Priority: Grammar match > Language match > TextHandler fallback.
    ```
 
 2. **Implement the grammar handler class:**
-   - Set `GRAMMAR_NAME` to a unique identifier (lowercase, hyphenated, e.g., `"github-actions"`)
-   - Set `BASE_LANGUAGE` to the base language (e.g., `"yaml"`)
-   - Set `PATH_PATTERNS` to glob patterns matching the file paths
-   - Define `SEPARATOR_SPEC` with `CustomLanguageSpec` (or `None` for default)
-   - Implement `matches(filepath, content)` for path + content detection
-   - Implement `extract_metadata(text)` returning `block_type`, `hierarchy`, and `language_id`
+
+   For YAML-based grammars, inherit from `YamlGrammarBase` (in `handlers/grammars/_base.py`), which provides shared comment stripping, path matching, and fallback metadata chain. You only need to implement:
+   - `GRAMMAR_NAME` — unique identifier (lowercase, hyphenated, e.g., `"github-actions"`)
+   - `PATH_PATTERNS` — glob patterns matching the file paths
+   - `SEPARATOR_SPEC` — `CustomLanguageSpec` with hierarchical separators (or `None` for default)
+   - `_has_content_markers(content)` — content validation for `matches()`
+   - `_extract_grammar_metadata(stripped, text)` — grammar-specific metadata extraction (return dict or `None` for fallback)
+
+   For non-YAML grammars (e.g., HCL-based Terraform), implement the full `GrammarHandler` protocol directly.
 
 3. **Important constraints:**
    - Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
    - The grammar is autodiscovered at import time; no registration code needed
-   - `matches()` should check path first, then optionally validate content markers
+   - Include patterns are auto-derived from `PATH_PATTERNS` — no manual `config.py` edit needed
 
 4. **Add tests:**
    ```bash
@@ -283,7 +285,7 @@ Use this when you want `smart_context=True` to expand search results to enclosin
 When adding a new language handler, verify all registrations are complete:
 
 - [ ] **Handler** (if applicable): `handlers/<language>.py` created, extensions registered via autodiscovery
-- [ ] **include_patterns**: file extensions added to `IndexingConfig.include_patterns` in `indexer/config.py`
+- [ ] **include_patterns**: auto-derived from handler `EXTENSIONS` — verify with `IndexingConfig().include_patterns`
 - [ ] **_SKIP_PARSE_EXTENSIONS**: language_id added to `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py` (only if no tree-sitter grammar — prevents false `no_grammar` reports)
 - [ ] **LANGUAGE_MAP** (if symbol extraction): all file extensions mapped to tree-sitter language name
 - [ ] **Query file** (if symbol extraction): `indexer/queries/<language>.scm` created
@@ -299,7 +301,7 @@ When adding a new language handler, verify all registrations are complete:
 
 When adding a new grammar handler:
 
-- [ ] **Grammar handler**: `handlers/grammars/<grammar>.py` created with `GRAMMAR_NAME`, `BASE_LANGUAGE`, `PATH_PATTERNS`, `matches()`, `extract_metadata()`
+- [ ] **Grammar handler**: `handlers/grammars/<grammar>.py` created — inherit `YamlGrammarBase` for YAML grammars
 - [ ] **Tests**: `tests/unit/handlers/grammars/test_<grammar>.py` created
 - [ ] **README.md**: Supported Grammars section updated
 - [ ] **README.md**: Grammar badge added to the badges section at the top

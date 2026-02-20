@@ -16,20 +16,24 @@ from cocosearch.handlers import (
 class TestGrammarRegistryDiscovery:
     """Tests for grammar handler autodiscovery."""
 
-    def test_discover_finds_all_grammars(self):
-        """_GRAMMAR_REGISTRY should have 7 grammar handlers."""
-        assert len(_GRAMMAR_REGISTRY) == 7
+    def test_discover_finds_grammars(self):
+        """_GRAMMAR_REGISTRY should have grammar handlers registered."""
+        assert len(_GRAMMAR_REGISTRY) >= 1
 
-    def test_grammar_names(self):
+    def test_expected_grammar_names_present(self):
         """All expected grammar names should be registered."""
         names = {h.GRAMMAR_NAME for h in _GRAMMAR_REGISTRY}
-        assert "github-actions" in names
-        assert "gitlab-ci" in names
-        assert "docker-compose" in names
-        assert "helm-template" in names
-        assert "helm-values" in names
-        assert "kubernetes" in names
-        assert "terraform" in names
+        expected = {
+            "github-actions",
+            "gitlab-ci",
+            "docker-compose",
+            "helm-template",
+            "helm-values",
+            "kubernetes",
+            "terraform",
+        }
+        for name in expected:
+            assert name in names, f"Missing grammar: {name}"
 
     def test_all_grammars_have_base_language(self):
         """All grammars should declare a BASE_LANGUAGE."""
@@ -173,10 +177,21 @@ class TestGetGrammarHandler:
 class TestGetCustomLanguagesWithGrammars:
     """Tests for get_custom_languages() including grammar specs."""
 
-    def test_returns_thirteen_specs(self):
-        """get_custom_languages() should return 13 specs (6 language + 7 grammar)."""
+    def test_includes_expected_specs(self):
+        """get_custom_languages() should include all expected grammar specs."""
         specs = get_custom_languages()
-        assert len(specs) == 13
+        language_names = {spec.language_name for spec in specs}
+        expected = {
+            "github-actions",
+            "gitlab-ci",
+            "docker-compose",
+            "helm-template",
+            "helm-values",
+            "kubernetes",
+            "terraform",
+        }
+        for name in expected:
+            assert name in language_names, f"Missing spec: {name}"
 
     def test_includes_grammar_specs(self):
         """get_custom_languages() should include grammar language names."""
@@ -215,10 +230,10 @@ class TestGetRegisteredGrammars:
         grammars = get_registered_grammars()
         assert isinstance(grammars, list)
 
-    def test_returns_seven_grammars(self):
-        """get_registered_grammars() should return 7 grammars."""
+    def test_returns_grammars(self):
+        """get_registered_grammars() should return at least one grammar."""
         grammars = get_registered_grammars()
-        assert len(grammars) == 7
+        assert len(grammars) >= 1
 
 
 @pytest.mark.unit

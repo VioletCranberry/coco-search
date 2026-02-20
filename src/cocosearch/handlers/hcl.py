@@ -129,9 +129,8 @@ class HclHandler:
 
     def _strip_comments(self, text: str) -> str:
         """Strip leading comments from chunk text, preserving indentation."""
-        lines = text.lstrip("\n").split("\n")
-        for i, line in enumerate(lines):
-            if line.strip() and not self._COMMENT_LINE.match(line):
-                if not self._DOC_COMMENT_LINE.match(line):
-                    return "\n".join(lines[i:])
-        return ""
+        from cocosearch.handlers.utils import strip_leading_comments
+
+        return strip_leading_comments(
+            text, [self._COMMENT_LINE, self._DOC_COMMENT_LINE], lstrip_chars="\n"
+        )

@@ -7,17 +7,17 @@ Matches: .gitlab-ci.yml
 Content markers: 'stages:' or ('script:' and ('image:' or 'stage:'))
 """
 
-import fnmatch
 import re
 
 import cocoindex
 
+from cocosearch.handlers.grammars._base import YamlGrammarBase
 
-class GitLabCIHandler:
+
+class GitLabCIHandler(YamlGrammarBase):
     """Grammar handler for GitLab CI configuration files."""
 
     GRAMMAR_NAME = "gitlab-ci"
-    BASE_LANGUAGE = "yaml"
     PATH_PATTERNS = [".gitlab-ci.yml"]
 
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
@@ -41,20 +41,9 @@ class GitLabCIHandler:
         aliases=[],
     )
 
-    _COMMENT_LINE = re.compile(r"^\s*#.*$", re.MULTILINE)
-
     # Top-level key (job name or keyword) at start of line
     # Supports . prefix (templates) and / in names (deploy/staging)
     _TOP_KEY_RE = re.compile(r"^([a-zA-Z_.][\w./-]*):\s*", re.MULTILINE)
-
-    # Job-level key (2-space indented key: script:, stage:, image:)
-    _ITEM_RE = re.compile(r"^  ([a-zA-Z_][\w-]*):", re.MULTILINE)
-
-    # Nested key (4+ space indented key: only:, except:, variables:)
-    _NESTED_KEY_RE = re.compile(r"^\s{4,}([a-zA-Z_][\w-]*):", re.MULTILINE)
-
-    # YAML list item key (e.g., "- project: mygroup/myproject", "- local: /path")
-    _LIST_ITEM_KEY_RE = re.compile(r"^\s*-\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
 
     # Script line (e.g., "- echo hello", "  - make build")
     _SCRIPT_LINE_RE = re.compile(r"^\s*-\s+(.+)$", re.MULTILINE)
@@ -77,43 +66,18 @@ class GitLabCIHandler:
         }
     )
 
-    def matches(self, filepath: str, content: str | None = None) -> bool:
-        """Check if file is a GitLab CI configuration.
+    def _has_content_markers(self, content: str) -> bool:
+        has_stages = "stages:" in content
+        has_script_combo = "script:" in content and (
+            "image:" in content or "stage:" in content
+        )
+        return has_stages or has_script_combo
 
-        Uses fnmatch with */{pattern} idiom so nested .gitlab-ci.yml files
-        are detected at any depth.
-
-        Args:
-            filepath: Relative file path within the project.
-            content: Optional file content for deeper matching.
-
-        Returns:
-            True if this is a GitLab CI configuration file.
-        """
-        for pattern in self.PATH_PATTERNS:
-            if fnmatch.fnmatch(filepath, pattern) or fnmatch.fnmatch(
-                filepath, f"*/{pattern}"
-            ):
-                if content is not None:
-                    has_stages = "stages:" in content
-                    has_script_combo = "script:" in content and (
-                        "image:" in content or "stage:" in content
-                    )
-                    return has_stages or has_script_combo
-                return True
-        return False
-
-    def extract_metadata(self, text: str) -> dict:
+    def _extract_grammar_metadata(self, stripped: str, text: str) -> dict | None:
         """Extract metadata from GitLab CI chunk.
 
         Identifies jobs, job-level keys, nested keys, list items,
         templates, global keywords, and value continuations.
-
-        Args:
-            text: The chunk text content.
-
-        Returns:
-            Dict with block_type, hierarchy, language_id.
 
         Examples:
             Job chunk: block_type="job", hierarchy="job:build"
@@ -122,37 +86,23 @@ class GitLabCIHandler:
             Nested key: block_type="nested-key", hierarchy="nested-key:only"
             List item: block_type="list-item", hierarchy="list-item:project"
         """
-        stripped = self._strip_comments(text)
-
         # Check for job-level key (2-space indented key)
         item_match = self._ITEM_RE.match(stripped)
         if item_match:
             key = item_match.group(1)
-            return {
-                "block_type": "job-key",
-                "hierarchy": f"job-key:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("job-key", f"job-key:{key}")
 
         # Check for nested key (4+ space indented)
         nested_match = self._NESTED_KEY_RE.match(stripped)
         if nested_match:
             key = nested_match.group(1)
-            return {
-                "block_type": "nested-key",
-                "hierarchy": f"nested-key:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("nested-key", f"nested-key:{key}")
 
         # Check for YAML list item key (e.g., "- project: value")
         list_match = self._LIST_ITEM_KEY_RE.match(stripped)
         if list_match:
             key = list_match.group(1)
-            return {
-                "block_type": "list-item",
-                "hierarchy": f"list-item:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("list-item", f"list-item:{key}")
 
         # Check for top-level keys
         top_match = self._TOP_KEY_RE.match(stripped)
@@ -161,53 +111,13 @@ class GitLabCIHandler:
 
             # Hidden jobs/templates (start with .)
             if key.startswith("."):
-                return {
-                    "block_type": "template",
-                    "hierarchy": f"template:{key}",
-                    "language_id": self.GRAMMAR_NAME,
-                }
+                return self._make_result("template", f"template:{key}")
 
             # Global keywords
             if key in self._TOP_LEVEL_KEYS:
-                return {
-                    "block_type": key,
-                    "hierarchy": key,
-                    "language_id": self.GRAMMAR_NAME,
-                }
+                return self._make_result(key, key)
 
             # Regular job
-            return {
-                "block_type": "job",
-                "hierarchy": f"job:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("job", f"job:{key}")
 
-        # YAML document separator (--- chunks)
-        if "---" in text:
-            return {
-                "block_type": "document",
-                "hierarchy": "document",
-                "language_id": self.GRAMMAR_NAME,
-            }
-
-        # Value continuation (chunk has content but no recognizable key)
-        if stripped:
-            return {
-                "block_type": "value",
-                "hierarchy": "value",
-                "language_id": self.GRAMMAR_NAME,
-            }
-
-        return {
-            "block_type": "",
-            "hierarchy": "",
-            "language_id": self.GRAMMAR_NAME,
-        }
-
-    def _strip_comments(self, text: str) -> str:
-        """Strip leading comments from chunk text, preserving indentation."""
-        lines = text.lstrip("\n").split("\n")
-        for i, line in enumerate(lines):
-            if line.strip() and not self._COMMENT_LINE.match(line):
-                return "\n".join(lines[i:])
-        return ""
+        return None

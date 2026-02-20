@@ -3,7 +3,7 @@
 Provides domain-specific chunking and metadata extraction for plain Kubernetes
 manifests (Deployments, Services, ConfigMaps, etc.) without Helm directives.
 
-Matches: *.yaml, *.yml (broad — content validation filters to K8s manifests)
+Matches: *.yaml, *.yml (broad -- content validation filters to K8s manifests)
 Content markers: 'apiVersion:' and 'kind:'
 """
 
@@ -12,14 +12,14 @@ import re
 
 import cocoindex
 
+from cocosearch.handlers.grammars._base import YamlGrammarBase
 from cocosearch.handlers.grammars.helm_template import _HELM_MARKERS
 
 
-class KubernetesHandler:
+class KubernetesHandler(YamlGrammarBase):
     """Grammar handler for Kubernetes manifest YAML files."""
 
     GRAMMAR_NAME = "kubernetes"
-    BASE_LANGUAGE = "yaml"
     PATH_PATTERNS = ["*.yaml", "*.yml"]
 
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
@@ -43,22 +43,8 @@ class KubernetesHandler:
         aliases=[],
     )
 
-    _COMMENT_LINE = re.compile(r"^\s*#.*$", re.MULTILINE)
-
     # Match K8s kind field
     _KIND_RE = re.compile(r"^kind:\s*(\S+)", re.MULTILINE)
-
-    # Match top-level section key (at start of line, not indented)
-    _TOP_KEY_RE = re.compile(r"^([a-zA-Z_][\w-]*):", re.MULTILINE)
-
-    # Section key (2-space indented key, e.g., containers:, ports:)
-    _ITEM_RE = re.compile(r"^  ([a-zA-Z_][\w-]*):", re.MULTILINE)
-
-    # Nested key (4+ space indented key, e.g., image:, containerPort:)
-    _NESTED_KEY_RE = re.compile(r"^\s{4,}([a-zA-Z_][\w-]*):", re.MULTILINE)
-
-    # Match YAML list item key (e.g., "- name: value", "  - name: value")
-    _LIST_ITEM_KEY_RE = re.compile(r"^\s*-\s+([a-zA-Z_][\w-]*):", re.MULTILINE)
 
     # Kubernetes top-level keywords (not section names)
     _TOP_LEVEL_KEYS = frozenset(
@@ -108,17 +94,15 @@ class KubernetesHandler:
                 return True
         return False
 
-    def extract_metadata(self, text: str) -> dict:
+    def _has_content_markers(self, content: str) -> bool:
+        # Not used -- matches() is fully overridden
+        return "apiVersion:" in content and "kind:" in content
+
+    def _extract_grammar_metadata(self, stripped: str, text: str) -> dict | None:
         """Extract metadata from Kubernetes manifest chunk.
 
         Identifies K8s resource kinds, section keys, nested keys,
         list items, and value continuations.
-
-        Args:
-            text: The chunk text content.
-
-        Returns:
-            Dict with block_type, hierarchy, language_id.
 
         Examples:
             Kind chunk: block_type="Deployment", hierarchy="kind:Deployment"
@@ -126,84 +110,34 @@ class KubernetesHandler:
             Nested: block_type="nested-key", hierarchy="nested-key:image"
             List item: block_type="list-item", hierarchy="list-item:name"
         """
-        stripped = self._strip_comments(text)
-
         # Check for K8s kind
         kind_match = self._KIND_RE.search(stripped)
         if kind_match:
             kind = kind_match.group(1)
-            return {
-                "block_type": kind,
-                "hierarchy": f"kind:{kind}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result(kind, f"kind:{kind}")
 
         # Check for section key (2-space indented)
         item_match = self._ITEM_RE.match(stripped)
         if item_match:
             key = item_match.group(1)
-            return {
-                "block_type": "section-key",
-                "hierarchy": f"section-key:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("section-key", f"section-key:{key}")
 
         # Check for nested key (4+ space indented)
         nested_match = self._NESTED_KEY_RE.match(stripped)
         if nested_match:
             key = nested_match.group(1)
-            return {
-                "block_type": "nested-key",
-                "hierarchy": f"nested-key:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("nested-key", f"nested-key:{key}")
 
         # Check for YAML list item key (e.g., "- name: value")
         list_match = self._LIST_ITEM_KEY_RE.match(stripped)
         if list_match:
             key = list_match.group(1)
-            return {
-                "block_type": "list-item",
-                "hierarchy": f"list-item:{key}",
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result("list-item", f"list-item:{key}")
 
         # Check for top-level section key
         top_match = self._TOP_KEY_RE.match(stripped)
         if top_match:
             key = top_match.group(1)
-            return {
-                "block_type": key,
-                "hierarchy": key,
-                "language_id": self.GRAMMAR_NAME,
-            }
+            return self._make_result(key, key)
 
-        # YAML document separator (--- header chunks)
-        if "---" in text:
-            return {
-                "block_type": "document",
-                "hierarchy": "document",
-                "language_id": self.GRAMMAR_NAME,
-            }
-
-        # Value continuation (chunk has content but no recognizable key)
-        if stripped:
-            return {
-                "block_type": "value",
-                "hierarchy": "value",
-                "language_id": self.GRAMMAR_NAME,
-            }
-
-        return {
-            "block_type": "",
-            "hierarchy": "",
-            "language_id": self.GRAMMAR_NAME,
-        }
-
-    def _strip_comments(self, text: str) -> str:
-        """Strip leading comments from chunk text, preserving indentation."""
-        lines = text.lstrip("\n").split("\n")
-        for i, line in enumerate(lines):
-            if line.strip() and not self._COMMENT_LINE.match(line):
-                return "\n".join(lines[i:])
-        return ""
+        return None

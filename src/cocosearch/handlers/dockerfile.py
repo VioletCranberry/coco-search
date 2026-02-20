@@ -17,6 +17,9 @@ class DockerfileHandler:
 
     EXTENSIONS = [".dockerfile"]
 
+    # Additional include patterns for extensionless Dockerfiles/Containerfiles
+    INCLUDE_PATTERNS = ["Dockerfile", "Dockerfile.*", "Containerfile"]
+
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
         language_name="dockerfile",
         separators_regex=[
@@ -160,17 +163,7 @@ class DockerfileHandler:
         return ""
 
     def _strip_comments(self, text: str) -> str:
-        """Strip leading comments from chunk text.
+        """Strip leading comments from chunk text."""
+        from cocosearch.handlers.utils import strip_leading_comments
 
-        Args:
-            text: The chunk text content.
-
-        Returns:
-            Text from first non-comment, non-blank line onward
-        """
-        lines = text.lstrip().split("\n")
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if stripped and not self._COMMENT_LINE.match(line):
-                return "\n".join(lines[i:])
-        return ""
+        return strip_leading_comments(text, [self._COMMENT_LINE])

@@ -92,7 +92,7 @@ uv run cocosearch mcp --project-from-cwd
 **Key patterns:**
 
 - Singleton DB connection pool via `search.db` — reset between tests with `reset_db_pool()` autouse fixture in `tests/conftest.py`
-- Handler autodiscovery: any `handlers/*.py` (not prefixed with `_`) implementing `LanguageHandler` protocol is auto-registered. Grammar handlers in `handlers/grammars/*.py` are also autodiscovered. Total custom language specs: 13 (6 language + 7 grammar) — update count assertions in `tests/unit/handlers/test_registry.py` and `tests/unit/handlers/test_grammar_registry.py` when adding handlers
+- Handler autodiscovery: any `handlers/*.py` (not prefixed with `_`) implementing `LanguageHandler` protocol is auto-registered. Grammar handlers in `handlers/grammars/*.py` are also autodiscovered. YAML-based grammar handlers inherit from `YamlGrammarBase` (`handlers/grammars/_base.py`) for shared comment stripping, matching, and fallback metadata chain. `include_patterns` in `IndexingConfig` are auto-derived from handler `EXTENSIONS` and grammar `PATH_PATTERNS`.
 - CocoIndex framework orchestrates the indexing pipeline in `indexer/flow.py`
 - **CocoIndex table naming:** `codeindex_{index_name}__{index_name}_chunks` (flow name `CodeIndex_{name}` is lowercased by CocoIndex). Parse results go to `cocosearch_parse_results_{index_name}`.
 - Parse status categories: `ok`, `partial`, `error`, `no_grammar`. Text-only formats (md, yaml, json, etc.) are skipped from parse tracking entirely via `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py`.
@@ -117,7 +117,7 @@ Three independent systems — a language can use any combination. See `docs/addi
 
 1. Copy `src/cocosearch/handlers/_template.py` to `<language>.py`
 2. Define `EXTENSIONS`, `SEPARATOR_SPEC` (using `CustomLanguageSpec`), and `extract_metadata()`
-3. Add file extensions to `include_patterns` in `src/cocosearch/indexer/config.py`
+3. Include patterns are auto-derived from `EXTENSIONS` — no manual `config.py` edit needed
 4. Separators must use standard regex only — no lookaheads/lookbehinds (CocoIndex uses Rust regex)
 5. Create `tests/unit/handlers/test_<language>.py`
 
@@ -130,10 +130,8 @@ Three independent systems — a language can use any combination. See `docs/addi
 **Grammar Handler** (domain-specific chunking within a base language, e.g. GitHub Actions within YAML):
 
 1. Copy `src/cocosearch/handlers/grammars/_template.py` to `<grammar>.py`
-2. Define path patterns, content matchers, separators, and metadata extraction
-3. Create `tests/unit/handlers/test_<grammar>.py`
-
-After adding any handler/grammar, update the count assertions in `tests/unit/handlers/test_registry.py` and `tests/unit/handlers/test_grammar_registry.py`.
+2. For YAML-based grammars, inherit `YamlGrammarBase` and implement `_has_content_markers()` and `_extract_grammar_metadata()`
+3. Create `tests/unit/handlers/grammars/test_<grammar>.py`
 
 ## Code Exploration
 
@@ -168,7 +166,6 @@ claude mcp add --scope user cocosearch --url http://localhost:3000/sse
 
 - **CLAUDE.md** — Update module descriptions, counts, patterns, and commands when adding/removing/modifying modules, handlers, CLI commands, MCP tools, or architectural patterns
 - **docs/** — Update relevant docs (`architecture.md`, `how-it-works.md`, `retrieval.md`, `adding-languages.md`) when changing the systems they describe
-- **Test count assertions** — Update handler/grammar count assertions in `tests/unit/handlers/test_registry.py` and `tests/unit/handlers/test_grammar_registry.py` when adding handlers
 - **README.md** — Update feature lists, usage examples, or screenshots when user-facing behavior changes
 - **`.claude-plugin/`** — Plugin version files (`plugin.json`, `marketplace.json`) and `src/cocosearch/__init__.py` must stay in sync with `pyproject.toml`. The release workflow handles this automatically. If editing `marketplace.json` descriptions or `plugin.json` metadata manually, ensure accuracy (skill count, server command).
 
