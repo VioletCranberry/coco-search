@@ -112,19 +112,12 @@ The handler is autodiscovered at import time; no registration code needed.
 
 6. **If the language has no tree-sitter grammar**, add the `language_id` to `_SKIP_PARSE_EXTENSIONS` in `src/cocosearch/indexer/parse_tracking.py`. This prevents false `no_grammar` reports in parse tracking stats.
 
-### 3c. Register File Extensions
+### 3c. File Extension Registration (Automatic)
 
-Add the new extensions to `include_patterns` so CocoIndex picks up the files:
+Extensions are **auto-derived** from the handler's `EXTENSIONS` attribute via `_default_include_patterns()` in `src/cocosearch/indexer/config.py`. No manual `config.py` edits are needed.
 
-```
-search_code(
-    query="include_patterns file extensions indexing config",
-    use_hybrid_search=True,
-    smart_context=True
-)
-```
-
-Modify `src/cocosearch/indexer/config.py` -- add glob patterns for the new extensions (e.g., `"**/*.kt"`).
+- The `EXTENSIONS` list you set in step 3b (e.g., `[".hcl", ".tf"]`) is automatically converted to glob patterns (e.g., `"*.hcl"`, `"*.tf"`) and merged into `include_patterns`
+- For non-extension patterns (e.g., `Dockerfile`, `Containerfile`), define an `INCLUDE_PATTERNS` class attribute on the handler (e.g., `INCLUDE_PATTERNS = ["Dockerfile", "Dockerfile.*", "Containerfile"]`) — these are also picked up automatically
 
 ### 3d. Update CLI Display Name
 
@@ -457,7 +450,7 @@ Paths completed:
 
 Registration points:
   [x] Handler file created (autodiscovered)
-  [x] Extensions in include_patterns (config.py)
+  [x] EXTENSIONS auto-derived into include patterns
   [x] LANGUAGE_MAP entries (symbols.py)
   [x] Query file created (queries/<language>.scm)
   [x] SYMBOL_AWARE_LANGUAGES updated (query.py)
@@ -481,7 +474,8 @@ Complete checklist of all registration points. Check off each one as you complet
 
 **Language Handler (Path A):**
 - [ ] `src/cocosearch/handlers/<language>.py` created
-- [ ] Extensions added to `include_patterns` in `src/cocosearch/indexer/config.py`
+- [ ] `EXTENSIONS` attribute defined (auto-derived into include patterns)
+- [ ] `INCLUDE_PATTERNS` attribute defined (if non-extension patterns needed, e.g., `Dockerfile`)
 - [ ] `_SKIP_PARSE_EXTENSIONS` updated in `src/cocosearch/indexer/parse_tracking.py` (if no tree-sitter grammar)
 - [ ] Display name added to `cli.py` `languages_command` (if `.title()` casing is wrong)
 - [ ] `tests/unit/handlers/test_<language>.py` created
