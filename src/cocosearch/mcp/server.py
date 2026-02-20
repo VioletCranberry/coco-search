@@ -192,6 +192,50 @@ async def heartbeat(request) -> StreamingResponse:
     )
 
 
+# SSE log streaming endpoint for dashboard
+@mcp.custom_route("/api/logs", methods=["GET"])
+async def api_logs(request) -> StreamingResponse:
+    """SSE stream of server logs for the dashboard log panel."""
+    import asyncio
+    import json as _json
+
+    from cocosearch.mcp.log_stream import get_log_buffer
+
+    buf = get_log_buffer()
+
+    async def event_stream():
+        if buf is None:
+            yield "event: history_done\ndata: {}\n\n"
+            return
+
+        # Subscribe first, then replay history (prevents missed entries)
+        sub_id, q = buf.subscribe()
+        try:
+            # Replay history
+            for entry in buf.get_history():
+                yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'name': entry.name, 'msg': entry.message})}\n\n"
+            yield "event: history_done\ndata: {}\n\n"
+
+            # Stream live entries
+            while True:
+                try:
+                    entry = await asyncio.wait_for(q.get(), timeout=30)
+                    yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'name': entry.name, 'msg': entry.message})}\n\n"
+                except asyncio.TimeoutError:
+                    # Keepalive
+                    yield ": keepalive\n\n"
+                except asyncio.CancelledError:
+                    return
+        finally:
+            buf.unsubscribe(sub_id)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
 # Dashboard endpoint
 @mcp.custom_route("/dashboard", methods=["GET"])
 async def serve_dashboard(request) -> HTMLResponse:
@@ -1882,6 +1926,11 @@ def run_server(
     """
     # Log startup info (always to stderr)
     logger.info(f"Starting MCP server with transport: {transport}")
+
+    # Start capturing logs for the dashboard log panel
+    from cocosearch.mcp.log_stream import setup_log_capture
+
+    setup_log_capture()
 
     # Dashboard auto-open (opt-out via COCOSEARCH_NO_DASHBOARD=1)
     no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
