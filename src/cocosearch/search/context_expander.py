@@ -53,6 +53,7 @@ DEFINITION_NODE_TYPES: dict[str, set[str]] = {
     },
     "hcl": {"block"},
     "terraform": {"block"},
+    "dockerfile": {"from_instruction"},
 }
 
 # Languages that support smart context expansion (derived from DEFINITION_NODE_TYPES)
@@ -82,6 +83,8 @@ EXTENSION_TO_LANGUAGE: dict[str, str] = {
     ".tf": "terraform",
     ".hcl": "hcl",
     ".tfvars": "terraform",
+    # Dockerfile
+    ".dockerfile": "dockerfile",
 }
 
 

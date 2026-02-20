@@ -53,11 +53,35 @@ class DockerfileHandler:
         r"(?:\s+[Aa][Ss]\s+(\S+))?",  # optional AS stage_name (case-insensitive AS)
     )
 
+    # COPY --from=<stage>
+    _COPY_FROM_RE = re.compile(r"^COPY\s+--from=(\S+)")
+
+    # ARG <name>[=<default>]
+    _ARG_RE = re.compile(r"^ARG\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+    # ENV <key>=<value> or ENV <key> <value>
+    _ENV_RE = re.compile(r"^ENV\s+([A-Za-z_][A-Za-z0-9_]*)")
+
+    # EXPOSE <port>
+    _EXPOSE_RE = re.compile(r"^EXPOSE\s+(\S+)")
+
+    # WORKDIR <path>
+    _WORKDIR_RE = re.compile(r"^WORKDIR\s+(\S+)")
+
+    # LABEL <key>=<value> or LABEL <key> <value>
+    _LABEL_RE = re.compile(r"^LABEL\s+([A-Za-z_][A-Za-z0-9_./-]*)")
+
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from Dockerfile chunk.
 
-        Matches Dockerfile instructions. For FROM instructions, extracts stage name
-        (AS clause) or image reference for the hierarchy.
+        Matches Dockerfile instructions. Extracts hierarchy metadata for:
+        - FROM: "stage:<name>" or "image:<ref>"
+        - COPY --from: "from:<stage>"
+        - ARG: "arg:<name>"
+        - ENV: "env:<key>"
+        - EXPOSE: "port:<port>"
+        - WORKDIR: "workdir:<path>"
+        - LABEL: "label:<key>"
 
         Args:
             text: The chunk text content.
@@ -65,7 +89,7 @@ class DockerfileHandler:
         Returns:
             Dict with metadata fields:
             - block_type: Dockerfile instruction (e.g., "FROM", "RUN")
-            - hierarchy: For FROM: "stage:name" or "image:ref"; empty for others
+            - hierarchy: Instruction-specific hierarchy or empty string
             - language_id: "dockerfile"
 
         Example:
@@ -82,27 +106,58 @@ class DockerfileHandler:
             return {"block_type": "", "hierarchy": "", "language_id": "dockerfile"}
 
         instruction = match.group(1)
-
-        if instruction == "FROM":
-            from_match = self._FROM_RE.match(stripped)
-            if from_match:
-                stage_name = from_match.group(2)
-                if stage_name:
-                    hierarchy = f"stage:{stage_name}"
-                else:
-                    image_ref = from_match.group(1)
-                    hierarchy = f"image:{image_ref}"
-            else:
-                hierarchy = ""
-        else:
-            # Non-FROM instructions get empty hierarchy in v1.2
-            hierarchy = ""
+        hierarchy = self._extract_hierarchy(instruction, stripped)
 
         return {
             "block_type": instruction,
             "hierarchy": hierarchy,
             "language_id": "dockerfile",
         }
+
+    def _extract_hierarchy(self, instruction: str, stripped: str) -> str:
+        """Extract hierarchy string for a Dockerfile instruction.
+
+        Args:
+            instruction: The instruction keyword (e.g., "FROM", "ARG").
+            stripped: The comment-stripped chunk text.
+
+        Returns:
+            Hierarchy string or empty string if not applicable.
+        """
+        if instruction == "FROM":
+            from_match = self._FROM_RE.match(stripped)
+            if from_match:
+                stage_name = from_match.group(2)
+                if stage_name:
+                    return f"stage:{stage_name}"
+                return f"image:{from_match.group(1)}"
+            return ""
+
+        if instruction == "COPY":
+            m = self._COPY_FROM_RE.match(stripped)
+            return f"from:{m.group(1)}" if m else ""
+
+        if instruction == "ARG":
+            m = self._ARG_RE.match(stripped)
+            return f"arg:{m.group(1)}" if m else ""
+
+        if instruction == "ENV":
+            m = self._ENV_RE.match(stripped)
+            return f"env:{m.group(1)}" if m else ""
+
+        if instruction == "EXPOSE":
+            m = self._EXPOSE_RE.match(stripped)
+            return f"port:{m.group(1)}" if m else ""
+
+        if instruction == "WORKDIR":
+            m = self._WORKDIR_RE.match(stripped)
+            return f"workdir:{m.group(1)}" if m else ""
+
+        if instruction == "LABEL":
+            m = self._LABEL_RE.match(stripped)
+            return f"label:{m.group(1)}" if m else ""
+
+        return ""
 
     def _strip_comments(self, text: str) -> str:
         """Strip leading comments from chunk text.

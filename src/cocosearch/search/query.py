@@ -109,6 +109,7 @@ SYMBOL_AWARE_LANGUAGES = {
     "bash",
     "scala",
     "css",
+    "dockerfile",
 }
 
 # Handler language canonical names mapped to language_id values in the database

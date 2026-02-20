@@ -100,6 +100,8 @@ LANGUAGE_MAP = {
     # CSS
     "css": "css",
     "scss": "css",
+    # Dockerfile
+    "dockerfile": "dockerfile",
 }
 
 # ============================================================================

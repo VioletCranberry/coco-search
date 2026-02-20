@@ -120,20 +120,57 @@ class TestDockerfileHandlerExtractMetadata:
         assert m["language_id"] == "dockerfile"
 
     def test_copy_instruction_empty_hierarchy(self):
-        """COPY instruction produces empty hierarchy."""
+        """COPY without --from produces empty hierarchy."""
         handler = DockerfileHandler()
         m = handler.extract_metadata("COPY . /app")
         assert m["block_type"] == "COPY"
         assert m["hierarchy"] == ""
         assert m["language_id"] == "dockerfile"
 
-    def test_env_instruction_empty_hierarchy(self):
-        """ENV instruction produces empty hierarchy."""
+    def test_copy_from_produces_hierarchy(self):
+        """COPY --from produces from:<stage> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("COPY --from=builder /app /app")
+        assert m["block_type"] == "COPY"
+        assert m["hierarchy"] == "from:builder"
+        assert m["language_id"] == "dockerfile"
+
+    def test_copy_from_numeric_stage(self):
+        """COPY --from with numeric stage produces from:<number> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("COPY --from=0 /app /app")
+        assert m["block_type"] == "COPY"
+        assert m["hierarchy"] == "from:0"
+
+    def test_arg_produces_hierarchy(self):
+        """ARG instruction produces arg:<name> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("ARG VERSION=dev")
+        assert m["block_type"] == "ARG"
+        assert m["hierarchy"] == "arg:VERSION"
+        assert m["language_id"] == "dockerfile"
+
+    def test_arg_without_default(self):
+        """ARG without default value produces arg:<name> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("ARG COMMIT_SHA")
+        assert m["block_type"] == "ARG"
+        assert m["hierarchy"] == "arg:COMMIT_SHA"
+
+    def test_env_produces_hierarchy(self):
+        """ENV instruction produces env:<key> hierarchy."""
         handler = DockerfileHandler()
         m = handler.extract_metadata("ENV NODE_ENV=production")
         assert m["block_type"] == "ENV"
-        assert m["hierarchy"] == ""
+        assert m["hierarchy"] == "env:NODE_ENV"
         assert m["language_id"] == "dockerfile"
+
+    def test_env_space_separated(self):
+        """ENV with space-separated key/value produces env:<key> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("ENV PATH /usr/local/bin")
+        assert m["block_type"] == "ENV"
+        assert m["hierarchy"] == "env:PATH"
 
     def test_add_instruction_empty_hierarchy(self):
         """ADD instruction produces empty hierarchy."""
@@ -143,13 +180,45 @@ class TestDockerfileHandlerExtractMetadata:
         assert m["hierarchy"] == ""
         assert m["language_id"] == "dockerfile"
 
-    def test_expose_instruction_empty_hierarchy(self):
-        """EXPOSE instruction produces empty hierarchy."""
+    def test_expose_produces_hierarchy(self):
+        """EXPOSE instruction produces port:<port> hierarchy."""
         handler = DockerfileHandler()
         m = handler.extract_metadata("EXPOSE 8080")
         assert m["block_type"] == "EXPOSE"
-        assert m["hierarchy"] == ""
+        assert m["hierarchy"] == "port:8080"
         assert m["language_id"] == "dockerfile"
+
+    def test_expose_with_protocol(self):
+        """EXPOSE with protocol produces port:<port/proto> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("EXPOSE 8080/tcp")
+        assert m["block_type"] == "EXPOSE"
+        assert m["hierarchy"] == "port:8080/tcp"
+
+    def test_workdir_produces_hierarchy(self):
+        """WORKDIR instruction produces workdir:<path> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata("WORKDIR /app")
+        assert m["block_type"] == "WORKDIR"
+        assert m["hierarchy"] == "workdir:/app"
+        assert m["language_id"] == "dockerfile"
+
+    def test_label_produces_hierarchy(self):
+        """LABEL instruction produces label:<key> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata('LABEL maintainer="me"')
+        assert m["block_type"] == "LABEL"
+        assert m["hierarchy"] == "label:maintainer"
+        assert m["language_id"] == "dockerfile"
+
+    def test_label_dotted_key(self):
+        """LABEL with dotted key produces label:<key> hierarchy."""
+        handler = DockerfileHandler()
+        m = handler.extract_metadata(
+            'LABEL org.opencontainers.image.title="CocoSearch"'
+        )
+        assert m["block_type"] == "LABEL"
+        assert m["hierarchy"] == "label:org.opencontainers.image.title"
 
     def test_comment_before_instruction(self):
         """Comment line before instruction is correctly skipped."""

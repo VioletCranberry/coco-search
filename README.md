@@ -58,7 +58,7 @@
 
 Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, [PostgreSQL](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) for storage, and [Ollama](https://ollama.com/) for local embeddings. No external APIs — everything runs on your machine.
 
-Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 31+ languages with symbol-level filtering for 14+, plus domain-specific grammars for structured config files.
+Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 31+ languages with symbol-level filtering for 15+, plus domain-specific grammars for structured config files.
 
 <details>
 <summary>Screenshots</summary>
@@ -110,9 +110,9 @@ This project was originally built for personal use — a solo experiment in loca
 
 - 🔍 **Hybrid search** -- combines semantic similarity (pgvector cosine) and keyword matching (PostgreSQL tsvector) via Reciprocal Rank Fusion. Auto-detects code identifiers (camelCase, snake_case, PascalCase) and enables hybrid mode automatically — or force it with `--hybrid`. Definition symbols (functions, classes) get a 2x score boost. RRF constant k=60.
 
-- 🏷️ **Symbol filtering** -- narrow results to `function`, `class`, `method`, or `interface` with `--symbol-type`; match symbol names with glob patterns (`User*`, `*Handler`) via `--symbol-name`. Supported for 14 languages with Tree-sitter `.scm` queries. Filters apply before RRF fusion for better ranking quality.
+- 🏷️ **Symbol filtering** -- narrow results to `function`, `class`, `method`, or `interface` with `--symbol-type`; match symbol names with glob patterns (`User*`, `*Handler`) via `--symbol-name`. Supported for 15 languages with Tree-sitter `.scm` queries. Filters apply before RRF fusion for better ranking quality.
 
-- 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter AST traversal, so you see complete units of code instead of arbitrary line ranges. Supports Python, JavaScript, TypeScript, Go, Rust, and Scala. Hard-capped at 50 lines per result, centered on the match. Disable with `--no-smart` or set explicit line counts with `-B`/`-A`/`-C`.
+- 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter AST traversal, so you see complete units of code instead of arbitrary line ranges. Supports Python, JavaScript, TypeScript, Go, Rust, Scala, HCL/Terraform, and Dockerfile. Hard-capped at 50 lines per result, centered on the match. Disable with `--no-smart` or set explicit line counts with `-B`/`-A`/`-C`.
 
 - ⚡ **Query caching** -- two-level LRU cache (500 entries, 24h TTL): exact-match via SHA-256 hash of all search parameters, plus semantic fallback that finds paraphrased queries by cosine similarity (threshold 0.92, scanning last 50 entries). Cache auto-invalidates on reindex. Bypass with `--no-cache`.
 
@@ -458,7 +458,7 @@ CocoSearch indexes 31 programming languages. Symbol-aware languages support `--s
 │ XML        │ .xml                        │    ✗    │    ✗    │
 │ YAML       │ .yaml, .yml                 │    ✗    │    ✗    │
 │ Bash       │ .sh, .bash, .zsh            │    ✓    │    ✗    │
-│ Dockerfile │ Dockerfile                  │    ✗    │    ✗    │
+│ Dockerfile │ Dockerfile                  │    ✓    │    ✓    │
 │ HCL        │ .hcl                        │    ✓    │    ✓    │
 └────────────┴─────────────────────────────┴─────────┴─────────┘
 ```
@@ -474,7 +474,7 @@ Chunking strategy depends on the language:
 
 In short: CocoIndex's Tree-sitter tells you _where to cut_; the `.scm` files tell you _what's inside each piece_.
 
-Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 14 languages.
+Independently of chunking, CocoSearch runs its own Tree-sitter queries (`.scm` files in `src/cocosearch/indexer/queries/`) to extract symbol metadata — function, class, method, and interface names and signatures. This powers `--symbol-type` and `--symbol-name` filtering. Symbol extraction is available for 15 languages.
 
 See [Adding Languages](./docs/adding-languages.md) for details on how these tiers work and how to add new languages or grammars.
 
