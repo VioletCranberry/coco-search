@@ -33,10 +33,15 @@ from typing import Annotated  # noqa: E402
 import cocoindex  # noqa: E402
 from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
 from pydantic import Field  # noqa: E402
-from starlette.responses import HTMLResponse, JSONResponse, StreamingResponse  # noqa: E402
+from starlette.responses import (  # noqa: E402
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
 
 from cocosearch.management.context import derive_index_name  # noqa: E402
-from cocosearch.dashboard.web import get_dashboard_html  # noqa: E402
+from cocosearch.dashboard.web import STATIC_DIR, get_dashboard_html  # noqa: E402
 from cocosearch.indexer import IndexingConfig, run_index  # noqa: E402
 from cocosearch.management import clear_index as mgmt_clear_index  # noqa: E402
 from cocosearch.management import list_indexes as mgmt_list_indexes  # noqa: E402
@@ -244,6 +249,28 @@ async def serve_dashboard(request) -> HTMLResponse:
     """Serve the web dashboard HTML."""
     html_content = get_dashboard_html()
     return HTMLResponse(content=html_content)
+
+
+# Static file serving for dashboard CSS/JS assets
+_CONTENT_TYPES = {
+    ".css": "text/css",
+    ".js": "application/javascript",
+    ".map": "application/json",
+}
+
+
+@mcp.custom_route("/static/{path:path}", methods=["GET"])
+async def serve_static(request) -> FileResponse | JSONResponse:
+    """Serve static assets (CSS, JS) for the web dashboard."""
+    path = request.path_params["path"]
+    file_path = (STATIC_DIR / path).resolve()
+    if not file_path.is_relative_to(STATIC_DIR.resolve()):
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+    if not file_path.is_file():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    suffix = file_path.suffix.lower()
+    media_type = _CONTENT_TYPES.get(suffix)
+    return FileResponse(file_path, media_type=media_type)
 
 
 # Stats API endpoints

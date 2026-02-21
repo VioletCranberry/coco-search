@@ -85,7 +85,7 @@ uv run cocosearch mcp --project-from-cwd
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py`), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection and status tracking (`metadata.py`), project root detection (`context.py`)
 - **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash, Scala, Groovy) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose, Kubernetes, Terraform) with autodiscovery registry
 - **`chat/`** — Optional AI chat module powered by the Claude Agent SDK (`claude-agent-sdk`). `ChatSession` wraps `ClaudeSDKClient` in a private asyncio event loop thread; `ChatSessionManager` is a singleton managing up to 10 concurrent sessions with 30-minute idle timeout. The agent has access to Read, Grep, Glob and a custom `search_codebase` MCP tool wrapping `cocosearch.search.search()`. Requires `cocosearch[web-chat]` optional dependency and `claude` CLI on PATH.
-- **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards with optional AI chat (inline `[Search] [Ask AI]` toggle with markdown rendering, tool use display, and session stats). In stdio MCP mode, `server.py` launches uvicorn in a daemon thread running the MCP server's `sse_app()` — all routes are served from a single source of truth (no duplicated handlers).
+- **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards with optional AI chat (inline `[Search] [Ask AI]` toggle with markdown rendering, tool use display, and session stats). In stdio MCP mode, `server.py` launches uvicorn in a daemon thread running the MCP server's `sse_app()` — all routes are served from a single source of truth (no duplicated handlers). Web static assets are split into ES modules: `dashboard/web/static/index.html` (HTML only), `css/styles.css`, and `js/` with modules (`app.js` entry point, `state.js` shared state, `api.js`, `utils.js`, `charts.js`, `dashboard.js`, `index-mgmt.js`, `search.js`, `chat.js`, `logs.js`). Static files served via `/static/{path}` route with path traversal protection.
 - **`.claude-plugin/`** — Claude Code plugin metadata: `plugin.json` (MCP server definition, version, keywords) and `marketplace.json` (marketplace listing). Versions must match `pyproject.toml` — the release workflow syncs them automatically.
 
 **Data flow:** Files → Tree-sitter parse → symbol extraction → chunking → Ollama embeddings → PostgreSQL (pgvector). Search queries → embedding → hybrid RRF (vector similarity + tsvector keyword) → context expansion → results.
@@ -109,6 +109,8 @@ Async tests use `pytest-asyncio` with `strict` mode — async test functions mus
 Shared fixtures live in `tests/fixtures/`.
 
 Symbol extraction tests live in `tests/unit/indexer/symbols/` (one file per language). Handler tests are in `tests/unit/handlers/`.
+
+Dashboard tests in `tests/unit/dashboard/` include HTML structure tests (`test_html_structure.py`) and ASGI integration tests (`test_dashboard_serving.py`) that exercise the full Starlette stack via `httpx.AsyncClient` + `ASGITransport`. API smoke tests in `tests/unit/mcp/test_api_smoke.py` similarly test key endpoints through the ASGI app. When adding dashboard routes or static assets, add corresponding ASGI integration tests.
 
 ## Adding Language Support
 

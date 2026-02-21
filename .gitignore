@@ -59,4 +59,5 @@ dmypy.json
 docker_data/**
 
 .claude/**
+.worktrees/
 docs/plans/**
