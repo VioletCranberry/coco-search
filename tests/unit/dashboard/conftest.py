@@ -1,9 +1,11 @@
-"""Shared fixtures for dashboard HTML structure tests."""
+"""Shared fixtures for dashboard HTML structure and ASGI integration tests."""
 
 import re
 from pathlib import Path
 
+import httpx
 import pytest
+import pytest_asyncio
 from bs4 import BeautifulSoup
 
 STATIC_DIR = (
@@ -48,3 +50,21 @@ def referenced_ids(all_js_content):
     """
     raw_ids = set(re.findall(r"getElementById\(['\"]([^'\"]+)['\"]\)", all_js_content))
     return {id_ for id_ in raw_ids if "${" not in id_}
+
+
+@pytest.fixture
+def asgi_app():
+    """Create the ASGI app from the MCP server."""
+    from cocosearch.mcp.server import mcp
+
+    return mcp.sse_app()
+
+
+@pytest_asyncio.fixture
+async def client(asgi_app):
+    """Create an httpx AsyncClient wired to the ASGI app."""
+    transport = httpx.ASGITransport(app=asgi_app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as c:
+        yield c

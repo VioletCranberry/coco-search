@@ -110,6 +110,8 @@ Shared fixtures live in `tests/fixtures/`.
 
 Symbol extraction tests live in `tests/unit/indexer/symbols/` (one file per language). Handler tests are in `tests/unit/handlers/`.
 
+Dashboard tests in `tests/unit/dashboard/` include HTML structure tests (`test_html_structure.py`) and ASGI integration tests (`test_dashboard_serving.py`) that exercise the full Starlette stack via `httpx.AsyncClient` + `ASGITransport`. API smoke tests in `tests/unit/mcp/test_api_smoke.py` similarly test key endpoints through the ASGI app. When adding dashboard routes or static assets, add corresponding ASGI integration tests.
+
 ## Adding Language Support
 
 Three independent systems — a language can use any combination. See `docs/adding-languages.md` for the full guide.
