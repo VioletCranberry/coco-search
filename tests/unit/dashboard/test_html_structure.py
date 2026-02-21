@@ -122,7 +122,6 @@ def test_all_expected_js_modules_exist():
         "dashboard.js",
         "index-mgmt.js",
         "search.js",
-        "chat.js",
         "logs.js",
     ]
     for module in expected_modules:
@@ -145,7 +144,6 @@ def test_app_js_imports_all_modules():
         "./dashboard.js",
         "./index-mgmt.js",
         "./search.js",
-        "./chat.js",
         "./logs.js",
     ]
     for module in expected_imports:

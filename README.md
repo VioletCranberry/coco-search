@@ -71,10 +71,6 @@ Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental 
   <img src="./screenshots/dashboard_search.png" alt="CocoSearch search results" width="960">
 </p>
 
-<p align="center">
-  <img src="./screenshots/dashboard_ai.png" alt="CocoSearch AI chat" width="960">
-</p>
-
 </details>
 
 > **If you're a DevOps engineer** — most code search tools treat your YAML, HCL, and Dockerfiles as plain text. Searching "S3 bucket with versioning" across Terraform files returns random line matches because the tool has no concept of a `resource` block boundary. CocoSearch ships with 7 grammar handlers (GitHub Actions, GitLab CI, Docker Compose, Helm Template, Helm Values, Kubernetes, Terraform) and 4 language handlers (HCL, Dockerfile, Bash, Go Template) that chunk infrastructure configs at domain-aware boundaries — job/step in Actions, resource/data blocks in Terraform, service definitions in Compose — and extract structured metadata so search results land on complete, meaningful units. CocoIndex's built-in chunking does not cover these formats; without grammar handlers, your workflow YAML would be split on whitespace like any other text file.
@@ -110,8 +106,6 @@ This project was originally built for personal use — a solo experiment in loca
 
 ## Features
 
-- 💬 **Web AI Chat** -- ask questions about your codebase directly from the web dashboard via a `[Search] [Ask AI]` toggle. Powered by the [Claude Agent SDK](https://docs.claude.com/en/docs/agent-sdk/overview) — uses your existing Claude Code authentication, no extra API keys needed. The agent has access to semantic search, file reading, and grep. Chat responses render full markdown with syntax-highlighted code blocks, show tool invocations in collapsible panels, and display session stats (turns, tokens, cost). Optional: install with `uv tool install "cocosearch[web-chat]"` or run directly with `uvx "cocosearch[web-chat]" dashboard`.
-
 - 🔍 **Hybrid search** -- combines semantic similarity (pgvector cosine) and keyword matching (PostgreSQL tsvector) via Reciprocal Rank Fusion. Auto-detects code identifiers (camelCase, snake_case, PascalCase) and enables hybrid mode automatically — or force it with `--hybrid`. Definition symbols (functions, classes) get a 2x score boost. RRF constant k=60.
 
 - 🏷️ **Symbol filtering** -- narrow results to `function`, `class`, `method`, or `interface` with `--symbol-type`; match symbol names with glob patterns (`User*`, `*Handler`) via `--symbol-name`. Supported for 15 languages with Tree-sitter `.scm` queries. Filters apply before RRF fusion for better ranking quality.
@@ -124,7 +118,7 @@ This project was originally built for personal use — a solo experiment in loca
 
 - 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool.
 
-- 🔒 **Privacy-first** -- everything runs on your machine — Ollama generates embeddings locally, PostgreSQL stores vectors locally, no telemetry, no external API calls. Your code never leaves your machine. AI Chat is the only feature that calls an external API (Anthropic), and it's fully opt-in — requires a separate install (`cocosearch[web-chat]`).
+- 🔒 **Privacy-first** -- everything runs on your machine — Ollama generates embeddings locally, PostgreSQL stores vectors locally, no telemetry, no external API calls. Your code never leaves your machine.
 
 ## Quick Start
 
@@ -168,22 +162,6 @@ claude mcp add --scope user cocosearch -- uvx cocosearch mcp --project-from-cwd
 
 > **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
 
-- **AI Chat from the dashboard** (optional):
-
-> **Note:** AI Chat is only available when running `cocosearch dashboard` directly. It is not available through the MCP server.
-
-```bash
-# Option A — run directly (no persistent install):
-uvx "cocosearch[web-chat]" dashboard
-
-# Option B — install persistently, then run:
-uv tool install "cocosearch[web-chat]"
-cocosearch dashboard
-
-# Requires `claude` CLI on PATH (Claude Code users).
-# Then open the dashboard and switch to the "Ask AI" tab.
-```
-
 ## Running in Docker
 
 Run CocoSearch as a centralized service — the host CLI forwards commands transparently over HTTP. The app container is opt-in via the `app` profile; `docker compose up` without it continues to start only PostgreSQL and Ollama, unchanged.
@@ -205,10 +183,6 @@ cocosearch search "authentication flow" -n myapp
 # It auto-discovers projects under PROJECTS_DIR and lets you index them with one click.
 open http://localhost:3000/dashboard
 ```
-
-> **Note:** The dashboard's "Ask AI" chat feature is not available in Docker mode.
-> It requires the `claude` CLI, which is only available on the host.
-> Search, indexing, and all other dashboard features work normally.
 
 > **Tip:** The dashboard auto-discovers projects in the current directory. To scan
 > a different directory, use `--projects-dir`:
@@ -304,7 +278,6 @@ For the full list of commands and flags, see [CLI Reference](./docs/cli-referenc
 - **Multi-project management** — auto-discovers projects under `--projects-dir` (or current directory). Switch between indexed projects via a dropdown; unindexed projects appear with an "Index Now" option. In Docker mode, mount your projects directory and manage everything from one dashboard.
 - **Code search** — natural language queries with language, symbol type, and hybrid search filters. Results show syntax-highlighted snippets, score badges, match type, and symbol metadata. Click any result to open it in your editor (`COCOSEARCH_EDITOR`, `$EDITOR`, or `$VISUAL`).
 - **Index management** — create, reindex (incremental or fresh), and delete indexes from the browser.
-- **AI Chat** — integrated `[Search] [Ask AI]` pill toggle within the search section. Streaming responses with markdown rendering, syntax-highlighted code blocks (Prism.js), collapsible tool use display, and a stats bar showing turns, tokens, and cost. Requires `cocosearch[web-chat]` and `claude` CLI on PATH (Claude Code users only).
 - **Observability** — language distribution charts, parse health breakdown, staleness warnings, storage metrics.
 
 ### Interactive REPL

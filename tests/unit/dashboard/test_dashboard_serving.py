@@ -17,7 +17,6 @@ JS_MODULES = [
     "dashboard.js",
     "index-mgmt.js",
     "search.js",
-    "chat.js",
     "logs.js",
 ]
 
@@ -52,13 +51,11 @@ class TestDashboardServing:
 
     @pytest.mark.asyncio
     async def test_dashboard_has_cdn_scripts(self, client):
-        """Chart.js, Prism, Marked, and DOMPurify CDN scripts are present."""
+        """Chart.js and Prism CDN scripts are present."""
         response = await client.get("/dashboard")
         html = response.text
         assert "chart.js" in html.lower() or "chart.umd.js" in html
         assert "prism.min.js" in html
-        assert "marked.min.js" in html
-        assert "purify.min.js" in html
 
     @pytest.mark.asyncio
     async def test_dashboard_has_critical_sections(self, client):
