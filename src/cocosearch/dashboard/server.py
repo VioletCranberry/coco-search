@@ -22,7 +22,7 @@ def start_dashboard_server(port: int | None = None) -> str | None:
     """Start the dashboard HTTP server in a daemon thread.
 
     Runs uvicorn with the MCP server's sse_app(), which includes all
-    custom_route endpoints (API, dashboard, health, AI chat, etc.).
+    custom_route endpoints (API, dashboard, health, etc.).
 
     Args:
         port: Port to bind to. Defaults to COCOSEARCH_DASHBOARD_PORT env

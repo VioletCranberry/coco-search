@@ -7,7 +7,6 @@ import {
     reindex, stopIndexing, deleteIndex, indexCurrentProject,
 } from './index-mgmt.js';
 import { executeSearch, clearSearch, toggleCodeExpand, openInEditor, viewFile, closeFileModal } from './search.js';
-import { switchSearchMode, initChatPanel, sendChatMessage, startNewChatSession, handleChatKey } from './chat.js';
 import { startLogStream, toggleLogPanel, clearLogPanel, scrollLogsToBottom } from './logs.js';
 
 // --- Expose functions needed by dynamically generated onclick handlers ---
@@ -40,19 +39,6 @@ document.getElementById('clearSearchBtn').addEventListener('click', clearSearch)
 // Search min score slider
 document.getElementById('searchMinScore').addEventListener('input', (e) => {
     document.getElementById('minScoreValue').textContent = e.target.value;
-});
-
-// Search mode toggle
-document.getElementById('modeSearchBtn').addEventListener('click', () => switchSearchMode('search'));
-document.getElementById('modeAskAIBtn').addEventListener('click', () => switchSearchMode('chat'));
-
-// Chat
-document.getElementById('chatSend').addEventListener('click', sendChatMessage);
-document.querySelector('.chat-new-btn').addEventListener('click', startNewChatSession);
-document.getElementById('chatInput').addEventListener('keydown', handleChatKey);
-document.getElementById('chatInput').addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 });
 
 // Index now button
@@ -128,5 +114,4 @@ startHeartbeat();
 loadIndexList();
 setInterval(updateUptime, 1000);
 updateUptime();
-initChatPanel();
 startLogStream();
