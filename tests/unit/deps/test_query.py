@@ -37,6 +37,21 @@ class TestRowToEdge:
             metadata={"line": 5},
         )
 
+    def test_handles_dict_metadata_from_psycopg(self):
+        """Psycopg auto-deserializes JSONB into dicts — should not double-decode."""
+        row = (
+            "src/main.py",
+            None,
+            "src/utils.py",
+            None,
+            "import",
+            {"line": 5},  # dict, not JSON string
+        )
+
+        edge = _row_to_edge(row)
+
+        assert edge.metadata == {"line": 5}
+
     def test_handles_none_metadata(self):
         """None metadata_json should produce an empty dict."""
         row = (

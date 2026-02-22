@@ -28,7 +28,13 @@ def _row_to_edge(row: tuple) -> DependencyEdge:
     source_file, source_symbol, target_file, target_symbol, dep_type, metadata_json = (
         row
     )
-    metadata = json.loads(metadata_json) if metadata_json is not None else {}
+    metadata = (
+        metadata_json
+        if isinstance(metadata_json, dict)
+        else json.loads(metadata_json)
+        if metadata_json is not None
+        else {}
+    )
     return DependencyEdge(
         source_file=source_file,
         source_symbol=source_symbol,
