@@ -56,6 +56,8 @@ from cocosearch.search.query import (
     SYMBOL_AWARE_LANGUAGES,
 )
 from cocosearch.search.repl import run_repl
+from cocosearch.deps.extractor import extract_dependencies
+from cocosearch.deps.query import get_dependencies, get_dependents, get_dep_stats
 
 
 def add_config_arg(
@@ -1724,6 +1726,127 @@ def dashboard_command(args: argparse.Namespace) -> int:
         raise
 
 
+def deps_extract_command(args: argparse.Namespace) -> int:
+    """Execute the deps extract command.
+
+    Extracts dependency edges from all indexed files in the codebase.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success, 1 for error).
+    """
+    console = Console()
+
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.name)
+
+    codebase_path = os.path.abspath(args.path)
+
+    try:
+        stats = extract_dependencies(index_name, codebase_path)
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    console.print("[green]Dependency extraction complete[/green]")
+    console.print(f"  Files processed: {stats['files_processed']}")
+    console.print(f"  Files skipped:   {stats['files_skipped']}")
+    console.print(f"  Edges found:     {stats['edges_found']}")
+    console.print(f"  Errors:          {stats['errors']}")
+
+    return 0
+
+
+def deps_show_command(args: argparse.Namespace) -> int:
+    """Execute the deps show command.
+
+    Shows dependencies and dependents for a given file.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    console = Console()
+
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+
+    dependencies = get_dependencies(index_name, args.file)
+    dependents = get_dependents(index_name, args.file)
+
+    console.print(f"\n[bold]Dependencies[/bold] (what [cyan]{args.file}[/cyan] depends on):")
+    if dependencies:
+        for edge in dependencies:
+            target = edge.target_file or edge.target_symbol or "unknown"
+            console.print(f"  {edge.dep_type}: {target}")
+    else:
+        console.print("  [dim]None[/dim]")
+
+    console.print(f"\n[bold]Dependents[/bold] (what depends on [cyan]{args.file}[/cyan]):")
+    if dependents:
+        for edge in dependents:
+            console.print(f"  {edge.dep_type}: {edge.source_file}")
+    else:
+        console.print("  [dim]None[/dim]")
+
+    return 0
+
+
+def deps_stats_command(args: argparse.Namespace) -> int:
+    """Execute the deps stats command.
+
+    Shows aggregate statistics for the dependency graph.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    console = Console()
+
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+
+    stats = get_dep_stats(index_name)
+
+    console.print(f"\n[bold]Dependency Graph Statistics[/bold] ({index_name})")
+    console.print(f"  Total edges: {stats['total_edges']}")
+
+    return 0
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -2152,6 +2275,55 @@ def main() -> None:
         help="Directory to scan for projects (default: current directory). [env: COCOSEARCH_PROJECTS_DIR]",
     )
 
+    # Deps subcommand
+    deps_parser = subparsers.add_parser(
+        "deps",
+        help="Dependency graph operations",
+        description="Extract, query, and analyze code dependencies.",
+    )
+    deps_subparsers = deps_parser.add_subparsers(dest="deps_command")
+
+    # deps extract
+    deps_extract_parser = deps_subparsers.add_parser(
+        "extract",
+        help="Extract dependencies from indexed codebase",
+    )
+    deps_extract_parser.add_argument("path", help="Path to the codebase directory")
+    add_config_arg(
+        deps_extract_parser,
+        "-n",
+        "--name",
+        config_key="indexName",
+        help_text="Index name",
+    )
+
+    # deps show
+    deps_show_parser = deps_subparsers.add_parser(
+        "show",
+        help="Show dependencies for a file",
+    )
+    deps_show_parser.add_argument("file", help="File path to inspect")
+    add_config_arg(
+        deps_show_parser,
+        "-n",
+        "--index",
+        config_key="indexName",
+        help_text="Index name",
+    )
+
+    # deps stats
+    deps_stats_parser = deps_subparsers.add_parser(
+        "stats",
+        help="Show dependency graph statistics",
+    )
+    add_config_arg(
+        deps_stats_parser,
+        "-n",
+        "--index",
+        config_key="indexName",
+        help_text="Index name",
+    )
+
     # Known subcommands for routing
     known_subcommands = (
         "index",
@@ -2166,6 +2338,7 @@ def main() -> None:
         "mcp",
         "config",
         "dashboard",
+        "deps",
         "-h",
         "--help",
         "--version",
@@ -2233,12 +2406,25 @@ def main() -> None:
         "check": config_check_command,
     }
 
+    _deps_command_registry: dict[str, Any] = {
+        "extract": deps_extract_command,
+        "show": deps_show_command,
+        "stats": deps_stats_command,
+    }
+
     if args.command == "config":
         handler = _config_command_registry.get(args.config_command)
         if handler:
             sys.exit(handler(args))
         else:
             config_parser.print_help()
+            sys.exit(1)
+    elif args.command == "deps":
+        handler = _deps_command_registry.get(args.deps_command)
+        if handler:
+            sys.exit(handler(args))
+        else:
+            deps_parser.print_help()
             sys.exit(1)
     else:
         handler = _command_registry.get(args.command)
