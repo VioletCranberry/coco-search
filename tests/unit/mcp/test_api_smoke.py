@@ -179,28 +179,63 @@ class TestApiLanguagesSmoke:
     async def test_returns_language_list(self, client):
         """Returns 200 with a list containing python."""
         with patch(
-            "cocosearch.handlers.get_registered_handlers",
-            return_value=[],
+            "cocosearch.deps.registry.get_all_extractor_language_ids",
+            return_value={"py"},
         ):
             with patch(
-                "cocosearch.search.context_expander.CONTEXT_EXPANSION_LANGUAGES",
-                {"python"},
+                "cocosearch.handlers.get_registered_handlers",
+                return_value=[],
             ):
                 with patch(
-                    "cocosearch.search.query.LANGUAGE_EXTENSIONS",
-                    {"python": [".py"]},
+                    "cocosearch.search.context_expander.CONTEXT_EXPANSION_LANGUAGES",
+                    {"python"},
                 ):
                     with patch(
-                        "cocosearch.search.query.SYMBOL_AWARE_LANGUAGES",
-                        {"python"},
+                        "cocosearch.search.query.LANGUAGE_EXTENSIONS",
+                        {"python": [".py"]},
                     ):
-                        response = await client.get("/api/languages")
+                        with patch(
+                            "cocosearch.search.query.SYMBOL_AWARE_LANGUAGES",
+                            {"python"},
+                        ):
+                            response = await client.get("/api/languages")
 
         assert response.status_code == 200
         body = response.json()
         assert isinstance(body, list)
         names = [lang["name"] for lang in body]
         assert "python" in names
+
+    @pytest.mark.asyncio
+    async def test_includes_deps_key(self, client):
+        """Each language entry should include a 'deps' key."""
+        with patch(
+            "cocosearch.deps.registry.get_all_extractor_language_ids",
+            return_value={"py"},
+        ):
+            with patch(
+                "cocosearch.handlers.get_registered_handlers",
+                return_value=[],
+            ):
+                with patch(
+                    "cocosearch.search.context_expander.CONTEXT_EXPANSION_LANGUAGES",
+                    {"python"},
+                ):
+                    with patch(
+                        "cocosearch.search.query.LANGUAGE_EXTENSIONS",
+                        {"python": [".py"]},
+                    ):
+                        with patch(
+                            "cocosearch.search.query.SYMBOL_AWARE_LANGUAGES",
+                            {"python"},
+                        ):
+                            response = await client.get("/api/languages")
+
+        body = response.json()
+        for lang in body:
+            assert "deps" in lang, f"Missing 'deps' key for {lang['name']}"
+        python_lang = next(lang for lang in body if lang["name"] == "python")
+        assert python_lang["deps"] is True
 
 
 class TestApiGrammarsSmoke:
@@ -215,13 +250,38 @@ class TestApiGrammarsSmoke:
         mock_grammar.PATH_PATTERNS = [".github/workflows/*.yml"]
 
         with patch(
-            "cocosearch.handlers.get_registered_grammars",
-            return_value=[mock_grammar],
+            "cocosearch.deps.registry.get_all_extractor_language_ids",
+            return_value={"github-actions"},
         ):
-            response = await client.get("/api/grammars")
+            with patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=[mock_grammar],
+            ):
+                response = await client.get("/api/grammars")
 
         assert response.status_code == 200
         body = response.json()
         assert isinstance(body, list)
         assert len(body) == 1
         assert body[0]["name"] == "github-actions"
+
+    @pytest.mark.asyncio
+    async def test_includes_deps_key(self, client):
+        """Each grammar entry should include a 'deps' key."""
+        mock_grammar = MagicMock()
+        mock_grammar.GRAMMAR_NAME = "github-actions"
+        mock_grammar.BASE_LANGUAGE = "yaml"
+        mock_grammar.PATH_PATTERNS = [".github/workflows/*.yml"]
+
+        with patch(
+            "cocosearch.deps.registry.get_all_extractor_language_ids",
+            return_value={"github-actions"},
+        ):
+            with patch(
+                "cocosearch.handlers.get_registered_grammars",
+                return_value=[mock_grammar],
+            ):
+                response = await client.get("/api/grammars")
+
+        body = response.json()
+        assert body[0]["deps"] is True

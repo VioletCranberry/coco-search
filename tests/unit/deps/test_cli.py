@@ -1,5 +1,6 @@
 """Tests for deps CLI commands in cocosearch.cli."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from cocosearch.deps.models import DependencyEdge, DependencyTree
@@ -352,3 +353,134 @@ class TestDepsImpactCommand:
         result = deps_impact_command(args)
 
         assert result == 1
+
+
+# ============================================================================
+# Tests: languages_command — Deps column
+# ============================================================================
+
+
+class TestLanguagesCommandDeps:
+    """Tests that languages_command includes deps information."""
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={"py", "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts", "go"},
+    )
+    @patch("cocosearch.handlers.get_registered_handlers", return_value=[])
+    def test_json_output_includes_deps_key(self, mock_handlers, mock_dep_ids, capsys):
+        """--json output should include 'deps' key for each language."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import languages_command
+
+        result = languages_command(args)
+
+        assert result == 0
+        output = json.loads(capsys.readouterr().out)
+        for lang in output:
+            assert "deps" in lang, f"Missing 'deps' key for {lang['name']}"
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={"py", "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts", "go"},
+    )
+    @patch("cocosearch.handlers.get_registered_handlers", return_value=[])
+    def test_python_has_deps_true(self, mock_handlers, mock_dep_ids, capsys):
+        """Python should have deps=True since 'py' is in extractor IDs."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import languages_command
+
+        languages_command(args)
+
+        output = json.loads(capsys.readouterr().out)
+        python_lang = next(lang for lang in output if lang["name"] == "Python")
+        assert python_lang["deps"] is True
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={"py", "go"},
+    )
+    @patch("cocosearch.handlers.get_registered_handlers", return_value=[])
+    def test_java_has_deps_false(self, mock_handlers, mock_dep_ids, capsys):
+        """Java should have deps=False since 'java' is not in extractor IDs."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import languages_command
+
+        languages_command(args)
+
+        output = json.loads(capsys.readouterr().out)
+        java_lang = next(lang for lang in output if lang["name"] == "Java")
+        assert java_lang["deps"] is False
+
+
+# ============================================================================
+# Tests: grammars_command — Deps column
+# ============================================================================
+
+
+class TestGrammarsCommandDeps:
+    """Tests that grammars_command includes deps information."""
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={
+            "docker-compose", "github-actions", "terraform",
+            "helm-template", "helm-values",
+        },
+    )
+    def test_json_output_includes_deps_key(self, mock_dep_ids, capsys):
+        """--json output should include 'deps' key for each grammar."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import grammars_command
+
+        result = grammars_command(args)
+
+        assert result == 0
+        output = json.loads(capsys.readouterr().out)
+        for grammar in output:
+            assert "deps" in grammar, f"Missing 'deps' key for {grammar['name']}"
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={
+            "docker-compose", "github-actions", "terraform",
+            "helm-template", "helm-values",
+        },
+    )
+    def test_docker_compose_has_deps_true(self, mock_dep_ids, capsys):
+        """docker-compose grammar should have deps=True."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import grammars_command
+
+        grammars_command(args)
+
+        output = json.loads(capsys.readouterr().out)
+        dc_grammar = next(g for g in output if g["name"] == "docker-compose")
+        assert dc_grammar["deps"] is True
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={"docker-compose"},
+    )
+    def test_gitlab_ci_has_deps_false(self, mock_dep_ids, capsys):
+        """gitlab-ci grammar should have deps=False."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import grammars_command
+
+        grammars_command(args)
+
+        output = json.loads(capsys.readouterr().out)
+        gl_grammar = next(g for g in output if g["name"] == "gitlab-ci")
+        assert gl_grammar["deps"] is False

@@ -1268,6 +1268,10 @@ def languages_command(args: argparse.Namespace) -> int:
     # Build language data from LANGUAGE_EXTENSIONS and handler registry
     languages = []
 
+    from cocosearch.deps.registry import get_all_extractor_language_ids
+
+    dep_language_ids = get_all_extractor_language_ids()
+
     # Standard languages from LANGUAGE_EXTENSIONS
     for lang, exts in sorted(LANGUAGE_EXTENSIONS.items()):
         # Format display name
@@ -1286,6 +1290,7 @@ def languages_command(args: argparse.Namespace) -> int:
                 "extensions": ", ".join(exts),
                 "symbols": lang in SYMBOL_AWARE_LANGUAGES,
                 "context": lang in CONTEXT_EXPANSION_LANGUAGES,
+                "deps": any(ext.lstrip(".") in dep_language_ids for ext in exts),
             }
         )
 
@@ -1304,6 +1309,10 @@ def languages_command(args: argparse.Namespace) -> int:
                 "extensions": display_exts.get(lang, ", ".join(handler.EXTENSIONS)),
                 "symbols": lang in SYMBOL_AWARE_LANGUAGES,
                 "context": lang in CONTEXT_EXPANSION_LANGUAGES,
+                "deps": lang in dep_language_ids
+                or any(
+                    ext.lstrip(".") in dep_language_ids for ext in handler.EXTENSIONS
+                ),
             }
         )
 
@@ -1319,16 +1328,21 @@ def languages_command(args: argparse.Namespace) -> int:
         table.add_column("Extensions", style="dim")
         table.add_column("Symbols", justify="center")
         table.add_column("Context", justify="center")
+        table.add_column("Deps", justify="center")
 
         for lang in languages:
             symbol_mark = "[green]✓[/green]" if lang["symbols"] else "[dim]✗[/dim]"
             context_mark = "[green]✓[/green]" if lang["context"] else "[dim]✗[/dim]"
-            table.add_row(lang["name"], lang["extensions"], symbol_mark, context_mark)
+            deps_mark = "[green]✓[/green]" if lang["deps"] else "[dim]✗[/dim]"
+            table.add_row(
+                lang["name"], lang["extensions"], symbol_mark, context_mark, deps_mark
+            )
 
         console.print(table)
         console.print(
             "\n[dim]Symbol-aware languages support --symbol-type and --symbol-name filtering.\n"
-            "Context-aware languages support smart expansion to function/class boundaries.[/dim]"
+            "Context-aware languages support smart expansion to function/class boundaries.\n"
+            "Deps-aware languages support dependency graph extraction (deps tree, deps impact).[/dim]"
         )
 
     return 0
@@ -1345,7 +1359,10 @@ def grammars_command(args: argparse.Namespace) -> int:
     """
     console = Console()
 
+    from cocosearch.deps.registry import get_all_extractor_language_ids
     from cocosearch.handlers import get_registered_grammars
+
+    dep_language_ids = get_all_extractor_language_ids()
 
     grammars = []
     for handler in sorted(get_registered_grammars(), key=lambda h: h.GRAMMAR_NAME):
@@ -1354,6 +1371,7 @@ def grammars_command(args: argparse.Namespace) -> int:
                 "name": handler.GRAMMAR_NAME,
                 "base_language": handler.BASE_LANGUAGE,
                 "path_patterns": handler.PATH_PATTERNS,
+                "deps": handler.GRAMMAR_NAME in dep_language_ids,
             }
         )
 
@@ -1368,17 +1386,21 @@ def grammars_command(args: argparse.Namespace) -> int:
         table.add_column("Grammar", style="cyan", no_wrap=True)
         table.add_column("File Format", style="dim")
         table.add_column("Path Patterns", style="dim")
+        table.add_column("Deps", justify="center")
 
         for g in grammars:
+            deps_mark = "[green]✓[/green]" if g["deps"] else "[dim]✗[/dim]"
             table.add_row(
                 g["name"],
                 g["base_language"],
                 ", ".join(g["path_patterns"]),
+                deps_mark,
             )
 
         console.print(table)
         console.print(
-            "\n[dim]Grammars provide domain-specific chunking for specific file formats.[/dim]"
+            "\n[dim]Grammars provide domain-specific chunking for specific file formats.\n"
+            "Deps-aware grammars support dependency extraction for reference patterns.[/dim]"
         )
 
     return 0

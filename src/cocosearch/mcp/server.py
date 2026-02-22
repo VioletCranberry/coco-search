@@ -803,10 +803,12 @@ async def api_analyze(request) -> JSONResponse:
 @mcp.custom_route("/api/languages", methods=["GET"])
 async def api_languages(request) -> JSONResponse:
     """List supported languages with extensions and capabilities."""
+    from cocosearch.deps.registry import get_all_extractor_language_ids
     from cocosearch.handlers import get_registered_handlers
     from cocosearch.search.context_expander import CONTEXT_EXPANSION_LANGUAGES
     from cocosearch.search.query import LANGUAGE_EXTENSIONS, SYMBOL_AWARE_LANGUAGES
 
+    dep_language_ids = get_all_extractor_language_ids()
     languages = []
 
     for lang, exts in sorted(LANGUAGE_EXTENSIONS.items()):
@@ -816,6 +818,7 @@ async def api_languages(request) -> JSONResponse:
                 "extensions": list(exts),
                 "symbols": lang in SYMBOL_AWARE_LANGUAGES,
                 "context": lang in CONTEXT_EXPANSION_LANGUAGES,
+                "deps": any(ext.lstrip(".") in dep_language_ids for ext in exts),
                 "source": "builtin",
             }
         )
@@ -830,6 +833,10 @@ async def api_languages(request) -> JSONResponse:
                 "extensions": list(handler.EXTENSIONS),
                 "symbols": lang in SYMBOL_AWARE_LANGUAGES,
                 "context": lang in CONTEXT_EXPANSION_LANGUAGES,
+                "deps": lang in dep_language_ids
+                or any(
+                    ext.lstrip(".") in dep_language_ids for ext in handler.EXTENSIONS
+                ),
                 "source": "handler",
             }
         )
@@ -840,7 +847,10 @@ async def api_languages(request) -> JSONResponse:
 @mcp.custom_route("/api/grammars", methods=["GET"])
 async def api_grammars(request) -> JSONResponse:
     """List supported grammars with path patterns."""
+    from cocosearch.deps.registry import get_all_extractor_language_ids
     from cocosearch.handlers import get_registered_grammars
+
+    dep_language_ids = get_all_extractor_language_ids()
 
     grammars = []
     for handler in sorted(get_registered_grammars(), key=lambda h: h.GRAMMAR_NAME):
@@ -849,6 +859,7 @@ async def api_grammars(request) -> JSONResponse:
                 "name": handler.GRAMMAR_NAME,
                 "base_language": handler.BASE_LANGUAGE,
                 "path_patterns": handler.PATH_PATTERNS,
+                "deps": handler.GRAMMAR_NAME in dep_language_ids,
             }
         )
 

@@ -182,8 +182,18 @@ def get_registered_extractors() -> list[DependencyExtractor]:
     return extractors
 
 
+def get_all_extractor_language_ids() -> set[str]:
+    """Get all language IDs that have registered dependency extractors.
+
+    Returns:
+        Set of language_id strings (e.g., ``{"py", "js", "go"}``).
+    """
+    return set(_EXTRACTOR_REGISTRY.keys())
+
+
 __all__ = [
     "DependencyExtractor",
+    "get_all_extractor_language_ids",
     "get_extractor",
     "get_registered_extractors",
 ]
