@@ -259,6 +259,33 @@ def run_index(
     # Target name: {index_name}_chunks
     table_name = f"codeindex_{index_name}__{index_name}_chunks"
 
+    # Detect stale CocoIndex state: internal metadata exists but data table was
+    # dropped externally.  CocoIndex would report "no changes" and skip indexing.
+    # Fix: drop the flow to clear internal tracking, then re-setup.
+    if not fresh:
+        with psycopg.connect(db_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
+                    (table_name,),
+                )
+                table_exists = cur.fetchone() is not None
+        if not table_exists:
+            logger.warning(
+                f"Data table {table_name} missing but flow exists — "
+                "resetting stale CocoIndex state"
+            )
+            flow.drop()
+            flow = create_code_index_flow(
+                index_name=index_name,
+                codebase_path=codebase_path,
+                include_patterns=config.include_patterns,
+                exclude_patterns=exclude_patterns,
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
+            flow.setup()
+
     with psycopg.connect(db_url) as conn:
         symbol_result = ensure_symbol_columns(conn, table_name)
         ensure_parse_results_table(conn, index_name)

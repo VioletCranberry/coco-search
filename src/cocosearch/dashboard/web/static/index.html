@@ -43,6 +43,15 @@
             </div>
         </header>
 
+        <div id="notIndexedBanner" class="not-indexed-banner" style="display: none;">
+            <h3>Project Not Indexed</h3>
+            <p>Current project at <code id="notIndexedPath"></code> is not indexed.</p>
+            <p>
+                <button id="indexNowBtn" class="action-btn">Index Now</button>
+                <span style="margin-left: 8px; font-size: 13px;">or run: <code>cocosearch index .</code></span>
+            </p>
+        </div>
+
         <div id="warningBanner" class="warning-banner">
             <h3>Index Warnings</h3>
             <ul id="warningList"></ul>
@@ -50,7 +59,7 @@
 
         <div class="controls-grid">
             <div class="summary-card">
-                <h3>Index</h3>
+                <h3>Available Indexes</h3>
                 <select id="indexSelect">
                     <option value="">Loading...</option>
                 </select>
@@ -129,15 +138,6 @@
         </div>
 
         <div id="statusBanner" class="status-banner"></div>
-
-        <div id="notIndexedBanner" class="not-indexed-banner" style="display: none;">
-            <h3>Project Not Indexed</h3>
-            <p>Current project at <code id="notIndexedPath"></code> is not indexed.</p>
-            <p>
-                <button id="indexNowBtn" class="action-btn">Index Now</button>
-                <span style="margin-left: 8px; font-size: 13px;">or run: <code>cocosearch index .</code></span>
-            </p>
-        </div>
 
         <div id="loadingMessage" class="loading">Loading dashboard data...</div>
         <div id="errorMessage" class="error" style="display: none;"></div>
