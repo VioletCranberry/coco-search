@@ -276,6 +276,20 @@ def index_command(args: argparse.Namespace) -> int:
                 "[dim]Index was created but path mapping was not updated.[/dim]"
             )
 
+        # Dependency extraction (if requested)
+        if getattr(args, "deps", False):
+            console.print("\n[bold]Extracting dependencies...[/bold]")
+            try:
+                dep_stats = extract_dependencies(index_name, codebase_path)
+                console.print(
+                    f"  [green]{dep_stats['edges_found']} edges[/green] from "
+                    f"{dep_stats['files_processed']} files"
+                )
+            except Exception as e:
+                console.print(
+                    f"  [yellow]Dependency extraction failed: {e}[/yellow]"
+                )
+
         return 0
 
     except Exception as e:
@@ -1902,6 +1916,11 @@ def main() -> None:
         "--fresh",
         action="store_true",
         help="Clear existing index before re-indexing (start from clean state)",
+    )
+    index_parser.add_argument(
+        "--deps",
+        action="store_true",
+        help="Extract dependency graph after indexing",
     )
 
     # Search subcommand (also works as default action)
