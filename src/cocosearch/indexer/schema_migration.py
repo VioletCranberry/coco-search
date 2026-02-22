@@ -158,6 +158,18 @@ def ensure_symbol_columns(conn: psycopg.Connection, table_name: str) -> dict[str
     symbol_columns = ["symbol_type", "symbol_name", "symbol_signature"]
 
     with conn.cursor() as cur:
+        # Skip if table doesn't exist yet — for fresh indexes CocoIndex creates
+        # the table (with symbol columns) during flow.update(), not flow.setup()
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
+            (table_name,),
+        )
+        if not cur.fetchone():
+            logger.info(
+                f"Table {table_name} does not exist yet, skipping symbol column migration"
+            )
+            return results
+
         # Check which columns exist
         cur.execute(
             """

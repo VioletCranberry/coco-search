@@ -59,7 +59,6 @@ def create_code_index_flow(
         CocoIndex Flow instance configured for the codebase.
     """
 
-    @cocoindex.flow_def(name=f"CodeIndex_{index_name}")
     def code_index_flow(
         flow_builder: cocoindex.FlowBuilder,
         data_scope: cocoindex.DataScope,
@@ -154,7 +153,18 @@ def create_code_index_flow(
             ],
         )
 
-    return code_index_flow
+    flow_name = f"CodeIndex_{index_name}"
+    try:
+        return cocoindex.open_flow(flow_name, code_index_flow)
+    except KeyError:
+        # Stale registration from a previous failed attempt in this process —
+        # close it (frees registry slot, does NOT touch persistent data) and retry
+        from cocoindex.flow import _flows
+
+        old = _flows.get(flow_name)
+        if old is not None:
+            old.close()
+        return cocoindex.open_flow(flow_name, code_index_flow)
 
 
 def run_index(
