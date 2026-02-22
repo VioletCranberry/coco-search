@@ -68,8 +68,18 @@ These tips apply across all CocoSearch skills:
 
 - **Always use `use_hybrid_search=True`** -- combines semantic understanding with keyword precision via RRF fusion. Essential for both concept discovery and identifier lookup.
 - **Always use `smart_context=True`** -- expands results to full function/class boundaries using Tree-sitter. Gives you complete code units, not truncated snippets.
+- **Use `include_deps=True` for dependency context** -- attaches direct dependencies and dependents to each search result. Useful when you need to understand a file's connections alongside the code.
 - **Use `symbol_name` for precision** -- when you know the identifier, use `symbol_name="<name>*"` with glob patterns to catch variants (e.g., `User*` finds `User`, `UserService`, `UserProfile`).
 - **Use `symbol_type` for structural searches** -- filter to `"function"`, `"class"`, `"method"`, or `"interface"` to reduce noise when looking for specific code structures.
 - **Use `language` for polyglot codebases** -- add `language="python"` (or any supported language) to scope results when debugging language-specific issues.
 - **Be specific in queries** -- `"search query embedding generation"` finds more relevant results than `"how search works"`.
 - **Follow identifiers across hops** -- when a function body references another function, search for it by name using `symbol_name` for precision. Use semantic queries for intent-based discovery.
+
+## Dependency Tools
+
+When the project has a dependency index (created with `cocosearch index . --deps` or `cocosearch deps extract .`), these MCP tools provide instant dependency analysis:
+
+- **`get_file_dependencies(file, depth)`** -- what does a file depend on? `depth=1` for direct imports, `depth>1` for transitive trees.
+- **`get_file_impact(file, depth)`** -- what would be affected if a file changes? Returns the transitive impact tree.
+
+These tools are especially powerful for refactoring (impact analysis), debugging (tracing call chains), and exploration (understanding module connections). They complement search by providing structural dependency data that search alone can't guarantee.

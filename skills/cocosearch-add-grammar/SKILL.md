@@ -213,6 +213,33 @@ search_code(
 
 **Checkpoint with user:** "Grammar handler created at `src/cocosearch/handlers/grammars/<grammar>.py` with [path-specific/broad] matching. Tests pass. Ready for count assertions and documentation?"
 
+## Step 5b: Add Dependency Extractor (Optional)
+
+> **Skip this step** unless the grammar has reference patterns worth extracting (e.g., image refs, action refs, module sources, template includes).
+
+Grammar handlers assign `language_id` to their `GRAMMAR_NAME` (e.g., `"docker-compose"`, `"github-actions"`). Dependency extractors match on `language_id`, so a grammar-level extractor just sets `LANGUAGES = {"grammar-name"}`.
+
+Already implemented: Docker Compose (image/depends_on/extends), GitHub Actions (uses refs), Terraform (module sources), Helm (includes/images/subcharts).
+
+### Steps
+
+1. **Choose the analog extractor** based on your grammar type:
+   - CI/CD with action refs → `extractors/github_actions.py`
+   - Container orchestration with image/service refs → `extractors/docker_compose.py`
+   - IaC with module/provider refs → `extractors/terraform.py`
+   - Template with includes and value refs → `extractors/helm.py`
+
+2. **Create** `src/cocosearch/deps/extractors/<grammar>.py`:
+   - Set `LANGUAGES = {"<grammar-name>"}` matching the grammar handler's `GRAMMAR_NAME`
+   - YAML grammars: parse with `yaml.safe_load`, extract refs. Non-YAML: use regex
+   - All edges should use `dep_type = DepType.REFERENCE` with `metadata.kind` for specifics
+
+3. **Create tests** in `tests/unit/deps/extractors/test_<grammar>.py`
+
+The extractor is autodiscovered — no registration code needed.
+
+**Checkpoint with user:** "Dependency extractor added for [grammar] with [N] reference types. Tests pass. Ready for count assertions?"
+
 ## Step 6: Update Count Assertions
 
 > **This is the most commonly missed step.** Do not skip.
@@ -281,6 +308,9 @@ If the new grammar introduces a novel matching pattern (e.g., first non-YAML gra
 # Grammar tests
 uv run pytest tests/unit/handlers/grammars/test_<grammar>.py -v
 
+# Dependency extractor tests (if added)
+uv run pytest tests/unit/deps/extractors/test_<grammar>.py -v
+
 # Registry count assertions
 uv run pytest tests/unit/handlers/test_registry.py -v
 uv run pytest tests/unit/handlers/test_grammar_registry.py -v
@@ -333,7 +363,9 @@ Complete checklist of all registration points. Check off each one as you complet
 - [ ] `tests/unit/handlers/grammars/test_<grammar>.py` created
 - [ ] `tests/unit/handlers/test_grammar_registry.py` -- grammar count and name set updated
 - [ ] `tests/unit/handlers/test_registry.py` -- combined spec count updated
-- [ ] `CLAUDE.md` -- grammar handler list and counts updated
+- [ ] `src/cocosearch/deps/extractors/<grammar>.py` created (if grammar has reference patterns)
+- [ ] `tests/unit/deps/extractors/test_<grammar>.py` created (if extractor added)
+- [ ] `CLAUDE.md` -- grammar handler list, extractor count, and dependency descriptions updated
 - [ ] `README.md` -- grammar table and badges updated
 
 For common search tips (hybrid search, smart_context, symbol filtering), see `skills/README.md`.

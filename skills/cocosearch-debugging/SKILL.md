@@ -99,6 +99,24 @@ The issue likely originates in `<strongest-candidate>`. Want me to trace how cod
 
 **Start shallow, go deeper on request.** Default to ONE HOP first.
 
+### 3a. Dependency Graph (Fast Path)
+
+If the project has a dependency index, use the dependency MCP tools first — they provide instant, complete dependency data:
+
+```
+# What does this file depend on?
+get_file_dependencies(file="<file-path>", depth=1)
+
+# What depends on this file? (impact analysis)
+get_file_impact(file="<file-path>", depth=2)
+```
+
+This immediately shows callers and callees at the file level. If the bug is in an imported dependency or caused by an upstream caller, the dependency tree reveals it directly.
+
+**If dependency tools return useful data:** Use it as the primary trace and supplement with search below for symbol-level detail.
+
+### 3b. Search-Based Tracing
+
 **One-hop trace:**
 
 1. **Find the suspected origin function:**

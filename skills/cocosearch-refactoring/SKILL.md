@@ -41,7 +41,29 @@ Parse the user's description to identify the refactoring type and target.
 
 This is the most critical step. Build a complete picture of what will be affected by the change.
 
-### 2a. Find All Usages
+### 2a. Dependency Graph Analysis (Fast Path)
+
+**Start here.** If the project has a dependency index (`cocosearch index . --deps`), use the dependency MCP tools for instant, complete impact analysis:
+
+**Forward dependencies (what does the target depend on):**
+
+```
+get_file_dependencies(file="<target_file>", depth=2)
+```
+
+**Reverse impact (what depends on the target):**
+
+```
+get_file_impact(file="<target_file>", depth=3)
+```
+
+These tools return transitive dependency/impact trees — far more complete than search-based heuristics. The impact tree shows the full blast radius of changing a file.
+
+**If dependency tools return results:** You already have the complete impact map. Skip to 2b (test coverage) and use the dependency data as your primary source. The search-based approaches below become supplementary.
+
+**If dependency tools are unavailable** (no deps index, or the file isn't tracked): Fall back to the search-based approaches below.
+
+### 2a-fallback. Find All Usages (Search-Based)
 
 **Direct symbol references:**
 
@@ -105,7 +127,9 @@ search_code(
 
 For each caller found in step 2a, check what THEY export or provide. Changing your target will affect their behavior.
 
-**For each caller:**
+**With dependency tools (preferred):** If you have the impact tree from step 2a, depth=2+ already shows transitive downstream effects. Each level of the tree represents one hop of propagation.
+
+**With search (fallback):**
 
 ```
 search_code(

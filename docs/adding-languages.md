@@ -16,12 +16,13 @@ Every indexed file is chunked by CocoIndex's `SplitRecursively`. The chunking st
 
 ## Systems Overview
 
-CocoSearch has four independent systems for language support:
+CocoSearch has five independent systems for language support:
 
 1. **Language Handlers** (`src/cocosearch/handlers/`) — custom chunking and metadata extraction for languages not in CocoIndex's built-in Tree-sitter list. Matched by file extension.
 2. **Grammar Handlers** (`src/cocosearch/handlers/grammars/`) — domain-specific chunking for files that share a base language but have distinct structure (e.g., GitHub Actions is a grammar of YAML). Matched by file path + content patterns.
 3. **Symbol Extraction** (`src/cocosearch/indexer/symbols.py`) — tree-sitter query-based extraction of functions, classes, methods, and other symbols for `--symbol-type` / `--symbol-name` filtering.
 4. **Context Expansion** (`src/cocosearch/search/context_expander.py`) — tree-sitter-based smart expansion to enclosing function/class boundaries for search results. Currently supports Python, JavaScript, TypeScript, Go, Rust.
+5. **Dependency Extraction** (`src/cocosearch/deps/extractors/`) — pluggable extractors that parse import/reference patterns to build a file-level dependency graph. Enables `deps tree`, `deps impact`, and MCP tools `get_file_dependencies`/`get_file_impact`.
 
 These systems are independent. A language can have:
 - A handler only (e.g., Dockerfile, Bash)
@@ -29,6 +30,7 @@ These systems are independent. A language can have:
 - Both (e.g., HCL/Terraform)
 - A grammar handler (e.g., GitHub Actions, GitLab CI, Docker Compose)
 - Context expansion (e.g., Python, Go, Rust)
+- A dependency extractor (e.g., Python, JS/TS, Go, Docker Compose, GitHub Actions, Terraform, Helm)
 
 ## Checking Tree-sitter's Built-in Language List
 
@@ -280,6 +282,89 @@ Use this when you want `smart_context=True` to expand search results to enclosin
 |------|--------|
 | `src/cocosearch/search/context_expander.py` | Modify — `DEFINITION_NODE_TYPES` and `EXTENSION_TO_LANGUAGE` |
 
+## Path F: Adding a Dependency Extractor
+
+Use this when the language has import/require/reference patterns that can be extracted for dependency analysis. This enables `deps tree`, `deps impact`, and the `get_file_dependencies`/`get_file_impact` MCP tools.
+
+**Already implemented:** Python (`py`), JavaScript/TypeScript (`js`, `jsx`, `ts`, `tsx`, `mjs`, `cjs`, `mts`, `cts`), Go (`go`), Docker Compose (`docker-compose`), GitHub Actions (`github-actions`), Terraform (`terraform`), Helm (`helm-template`, `helm-values`).
+
+### When to add an extractor
+
+- **Programming languages** with import statements (e.g., `import`, `require`, `use`, `include`) → edge type `DepType.IMPORT`
+- **Infrastructure formats** with reference patterns (e.g., image refs, action `uses:`, module sources) → edge type `DepType.REFERENCE` with `metadata.kind` for specifics
+- **Grammar handlers** that set a `language_id` (their `GRAMMAR_NAME`) — the extractor matches on `LANGUAGES = {"grammar-name"}`
+
+### Steps
+
+1. **Create the extractor:**
+   ```bash
+   touch src/cocosearch/deps/extractors/<language>.py
+   ```
+
+   Implement the `DependencyExtractor` protocol:
+   - Set `LANGUAGES` — set of language IDs this extractor handles (must match the `language_id` from the handler/grammar or file extension)
+   - Implement `extract(file_path: str, content: str) -> list[DependencyEdge]`
+   - For tree-sitter languages, use `get_parser("<language>")` and walk the AST to find import nodes
+   - For YAML-based grammars, parse with `yaml.safe_load` and extract reference patterns
+   - For HCL/template formats, use regex
+
+2. **Choose edge types:**
+   - `DepType.IMPORT` — code-level imports (`import X`, `require('X')`, `use X`)
+   - `DepType.REFERENCE` — grammar-level refs (image refs, action uses, module sources). Set `metadata.kind` to describe the reference type (e.g., `"image"`, `"action"`, `"module_source"`)
+   - `DepType.CALL` — direct symbol calls (rare, not used by current extractors)
+
+3. **Populate edge metadata:**
+   ```python
+   DependencyEdge(
+       source_file=file_path,
+       target_file=None,           # Resolved later by module resolver
+       target_module="<raw-import-string>",
+       dep_type=DepType.IMPORT,
+       metadata={"module": "<raw-string>", "line": 5},
+   )
+   ```
+
+4. **Add a module resolver** (if needed) to `src/cocosearch/deps/resolver.py`:
+   - Implement `ModuleResolver` protocol: `build_index(indexed_files)` and `resolve(edge, module_index)`
+   - Register in `_RESOLVERS` dict mapping language IDs to the resolver instance
+   - Already implemented: `PythonResolver`, `JavaScriptResolver`, `GoResolver`, `TerraformResolver`
+
+5. **Add tests:**
+   ```bash
+   touch tests/unit/deps/extractors/test_<language>.py
+   uv run pytest tests/unit/deps/extractors/test_<language>.py -v
+   ```
+
+   Cover: each import/reference pattern, edge metadata, empty files, syntax variations.
+
+   If a resolver was added:
+   ```bash
+   uv run pytest tests/unit/deps/test_resolver.py -v
+   ```
+
+The extractor is **autodiscovered** at import time — any `deps/extractors/*.py` file (not prefixed with `_`) implementing the protocol is auto-registered. No registration code needed.
+
+### Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `src/cocosearch/deps/extractors/<language>.py` | Create — dependency extractor |
+| `src/cocosearch/deps/resolver.py` | Modify — add resolver (only if import resolution needed) |
+| `tests/unit/deps/extractors/test_<language>.py` | Create — extractor tests |
+| `tests/unit/deps/test_resolver.py` | Modify — resolver tests (only if resolver added) |
+
+### Existing extractors
+
+| Extractor | Language IDs | Edge Type | Parsing Method |
+|-----------|-------------|-----------|----------------|
+| `python.py` | `py` | IMPORT | Tree-sitter (`import_statement`, `import_from_statement`) |
+| `javascript.py` | `js`, `jsx`, `ts`, `tsx`, `mjs`, `cjs`, `mts`, `cts` | IMPORT | Tree-sitter (`import_statement`, `call_expression[require]`) |
+| `go.py` | `go` | IMPORT | Tree-sitter (`import_declaration`, `import_spec`) |
+| `docker_compose.py` | `docker-compose` | REFERENCE | YAML (`image:`, `depends_on:`, `extends:`) |
+| `github_actions.py` | `github-actions` | REFERENCE | YAML (`uses:` action/workflow refs) |
+| `terraform.py` | `terraform` | REFERENCE | Regex (HCL `module { source = "..." }`) |
+| `helm.py` | `helm-template`, `helm-values` | REFERENCE | Regex + YAML (includes, images, subcharts) |
+
 ## Registration Checklist
 
 When adding a new language handler, verify all registrations are complete:
@@ -295,6 +380,8 @@ When adding a new language handler, verify all registrations are complete:
 - [ ] **DEFINITION_NODE_TYPES** (if context expansion): node types added in `search/context_expander.py`
 - [ ] **EXTENSION_TO_LANGUAGE** (if context expansion): extension mappings added in `search/context_expander.py`
 - [ ] **cli.py languages_command**: display name override added if needed (extensions are derived from handler)
+- [ ] **Dependency extractor**: `deps/extractors/<language>.py` created (if language has imports — Path F)
+- [ ] **Module resolver**: added to `deps/resolver.py` (if import resolution needed — Path F)
 - [ ] **Tests**: handler tests and/or symbol extraction tests added
 - [ ] **README.md**: Supported Languages section updated (count, table, lists)
 - [ ] **README.md**: Language badge added to the badges section at the top
@@ -303,8 +390,20 @@ When adding a new grammar handler:
 
 - [ ] **Grammar handler**: `handlers/grammars/<grammar>.py` created — inherit `YamlGrammarBase` for YAML grammars
 - [ ] **Tests**: `tests/unit/handlers/grammars/test_<grammar>.py` created
+- [ ] **Dependency extractor**: `deps/extractors/<grammar>.py` created (if grammar has reference patterns)
+- [ ] **Extractor tests**: `tests/unit/deps/extractors/test_<grammar>.py` created (if extractor added)
 - [ ] **README.md**: Supported Grammars section updated
 - [ ] **README.md**: Grammar badge added to the badges section at the top
+
+When adding a dependency extractor (Path F):
+
+- [ ] **Extractor**: `src/cocosearch/deps/extractors/<language>.py` created (autodiscovered)
+- [ ] **`LANGUAGES`** set matches language IDs from handler/grammar or file extension
+- [ ] **Module resolver** added to `src/cocosearch/deps/resolver.py` (if import resolution needed)
+- [ ] **Resolver registered** in `_RESOLVERS` dict (if added)
+- [ ] **Tests**: `tests/unit/deps/extractors/test_<language>.py` created
+- [ ] **Resolver tests**: added to `tests/unit/deps/test_resolver.py` (if resolver added)
+- [ ] **CLAUDE.md**: extractor count and resolver list updated
 
 ## Reference
 

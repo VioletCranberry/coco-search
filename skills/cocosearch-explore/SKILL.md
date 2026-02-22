@@ -117,6 +117,15 @@ search_code(
 )
 ```
 
+**Trace dependencies for a key file** (if dependency index exists):
+
+```
+get_file_dependencies(file="<file-path>", depth=2)
+get_file_impact(file="<file-path>", depth=2)
+```
+
+Dependency tools provide instant, complete file-level dependency data. Use them to map how modules connect without needing multiple search hops.
+
 **Search budget:** 3-5 total searches across Phases 1-2. If you need more than 7, split the question.
 
 ### Phase 3: Verify
@@ -247,13 +256,13 @@ search_code(
 
 Starting from entry points, trace how the concept works. Adapt strategy to question type:
 
-**For flow questions:** Follow the data from input to output, one hop at a time. Build the chain: `A() -> B() -> C() -> result`
+**For flow questions:** Follow the data from input to output, one hop at a time. Build the chain: `A() -> B() -> C() -> result`. Use `get_file_dependencies(file, depth=2)` to quickly map how files connect.
 
 **For logic questions:** Find the core decision function, examine branching logic (if/else, match, strategy patterns), trace each branch.
 
-**For subsystem questions:** Map public API surface first (breadth-first), then drill into each function (depth-first).
+**For subsystem questions:** Map public API surface first (breadth-first), then drill into each function (depth-first). Use `get_file_impact(file, depth=2)` to see what depends on a key file.
 
-**For integration questions:** Find component A's outbound interface, component B's inbound interface, then the glue where they connect.
+**For integration questions:** Find component A's outbound interface, component B's inbound interface, then the glue where they connect. Dependency tools can reveal cross-module connections instantly.
 
 ### Step 4: Synthesize the Explanation
 
