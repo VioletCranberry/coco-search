@@ -66,6 +66,15 @@ class DependencyTree:
     dep_type: str
     children: list["DependencyTree"] = field(default_factory=list)
 
+    def to_dict(self) -> dict:
+        """Convert to a JSON-serializable dict."""
+        return {
+            "file": self.file,
+            "symbol": self.symbol,
+            "dep_type": self.dep_type,
+            "children": [c.to_dict() for c in self.children],
+        }
+
 
 def get_deps_table_name(index_name: str) -> str:
     """Return the PostgreSQL table name for dependency edges.

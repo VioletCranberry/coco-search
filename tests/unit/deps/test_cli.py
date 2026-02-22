@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from cocosearch.deps.models import DependencyEdge
+from cocosearch.deps.models import DependencyEdge, DependencyTree
 
 
 # ============================================================================
@@ -209,3 +209,150 @@ class TestDepsStatsCommand:
         # Rich Console output goes to stdout; we just verify no crash
         # The actual output test uses capsys indirectly through Rich
         mock_stats.assert_called_once_with("myindex")
+
+
+# ============================================================================
+# Tests: deps_tree_command
+# ============================================================================
+
+
+class TestDepsTreeCommand:
+    """Tests for deps_tree_command()."""
+
+    @patch("cocosearch.cli.get_dependency_tree")
+    @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
+    @patch("cocosearch.cli.load_project_config")
+    @patch("cocosearch.cli.find_config_file", return_value="/fake/cocosearch.yaml")
+    def test_calls_get_dependency_tree_and_returns_zero(
+        self, mock_find, mock_load, mock_resolve, mock_tree
+    ):
+        """Should call get_dependency_tree and return 0."""
+        mock_tree.return_value = DependencyTree(
+            file="src/main.py", symbol=None, dep_type="root", children=[]
+        )
+
+        args = MagicMock()
+        args.index = None
+        args.file = "src/main.py"
+        args.depth = 5
+        args.type = None
+        args.json = False
+
+        from cocosearch.cli import deps_tree_command
+
+        result = deps_tree_command(args)
+
+        assert result == 0
+        mock_tree.assert_called_once_with(
+            "myindex", "src/main.py", max_depth=5, dep_type=None
+        )
+
+    @patch("cocosearch.cli.get_dependency_tree")
+    @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
+    @patch("cocosearch.cli.load_project_config")
+    @patch("cocosearch.cli.find_config_file", return_value="/fake/cocosearch.yaml")
+    def test_passes_depth_and_type(
+        self, mock_find, mock_load, mock_resolve, mock_tree
+    ):
+        """Should pass depth and type filters."""
+        mock_tree.return_value = DependencyTree(
+            file="a.py", symbol=None, dep_type="root", children=[]
+        )
+
+        args = MagicMock()
+        args.index = None
+        args.file = "a.py"
+        args.depth = 2
+        args.type = "import"
+        args.json = False
+
+        from cocosearch.cli import deps_tree_command
+
+        deps_tree_command(args)
+
+        mock_tree.assert_called_once_with(
+            "myindex", "a.py", max_depth=2, dep_type="import"
+        )
+
+    @patch("cocosearch.cli.get_dependency_tree")
+    @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
+    @patch("cocosearch.cli.load_project_config")
+    @patch("cocosearch.cli.find_config_file", return_value="/fake/cocosearch.yaml")
+    def test_returns_one_on_error(
+        self, mock_find, mock_load, mock_resolve, mock_tree
+    ):
+        """Should return 1 on error."""
+        mock_tree.side_effect = Exception("DB error")
+
+        args = MagicMock()
+        args.index = None
+        args.file = "a.py"
+        args.depth = 5
+        args.type = None
+        args.json = False
+
+        from cocosearch.cli import deps_tree_command
+
+        result = deps_tree_command(args)
+
+        assert result == 1
+
+
+# ============================================================================
+# Tests: deps_impact_command
+# ============================================================================
+
+
+class TestDepsImpactCommand:
+    """Tests for deps_impact_command()."""
+
+    @patch("cocosearch.cli.get_impact")
+    @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
+    @patch("cocosearch.cli.load_project_config")
+    @patch("cocosearch.cli.find_config_file", return_value="/fake/cocosearch.yaml")
+    def test_calls_get_impact_and_returns_zero(
+        self, mock_find, mock_load, mock_resolve, mock_impact
+    ):
+        """Should call get_impact and return 0."""
+        mock_impact.return_value = DependencyTree(
+            file="src/utils.py", symbol=None, dep_type="root", children=[]
+        )
+
+        args = MagicMock()
+        args.index = None
+        args.file = "src/utils.py"
+        args.depth = 3
+        args.type = None
+        args.json = False
+
+        from cocosearch.cli import deps_impact_command
+
+        result = deps_impact_command(args)
+
+        assert result == 0
+        mock_impact.assert_called_once_with(
+            "myindex", "src/utils.py", max_depth=3, dep_type=None
+        )
+
+    @patch("cocosearch.cli.get_impact")
+    @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
+    @patch("cocosearch.cli.load_project_config")
+    @patch("cocosearch.cli.find_config_file", return_value="/fake/cocosearch.yaml")
+    def test_returns_one_on_error(
+        self, mock_find, mock_load, mock_resolve, mock_impact
+    ):
+        """Should return 1 on error."""
+        mock_impact.side_effect = Exception("DB error")
+
+        args = MagicMock()
+        args.index = None
+        args.file = "a.py"
+        args.depth = 5
+        args.type = None
+        args.json = False
+
+        from cocosearch.cli import deps_impact_command
+
+        result = deps_impact_command(args)
+
+        assert result == 1

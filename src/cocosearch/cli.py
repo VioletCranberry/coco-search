@@ -57,7 +57,13 @@ from cocosearch.search.query import (
 )
 from cocosearch.search.repl import run_repl
 from cocosearch.deps.extractor import extract_dependencies
-from cocosearch.deps.query import get_dependencies, get_dependents, get_dep_stats
+from cocosearch.deps.query import (
+    get_dependencies,
+    get_dependents,
+    get_dep_stats,
+    get_dependency_tree,
+    get_impact,
+)
 
 
 def add_config_arg(
@@ -1872,6 +1878,125 @@ def deps_stats_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def deps_tree_command(args: argparse.Namespace) -> int:
+    """Execute the deps tree command.
+
+    Shows the forward dependency tree for a file.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    from rich.tree import Tree as RichTree
+
+    console = Console()
+
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+
+    dep_type_filter = getattr(args, "type", None)
+    depth = getattr(args, "depth", 5)
+
+    try:
+        tree = get_dependency_tree(
+            index_name, args.file, max_depth=depth, dep_type=dep_type_filter
+        )
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    if getattr(args, "json", False):
+        import json
+
+        console.print(json.dumps(_tree_to_dict(tree), indent=2))
+        return 0
+
+    rich_tree = RichTree(f"[bold cyan]{tree.file}[/bold cyan]")
+    _build_rich_tree(rich_tree, tree)
+
+    console.print(f"\n[bold]Dependency Tree[/bold] (depth={depth})")
+    console.print(rich_tree)
+    return 0
+
+
+def deps_impact_command(args: argparse.Namespace) -> int:
+    """Execute the deps impact command.
+
+    Shows the reverse impact tree for a file.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        Exit code (0 for success).
+    """
+    from rich.tree import Tree as RichTree
+
+    console = Console()
+
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError:
+            project_config = CocoSearchConfig()
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+
+    dep_type_filter = getattr(args, "type", None)
+    depth = getattr(args, "depth", 5)
+
+    try:
+        tree = get_impact(
+            index_name, args.file, max_depth=depth, dep_type=dep_type_filter
+        )
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    if getattr(args, "json", False):
+        import json
+
+        console.print(json.dumps(_tree_to_dict(tree), indent=2))
+        return 0
+
+    rich_tree = RichTree(f"[bold cyan]{tree.file}[/bold cyan]")
+    _build_rich_tree(rich_tree, tree)
+
+    console.print(f"\n[bold]Impact Tree[/bold] (depth={depth})")
+    console.print(rich_tree)
+    return 0
+
+
+def _tree_to_dict(tree) -> dict:
+    """Convert a DependencyTree to a JSON-serializable dict."""
+    return tree.to_dict()
+
+
+def _build_rich_tree(rich_node, tree_node) -> None:
+    """Recursively build a Rich Tree from a DependencyTree."""
+    for child in tree_node.children:
+        label = f"[dim]{child.dep_type}[/dim] → {child.file}"
+        if child.symbol:
+            label += f" ([yellow]{child.symbol}[/yellow])"
+        child_rich = rich_node.add(label)
+        _build_rich_tree(child_rich, child)
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -2354,6 +2479,52 @@ def main() -> None:
         help_text="Index name",
     )
 
+    # deps tree
+    deps_tree_parser = deps_subparsers.add_parser(
+        "tree",
+        help="Show forward dependency tree for a file",
+    )
+    deps_tree_parser.add_argument("file", help="File path to inspect")
+    deps_tree_parser.add_argument(
+        "--depth", type=int, default=5, help="Maximum traversal depth (default: 5)"
+    )
+    deps_tree_parser.add_argument(
+        "--type", help="Filter by dependency type (import, call, reference)"
+    )
+    deps_tree_parser.add_argument(
+        "--json", action="store_true", help="Output as JSON"
+    )
+    add_config_arg(
+        deps_tree_parser,
+        "-n",
+        "--index",
+        config_key="indexName",
+        help_text="Index name",
+    )
+
+    # deps impact
+    deps_impact_parser = deps_subparsers.add_parser(
+        "impact",
+        help="Show reverse impact tree for a file",
+    )
+    deps_impact_parser.add_argument("file", help="File path to inspect")
+    deps_impact_parser.add_argument(
+        "--depth", type=int, default=5, help="Maximum traversal depth (default: 5)"
+    )
+    deps_impact_parser.add_argument(
+        "--type", help="Filter by dependency type (import, call, reference)"
+    )
+    deps_impact_parser.add_argument(
+        "--json", action="store_true", help="Output as JSON"
+    )
+    add_config_arg(
+        deps_impact_parser,
+        "-n",
+        "--index",
+        config_key="indexName",
+        help_text="Index name",
+    )
+
     # Known subcommands for routing
     known_subcommands = (
         "index",
@@ -2440,6 +2611,8 @@ def main() -> None:
         "extract": deps_extract_command,
         "show": deps_show_command,
         "stats": deps_stats_command,
+        "tree": deps_tree_command,
+        "impact": deps_impact_command,
     }
 
     if args.command == "config":
