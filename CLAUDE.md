@@ -62,6 +62,8 @@ uv run cocosearch dashboard              # Terminal dashboard
 uv run cocosearch index . --deps          # Index + extract dependencies
 uv run cocosearch deps extract .          # Extract dependencies (standalone)
 uv run cocosearch deps show <file>        # Show dependencies for a file
+uv run cocosearch deps tree <file>        # Forward dependency tree (transitive)
+uv run cocosearch deps impact <file>      # Reverse impact tree (what depends on this)
 uv run cocosearch deps stats              # Show dependency graph statistics
 
 # MCP server
@@ -78,16 +80,16 @@ uv run cocosearch mcp --project-from-cwd
 - **`client.py`** — HTTP client for remote server mode. `CocoSearchClient` forwards CLI commands to a running CocoSearch server via HTTP API (`/api/search`, `/api/index`, `/api/stats`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/delete-index`). Path translation via `COCOSEARCH_PATH_PREFIX` rewrites host↔container paths.
 - **`exceptions.py`** — Structured exception hierarchy: `CocoSearchError` (base), `IndexNotFoundError`, `IndexValidationError`, `SearchError`, `InfrastructureError`. Inherits from `ValueError` where needed for backward compatibility.
 - **`validation.py`** — Input validation guards: `validate_index_name()` (SQL injection protection for dynamic table names), `validate_query()` (resource exhaustion protection, max 10,000 chars)
-- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/projects`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/open-in-editor`, `/api/file-content`, `/health`, `/api/heartbeat` SSE, `/api/logs` SSE)
+- **`mcp/server.py`** — MCP server exposing tools (search_code, analyze_query, index_codebase, get_file_dependencies, get_file_impact, etc.) + web dashboard with HTTP API (`/api/stats`, `/api/reindex`, `/api/search`, `/api/project`, `/api/projects`, `/api/index`, `/api/stop-indexing`, `/api/delete-index`, `/api/list`, `/api/analyze`, `/api/languages`, `/api/grammars`, `/api/open-in-editor`, `/api/file-content`, `/api/deps`, `/api/deps/impact`, `/api/deps/graph`, `/health`, `/api/heartbeat` SSE, `/api/logs` SSE)
 - **`mcp/log_stream.py`** — Real-time log capture for dashboard: `LogBuffer` ring buffer with SSE pub/sub, `BufferHandler` (logging.Handler), `StderrCapture` (tee wrapper for CocoIndex framework output), `setup_log_capture()` singleton lifecycle
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (16 languages via `.scm` queries in `indexer/queries/`), Ollama embedding, tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py`), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
-- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries for 9 languages (`context_expander.py`, exports `CONTEXT_EXPANSION_LANGUAGES`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), interactive REPL (`repl.py`), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics (`analyze.py`)
+- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries for 9 languages (`context_expander.py`, exports `CONTEXT_EXPANSION_LANGUAGES`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), optional dependency enrichment (`include_deps` attaches direct dependencies/dependents to search results), interactive REPL (`repl.py`), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics (`analyze.py`)
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution (`env_substitution.py`), Pydantic schema validation (`schema.py` with `extra="forbid"`, `strict=True`), user-friendly error formatting with fuzzy field suggestions (`errors.py`), env var validation (`env_validation.py`)
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py`), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection and status tracking (`metadata.py`), project root detection (`context.py`)
-- **`deps/`** — Dependency graph framework: pluggable extractors (`extractors/`), edge storage (`db.py`), extraction orchestrator (`extractor.py`), query API (`query.py`), data models (`models.py`), autodiscovery registry (`registry.py`). Extractors operate on whole files (not chunks) and run as a separate pass after CocoIndex indexing. Three edge types: "import" (code imports), "call" (symbol calls), "reference" (grammar-level refs with `metadata.kind` for specifics).
+- **`deps/`** — Dependency graph framework: pluggable extractors (`extractors/`), pluggable module resolvers (`resolver.py`), edge storage (`db.py`), extraction orchestrator (`extractor.py`), query API with transitive BFS traversal (`query.py`), data models (`models.py`), autodiscovery registry (`registry.py`). 8 extractors: Python imports, JavaScript/TypeScript (ES6 + CommonJS + re-exports), Go imports, Docker Compose (image/depends_on/extends), GitHub Actions (uses refs), Terraform (module sources), Helm (template includes, values images, Chart.yaml subcharts). 4 module resolvers: Python (dotted modules, `__init__.py`, relative imports, `src/`/`lib/` prefix stripping), JavaScript (extension probing, index files), Go (import path suffix matching), Terraform (local module sources). Query layer supports direct lookups (`get_dependencies`/`get_dependents`), transitive BFS trees (`get_dependency_tree`/`get_impact` with cycle detection and depth limits), and detailed stats (`get_dep_stats_detailed`). Three edge types: "import" (code imports), "call" (symbol calls), "reference" (grammar-level refs with `metadata.kind` for specifics).
 - **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash, Scala, Groovy) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose, Kubernetes, Terraform) with autodiscovery registry
 - **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards. In stdio MCP mode, `server.py` launches uvicorn in a daemon thread running the MCP server's `sse_app()` — all routes are served from a single source of truth (no duplicated handlers). Web static assets are split into ES modules: `dashboard/web/static/index.html` (HTML only), `css/styles.css`, and `js/` with modules (`app.js` entry point, `state.js` shared state, `api.js`, `utils.js`, `charts.js`, `dashboard.js`, `index-mgmt.js`, `search.js`, `logs.js`). Static files served via `/static/{path}` route with path traversal protection.
 - **`.claude-plugin/`** — Claude Code plugin metadata: `plugin.json` (MCP server definition, version, keywords) and `marketplace.json` (marketplace listing). Versions must match `pyproject.toml` — the release workflow syncs them automatically.
@@ -101,7 +103,7 @@ uv run cocosearch mcp --project-from-cwd
 - CocoIndex framework orchestrates the indexing pipeline in `indexer/flow.py`
 - **CocoIndex table naming:** `codeindex_{index_name}__{index_name}_chunks` (flow name `CodeIndex_{name}` is lowercased by CocoIndex). Parse results go to `cocosearch_parse_results_{index_name}`.
 - Parse status categories: `ok`, `partial`, `error`, `no_grammar`. Text-only formats (md, yaml, json, etc.) are skipped from parse tracking entirely via `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py`.
-- Dependency extractor autodiscovery: any `deps/extractors/*.py` (not prefixed with `_`) implementing `DependencyExtractor` protocol is auto-registered. Lookup by `language_id` (file extension, e.g., "py"). Dependency edges stored in `cocosearch_deps_{index_name}`.
+- Dependency extractor autodiscovery: any `deps/extractors/*.py` (not prefixed with `_`) implementing `DependencyExtractor` protocol is auto-registered. Lookup by `language_id` (file extension or grammar name, e.g., "py", "js", "go", "docker-compose", "github-actions", "terraform", "helm-template", "helm-values"). Dependency edges stored in `cocosearch_deps_{index_name}`. Module resolvers in `deps/resolver.py` are registered per language_id and resolve module names to file paths after extraction.
 
 ## Testing
 
@@ -185,12 +187,14 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 
 ### MCP Tools
 
-- `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`.
+- `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`. Optional `include_deps=True` attaches dependency info to results.
 - `analyze_query` — Pipeline diagnostics: see why a query returns specific results (stage timings, mode selection, RRF fusion breakdown)
 - `index_codebase` — Index a directory for search
 - `list_indexes` — List all available indexes
 - `index_stats` — Statistics and health for an index
 - `clear_index` — Remove an index
+- `get_file_dependencies` — Forward dependency query: what does a file depend on? `depth=1` returns flat edge list, `depth>1` returns transitive tree.
+- `get_file_impact` — Reverse impact query: what would be affected if a file changes? Returns transitive impact tree.
 
 ### Search Best Practices
 

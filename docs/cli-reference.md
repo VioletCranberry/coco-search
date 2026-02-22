@@ -154,6 +154,68 @@ Start the MCP server for LLM integration. Typically invoked by MCP clients, not 
 uv run cocosearch mcp  # Runs until killed, used by Claude/OpenCode
 ```
 
+### Dependency Graph Commands
+
+`uv run cocosearch deps extract <path>`
+
+Extract dependency edges from all indexed files. Parses import/require/uses statements across 8 languages (Python, JavaScript/TypeScript, Go, Docker Compose, GitHub Actions, Terraform, Helm) and stores directed edges with resolved file paths. Runs as a separate pass after indexing.
+
+```bash
+uv run cocosearch deps extract .
+```
+
+`uv run cocosearch deps show <file>`
+
+Show dependencies and dependents for a specific file. Lists both what the file imports (dependencies) and what imports the file (dependents).
+
+```bash
+uv run cocosearch deps show src/cocosearch/deps/extractor.py
+```
+
+`uv run cocosearch deps tree <file> [--depth N] [--type TYPE] [--json]`
+
+Show the transitive forward dependency tree for a file — what does this file depend on, recursively?
+
+| Flag          | Description                          | Default |
+| ------------- | ------------------------------------ | ------- |
+| `--depth`     | Maximum traversal depth              | 5       |
+| `--type`      | Filter by edge type (import/call/reference) | None |
+| `--json`      | Output as JSON instead of Rich tree  | Off     |
+
+```bash
+uv run cocosearch deps tree src/cocosearch/cli.py --depth 3
+uv run cocosearch deps tree src/cocosearch/cli.py --json
+```
+
+`uv run cocosearch deps impact <file> [--depth N] [--type TYPE] [--json]`
+
+Show the reverse impact tree — what would be affected if this file changes?
+
+| Flag          | Description                          | Default |
+| ------------- | ------------------------------------ | ------- |
+| `--depth`     | Maximum traversal depth              | 5       |
+| `--type`      | Filter by edge type (import/call/reference) | None |
+| `--json`      | Output as JSON instead of Rich tree  | Off     |
+
+```bash
+uv run cocosearch deps impact src/cocosearch/search/db.py --depth 2
+uv run cocosearch deps impact src/cocosearch/search/db.py --json
+```
+
+`uv run cocosearch deps stats`
+
+Show dependency graph statistics (total edges, files with dependencies, per-type and per-language breakdowns, top files by connection count).
+
+```bash
+uv run cocosearch deps stats
+```
+
+The `--deps` flag on the `index` command combines indexing with dependency extraction:
+
+```bash
+uv run cocosearch index . --deps
+```
+
 ### Configuration Commands
 
 **Check configuration and connectivity:** `uv run cocosearch config check`

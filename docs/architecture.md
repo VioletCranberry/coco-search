@@ -54,15 +54,31 @@ The search pipeline combines semantic understanding with keyword precision:
 
 See [Retrieval Logic](retrieval.md) for scoring formulas, cache implementation, and performance characteristics.
 
+## Data Flow — Dependency Graph
+
+The dependency graph captures import/call/reference relationships between files, enabling "who depends on this?" and "what does this depend on?" queries.
+
+1. **File Enumeration:** Query the chunks table for all indexed files with known language IDs
+2. **Extraction:** For each file with a registered extractor, parse the source and emit `DependencyEdge` objects. 8 extractors cover: Python imports (tree-sitter), JavaScript/TypeScript (ES6 imports, CommonJS require, re-exports via tree-sitter), Go imports (tree-sitter), Docker Compose (YAML-parsed: image refs, depends_on, extends), GitHub Actions (YAML-parsed: uses action/workflow refs), Terraform (regex-based: module source attributes), Helm (template includes, values image refs, Chart.yaml subchart dependencies).
+3. **Module Resolution:** After all extractors finish, a pluggable resolver framework (`resolver.py`) resolves module names to file paths. Four resolvers: **Python** (dotted modules, `__init__.py` packages, relative imports, `src/`/`lib/` prefix stripping), **JavaScript** (extension probing `.js/.ts/.jsx/.tsx` + index files, bare specifiers → None), **Go** (import path suffix matching against indexed directories), **Terraform** (local `./`/`../` module sources). Unresolvable modules (third-party packages) keep `target_file=None`.
+4. **Storage:** Resolved edges are batch-inserted into a per-index table (`cocosearch_deps_{index_name}`) with columns for source/target file, source/target symbol, dependency type, and JSON metadata.
+5. **Transitive Queries:** BFS-based traversal for forward dependencies (`get_dependency_tree`) and reverse impact analysis (`get_impact`). Both support configurable depth limits (default 5) and cycle detection via visited sets. Returns `DependencyTree` structures for tree visualization.
+
+Extraction runs as a separate pass after CocoIndex indexing — triggered by `--deps` flag on `index` or standalone via `deps extract`.
+
+**Implementation:** `src/cocosearch/deps/` — `extractor.py` (orchestrator), `resolver.py` (module resolution framework), `extractors/` (8 language/grammar extractors), `db.py` (storage), `query.py` (direct + transitive lookups), `models.py` (DependencyEdge, DependencyTree, DepType), `registry.py` (autodiscovery)
+
 ## MCP Integration
 
-CocoSearch exposes five MCP tools for AI assistant integration:
+CocoSearch exposes seven MCP tools for AI assistant integration:
 
-- `search_code` — Async semantic search with hybrid mode, symbol filtering, context expansion. Accepts Context for Roots-based project detection.
+- `search_code` — Async semantic search with hybrid mode, symbol filtering, context expansion. Optional `include_deps` parameter attaches dependency info to results. Accepts Context for Roots-based project detection.
 - `index_codebase` — Create or update code index from directory path
 - `list_indexes` — Show all available indexes with metadata
 - `index_stats` — Get statistics including parse health data and optional `include_failures` parameter for detailed failure listing
 - `clear_index` — Delete an index and all associated data (including parse results)
+- `get_file_dependencies` — Forward dependency query: what does a file depend on? `depth=1` returns flat edge list, `depth>1` returns transitive tree with cycle detection.
+- `get_file_impact` — Reverse impact query: what depends on this file? Returns transitive impact tree for change analysis.
 
 **Transport Support:** stdio (Claude Code), SSE (server-sent events), HTTP (Claude Desktop via mcp-remote bridge)
 

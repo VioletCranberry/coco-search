@@ -134,6 +134,22 @@ Everything described above runs on your machine:
 
 The only external dependencies are Docker (to run Postgres and Ollama) and the embedding model weights (downloaded once by Ollama). After that, you could run CocoSearch on an airplane.
 
+## Beyond Search: Dependency Graph
+
+CocoSearch can also extract dependency relationships between files. After indexing, run `cocosearch deps extract .` to parse import statements and build a directed graph of which files depend on which.
+
+The system supports 8 extractors across programming languages and infrastructure-as-code: Python imports, JavaScript/TypeScript (ES6 imports, CommonJS `require`, re-exports), Go imports, Docker Compose (image refs, `depends_on`, `extends`), GitHub Actions (`uses` refs), Terraform (module sources), and Helm (template includes, image refs, subchart dependencies).
+
+Module names are resolved to actual file paths via language-specific resolvers — Python handles dotted modules, `__init__.py` packages, and `src/` prefixes; JavaScript probes extensions and index files; Go matches import path suffixes; Terraform resolves local module paths. Third-party dependencies (unresolvable modules) are preserved as edges without a target file.
+
+You can query dependencies at two levels:
+- **Direct:** `cocosearch deps show <file>` — what does this file import, and what imports it?
+- **Transitive:** `cocosearch deps tree <file>` — full forward dependency tree (BFS with cycle detection). `cocosearch deps impact <file>` — reverse impact tree showing what would be affected by changes to a file.
+
+Both MCP tools (`get_file_dependencies`, `get_file_impact`) and API endpoints (`/api/deps`, `/api/deps/impact`, `/api/deps/graph`) expose dependency queries for AI assistants and dashboard integration. The `search_code` tool also accepts `include_deps=True` to attach dependency info alongside search results.
+
+See [Architecture Overview](architecture.md) for implementation details and [CLI Reference](cli-reference.md) for commands.
+
 ## Where to Go from Here
 
 - [Architecture Overview](architecture.md) — component diagram, design decisions, module structure
