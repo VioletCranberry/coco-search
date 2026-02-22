@@ -43,7 +43,7 @@ class PythonImportExtractor:
     empty (filled by the orchestrator).
     """
 
-    LANGUAGES: set[str] = {"python"}
+    LANGUAGES: set[str] = {"py"}
 
     def extract(self, file_path: str, content: str) -> list[DependencyEdge]:
         """Extract import dependency edges from a Python source file.

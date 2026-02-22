@@ -16,7 +16,7 @@ from cocosearch.deps.registry import (
 class _ValidExtractor:
     """A valid extractor with LANGUAGES and extract()."""
 
-    LANGUAGES = {"python"}
+    LANGUAGES = {"py"}
 
     def extract(self, file_path: str, content: str) -> list[DependencyEdge]:
         return []
@@ -165,7 +165,7 @@ class TestPythonExtractorRegistered:
 
     def test_python_extractor_registered(self):
         """Python extractor should be discoverable by language_id."""
-        ext = get_extractor("python")
+        ext = get_extractor("py")
         assert ext is not None
 
     def test_python_in_registered_list(self):
@@ -174,4 +174,4 @@ class TestPythonExtractorRegistered:
         languages = set()
         for ext in extractors:
             languages.update(ext.LANGUAGES)
-        assert "python" in languages
+        assert "py" in languages

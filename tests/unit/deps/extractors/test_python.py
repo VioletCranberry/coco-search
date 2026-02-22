@@ -22,7 +22,7 @@ class TestLanguages:
 
     def test_languages_contains_python(self, extractor):
         """LANGUAGES should include 'python'."""
-        assert "python" in extractor.LANGUAGES
+        assert "py" in extractor.LANGUAGES
 
 
 # ============================================================================
