@@ -148,3 +148,29 @@ def test_app_js_imports_all_modules():
     ]
     for module in expected_imports:
         assert module in content, f"app.js missing import from '{module}'"
+
+
+def test_deps_graph_modal_exists(soup):
+    """The dependency graph modal backdrop and SVG must exist."""
+    backdrop = soup.find(id="depsGraphBackdrop")
+    assert backdrop is not None, "Missing #depsGraphBackdrop element"
+    svg = soup.find(id="depsGraphSvg")
+    assert svg is not None, "Missing #depsGraphSvg element"
+
+
+def test_deps_checkbox_exists(soup):
+    """The searchIncludeDeps checkbox must exist in the HTML."""
+    checkbox = soup.find(id="searchIncludeDeps")
+    assert checkbox is not None, "Missing #searchIncludeDeps checkbox"
+    assert checkbox.get("type") == "checkbox", "searchIncludeDeps should be a checkbox"
+
+
+def test_deps_graph_depth_selector_exists(soup):
+    """The depth selector for the dependency graph modal must exist."""
+    select = soup.find(id="depsGraphDepth")
+    assert select is not None, "Missing #depsGraphDepth select element"
+    options = select.find_all("option")
+    values = [opt.get("value") for opt in options]
+    assert "1" in values and "3" in values, (
+        f"Expected depth options 1 and 3, got {values}"
+    )

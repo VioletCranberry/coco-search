@@ -15,6 +15,13 @@ export async function fetchProjects() {
     } catch { return []; }
 }
 
+export async function fetchDepsGraph(file, indexName, depth = 3) {
+    const params = new URLSearchParams({ file, index: indexName, depth: String(depth) });
+    const resp = await fetch(`/api/deps/graph?${params}`);
+    if (!resp.ok) throw new Error((await resp.json()).error || 'Failed to load graph');
+    return await resp.json();
+}
+
 export async function fetchStats(indexName = null) {
     let url = indexName
         ? `/api/stats?index=${encodeURIComponent(indexName)}&include_failures=true`

@@ -172,6 +172,114 @@ class TestApiSearchSmoke:
         assert body["results"][0]["file_path"] == "/test/file.py"
 
 
+class TestApiSearchWithDeps:
+    """Tests for POST /api/search with include_deps through the ASGI stack."""
+
+    @pytest.mark.asyncio
+    async def test_search_with_include_deps_returns_dependencies(self, client):
+        """Returns dependencies and dependents when include_deps is true."""
+        mock_result = MagicMock()
+        mock_result.filename = "/test/file.py"
+        mock_result.start_byte = 0
+        mock_result.end_byte = 100
+        mock_result.score = 0.9
+        mock_result.block_type = "function"
+        mock_result.hierarchy = ""
+        mock_result.language_id = "python"
+        mock_result.match_type = "vector"
+        mock_result.vector_score = 0.9
+        mock_result.keyword_score = None
+        mock_result.symbol_type = "function"
+        mock_result.symbol_name = "hello"
+        mock_result.symbol_signature = "def hello()"
+        mock_result.dependencies = [
+            {"target": "os", "dep_type": "import"},
+            {"target": "sys", "dep_type": "import"},
+        ]
+        mock_result.dependents = [
+            {"source": "main.py", "dep_type": "import"},
+        ]
+
+        with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
+            with patch("cocosearch.mcp.server.search", return_value=[mock_result]):
+                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content",
+                        return_value="def hello(): pass",
+                    ):
+                        response = await client.post(
+                            "/api/search",
+                            json={
+                                "query": "hello function",
+                                "index_name": "myindex",
+                                "include_deps": True,
+                            },
+                        )
+
+        assert response.status_code == 200
+        body = response.json()
+        result = body["results"][0]
+        assert "dependencies" in result
+        assert len(result["dependencies"]) == 2
+        assert "dependents" in result
+        assert len(result["dependents"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_search_without_include_deps_omits_dependencies(self, client):
+        """Does not include dependencies when include_deps is false/absent."""
+        mock_result = MagicMock()
+        mock_result.filename = "/test/file.py"
+        mock_result.start_byte = 0
+        mock_result.end_byte = 100
+        mock_result.score = 0.9
+        mock_result.block_type = "function"
+        mock_result.hierarchy = ""
+        mock_result.language_id = "python"
+        mock_result.match_type = ""
+        mock_result.vector_score = None
+        mock_result.keyword_score = None
+        mock_result.symbol_type = None
+        mock_result.symbol_name = None
+        mock_result.symbol_signature = None
+        mock_result.dependencies = None
+        mock_result.dependents = None
+
+        with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
+            with patch("cocosearch.mcp.server.search", return_value=[mock_result]):
+                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content",
+                        return_value="def hello(): pass",
+                    ):
+                        response = await client.post(
+                            "/api/search",
+                            json={"query": "hello", "index_name": "myindex"},
+                        )
+
+        assert response.status_code == 200
+        result = response.json()["results"][0]
+        assert "dependencies" not in result
+        assert "dependents" not in result
+
+
+class TestApiDepsGraphSmoke:
+    """Tests for GET /api/deps/graph through the ASGI stack."""
+
+    @pytest.mark.asyncio
+    async def test_missing_file_param_returns_400(self, client):
+        """Returns 400 when file param is missing."""
+        response = await client.get("/api/deps/graph?index=myindex")
+        assert response.status_code == 400
+        assert "file" in response.json()["error"]
+
+    @pytest.mark.asyncio
+    async def test_missing_index_param_returns_400(self, client):
+        """Returns 400 when index param is missing."""
+        response = await client.get("/api/deps/graph?file=test.py")
+        assert response.status_code == 400
+        assert "index" in response.json()["error"]
+
+
 class TestApiLanguagesSmoke:
     """Tests for GET /api/languages through the ASGI stack."""
 

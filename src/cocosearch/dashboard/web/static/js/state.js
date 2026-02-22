@@ -15,4 +15,5 @@ export const state = {
     logRetries: 0,
     isUnloading: false,
     toastTimer: null,
+    depsGraphSimulation: null,
 };

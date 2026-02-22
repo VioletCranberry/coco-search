@@ -893,6 +893,7 @@ async def api_search(request) -> JSONResponse:
     min_score = body.get("min_score", 0.3)
     use_hybrid = body.get("use_hybrid")
     no_cache = body.get("no_cache", False)
+    include_deps = body.get("include_deps", False)
     smart_context = body.get("smart_context", False)
     context_before = body.get("context_before")
     context_after = body.get("context_after")
@@ -918,6 +919,7 @@ async def api_search(request) -> JSONResponse:
             symbol_type=symbol_type,
             symbol_name=symbol_name,
             no_cache=no_cache,
+            include_deps=include_deps,
         )
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
@@ -983,6 +985,10 @@ async def api_search(request) -> JSONResponse:
                 result_dict["vector_score"] = r.vector_score
             if r.keyword_score is not None:
                 result_dict["keyword_score"] = r.keyword_score
+
+            if include_deps and r.dependencies is not None:
+                result_dict["dependencies"] = r.dependencies
+                result_dict["dependents"] = r.dependents or []
 
             output.append(result_dict)
     finally:
@@ -1148,12 +1154,20 @@ async def api_deps_graph(request) -> JSONResponse:
     depth = min(int(request.query_params.get("depth", "3")), 20)
 
     try:
-        from cocosearch.deps.query import get_dependency_tree
+        from cocosearch.deps.query import get_dependency_tree, get_impact
 
-        tree = get_dependency_tree(index_name, file, max_depth=depth)
+        seen: set[str] = set()
         nodes: list[dict] = []
         edges: list[dict] = []
-        _tree_to_graph(tree, nodes, edges, set())
+
+        # Forward dependencies (what this file imports)
+        fwd_tree = get_dependency_tree(index_name, file, max_depth=depth)
+        _tree_to_graph(fwd_tree, nodes, edges, seen, direction="forward")
+
+        # Reverse dependencies (what imports this file)
+        rev_tree = get_impact(index_name, file, max_depth=depth)
+        _tree_to_graph(rev_tree, nodes, edges, seen, direction="reverse")
+
         return JSONResponse({"nodes": nodes, "edges": edges})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -1164,7 +1178,13 @@ def _dep_tree_to_dict(tree) -> dict:
     return tree.to_dict()
 
 
-def _tree_to_graph(tree, nodes: list[dict], edges: list[dict], seen: set[str]) -> None:
+def _tree_to_graph(
+    tree,
+    nodes: list[dict],
+    edges: list[dict],
+    seen: set[str],
+    direction: str = "forward",
+) -> None:
     """Convert a DependencyTree to D3 nodes/edges format."""
     if tree.file not in seen:
         seen.add(tree.file)
@@ -1175,9 +1195,10 @@ def _tree_to_graph(tree, nodes: list[dict], edges: list[dict], seen: set[str]) -
                 "source": tree.file,
                 "target": child.file,
                 "dep_type": child.dep_type,
+                "direction": direction,
             }
         )
-        _tree_to_graph(child, nodes, edges, seen)
+        _tree_to_graph(child, nodes, edges, seen, direction=direction)
 
 
 def _get_treesitter_language(ext: str) -> str | None:

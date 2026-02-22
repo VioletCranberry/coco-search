@@ -1195,3 +1195,215 @@ select option:checked {
         right: -100%;
     }
 }
+
+/* Dependency badges on search results */
+.dep-badges {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 4px;
+}
+
+.dep-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    border: 1px solid transparent;
+}
+
+.dep-badge:hover {
+    opacity: 0.85;
+}
+
+.dep-badge-imports {
+    background: rgba(224, 120, 64, 0.2);
+    color: var(--accent-orange);
+    border-color: rgba(224, 120, 64, 0.3);
+}
+
+.dep-badge-dependents {
+    background: rgba(100, 160, 220, 0.2);
+    color: rgb(100, 160, 220);
+    border-color: rgba(100, 160, 220, 0.3);
+}
+
+.dep-badge-zero {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.dep-badge-zero:hover {
+    opacity: 0.35;
+}
+
+/* Expandable dependency panel in search results */
+.search-result-deps {
+    display: none;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: 13px;
+}
+
+.search-result-deps.visible {
+    display: block;
+}
+
+.deps-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.deps-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+}
+
+.deps-file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.deps-file-list li {
+    padding: 2px 0;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deps-overflow { display: none; }
+.deps-overflow.visible { display: contents; }
+.deps-show-more { cursor: pointer; color: var(--accent-blue); }
+.deps-show-more:hover { text-decoration: underline; }
+
+.dep-type-tag {
+    display: inline-block;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: rgba(240, 160, 96, 0.15);
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+
+.deps-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.deps-actions button {
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.deps-actions button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+}
+
+/* Dependency graph modal */
+.deps-graph-modal {
+    width: 92vw;
+    height: 88vh;
+    max-width: 1400px;
+}
+
+.deps-graph-body {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.deps-graph-body svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.deps-depth-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: 16px;
+}
+
+.deps-depth-label select {
+    padding: 2px 20px 2px 6px;
+    font-size: 12px;
+    background-position: right 4px center;
+    background-size: 10px 10px;
+}
+
+/* D3 graph node/edge styles */
+.deps-graph-body .node circle {
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    fill: var(--bg-card);
+}
+
+.deps-graph-body .node.root circle {
+    fill: var(--accent-orange);
+    stroke: var(--accent-orange);
+}
+
+.deps-graph-body .node text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: var(--text-secondary);
+}
+
+.deps-graph-body .node.root text {
+    fill: var(--text-primary);
+    font-weight: 600;
+}
+
+.deps-graph-body .link {
+    stroke: var(--border-color);
+    stroke-width: 1.2;
+    fill: none;
+}
+
+.deps-graph-body .link.reverse {
+    stroke: rgba(100, 160, 220, 0.5);
+    stroke-dasharray: 5 3;
+}
+
+.deps-graph-body .link-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .deps-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .deps-graph-modal {
+        width: 98vw;
+        height: 92vh;
+    }
+}
