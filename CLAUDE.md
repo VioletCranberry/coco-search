@@ -58,6 +58,12 @@ uv run cocosearch config path
 uv run cocosearch config check
 uv run cocosearch dashboard              # Terminal dashboard
 
+# Dependency graph
+uv run cocosearch index . --deps          # Index + extract dependencies
+uv run cocosearch deps extract .          # Extract dependencies (standalone)
+uv run cocosearch deps show <file>        # Show dependencies for a file
+uv run cocosearch deps stats              # Show dependency graph statistics
+
 # MCP server
 uv run cocosearch mcp --project-from-cwd
 ```
@@ -81,6 +87,7 @@ uv run cocosearch mcp --project-from-cwd
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution (`env_substitution.py`), Pydantic schema validation (`schema.py` with `extra="forbid"`, `strict=True`), user-friendly error formatting with fuzzy field suggestions (`errors.py`), env var validation (`env_validation.py`)
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py`), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection and status tracking (`metadata.py`), project root detection (`context.py`)
+- **`deps/`** — Dependency graph framework: pluggable extractors (`extractors/`), edge storage (`db.py`), extraction orchestrator (`extractor.py`), query API (`query.py`), data models (`models.py`), autodiscovery registry (`registry.py`). Extractors operate on whole files (not chunks) and run as a separate pass after CocoIndex indexing. Three edge types: "import" (code imports), "call" (symbol calls), "reference" (grammar-level refs with `metadata.kind` for specifics).
 - **`handlers/`** — Language-specific chunking (HCL, Go Template, Dockerfile, Bash, Scala, Groovy) and grammar handlers (`handlers/grammars/` — Helm Template, Helm Values, GitHub Actions, GitLab CI, Docker Compose, Kubernetes, Terraform) with autodiscovery registry
 - **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards. In stdio MCP mode, `server.py` launches uvicorn in a daemon thread running the MCP server's `sse_app()` — all routes are served from a single source of truth (no duplicated handlers). Web static assets are split into ES modules: `dashboard/web/static/index.html` (HTML only), `css/styles.css`, and `js/` with modules (`app.js` entry point, `state.js` shared state, `api.js`, `utils.js`, `charts.js`, `dashboard.js`, `index-mgmt.js`, `search.js`, `logs.js`). Static files served via `/static/{path}` route with path traversal protection.
 - **`.claude-plugin/`** — Claude Code plugin metadata: `plugin.json` (MCP server definition, version, keywords) and `marketplace.json` (marketplace listing). Versions must match `pyproject.toml` — the release workflow syncs them automatically.
@@ -94,6 +101,7 @@ uv run cocosearch mcp --project-from-cwd
 - CocoIndex framework orchestrates the indexing pipeline in `indexer/flow.py`
 - **CocoIndex table naming:** `codeindex_{index_name}__{index_name}_chunks` (flow name `CodeIndex_{name}` is lowercased by CocoIndex). Parse results go to `cocosearch_parse_results_{index_name}`.
 - Parse status categories: `ok`, `partial`, `error`, `no_grammar`. Text-only formats (md, yaml, json, etc.) are skipped from parse tracking entirely via `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py`.
+- Dependency extractor autodiscovery: any `deps/extractors/*.py` (not prefixed with `_`) implementing `DependencyExtractor` protocol is auto-registered. Lookup by `language_id` (file extension, e.g., "py"). Dependency edges stored in `cocosearch_deps_{index_name}`.
 
 ## Testing
 

@@ -2,8 +2,6 @@
 
 import argparse
 
-from cocosearch.cli import main
-
 
 class TestIndexDepsFlag:
     """Test that --deps flag is accepted by the index parser."""
