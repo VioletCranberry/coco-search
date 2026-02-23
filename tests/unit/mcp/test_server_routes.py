@@ -579,6 +579,8 @@ class TestApiSearchEnhanced:
         mock_result.symbol_type = None
         mock_result.symbol_name = None
         mock_result.symbol_signature = None
+        mock_result.dependencies = None
+        mock_result.dependents = None
 
         mock_expander_instance = MagicMock()
         mock_expander_instance.get_context_lines.return_value = (
@@ -637,6 +639,8 @@ class TestApiSearchEnhanced:
         mock_result.symbol_type = None
         mock_result.symbol_name = None
         mock_result.symbol_signature = None
+        mock_result.dependencies = None
+        mock_result.dependents = None
 
         mock_expander_instance = MagicMock()
         mock_expander_instance.get_context_lines.return_value = (

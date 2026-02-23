@@ -971,7 +971,7 @@ async def api_search(request) -> JSONResponse:
     min_score = body.get("min_score", 0.3)
     use_hybrid = body.get("use_hybrid")
     no_cache = body.get("no_cache", False)
-    include_deps = body.get("include_deps", False)
+    include_deps = body.get("include_deps", True)
     smart_context = body.get("smart_context", False)
     context_before = body.get("context_before")
     context_after = body.get("context_after")
@@ -1546,7 +1546,7 @@ async def search_code(
             description="Include dependency info (imports/dependents) for each result file. "
             "When True, each result includes 'dependencies' and 'dependents' lists."
         ),
-    ] = False,
+    ] = True,
 ) -> list[dict]:
     """Search indexed code using natural language.
 

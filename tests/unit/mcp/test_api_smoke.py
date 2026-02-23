@@ -151,6 +151,8 @@ class TestApiSearchSmoke:
         mock_result.symbol_type = "function"
         mock_result.symbol_name = "hello"
         mock_result.symbol_signature = "def hello()"
+        mock_result.dependencies = None
+        mock_result.dependents = None
 
         with patch("cocosearch.mcp.server._ensure_cocoindex_init"):
             with patch("cocosearch.mcp.server.search", return_value=[mock_result]):
