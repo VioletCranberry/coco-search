@@ -663,6 +663,36 @@ class TestSymbolFilters:
 # ============================================================================
 
 
+def _mock_deps_pool(table_exists=True):
+    """Create a mock pool that simulates deps table existence check."""
+    mock_cursor = type(
+        "C",
+        (),
+        {
+            "execute": lambda self, *a, **kw: None,
+            "fetchone": lambda self: (1,) if table_exists else None,
+            "__enter__": lambda self: self,
+            "__exit__": lambda self, *a: None,
+        },
+    )()
+    mock_conn = type(
+        "Conn",
+        (),
+        {
+            "cursor": lambda self: mock_cursor,
+            "__enter__": lambda self: self,
+            "__exit__": lambda self, *a: None,
+        },
+    )()
+    return type(
+        "Pool",
+        (),
+        {
+            "connection": lambda self: mock_conn,
+        },
+    )()
+
+
 class TestDepsEnrichment:
     """Tests for include_deps search enrichment."""
 
@@ -713,6 +743,10 @@ class TestDepsEnrichment:
         ]
 
         with (
+            patch(
+                "cocosearch.search.query.get_connection_pool",
+                return_value=_mock_deps_pool(table_exists=True),
+            ),
             patch("cocosearch.deps.query.get_dependencies", return_value=mock_deps),
             patch("cocosearch.deps.query.get_dependents", return_value=mock_depnts),
         ):
@@ -747,6 +781,10 @@ class TestDepsEnrichment:
             return []
 
         with (
+            patch(
+                "cocosearch.search.query.get_connection_pool",
+                return_value=_mock_deps_pool(table_exists=True),
+            ),
             patch("cocosearch.deps.query.get_dependencies", side_effect=mock_deps),
             patch("cocosearch.deps.query.get_dependents", side_effect=mock_depnts),
         ):
@@ -757,7 +795,7 @@ class TestDepsEnrichment:
         assert call_count["depnts"] == 2
 
     def test_enrich_handles_query_errors(self):
-        """_enrich_with_deps should gracefully handle query errors."""
+        """Per-file query errors should still produce [] (not None)."""
         from cocosearch.search.query import _enrich_with_deps
 
         results = [
@@ -765,6 +803,10 @@ class TestDepsEnrichment:
         ]
 
         with (
+            patch(
+                "cocosearch.search.query.get_connection_pool",
+                return_value=_mock_deps_pool(table_exists=True),
+            ),
             patch(
                 "cocosearch.deps.query.get_dependencies",
                 side_effect=Exception("DB error"),
@@ -778,3 +820,21 @@ class TestDepsEnrichment:
 
         assert results[0].dependencies == []
         assert results[0].dependents == []
+
+    def test_enrich_skips_when_deps_table_missing(self):
+        """When deps table doesn't exist, .dependencies stays None."""
+        from cocosearch.search.query import _enrich_with_deps
+
+        results = [
+            SearchResult(filename="a.py", start_byte=0, end_byte=50, score=0.9),
+        ]
+
+        with patch(
+            "cocosearch.search.query.get_connection_pool",
+            return_value=_mock_deps_pool(table_exists=False),
+        ):
+            _enrich_with_deps(results, "test")
+
+        # .dependencies should stay None (not [])
+        assert results[0].dependencies is None
+        assert results[0].dependents is None

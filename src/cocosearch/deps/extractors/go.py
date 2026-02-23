@@ -58,9 +58,14 @@ class GoImportExtractor:
 
         edges: list[DependencyEdge] = []
 
-        for node in tree.root_node.children:
+        # Stack-based walk to find imports nested inside function bodies, etc.
+        stack = list(tree.root_node.children)
+        while stack:
+            node = stack.pop()
             if node.type == "import_declaration":
                 edges.extend(self._handle_import_declaration(source, node))
+            else:
+                stack.extend(node.children)
 
         return edges
 

@@ -65,11 +65,17 @@ class PythonImportExtractor:
 
         edges: list[DependencyEdge] = []
 
-        for node in tree.root_node.children:
+        # Stack-based walk to find imports nested inside try/except,
+        # if TYPE_CHECKING:, function bodies, etc.
+        stack = list(tree.root_node.children)
+        while stack:
+            node = stack.pop()
             if node.type == "import_statement":
                 edges.extend(self._handle_import_statement(source, node))
             elif node.type == "import_from_statement":
                 edges.extend(self._handle_import_from_statement(source, node))
+            else:
+                stack.extend(node.children)
 
         return edges
 

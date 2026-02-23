@@ -208,3 +208,71 @@ class TestEdgeFields:
         """target_file should be None (resolved later)."""
         edges = extractor.extract("app.py", "import os\n")
         assert edges[0].target_file is None
+
+
+# ============================================================================
+# Tests: nested imports (try/except, TYPE_CHECKING, functions, if blocks)
+# ============================================================================
+
+
+class TestNestedImports:
+    """Tests for imports nested inside blocks (not at module top level)."""
+
+    def test_import_inside_try_except(self, extractor):
+        """Imports inside try/except should be found."""
+        code = (
+            "try:\n"
+            "    from fast import X\n"
+            "except ImportError:\n"
+            "    from slow import X\n"
+        )
+        edges = extractor.extract("app.py", code)
+        assert len(edges) == 2
+        modules = {e.metadata["module"] for e in edges}
+        assert modules == {"fast", "slow"}
+
+    def test_import_inside_if_type_checking(self, extractor):
+        """Imports inside if TYPE_CHECKING: should be found."""
+        code = (
+            "from typing import TYPE_CHECKING\n"
+            "\n"
+            "if TYPE_CHECKING:\n"
+            "    from rich import Table\n"
+            "    from pathlib import Path\n"
+        )
+        edges = extractor.extract("app.py", code)
+        # 3 edges: TYPE_CHECKING + Table + Path
+        assert len(edges) == 3
+        symbols = {e.target_symbol for e in edges if e.target_symbol}
+        assert "Table" in symbols
+        assert "Path" in symbols
+
+    def test_import_inside_function(self, extractor):
+        """Lazy imports inside function bodies should be found."""
+        code = (
+            "def load_heavy():\n"
+            "    import numpy as np\n"
+            "    from pandas import DataFrame\n"
+            "    return np, DataFrame\n"
+        )
+        edges = extractor.extract("app.py", code)
+        assert len(edges) == 2
+        modules = {e.metadata["module"] for e in edges}
+        assert "numpy" in modules
+        assert "pandas" in modules
+
+    def test_import_inside_if_block(self, extractor):
+        """Conditional imports inside if blocks should be found."""
+        code = (
+            "import sys\n"
+            "if sys.version_info >= (3, 11):\n"
+            "    from tomllib import loads\n"
+            "else:\n"
+            "    from tomli import loads\n"
+        )
+        edges = extractor.extract("app.py", code)
+        assert len(edges) == 3  # sys + tomllib.loads + tomli.loads
+        modules = {e.metadata["module"] for e in edges}
+        assert "sys" in modules
+        assert "tomllib" in modules
+        assert "tomli" in modules

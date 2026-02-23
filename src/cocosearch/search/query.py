@@ -518,6 +518,10 @@ def _enrich_with_deps(results: list[SearchResult], index_name: str) -> None:
 
     For each unique filename in the results, queries forward and reverse
     dependencies and attaches them as lists on the result objects.
+
+    If the deps table doesn't exist (deps never extracted), returns early
+    and leaves .dependencies/.dependents as None so the dashboard can
+    distinguish "no data" from "zero imports."
     """
     try:
         from cocosearch.deps.query import (
@@ -525,6 +529,28 @@ def _enrich_with_deps(results: list[SearchResult], index_name: str) -> None:
             get_dependents as _get_depnts,
         )
     except ImportError:
+        return
+
+    # Check deps table existence once (not per-file)
+    from cocosearch.deps.models import get_deps_table_name
+
+    table = get_deps_table_name(index_name)
+    try:
+        pool = get_connection_pool()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
+                    (table,),
+                )
+                if cur.fetchone() is None:
+                    logger.debug(
+                        "Deps table %s does not exist — skipping enrichment",
+                        table,
+                    )
+                    return  # .dependencies stays None → dashboard hides badges
+    except Exception:
+        logger.warning("Failed to check deps table existence, skipping enrichment")
         return
 
     # Batch: collect unique filenames
@@ -549,6 +575,7 @@ def _enrich_with_deps(results: list[SearchResult], index_name: str) -> None:
                 for e in deps
             ]
         except Exception:
+            logger.warning("Failed to query deps for %s: skipping", filename)
             deps_cache[filename] = []
 
         try:
@@ -561,6 +588,7 @@ def _enrich_with_deps(results: list[SearchResult], index_name: str) -> None:
                 for e in depnts
             ]
         except Exception:
+            logger.warning("Failed to query dependents for %s: skipping", filename)
             depnts_cache[filename] = []
 
     # Attach to results

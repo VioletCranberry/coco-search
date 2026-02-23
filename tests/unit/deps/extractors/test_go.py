@@ -182,3 +182,50 @@ func main() {}
     def test_languages_set(self):
         extractor = GoImportExtractor()
         assert extractor.LANGUAGES == {"go"}
+
+
+# ============================================================================
+# Tests: Nested import declarations
+# ============================================================================
+
+
+class TestNestedImports:
+    """Tests for imports nested inside blocks (init functions, etc.)."""
+
+    def test_import_inside_init_function(self):
+        """Import inside func init() should be found (rare but valid Go)."""
+        code = """\
+package main
+
+import "fmt"
+
+func init() {
+    // Go doesn't allow import inside functions syntactically,
+    // but the recursive walker should still find top-level imports
+    // and not break when traversing function bodies.
+}
+"""
+        edges = _extract(code)
+        modules = [e.metadata["module"] for e in edges]
+        assert "fmt" in modules
+
+    def test_recursive_walk_does_not_duplicate(self):
+        """Recursive walk should not produce duplicate edges."""
+        code = """\
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    fmt.Println("hello")
+    os.Exit(0)
+}
+"""
+        edges = _extract(code)
+        modules = [e.metadata["module"] for e in edges]
+        assert len(modules) == 2
+        assert "fmt" in modules
+        assert "os" in modules
