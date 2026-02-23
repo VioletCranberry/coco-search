@@ -934,12 +934,19 @@ async def api_search(request) -> JSONResponse:
     if smart_context or context_before is not None or context_after is not None:
         expander = ContextExpander()
 
+    # Resolve relative DB paths to absolute using the index's canonical_path
+    metadata = get_index_metadata(index_name)
+    source_path = metadata.get("canonical_path") if metadata else None
+
     output = []
     try:
         for r in results:
-            start_line = byte_to_line(r.filename, r.start_byte)
-            end_line = byte_to_line(r.filename, r.end_byte)
-            content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+            filepath = (
+                os.path.join(source_path, r.filename) if source_path else r.filename
+            )
+            start_line = byte_to_line(filepath, r.start_byte)
+            end_line = byte_to_line(filepath, r.end_byte)
+            content = read_chunk_content(filepath, r.start_byte, r.end_byte)
 
             result_dict = {
                 "file_path": r.filename,
@@ -962,7 +969,7 @@ async def api_search(request) -> JSONResponse:
 
                 before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
                     expander.get_context_lines(
-                        r.filename,
+                        filepath,
                         start_line,
                         end_line,
                         context_before=context_before or 0,
@@ -1573,6 +1580,9 @@ async def search_code(
     # Create context expander for file caching
     expander = ContextExpander()
 
+    # Look up index metadata for header and path resolution
+    metadata = get_index_metadata(index_name)
+
     # Build header with project context when auto-detecting
     output = []
     if root_path is not None:
@@ -1582,19 +1592,24 @@ async def search_code(
             "index_name": index_name,
         }
         # Include last_indexed_at so LLM clients know when the index was built
-        metadata = get_index_metadata(index_name)
         if metadata and metadata.get("updated_at"):
             search_header["last_indexed_at"] = str(metadata["updated_at"])
         output.append(search_header)
+
+    # Resolve relative DB paths to absolute using the index's canonical_path
+    source_path = metadata.get("canonical_path") if metadata else None
 
     # Convert results to dicts with line numbers, content, and context.
     # Wrap in try/finally to ensure expander cache is always cleared,
     # preventing LRU cache leaks (up to 128 files) on exceptions.
     try:
         for r in results:
-            start_line = byte_to_line(r.filename, r.start_byte)
-            end_line = byte_to_line(r.filename, r.end_byte)
-            content = read_chunk_content(r.filename, r.start_byte, r.end_byte)
+            filepath = (
+                os.path.join(source_path, r.filename) if source_path else r.filename
+            )
+            start_line = byte_to_line(filepath, r.start_byte)
+            end_line = byte_to_line(filepath, r.end_byte)
+            content = read_chunk_content(filepath, r.start_byte, r.end_byte)
 
             # Get context if requested or smart context enabled
             context_before_text = ""
@@ -1607,7 +1622,7 @@ async def search_code(
 
                 before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
                     expander.get_context_lines(
-                        r.filename,
+                        filepath,
                         start_line,
                         end_line,
                         context_before=context_before or 0,
