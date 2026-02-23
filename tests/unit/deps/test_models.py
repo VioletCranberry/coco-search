@@ -225,6 +225,51 @@ class TestDependencyTree:
         )
         assert len(tree2.children) == 0
 
+    def test_is_external_default_false(self):
+        """is_external defaults to False."""
+        tree = DependencyTree(file="a.py", symbol=None, dep_type=DepType.IMPORT)
+        assert tree.is_external is False
+
+    def test_is_external_set_true(self):
+        """is_external can be set to True."""
+        tree = DependencyTree(
+            file="fmt", symbol="fmt", dep_type=DepType.IMPORT, is_external=True
+        )
+        assert tree.is_external is True
+
+    def test_to_dict_omits_is_external_when_false(self):
+        """to_dict() should not include is_external when False."""
+        tree = DependencyTree(file="a.py", symbol=None, dep_type=DepType.IMPORT)
+        d = tree.to_dict()
+        assert "is_external" not in d
+
+    def test_to_dict_includes_is_external_when_true(self):
+        """to_dict() should include is_external when True."""
+        tree = DependencyTree(
+            file="fmt", symbol="fmt", dep_type=DepType.IMPORT, is_external=True
+        )
+        d = tree.to_dict()
+        assert d["is_external"] is True
+
+    def test_to_dict_nested_with_external_child(self):
+        """to_dict() correctly serializes a tree with an external child."""
+        ext_child = DependencyTree(
+            file="fmt", symbol="fmt", dep_type=DepType.IMPORT, is_external=True
+        )
+        local_child = DependencyTree(
+            file="src/utils.py", symbol=None, dep_type=DepType.IMPORT
+        )
+        root = DependencyTree(
+            file="src/main.py",
+            symbol=None,
+            dep_type="root",
+            children=[local_child, ext_child],
+        )
+        d = root.to_dict()
+        assert "is_external" not in d
+        assert "is_external" not in d["children"][0]
+        assert d["children"][1]["is_external"] is True
+
 
 @pytest.mark.unit
 class TestGetDepsTableName:

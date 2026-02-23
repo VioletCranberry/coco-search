@@ -2016,11 +2016,18 @@ def _tree_to_dict(tree) -> dict:
 def _build_rich_tree(rich_node, tree_node) -> None:
     """Recursively build a Rich Tree from a DependencyTree."""
     for child in tree_node.children:
-        label = f"[dim]{child.dep_type}[/dim] → {child.file}"
-        if child.symbol:
-            label += f" ([yellow]{child.symbol}[/yellow])"
-        child_rich = rich_node.add(label)
-        _build_rich_tree(child_rich, child)
+        if getattr(child, "is_external", False):
+            label = (
+                f"[dim]{child.dep_type}[/dim] → "
+                f"[dim italic]{child.file}[/dim italic]  (external)"
+            )
+            rich_node.add(label)
+        else:
+            label = f"[dim]{child.dep_type}[/dim] → {child.file}"
+            if child.symbol:
+                label += f" ([yellow]{child.symbol}[/yellow])"
+            child_rich = rich_node.add(label)
+            _build_rich_tree(child_rich, child)
 
 
 def main() -> None:

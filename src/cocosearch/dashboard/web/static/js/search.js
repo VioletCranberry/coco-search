@@ -490,7 +490,11 @@ function renderDepsGraph(data, svgEl, rootFile) {
     const node = g.selectAll('.node')
         .data(nodes)
         .enter().append('g')
-        .attr('class', d => d.id === rootFile ? 'node root' : 'node')
+        .attr('class', d => {
+            if (d.id === rootFile) return 'node root';
+            if (d.is_external) return 'node external';
+            return 'node';
+        })
         .call(d3.drag()
             .on('start', (event, d) => {
                 if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -509,12 +513,23 @@ function renderDepsGraph(data, svgEl, rootFile) {
         );
 
     node.append('circle')
-        .attr('r', d => d.id === rootFile ? 10 : 7);
+        .attr('r', d => {
+            if (d.id === rootFile) return 10;
+            if (d.is_external) return 4;
+            return 7;
+        })
+        .attr('stroke-dasharray', d => d.is_external ? '2,2' : null)
+        .style('opacity', d => d.is_external ? 0.5 : 1);
 
     node.append('text')
         .attr('dx', 14)
         .attr('dy', 4)
-        .text(d => d.label || d.id.split('/').pop());
+        .style('font-style', d => d.is_external ? 'italic' : null)
+        .style('opacity', d => d.is_external ? 0.6 : 1)
+        .text(d => {
+            const label = d.label || d.id.split('/').pop();
+            return d.is_external ? `${label} (ext)` : label;
+        });
 
     simulation.on('tick', () => {
         link

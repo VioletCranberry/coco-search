@@ -6,7 +6,7 @@ from cocosearch.deps.models import DependencyEdge, DepType
 from cocosearch.deps.query import get_dependency_tree, get_impact
 
 
-def _edge(source, target, dep_type=DepType.IMPORT, symbol=None):
+def _edge(source, target, dep_type=DepType.IMPORT, symbol=None, metadata=None):
     """Create a simple DependencyEdge for testing."""
     return DependencyEdge(
         source_file=source,
@@ -14,7 +14,7 @@ def _edge(source, target, dep_type=DepType.IMPORT, symbol=None):
         target_file=target,
         target_symbol=symbol,
         dep_type=dep_type,
-        metadata={},
+        metadata=metadata or {},
     )
 
 
@@ -49,6 +49,29 @@ _CYCLE_DEPS = {
     "a.py": [_edge("a.py", "b.py")],
     "b.py": [_edge("b.py", "c.py")],
     "c.py": [_edge("c.py", "a.py")],
+}
+
+# Mixed: A → B (local) + A → fmt (external, via metadata module) + A → os (external, via symbol)
+_MIXED_DEPS = {
+    "main.go": [
+        _edge("main.go", "pkg/utils.go"),
+        _edge("main.go", None, symbol="fmt", metadata={"module": "fmt"}),
+        _edge(
+            "main.go",
+            None,
+            symbol="client_golang",
+            metadata={"module": "github.com/prometheus/client_golang"},
+        ),
+    ],
+    "pkg/utils.go": [],
+}
+
+# Only external deps
+_EXTERNAL_ONLY_DEPS = {
+    "main.go": [
+        _edge("main.go", None, symbol="fmt", metadata={"module": "fmt"}),
+        _edge("main.go", None, symbol="os"),
+    ],
 }
 
 
@@ -159,6 +182,71 @@ class TestGetDependencyTree:
             tree = get_dependency_tree("test", "a.py")
 
         assert tree.dep_type == "root"
+
+    def test_mixed_local_and_external_deps(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_MIXED_DEPS),
+        ):
+            tree = get_dependency_tree("test", "main.go", max_depth=5)
+
+        assert tree.file == "main.go"
+        assert len(tree.children) == 3
+
+        local = [c for c in tree.children if not c.is_external]
+        external = [c for c in tree.children if c.is_external]
+
+        assert len(local) == 1
+        assert local[0].file == "pkg/utils.go"
+
+        assert len(external) == 2
+        ext_files = {c.file for c in external}
+        assert "fmt" in ext_files
+        assert "github.com/prometheus/client_golang" in ext_files
+        for ext in external:
+            assert ext.children == []
+
+    def test_only_external_deps(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_EXTERNAL_ONLY_DEPS),
+        ):
+            tree = get_dependency_tree("test", "main.go", max_depth=5)
+
+        assert tree.file == "main.go"
+        assert len(tree.children) == 2
+        for child in tree.children:
+            assert child.is_external is True
+            assert child.children == []
+
+        child_files = {c.file for c in tree.children}
+        assert "fmt" in child_files
+        assert "os" in child_files
+
+    def test_external_deps_use_module_metadata(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_MIXED_DEPS),
+        ):
+            tree = get_dependency_tree("test", "main.go", max_depth=5)
+
+        # The prometheus edge has metadata.module, should use that as file label
+        ext = [c for c in tree.children if c.is_external]
+        prometheus = [c for c in ext if "prometheus" in c.file]
+        assert len(prometheus) == 1
+        assert prometheus[0].file == "github.com/prometheus/client_golang"
+
+    def test_external_deps_fallback_to_symbol(self):
+        """When no metadata.module, external dep falls back to target_symbol."""
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_EXTERNAL_ONLY_DEPS),
+        ):
+            tree = get_dependency_tree("test", "main.go", max_depth=5)
+
+        # "os" edge has no metadata.module, should use target_symbol
+        os_nodes = [c for c in tree.children if c.file == "os"]
+        assert len(os_nodes) == 1
 
 
 # ============================================================================

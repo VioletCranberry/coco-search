@@ -211,7 +211,21 @@ def get_dependency_tree(
         edges = get_dependencies(index_name, node.file, dep_type=dep_type)
         for edge in edges:
             target = edge.target_file
-            if target is None or target in visited:
+            if target is None:
+                # External/unresolved dependency — add as non-traversable leaf
+                ext_label = (
+                    edge.metadata.get("module") or edge.target_symbol or "unknown"
+                )
+                child = DependencyTree(
+                    file=ext_label,
+                    symbol=edge.target_symbol,
+                    dep_type=edge.dep_type,
+                    children=[],
+                    is_external=True,
+                )
+                node.children.append(child)
+                continue
+            if target in visited:
                 continue
             visited.add(target)
             child = DependencyTree(

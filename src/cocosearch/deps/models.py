@@ -65,15 +65,19 @@ class DependencyTree:
     symbol: str | None
     dep_type: str
     children: list["DependencyTree"] = field(default_factory=list)
+    is_external: bool = False
 
     def to_dict(self) -> dict:
         """Convert to a JSON-serializable dict."""
-        return {
+        d = {
             "file": self.file,
             "symbol": self.symbol,
             "dep_type": self.dep_type,
             "children": [c.to_dict() for c in self.children],
         }
+        if self.is_external:
+            d["is_external"] = True
+        return d
 
 
 def get_deps_table_name(index_name: str) -> str:

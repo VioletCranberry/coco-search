@@ -440,6 +440,54 @@ async def api_reindex(request) -> JSONResponse:
     )
 
 
+@mcp.custom_route("/api/extract-deps", methods=["POST"])
+async def api_extract_deps(request) -> JSONResponse:
+    """Extract dependency edges for an index."""
+    import asyncio
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+    index_name = body.get("index_name")
+    if not index_name:
+        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    # Look up source path from metadata, with fallbacks
+    metadata = get_index_metadata(index_name)
+    source_path = metadata.get("canonical_path") if metadata else None
+
+    if not source_path:
+        source_path = body.get("source_path")
+        if not source_path:
+            return JSONResponse(
+                {"error": f"Index '{index_name}' not found or has no source path"},
+                status_code=400,
+            )
+
+    try:
+        from cocosearch.deps.extractor import extract_dependencies
+
+        loop = asyncio.get_event_loop()
+        stats = await loop.run_in_executor(
+            None, extract_dependencies, index_name, source_path
+        )
+        edges = stats.get("edges_found", 0)
+        return JSONResponse(
+            {
+                "success": True,
+                "message": f"Extracted {edges} dependency edges for '{index_name}'",
+                "stats": stats,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Dependency extraction failed: {e}")
+        return JSONResponse(
+            {"error": f"Dependency extraction failed: {e}"}, status_code=500
+        )
+
+
 @mcp.custom_route("/api/project", methods=["GET"])
 async def api_project(request) -> JSONResponse:
     """Return current project context based on COCOSEARCH_PROJECT_PATH."""
@@ -1201,7 +1249,10 @@ def _tree_to_graph(
     """Convert a DependencyTree to D3 nodes/edges format."""
     if tree.file not in seen:
         seen.add(tree.file)
-        nodes.append({"id": tree.file, "label": tree.file.rsplit("/", 1)[-1]})
+        node_dict = {"id": tree.file, "label": tree.file.rsplit("/", 1)[-1]}
+        if getattr(tree, "is_external", False):
+            node_dict["is_external"] = True
+        nodes.append(node_dict)
     for child in tree.children:
         edges.append(
             {

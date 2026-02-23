@@ -346,6 +346,53 @@ class TestApiLanguagesSmoke:
         assert python_lang["deps"] is True
 
 
+class TestApiExtractDepsSmoke:
+    """Tests for POST /api/extract-deps through the ASGI stack."""
+
+    @pytest.mark.asyncio
+    async def test_missing_index_name_returns_400(self, client):
+        """Returns 400 when index_name is missing."""
+        response = await client.post("/api/extract-deps", json={})
+        assert response.status_code == 400
+        assert "index_name is required" in response.json()["error"]
+
+    @pytest.mark.asyncio
+    async def test_no_source_path_returns_400(self, client):
+        """Returns 400 when index has no source path and none provided."""
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=None):
+            response = await client.post(
+                "/api/extract-deps", json={"index_name": "myindex"}
+            )
+        assert response.status_code == 400
+        assert "not found or has no source path" in response.json()["error"]
+
+    @pytest.mark.asyncio
+    async def test_successful_extraction(self, client):
+        """Returns 200 with edge count on success."""
+        metadata = {"canonical_path": "/projects/myproject"}
+        stats = {
+            "files_processed": 10,
+            "files_skipped": 2,
+            "edges_found": 42,
+            "errors": 0,
+        }
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=metadata):
+            with patch(
+                "cocosearch.deps.extractor.extract_dependencies",
+                return_value=stats,
+            ):
+                response = await client.post(
+                    "/api/extract-deps", json={"index_name": "myindex"}
+                )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is True
+        assert "42" in body["message"]
+        assert body["stats"]["edges_found"] == 42
+
+
 class TestApiGrammarsSmoke:
     """Tests for GET /api/grammars through the ASGI stack."""
 

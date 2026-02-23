@@ -1380,6 +1380,18 @@ select option:checked {
     font-weight: 600;
 }
 
+.deps-graph-body .node.external circle {
+    fill: var(--bg-secondary);
+    stroke: var(--text-muted);
+    stroke-dasharray: 2 2;
+    opacity: 0.5;
+}
+
+.deps-graph-body .node.external text {
+    fill: var(--text-muted);
+    font-style: italic;
+}
+
 .deps-graph-body .link {
     stroke: var(--border-color);
     stroke-width: 1.2;

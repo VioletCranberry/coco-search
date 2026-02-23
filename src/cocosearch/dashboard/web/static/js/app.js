@@ -4,7 +4,7 @@ import { updateTabStatus } from './dashboard.js';
 import { toggleLanguageDetails, toggleGrammarDetails } from './dashboard.js';
 import {
     loadIndexList, onIndexSelectChange,
-    reindex, stopIndexing, deleteIndex, indexCurrentProject,
+    reindex, stopIndexing, deleteIndex, indexCurrentProject, extractDeps,
 } from './index-mgmt.js';
 import {
     executeSearch, clearSearch, toggleCodeExpand, openInEditor, viewFile, closeFileModal,
@@ -34,6 +34,7 @@ document.getElementById('reindexBtn').addEventListener('click', () => reindex(fa
 document.getElementById('freshIndexBtn').addEventListener('click', () => reindex(true));
 document.getElementById('stopIndexBtn').addEventListener('click', stopIndexing);
 document.getElementById('deleteIndexBtn').addEventListener('click', deleteIndex);
+document.getElementById('extractDepsBtn').addEventListener('click', extractDeps);
 
 // Search
 document.getElementById('searchInput').addEventListener('keydown', (e) => {
