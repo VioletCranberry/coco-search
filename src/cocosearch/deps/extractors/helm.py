@@ -2,15 +2,18 @@
 
 Extracts references from Helm template and values files:
 - **helm-template**: ``{{ include "name" }}`` and ``{{ template "name" }}``
-  template inclusions, ``{{ .Values.X }}`` value references
-- **helm-values**: ``image.repository``/``image.tag`` container image refs
+  template inclusions
+- **helm-values**: chart membership edges linking values files to Chart.yaml
 
 Also handles ``Chart.yaml`` subchart dependencies when language_id
 matches (detected by filename).
 
-All edges use ``dep_type = DepType.REFERENCE``.
+All edges use ``dep_type = DepType.REFERENCE``.  Chart membership edges
+carry ``is_subchart: True`` when the file belongs to a subchart
+(i.e. its Chart.yaml sits inside a ``/charts/`` directory).
 """
 
+import posixpath
 import re
 
 import yaml
@@ -21,14 +24,11 @@ from cocosearch.deps.models import DependencyEdge, DepType
 _INCLUDE_RE = re.compile(r'\{\{-?\s*include\s+"([^"]+)"')
 _TEMPLATE_RE = re.compile(r'\{\{-?\s*template\s+"([^"]+)"')
 
-# Match {{ .Values.X.Y.Z ... }}
-_VALUES_REF_RE = re.compile(r"\{\{-?\s*\.Values\.([\w.]+)")
-
 
 class HelmExtractor:
     """Extractor for Helm template and values reference edges."""
 
-    LANGUAGES: set[str] = {"helm-template", "helm-values"}
+    LANGUAGES: set[str] = {"helm-template", "helm-values", "helm-chart"}
 
     def extract(self, file_path: str, content: str) -> list[DependencyEdge]:
         if not content:
@@ -36,17 +36,80 @@ class HelmExtractor:
 
         # Detect Chart.yaml by filename
         if file_path.endswith("Chart.yaml") or file_path.endswith("Chart.yml"):
-            return self._extract_chart_yaml(content)
+            edges = self._extract_chart_yaml(content, file_path)
+            parent_edge = self._extract_subchart_parent(file_path)
+            if parent_edge:
+                edges.append(parent_edge)
+            return edges
 
         # Detect values files by path pattern
         basename = file_path.rsplit("/", 1)[-1] if "/" in file_path else file_path
         if basename.startswith("values") and (
             basename.endswith(".yaml") or basename.endswith(".yml")
         ):
-            return self._extract_values(content)
+            membership = self._extract_chart_membership(file_path, "values")
+            return [membership] if membership else []
 
         # Default: treat as template file
-        return self._extract_template(content)
+        edges = self._extract_template(content)
+        membership = self._extract_chart_membership(file_path, "template")
+        if membership:
+            edges.append(membership)
+        return edges
+
+    @staticmethod
+    def _infer_chart_yaml(file_path: str, member_type: str) -> str | None:
+        """Infer the Chart.yaml path for a file within a Helm chart.
+
+        For templates: find /templates/ in path, chart root = everything before it.
+        For values: parent directory is the chart root.
+
+        Returns the inferred Chart.yaml path, or None if it can't be determined.
+        """
+        if member_type == "template":
+            idx = file_path.find("/templates/")
+            if idx == -1:
+                return None
+            chart_root = file_path[:idx]
+            return f"{chart_root}/Chart.yaml"
+        # values: parent directory is chart root
+        if "/" not in file_path:
+            return None
+        chart_root = file_path.rsplit("/", 1)[0]
+        return f"{chart_root}/Chart.yaml"
+
+    def _extract_chart_membership(
+        self, file_path: str, member_type: str
+    ) -> DependencyEdge | None:
+        """Create a chart membership edge from a template/values file to its Chart.yaml."""
+        chart_yaml = self._infer_chart_yaml(file_path, member_type)
+        if not chart_yaml:
+            return None
+        return DependencyEdge(
+            source_file="",
+            source_symbol=None,
+            target_file=chart_yaml,
+            target_symbol=None,
+            dep_type=DepType.REFERENCE,
+            metadata={"kind": "chart_member", "member_type": member_type}
+            | ({"is_subchart": True} if "/charts/" in chart_yaml else {}),
+        )
+
+    @staticmethod
+    def _extract_subchart_parent(file_path: str) -> DependencyEdge | None:
+        """Create a subchart-to-parent edge for Chart.yaml inside a /charts/ directory."""
+        idx = file_path.rfind("/charts/")
+        if idx == -1:
+            return None
+        parent_root = file_path[:idx]
+        return DependencyEdge(
+            source_file="",
+            source_symbol=None,
+            target_file=f"{parent_root}/Chart.yaml",
+            target_symbol=None,
+            dep_type=DepType.REFERENCE,
+            metadata={"kind": "subchart_of"},
+        )
 
     def _extract_template(self, content: str) -> list[DependencyEdge]:
         """Extract template references from a Helm template file."""
@@ -78,66 +141,9 @@ class HelmExtractor:
                 )
             )
 
-        seen_refs: set[str] = set()
-        for match in _VALUES_REF_RE.finditer(content):
-            ref = match.group(1)
-            if ref not in seen_refs:
-                seen_refs.add(ref)
-                edges.append(
-                    DependencyEdge(
-                        source_file="",
-                        source_symbol=None,
-                        target_file=None,
-                        target_symbol=None,
-                        dep_type=DepType.REFERENCE,
-                        metadata={"kind": "values_ref", "name": ref},
-                    )
-                )
-
         return edges
 
-    def _extract_values(self, content: str) -> list[DependencyEdge]:
-        """Extract image references from a Helm values file."""
-        try:
-            data = yaml.safe_load(content)
-        except yaml.YAMLError:
-            return []
-
-        if not isinstance(data, dict):
-            return []
-
-        edges: list[DependencyEdge] = []
-        self._find_image_refs(data, edges, [])
-        return edges
-
-    def _find_image_refs(
-        self, data: dict, edges: list[DependencyEdge], path: list[str]
-    ) -> None:
-        """Recursively find image references in a values dict."""
-        if not isinstance(data, dict):
-            return
-
-        # Check for image.repository pattern
-        if "repository" in data and isinstance(data["repository"], str):
-            repo = data["repository"]
-            tag = data.get("tag", "latest")
-            ref = f"{repo}:{tag}" if isinstance(tag, str) else repo
-            edges.append(
-                DependencyEdge(
-                    source_file="",
-                    source_symbol=".".join(path) if path else None,
-                    target_file=None,
-                    target_symbol=None,
-                    dep_type=DepType.REFERENCE,
-                    metadata={"kind": "image", "name": ref},
-                )
-            )
-
-        for key, value in data.items():
-            if isinstance(value, dict):
-                self._find_image_refs(value, edges, path + [key])
-
-    def _extract_chart_yaml(self, content: str) -> list[DependencyEdge]:
+    def _extract_chart_yaml(self, content: str, file_path: str) -> list[DependencyEdge]:
         """Extract subchart dependencies from Chart.yaml."""
         try:
             data = yaml.safe_load(content)
@@ -151,6 +157,8 @@ class HelmExtractor:
         dependencies = data.get("dependencies", [])
         if not isinstance(dependencies, list):
             return edges
+
+        chart_dir = posixpath.dirname(file_path)
 
         for dep in dependencies:
             if not isinstance(dep, dict):
@@ -167,13 +175,13 @@ class HelmExtractor:
 
             target_file = None
             if is_local:
-                # Strip file:// prefix
                 local_path = repository
                 if local_path.startswith("file://"):
                     local_path = local_path[7:]
-                if local_path.startswith("./"):
-                    local_path = local_path[2:]
-                target_file = local_path
+                resolved = posixpath.normpath(
+                    posixpath.join(chart_dir, local_path) if chart_dir else local_path
+                )
+                target_file = resolved + "/Chart.yaml"
 
             edges.append(
                 DependencyEdge(

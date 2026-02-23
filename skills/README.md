@@ -10,6 +10,7 @@ Reusable AI coding assistant skills that leverage CocoSearch's semantic and symb
 | [cocosearch-onboarding](./cocosearch-onboarding/SKILL.md) | Guided tour of a new codebase: architecture, layers, patterns | Yes |
 | [cocosearch-explore](./cocosearch-explore/SKILL.md) | Codebase exploration with two modes: autonomous (subagent/plan mode) and interactive ("how does X work?") | Both |
 | [cocosearch-debugging](./cocosearch-debugging/SKILL.md) | Root cause analysis: symptom parsing, call tracing, fix suggestions | Yes |
+| [cocosearch-deps](./cocosearch-deps/SKILL.md) | Dependency graph exploration: impact analysis, connection tracing, hub identification | Yes |
 | [cocosearch-refactoring](./cocosearch-refactoring/SKILL.md) | Safe refactoring: full impact analysis, dependency mapping, step-by-step execution | Yes |
 | [cocosearch-new-feature](./cocosearch-new-feature/SKILL.md) | Add new functionality: find patterns, match conventions, integrate | Yes |
 | [cocosearch-subway](./cocosearch-subway/SKILL.md) | Visualize codebase as an interactive London Underground-style subway map | Yes |
@@ -26,7 +27,7 @@ claude plugin marketplace add VioletCranberry/coco-search
 claude plugin install cocosearch@cocosearch
 ```
 
-This automatically configures the MCP server and all 10 skills. No symlinks or manual setup needed.
+This automatically configures the MCP server and all 11 skills. No symlinks or manual setup needed.
 
 ### Claude Code (project-local)
 
@@ -34,7 +35,7 @@ Symlink skills from a cloned CocoSearch repo into your project:
 
 ```bash
 mkdir -p .claude/skills
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor; do
     ln -sfn "../../skills/$skill" ".claude/skills/$skill"
 done
 ```
@@ -44,7 +45,7 @@ done
 Copy skills to your global Claude config:
 
 ```bash
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor; do
     mkdir -p ~/.claude/skills/$skill
     cp skills/$skill/SKILL.md ~/.claude/skills/$skill/SKILL.md
 done
@@ -55,7 +56,7 @@ done
 Copy skills to your OpenCode config:
 
 ```bash
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-subway cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor; do
     mkdir -p ~/.config/opencode/skills/$skill
     cp skills/$skill/SKILL.md ~/.config/opencode/skills/$skill/SKILL.md
 done

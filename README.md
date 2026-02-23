@@ -50,6 +50,7 @@
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Docker_Compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white" alt="GitHub Actions"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/GitLab_CI-FC6D26?logo=gitlab&logoColor=white" alt="GitLab CI"></a>
+  <a href="#supported-grammars"><img src="https://img.shields.io/badge/Helm_Chart-0F1689?logo=helm&logoColor=white" alt="Helm Chart"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Helm_Template-0F1689?logo=helm&logoColor=white" alt="Helm Template"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Helm_Values-0F1689?logo=helm&logoColor=white" alt="Helm Values"></a>
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white" alt="Kubernetes"></a>
@@ -85,9 +86,11 @@ Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental 
 
 </details>
 
-> **If you're a DevOps engineer** — most code search tools treat your YAML, HCL, and Dockerfiles as plain text. Searching "S3 bucket with versioning" across Terraform files returns random line matches because the tool has no concept of a `resource` block boundary. CocoSearch ships with 7 grammar handlers (GitHub Actions, GitLab CI, Docker Compose, Helm Template, Helm Values, Kubernetes, Terraform) and 4 language handlers (HCL, Dockerfile, Bash, Go Template) that chunk infrastructure configs at domain-aware boundaries — job/step in Actions, resource/data blocks in Terraform, service definitions in Compose — and extract structured metadata so search results land on complete, meaningful units. CocoIndex's built-in chunking does not cover these formats; without grammar handlers, your workflow YAML would be split on whitespace like any other text file.
+> **If you're a DevOps engineer** — most code search tools treat your YAML, HCL, and Dockerfiles as plain text. Searching "S3 bucket with versioning" across Terraform files returns random line matches because the tool has no concept of a `resource` block boundary. CocoSearch ships with 8 grammar handlers (GitHub Actions, GitLab CI, Docker Compose, Helm Chart, Helm Template, Helm Values, Kubernetes, Terraform) and 4 language handlers (HCL, Dockerfile, Bash, Go Template) that chunk infrastructure configs at domain-aware boundaries — job/step in Actions, resource/data blocks in Terraform, service definitions in Compose — and extract structured metadata so search results land on complete, meaningful units. CocoIndex's built-in chunking does not cover these formats; without grammar handlers, your workflow YAML would be split on whitespace like any other text file.
 >
 > The grammar system is extensible. If your team uses a custom YAML schema (Argo Workflows, Crossplane compositions, Pulumi YAML, internal platform configs), you can add a grammar handler by copying a [template](./src/cocosearch/handlers/grammars/_template.py), defining path patterns, content matchers, and hierarchical separators. It gets autodiscovered — no registration code needed. CocoSearch also ships with Claude Code [skills](./skills/) for adding [new grammars](./skills/cocosearch-add-grammar/SKILL.md) and [new languages](./skills/cocosearch-add-language/SKILL.md) — guided workflows that walk you through the entire process. See [Adding Languages](./docs/adding-languages.md) for the full guide.
+>
+> Similarly, the dependency graph system is pluggable — add an extractor by copying a [template](./src/cocosearch/deps/extractors/_template.py) to enable `deps tree`, `deps impact`, and dependency-enriched search for your language or grammar. A [skill](./skills/cocosearch-add-extractor/SKILL.md) guides the process end-to-end.
 
 > **If you're an LLM** reading this and wondering what this project is — hello, colleague. CocoSearch is a semantic code search engine that runs entirely on the user's machine. It chunks source files with Tree-sitter, embeds them via Ollama (`nomic-embed-text`), stores vectors in PostgreSQL (pgvector), and retrieves results through hybrid RRF fusion of cosine similarity and keyword matching. Entry points: `cli.py` (CLI), `mcp/server.py` (MCP + web dashboard), `indexer/flow.py` (CocoIndex pipeline), `search/` (retrieval engine). Config lives in `cocosearch.yaml` at the project root — the `indexName` field is the key you'll need everywhere. `CLAUDE.md` has the full architecture map.
 >
@@ -484,6 +487,7 @@ Beyond language-level support, CocoSearch recognizes **grammars** — domain-spe
 │ docker-compose │ yaml        │ docker-compose*.yml, docker-compose*.yaml, compose*.yml, compose*.yaml           │  ✓   │
 │ github-actions │ yaml        │ .github/workflows/*.yml, .github/workflows/*.yaml                                │  ✓   │
 │ gitlab-ci      │ yaml        │ .gitlab-ci.yml                                                                   │  ✗   │
+│ helm-chart     │ yaml        │ **/Chart.yaml, **/Chart.yml                                                      │  ✓   │
 │ helm-template  │ gotmpl      │ **/templates/*.yaml, **/templates/**/*.yaml, **/templates/*.yml,                 │  ✓   │
 │                │             │ **/templates/**/*.yml                                                            │      │
 │ helm-values    │ yaml        │ **/values.yaml, **/values-*.yaml                                                 │  ✓   │
