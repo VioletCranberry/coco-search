@@ -145,7 +145,7 @@ export async function loadIndexList() {
         // Determine which index to select
         let selectedIndex = 0;
         let projectNotIndexed = false;
-        if (state.projectContext) {
+        if (state.projectContext && state.projectContext.has_project) {
             if (state.projectContext.is_indexed) {
                 // Find the project's index in the list and auto-select it
                 const matchIdx = state.allIndexes.findIndex(
@@ -165,8 +165,8 @@ export async function loadIndexList() {
             }
         }
 
-        if (projectNotIndexed) {
-            // Don't load dashboard data — just show the not-indexed banner
+        if (projectNotIndexed && state.allIndexes.length === 0) {
+            // No indexes at all — only show the not-indexed banner
         } else if (state.allIndexes.length > 0) {
             await loadDashboard(selectedIndex);
 

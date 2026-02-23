@@ -339,10 +339,16 @@ export function updateDashboard(stats) {
     state.grammarFailuresData = stats.grammar_failures || [];
     updateSummaryCards(stats);
     updateWarnings(stats.warnings);
-    updateLanguageChart(stats.languages || []);
-    updateSymbolChart(stats.symbols || {});
-    updateGrammarChart(stats.grammars || []);
+    // Populate language filter before charts — charts depend on CDN libs
+    // and a failure there must not prevent the filter from updating
+    populateLanguageFilter(stats.languages || []);
+    try {
+        updateLanguageChart(stats.languages || []);
+        updateSymbolChart(stats.symbols || {});
+        updateGrammarChart(stats.grammars || []);
+    } catch (e) {
+        console.warn('Chart update failed:', e);
+    }
     updateGrammarHealthTable(stats.grammars || []);
     updateParseHealthTable(stats.parse_stats);
-    populateLanguageFilter(stats.languages || []);
 }

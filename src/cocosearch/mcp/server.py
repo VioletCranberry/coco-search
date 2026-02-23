@@ -134,6 +134,7 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
     """
     _ensure_cocoindex_init()
     indexes = mgmt_list_indexes()
+    logger.debug("build_all_stats: found %d indexes: %s", len(indexes), [i["name"] for i in indexes])
     all_stats = []
     for idx in indexes:
         try:
@@ -144,7 +145,8 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
                 result["parse_failures"] = get_parse_failures(idx["name"])
                 result["grammar_failures"] = get_grammar_failures(idx["name"])
             all_stats.append(result)
-        except ValueError:
+        except ValueError as e:
+            logger.warning("build_all_stats: skipped index %r: %s", idx["name"], e)
             continue
     return all_stats
 
