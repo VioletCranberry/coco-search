@@ -37,6 +37,32 @@ from cocosearch.validation import validate_index_name
 logger = logging.getLogger(__name__)
 
 
+def _clean_stale_flow_state(index_name: str, db_url: str) -> None:
+    """Remove stale CocoIndex metadata and data tables for a flow.
+
+    Called when CocoIndex's own drop()/setup() fail due to version mismatch
+    in the cocoindex_setup_metadata table.  Cleans up directly via SQL so
+    a fresh flow can be created from scratch.
+    """
+    from cocoindex.flow import get_flow_full_name
+
+    flow_name = f"CodeIndex_{index_name}"
+    full_name = get_flow_full_name(flow_name)
+    data_table = f"codeindex_{index_name}__{index_name}_chunks"
+
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM cocoindex_setup_metadata WHERE flow_name = %s",
+                (full_name,),
+            )
+            cur.execute(f"DROP TABLE IF EXISTS {data_table}")
+            cur.execute(f"DROP TABLE IF EXISTS cocosearch_parse_results_{index_name}")
+            cur.execute(f"DROP TABLE IF EXISTS cocosearch_deps_{index_name}")
+        conn.commit()
+    logger.info("Cleaned stale flow state for index '%s'", index_name)
+
+
 def create_code_index_flow(
     index_name: str,
     codebase_path: str,
@@ -246,36 +272,45 @@ def run_index(
             )
         logger.info(f"Dropped flow for index '{index_name}' (--fresh)")
 
-    # Setup flow (creates tables if needed)
-    flow.setup()
-
-    # Ensure symbol columns exist in target table
-    # This must happen after setup (table exists) but before update (data insertion)
+    # Setup flow, ensure schema, and run indexing.
     db_url = get_database_url()
 
-    # Get the actual table name following CocoIndex naming convention
     # CocoIndex naming: {flow_name}__{target_name}
     # Flow name: CodeIndex_{index_name} -> lowercased to codeindex_{index_name}
     # Target name: {index_name}_chunks
     table_name = f"codeindex_{index_name}__{index_name}_chunks"
 
-    # Detect stale CocoIndex state: internal metadata exists but data table was
-    # dropped externally.  CocoIndex would report "no changes" and skip indexing.
-    # Fix: drop the flow to clear internal tracking, then re-setup.
-    if not fresh:
+    def _setup_and_update():
+        """Setup flow, ensure schema columns, and run flow.update()."""
+        flow.setup()
         with psycopg.connect(db_url) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT 1 FROM information_schema.tables WHERE table_name = %s",
-                    (table_name,),
-                )
-                table_exists = cur.fetchone() is not None
-        if not table_exists:
+            symbol_result = ensure_symbol_columns(conn, table_name)
+            ensure_parse_results_table(conn, index_name)
+        if symbol_result.get("columns_added"):
+            from cocosearch.search.db import reset_symbol_columns_cache
+
+            reset_symbol_columns_cache()
+        return flow.update()
+
+    # Stale-state recovery: if the flow definition changed (e.g. different
+    # codebase_path from a worktree, or updated CocoSearch code), setup/update
+    # will fail with "does not exist" or "newer version" errors.  CocoIndex's
+    # own drop() also fails in this case (same version check), so we clean the
+    # internal metadata table directly via SQL and retry with a fresh flow.
+    try:
+        update_info = _setup_and_update()
+    except Exception as e:
+        err_msg = str(e)
+        if ("does not exist" in err_msg or "newer version" in err_msg) and not fresh:
             logger.warning(
-                f"Data table {table_name} missing but flow exists — "
-                "resetting stale CocoIndex state"
+                "Stale CocoIndex state detected during setup/update — "
+                "resetting and retrying"
             )
-            flow.drop()
+            try:
+                flow.close()
+            except Exception:
+                logger.debug("flow.close() failed during recovery (non-fatal)")
+            _clean_stale_flow_state(index_name, db_url)
             flow = create_code_index_flow(
                 index_name=index_name,
                 codebase_path=codebase_path,
@@ -284,21 +319,9 @@ def run_index(
                 chunk_size=config.chunk_size,
                 chunk_overlap=config.chunk_overlap,
             )
-            flow.setup()
-
-    with psycopg.connect(db_url) as conn:
-        symbol_result = ensure_symbol_columns(conn, table_name)
-        ensure_parse_results_table(conn, index_name)
-
-    # Invalidate symbol columns cache after migration so searches
-    # pick up newly added columns without requiring a process restart
-    if symbol_result.get("columns_added"):
-        from cocosearch.search.db import reset_symbol_columns_cache
-
-        reset_symbol_columns_cache()
-
-    # Run indexing and return statistics
-    update_info = flow.update()
+            update_info = _setup_and_update()
+        else:
+            raise
 
     # Determine if any files actually changed
     has_changes = True  # conservative default
