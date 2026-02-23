@@ -134,7 +134,11 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
     """
     _ensure_cocoindex_init()
     indexes = mgmt_list_indexes()
-    logger.debug("build_all_stats: found %d indexes: %s", len(indexes), [i["name"] for i in indexes])
+    logger.debug(
+        "build_all_stats: found %d indexes: %s",
+        len(indexes),
+        [i["name"] for i in indexes],
+    )
     all_stats = []
     for idx in indexes:
         try:
