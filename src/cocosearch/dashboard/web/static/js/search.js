@@ -2,7 +2,15 @@ import { state } from './state.js';
 import { escapeHtml, copyToClipboard, showToast, resolveFilePath } from './utils.js';
 import { fetchDepsGraph } from './api.js';
 
+let _abortController = null;
+
 export async function executeSearch() {
+    // If a search is in flight, cancel it instead
+    if (_abortController) {
+        cancelSearch();
+        return;
+    }
+
     const query = document.getElementById('searchInput').value.trim();
     if (!query) return;
 
@@ -19,13 +27,17 @@ export async function executeSearch() {
     const useHybrid = hybridVal === 'on' ? true : hybridVal === 'off' ? false : undefined;
     const includeDeps = document.getElementById('searchIncludeDeps').checked;
 
-    // Show loading
+    // Show loading, swap button to Cancel
+    const searchBtn = document.getElementById('searchBtn');
     document.getElementById('searchLoading').style.display = 'block';
     document.getElementById('searchEmpty').style.display = 'none';
     document.getElementById('searchError').style.display = 'none';
     document.getElementById('searchResultsInfo').style.display = 'none';
     document.getElementById('searchResults').innerHTML = '';
-    document.getElementById('searchBtn').disabled = true;
+    searchBtn.textContent = 'Cancel';
+    searchBtn.classList.add('cancel-mode');
+
+    _abortController = new AbortController();
 
     try {
         const body = {
@@ -42,12 +54,10 @@ export async function executeSearch() {
         const resp = await fetch('/api/search', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            signal: _abortController.signal
         });
         const data = await resp.json();
-
-        document.getElementById('searchLoading').style.display = 'none';
-        document.getElementById('searchBtn').disabled = false;
 
         if (!resp.ok) {
             document.getElementById('searchError').textContent = data.error || 'Search failed';
@@ -59,15 +69,31 @@ export async function executeSearch() {
         displaySearchResults(data);
         document.getElementById('clearSearchBtn').style.display = '';
     } catch (err) {
-        document.getElementById('searchLoading').style.display = 'none';
-        document.getElementById('searchBtn').disabled = false;
-        document.getElementById('searchError').textContent = 'Search failed: ' + err.message;
-        document.getElementById('searchError').style.display = 'block';
+        if (err.name === 'AbortError') {
+            document.getElementById('searchEmpty').textContent = 'Search cancelled.';
+            document.getElementById('searchEmpty').style.display = 'block';
+        } else {
+            document.getElementById('searchError').textContent = 'Search failed: ' + err.message;
+            document.getElementById('searchError').style.display = 'block';
+        }
         document.getElementById('clearSearchBtn').style.display = '';
+    } finally {
+        _abortController = null;
+        document.getElementById('searchLoading').style.display = 'none';
+        const btn = document.getElementById('searchBtn');
+        btn.textContent = 'Search';
+        btn.classList.remove('cancel-mode');
+    }
+}
+
+export function cancelSearch() {
+    if (_abortController) {
+        _abortController.abort();
     }
 }
 
 export function clearSearch() {
+    cancelSearch();
     document.getElementById('searchInput').value = '';
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('searchResultsInfo').style.display = 'none';
