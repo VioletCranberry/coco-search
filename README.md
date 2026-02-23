@@ -71,6 +71,18 @@ Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental 
   <img src="./screenshots/dashboard_search.png" alt="CocoSearch search results" width="960">
 </p>
 
+<p align="center">
+  <img src="./screenshots/dashboard_search_w_deps.png" alt="CocoSearch search results with dependency info" width="960">
+</p>
+
+<p align="center">
+  <img src="./screenshots/dashboard_search_deps_graph.png" alt="CocoSearch dependency graph visualization" width="960">
+</p>
+
+<p align="center">
+  <img src="./screenshots/dashboard_search_file_opened.png" alt="CocoSearch file viewer with syntax highlighting" width="960">
+</p>
+
 </details>
 
 > **If you're a DevOps engineer** — most code search tools treat your YAML, HCL, and Dockerfiles as plain text. Searching "S3 bucket with versioning" across Terraform files returns random line matches because the tool has no concept of a `resource` block boundary. CocoSearch ships with 7 grammar handlers (GitHub Actions, GitLab CI, Docker Compose, Helm Template, Helm Values, Kubernetes, Terraform) and 4 language handlers (HCL, Dockerfile, Bash, Go Template) that chunk infrastructure configs at domain-aware boundaries — job/step in Actions, resource/data blocks in Terraform, service definitions in Compose — and extract structured metadata so search results land on complete, meaningful units. CocoIndex's built-in chunking does not cover these formats; without grammar handlers, your workflow YAML would be split on whitespace like any other text file.
