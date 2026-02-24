@@ -225,14 +225,40 @@ def run_index(
     if config is None:
         config = IndexingConfig()
 
+    # Resolve embedding provider and model for preflight + metadata
+    from cocosearch.config.schema import default_model_for_provider
+
+    embedding_provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    embedding_model = os.environ.get(
+        "COCOSEARCH_EMBEDDING_MODEL", default_model_for_provider(embedding_provider)
+    )
+
     # Preflight: verify infrastructure is reachable before any CocoIndex work
     check_infrastructure(
         db_url=get_database_url(),
         ollama_url=os.environ.get("COCOSEARCH_OLLAMA_URL"),
-        embedding_model=os.environ.get(
-            "COCOSEARCH_EMBEDDING_MODEL", "nomic-embed-text"
-        ),
+        embedding_model=embedding_model,
+        provider=embedding_provider,
     )
+
+    # Mismatch detection: warn if index was built with different provider/model
+    from cocosearch.management.metadata import get_index_metadata
+
+    existing = get_index_metadata(index_name)
+    if existing and existing.get("embedding_model"):
+        if (
+            existing["embedding_model"] != embedding_model
+            or existing.get("embedding_provider") != embedding_provider
+        ):
+            logger.warning(
+                "Index '%s' was built with %s/%s but current config uses %s/%s. "
+                "Use --fresh to reindex with the new model.",
+                index_name,
+                existing.get("embedding_provider", "unknown"),
+                existing["embedding_model"],
+                embedding_provider,
+                embedding_model,
+            )
 
     # Initialize CocoIndex (database configured via COCOSEARCH_DATABASE_URL)
     cocoindex.init()

@@ -91,6 +91,32 @@ class TestEnsureMetadataTable:
         assert "ALTER TABLE" in sql
         assert "branch_commit_count" in sql
 
+    def test_creates_embedding_provider_column_migration(self, mock_db_pool):
+        """ensure_metadata_table adds embedding_provider column for existing DBs."""
+        pool, cursor, conn = mock_db_pool()
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            ensure_metadata_table()
+
+        sql = cursor.calls[5][0]
+        assert "ALTER TABLE" in sql
+        assert "embedding_provider" in sql
+
+    def test_creates_embedding_model_column_migration(self, mock_db_pool):
+        """ensure_metadata_table adds embedding_model column for existing DBs."""
+        pool, cursor, conn = mock_db_pool()
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            ensure_metadata_table()
+
+        sql = cursor.calls[6][0]
+        assert "ALTER TABLE" in sql
+        assert "embedding_model" in sql
+
     def test_creates_path_index(self, mock_db_pool):
         """ensure_metadata_table creates index on canonical_path."""
         pool, cursor, conn = mock_db_pool()
@@ -100,8 +126,8 @@ class TestEnsureMetadataTable:
         ):
             ensure_metadata_table()
 
-        # Sixth SQL should be CREATE INDEX (after CREATE TABLE and 4 ALTER TABLEs)
-        sql = cursor.calls[5][0]
+        # Eighth SQL: CREATE INDEX (after CREATE TABLE + 6 ALTER TABLEs)
+        sql = cursor.calls[7][0]
         assert "CREATE INDEX IF NOT EXISTS" in sql
         assert "canonical_path" in sql
 

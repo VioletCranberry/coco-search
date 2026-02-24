@@ -123,6 +123,7 @@ class TestEmbeddingSection:
     def test_default_values(self):
         """Test that default values are set correctly."""
         section = EmbeddingSection()
+        assert section.provider == "ollama"
         assert section.model == "nomic-embed-text"
 
     def test_valid_config(self):
@@ -135,6 +136,31 @@ class TestEmbeddingSection:
         with pytest.raises(ValidationError) as exc_info:
             EmbeddingSection(unknownField="value")
         assert "Extra inputs are not permitted" in str(exc_info.value)
+
+    def test_provider_ollama_default_model(self):
+        """Ollama provider defaults to nomic-embed-text."""
+        section = EmbeddingSection(provider="ollama")
+        assert section.model == "nomic-embed-text"
+
+    def test_provider_openai_default_model(self):
+        """OpenAI provider defaults to text-embedding-3-small."""
+        section = EmbeddingSection(provider="openai")
+        assert section.model == "text-embedding-3-small"
+
+    def test_provider_openrouter_default_model(self):
+        """OpenRouter provider defaults to openai/text-embedding-3-small."""
+        section = EmbeddingSection(provider="openrouter")
+        assert section.model == "openai/text-embedding-3-small"
+
+    def test_provider_custom_model_overrides_default(self):
+        """Explicit model overrides provider default."""
+        section = EmbeddingSection(provider="openai", model="text-embedding-3-large")
+        assert section.model == "text-embedding-3-large"
+
+    def test_invalid_provider_rejected(self):
+        """Invalid provider raises ValueError."""
+        with pytest.raises(ValidationError, match="Invalid embedding provider"):
+            EmbeddingSection(provider="invalid-provider")
 
 
 class TestCocoSearchConfig:

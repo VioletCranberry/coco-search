@@ -9,6 +9,7 @@ from unittest.mock import patch, MagicMock
 
 
 from cocosearch.indexer.preflight import (
+    check_api_key,
     check_infrastructure,
     check_ollama,
     check_ollama_model,
@@ -159,3 +160,88 @@ class TestCheckInfrastructure:
                 check_infrastructure(
                     "postgresql://localhost/test", None, "nomic-embed-text"
                 )
+
+    def test_ollama_checks_skipped_for_openai_provider(self):
+        """Ollama checks are skipped when provider is openai."""
+        mock_conn = MagicMock()
+        with patch(
+            "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
+        ):
+            with patch(
+                "cocosearch.indexer.preflight.urllib.request.urlopen"
+            ) as mock_urlopen:
+                with patch.dict(
+                    "os.environ", {"COCOSEARCH_EMBEDDING_API_KEY": "sk-test"}
+                ):
+                    check_infrastructure(
+                        "postgresql://localhost/test",
+                        None,
+                        "text-embedding-3-small",
+                        provider="openai",
+                    )
+                # Ollama should not be contacted
+                mock_urlopen.assert_not_called()
+
+    def test_ollama_checks_skipped_for_openrouter_provider(self):
+        """Ollama checks are skipped when provider is openrouter."""
+        mock_conn = MagicMock()
+        with patch(
+            "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
+        ):
+            with patch(
+                "cocosearch.indexer.preflight.urllib.request.urlopen"
+            ) as mock_urlopen:
+                with patch.dict(
+                    "os.environ", {"COCOSEARCH_EMBEDDING_API_KEY": "sk-test"}
+                ):
+                    check_infrastructure(
+                        "postgresql://localhost/test",
+                        None,
+                        provider="openrouter",
+                    )
+                mock_urlopen.assert_not_called()
+
+    def test_missing_api_key_raises_for_remote_provider(self):
+        """Missing API key raises ConnectionError for remote providers."""
+        mock_conn = MagicMock()
+        with patch(
+            "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
+        ):
+            with patch.dict("os.environ", {}, clear=False):
+                # Ensure the key is not set
+                import os
+
+                os.environ.pop("COCOSEARCH_EMBEDDING_API_KEY", None)
+                with pytest.raises(ConnectionError, match="requires an API key"):
+                    check_infrastructure(
+                        "postgresql://localhost/test",
+                        None,
+                        provider="openai",
+                    )
+
+
+class TestCheckApiKey:
+    """Tests for check_api_key."""
+
+    def test_api_key_set_passes(self):
+        """No exception when API key is set."""
+        with patch.dict("os.environ", {"COCOSEARCH_EMBEDDING_API_KEY": "sk-test"}):
+            check_api_key("openai")
+
+    def test_api_key_missing_raises(self):
+        """Raises ConnectionError when API key is missing."""
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+
+            os.environ.pop("COCOSEARCH_EMBEDDING_API_KEY", None)
+            with pytest.raises(ConnectionError, match="requires an API key"):
+                check_api_key("openai")
+
+    def test_error_message_includes_provider(self):
+        """Error message includes the provider name."""
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+
+            os.environ.pop("COCOSEARCH_EMBEDDING_API_KEY", None)
+            with pytest.raises(ConnectionError, match="openrouter"):
+                check_api_key("openrouter")

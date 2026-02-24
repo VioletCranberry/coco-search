@@ -113,17 +113,26 @@ def _apply_thread_liveness_status(
 
 def _register_with_git(index_name: str, project_path: str) -> None:
     """Register index path with current git branch/commit metadata."""
+    import os
+
+    from cocosearch.config.schema import default_model_for_provider
     from cocosearch.management.git import get_branch_commit_count
 
     branch = get_current_branch(project_path)
     commit_hash = get_commit_hash(project_path)
     branch_commit_count = get_branch_commit_count(project_path)
+    embed_provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    embed_model = os.environ.get(
+        "COCOSEARCH_EMBEDDING_MODEL", default_model_for_provider(embed_provider)
+    )
     register_index_path(
         index_name,
         project_path,
         branch=branch,
         commit_hash=commit_hash,
         branch_commit_count=branch_commit_count,
+        embedding_provider=embed_provider,
+        embedding_model=embed_model,
     )
 
 

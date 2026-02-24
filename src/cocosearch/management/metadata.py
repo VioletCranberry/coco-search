@@ -55,6 +55,14 @@ def ensure_metadata_table() -> None:
                     ADD COLUMN IF NOT EXISTS branch_commit_count INTEGER
             """)
             cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS embedding_provider TEXT
+            """)
+            cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS embedding_model TEXT
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_cocosearch_metadata_path
                     ON cocosearch_index_metadata(canonical_path)
             """)
@@ -82,7 +90,8 @@ def get_index_metadata(index_name: str) -> dict | None:
                 cur.execute(
                     """
                     SELECT index_name, canonical_path, created_at, updated_at, status,
-                           branch, commit_hash, branch_commit_count
+                           branch, commit_hash, branch_commit_count,
+                           embedding_provider, embedding_model
                     FROM cocosearch_index_metadata
                     WHERE index_name = %s
                     """,
@@ -103,6 +112,8 @@ def get_index_metadata(index_name: str) -> dict | None:
                     "branch": row[5] if len(row) > 5 else None,
                     "commit_hash": row[6] if len(row) > 6 else None,
                     "branch_commit_count": row[7] if len(row) > 7 else None,
+                    "embedding_provider": row[8] if len(row) > 8 else None,
+                    "embedding_model": row[9] if len(row) > 9 else None,
                 }
 
                 # Provide elapsed time so callers can warn about
@@ -165,6 +176,8 @@ def register_index_path(
     branch: str | None = None,
     commit_hash: str | None = None,
     branch_commit_count: int | None = None,
+    embedding_provider: str | None = None,
+    embedding_model: str | None = None,
 ) -> None:
     """Register a path-to-index mapping with collision detection.
 
@@ -173,6 +186,8 @@ def register_index_path(
         project_path: The project directory path (will be resolved to canonical form)
         branch: Git branch name at time of indexing (optional)
         commit_hash: Git commit hash at time of indexing (optional)
+        embedding_provider: Embedding provider used for indexing (optional)
+        embedding_model: Embedding model used for indexing (optional)
 
     Raises:
         ValueError: If index_name already maps to a different path (collision)
@@ -207,16 +222,27 @@ def register_index_path(
                 """
                 INSERT INTO cocosearch_index_metadata
                     (index_name, canonical_path, created_at, updated_at, status,
-                     branch, commit_hash, branch_commit_count)
-                VALUES (%s, %s, NOW(), NOW(), 'indexing', %s, %s, %s)
+                     branch, commit_hash, branch_commit_count,
+                     embedding_provider, embedding_model)
+                VALUES (%s, %s, NOW(), NOW(), 'indexing', %s, %s, %s, %s, %s)
                 ON CONFLICT (index_name) DO UPDATE SET
                     canonical_path = EXCLUDED.canonical_path,
                     updated_at = NOW(),
                     branch = EXCLUDED.branch,
                     commit_hash = EXCLUDED.commit_hash,
-                    branch_commit_count = EXCLUDED.branch_commit_count
+                    branch_commit_count = EXCLUDED.branch_commit_count,
+                    embedding_provider = EXCLUDED.embedding_provider,
+                    embedding_model = EXCLUDED.embedding_model
                 """,
-                (index_name, canonical, branch, commit_hash, branch_commit_count),
+                (
+                    index_name,
+                    canonical,
+                    branch,
+                    commit_hash,
+                    branch_commit_count,
+                    embedding_provider,
+                    embedding_model,
+                ),
             )
         conn.commit()
 

@@ -83,18 +83,34 @@ def add_filename_context(text: str, filename: str) -> str:
     return text
 
 
+PROVIDER_MAP: dict[str, "cocoindex.LlmApiType"] = {
+    "ollama": cocoindex.LlmApiType.OLLAMA,
+    "openai": cocoindex.LlmApiType.OPENAI,
+    "openrouter": cocoindex.LlmApiType.OPEN_ROUTER,
+}
+
+
+def _default_model(provider: str) -> str:
+    """Return the default embedding model for a provider."""
+    from cocosearch.config.schema import default_model_for_provider
+
+    return default_model_for_provider(provider)
+
+
 @cocoindex.transform_flow()
 def code_to_embedding(
     text: cocoindex.DataSlice[str],
 ) -> cocoindex.DataSlice[list[float]]:
     """Shared embedding function for indexing and querying.
 
-    Uses Ollama to generate embeddings. This function should be used by both
-    the indexing flow and search queries to ensure consistent embeddings.
+    Supports multiple embedding providers (Ollama, OpenAI, OpenRouter).
+    Provider selection is controlled via environment variables.
 
     Environment variables:
+        COCOSEARCH_EMBEDDING_PROVIDER: Provider name (default: ollama).
         COCOSEARCH_OLLAMA_URL: Ollama server address (default: http://localhost:11434).
-        COCOSEARCH_EMBEDDING_MODEL: Embedding model name (default: nomic-embed-text).
+        COCOSEARCH_EMBEDDING_MODEL: Embedding model name (default depends on provider).
+        COCOSEARCH_EMBEDDING_API_KEY: API key for remote providers (OpenAI, OpenRouter).
 
     Args:
         text: Text to embed.
@@ -102,13 +118,19 @@ def code_to_embedding(
     Returns:
         Embedding vector.
     """
-    ollama_url = os.environ.get("COCOSEARCH_OLLAMA_URL")
-    model = os.environ.get("COCOSEARCH_EMBEDDING_MODEL", "nomic-embed-text")
+    provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    model = os.environ.get("COCOSEARCH_EMBEDDING_MODEL", _default_model(provider))
+    api_type = PROVIDER_MAP.get(provider, cocoindex.LlmApiType.OLLAMA)
 
-    return text.transform(
-        cocoindex.functions.EmbedText(
-            api_type=cocoindex.LlmApiType.OLLAMA,
-            model=model,
-            address=ollama_url,
-        )
-    )
+    kwargs: dict = {"api_type": api_type, "model": model}
+
+    if provider == "ollama":
+        kwargs["address"] = os.environ.get("COCOSEARCH_OLLAMA_URL")
+    else:
+        api_key = os.environ.get("COCOSEARCH_EMBEDDING_API_KEY")
+        if api_key:
+            kwargs["api_key"] = cocoindex.auth_registry.add_transient_auth_entry(
+                api_key
+            )
+
+    return text.transform(cocoindex.functions.EmbedText(**kwargs))

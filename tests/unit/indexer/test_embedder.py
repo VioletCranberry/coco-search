@@ -1,5 +1,53 @@
 """Tests for cocosearch.indexer.embedder module."""
 
+import cocoindex
+
+
+class TestProviderMap:
+    """Tests for PROVIDER_MAP and _default_model."""
+
+    def test_provider_map_contains_ollama(self):
+        """PROVIDER_MAP maps 'ollama' to OLLAMA api type."""
+        from cocosearch.indexer.embedder import PROVIDER_MAP
+
+        assert PROVIDER_MAP["ollama"] == cocoindex.LlmApiType.OLLAMA
+
+    def test_provider_map_contains_openai(self):
+        """PROVIDER_MAP maps 'openai' to OPENAI api type."""
+        from cocosearch.indexer.embedder import PROVIDER_MAP
+
+        assert PROVIDER_MAP["openai"] == cocoindex.LlmApiType.OPENAI
+
+    def test_provider_map_contains_openrouter(self):
+        """PROVIDER_MAP maps 'openrouter' to OPEN_ROUTER api type."""
+        from cocosearch.indexer.embedder import PROVIDER_MAP
+
+        assert PROVIDER_MAP["openrouter"] == cocoindex.LlmApiType.OPEN_ROUTER
+
+    def test_default_model_ollama(self):
+        """Default model for ollama is nomic-embed-text."""
+        from cocosearch.indexer.embedder import _default_model
+
+        assert _default_model("ollama") == "nomic-embed-text"
+
+    def test_default_model_openai(self):
+        """Default model for openai is text-embedding-3-small."""
+        from cocosearch.indexer.embedder import _default_model
+
+        assert _default_model("openai") == "text-embedding-3-small"
+
+    def test_default_model_openrouter(self):
+        """Default model for openrouter is openai/text-embedding-3-small."""
+        from cocosearch.indexer.embedder import _default_model
+
+        assert _default_model("openrouter") == "openai/text-embedding-3-small"
+
+    def test_default_model_unknown_falls_back(self):
+        """Unknown provider falls back to nomic-embed-text."""
+        from cocosearch.indexer.embedder import _default_model
+
+        assert _default_model("unknown") == "nomic-embed-text"
+
 
 class TestCodeToEmbedding:
     """Tests for code_to_embedding function.

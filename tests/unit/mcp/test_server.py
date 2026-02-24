@@ -795,6 +795,8 @@ class TestRegisterWithGit:
             branch="main",
             commit_hash="abc1234",
             branch_commit_count=1234,
+            embedding_provider="ollama",
+            embedding_model="nomic-embed-text",
         )
 
     def test_passes_none_when_not_git_repo(self):
@@ -818,6 +820,8 @@ class TestRegisterWithGit:
             branch=None,
             commit_hash=None,
             branch_commit_count=None,
+            embedding_provider="ollama",
+            embedding_model="nomic-embed-text",
         )
 
     def test_index_codebase_registers_with_git(self, tmp_codebase):

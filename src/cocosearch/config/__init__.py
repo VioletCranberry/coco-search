@@ -16,6 +16,8 @@ from .schema import (
     EmbeddingSection,
     IndexingSection,
     SearchSection,
+    VALID_EMBEDDING_PROVIDERS,
+    default_model_for_provider,
 )
 
 __all__ = [
@@ -37,4 +39,6 @@ __all__ = [
     "mask_password",
     "DEFAULT_DATABASE_URL",
     "get_database_url",
+    "VALID_EMBEDDING_PROVIDERS",
+    "default_model_for_provider",
 ]

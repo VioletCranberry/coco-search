@@ -1,6 +1,19 @@
 """Configuration schema for CocoSearch using Pydantic."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+VALID_EMBEDDING_PROVIDERS = ("ollama", "openai", "openrouter")
+
+_PROVIDER_DEFAULT_MODELS: dict[str, str] = {
+    "ollama": "nomic-embed-text",
+    "openai": "text-embedding-3-small",
+    "openrouter": "openai/text-embedding-3-small",
+}
+
+
+def default_model_for_provider(provider: str) -> str:
+    """Return the default embedding model for a given provider."""
+    return _PROVIDER_DEFAULT_MODELS.get(provider, "nomic-embed-text")
 
 
 class ConfigError(Exception):
@@ -30,11 +43,23 @@ class SearchSection(BaseModel):
 
 
 class EmbeddingSection(BaseModel):
-    """Configuration for embedding model."""
+    """Configuration for embedding model and provider."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    model: str = Field(default="nomic-embed-text")
+    provider: str = Field(default="ollama")
+    model: str | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _validate_provider_and_defaults(self) -> "EmbeddingSection":
+        if self.provider not in VALID_EMBEDDING_PROVIDERS:
+            raise ValueError(
+                f"Invalid embedding provider '{self.provider}'. "
+                f"Must be one of: {', '.join(VALID_EMBEDDING_PROVIDERS)}"
+            )
+        if self.model is None:
+            self.model = default_model_for_provider(self.provider)
+        return self
 
 
 class CocoSearchConfig(BaseModel):
