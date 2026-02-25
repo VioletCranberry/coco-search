@@ -30,8 +30,9 @@ from typing import NamedTuple
 class LogEntry(NamedTuple):
     timestamp: float
     level: str
-    name: str
+    category: str
     message: str
+    fields: dict
 
 
 # ---------------------------------------------------------------------------
@@ -101,8 +102,9 @@ class BufferHandler(logging.Handler):
             entry = LogEntry(
                 timestamp=record.created,
                 level=record.levelname,
-                name=record.name,
+                category=getattr(record, "category", "system"),
                 message=self.format(record),
+                fields=getattr(record, "fields", {}),
             )
             self._buffer.append(entry)
         except Exception:
@@ -144,8 +146,9 @@ class StderrCapture(io.TextIOBase):
                         LogEntry(
                             timestamp=time.time(),
                             level="STDERR",
-                            name="stderr",
+                            category="system",
                             message=line,
+                            fields={},
                         )
                     )
         return len(s)

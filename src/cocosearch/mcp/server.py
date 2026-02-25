@@ -234,14 +234,14 @@ async def api_logs(request) -> StreamingResponse:
         try:
             # Replay history
             for entry in buf.get_history():
-                yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'name': entry.name, 'msg': entry.message})}\n\n"
+                yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'cat': entry.category, 'msg': entry.message, 'fields': entry.fields})}\n\n"
             yield "event: history_done\ndata: {}\n\n"
 
             # Stream live entries
             while True:
                 try:
                     entry = await asyncio.wait_for(q.get(), timeout=30)
-                    yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'name': entry.name, 'msg': entry.message})}\n\n"
+                    yield f"data: {_json.dumps({'ts': entry.timestamp, 'level': entry.level, 'cat': entry.category, 'msg': entry.message, 'fields': entry.fields})}\n\n"
                 except asyncio.TimeoutError:
                     # Keepalive
                     yield ": keepalive\n\n"
