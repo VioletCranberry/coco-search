@@ -20,7 +20,7 @@ import logging
 import sys
 import threading
 import time
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -32,7 +32,7 @@ class LogEntry(NamedTuple):
     level: str
     category: str
     message: str
-    fields: dict
+    fields: dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
