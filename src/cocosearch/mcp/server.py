@@ -11,10 +11,12 @@ Provides Model Context Protocol server with tools for:
 # CRITICAL: Configure logging to stderr immediately before any other imports
 # This prevents stdout corruption of the JSON-RPC protocol
 import asyncio
+import functools
 import os
 import sys
 import logging
 import threading
+import time as _time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1486,7 +1488,78 @@ def _build_editor_command(editor: str, file_path: str, line: int | None) -> list
     return [editor_path, file_path]
 
 
+def _truncate(value, max_len=200):
+    """Truncate string representation for logging."""
+    s = str(value)
+    return s[:max_len] + "..." if len(s) > max_len else s
+
+
+def log_mcp_tool(func):
+    """Decorator that logs MCP tool entry and exit with cs_log.mcp()."""
+    if asyncio.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            from cocosearch.logging import cs_log
+
+            tool_name = func.__name__
+            # Extract key params (skip 'ctx' and internal args)
+            key_params = {k: _truncate(v) for k, v in kwargs.items()
+                          if k != "ctx" and v is not None}
+            cs_log.mcp(f"{tool_name} called", **key_params)
+
+            start = _time.monotonic()
+            try:
+                result = await func(*args, **kwargs)
+                elapsed_ms = round((_time.monotonic() - start) * 1000)
+
+                # Summarize result
+                if isinstance(result, list):
+                    cs_log.mcp(f"{tool_name} completed", results=len(result), latency_ms=elapsed_ms)
+                elif isinstance(result, dict):
+                    cs_log.mcp(f"{tool_name} completed", latency_ms=elapsed_ms)
+                else:
+                    cs_log.mcp(f"{tool_name} completed", latency_ms=elapsed_ms)
+                return result
+            except Exception as e:
+                elapsed_ms = round((_time.monotonic() - start) * 1000)
+                cs_log.mcp(f"{tool_name} failed", level="ERROR",
+                           error=_truncate(str(e)), latency_ms=elapsed_ms)
+                raise
+        return wrapper
+    else:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            from cocosearch.logging import cs_log
+
+            tool_name = func.__name__
+            # Extract key params (skip 'ctx' and internal args)
+            key_params = {k: _truncate(v) for k, v in kwargs.items()
+                          if k != "ctx" and v is not None}
+            cs_log.mcp(f"{tool_name} called", **key_params)
+
+            start = _time.monotonic()
+            try:
+                result = func(*args, **kwargs)
+                elapsed_ms = round((_time.monotonic() - start) * 1000)
+
+                # Summarize result
+                if isinstance(result, list):
+                    cs_log.mcp(f"{tool_name} completed", results=len(result), latency_ms=elapsed_ms)
+                elif isinstance(result, dict):
+                    cs_log.mcp(f"{tool_name} completed", latency_ms=elapsed_ms)
+                else:
+                    cs_log.mcp(f"{tool_name} completed", latency_ms=elapsed_ms)
+                return result
+            except Exception as e:
+                elapsed_ms = round((_time.monotonic() - start) * 1000)
+                cs_log.mcp(f"{tool_name} failed", level="ERROR",
+                           error=_truncate(str(e)), latency_ms=elapsed_ms)
+                raise
+        return wrapper
+
+
 @mcp.tool()
+@log_mcp_tool
 async def search_code(
     query: Annotated[str, Field(description="Natural language search query")],
     ctx: Context,
@@ -1838,6 +1911,7 @@ async def search_code(
 
 
 @mcp.tool()
+@log_mcp_tool
 async def analyze_query(
     query: Annotated[str, Field(description="Search query to analyze")],
     ctx: Context,
@@ -1944,6 +2018,7 @@ async def analyze_query(
 
 
 @mcp.tool()
+@log_mcp_tool
 def list_indexes() -> list[dict]:
     """List all available code indexes.
 
@@ -1957,6 +2032,7 @@ def list_indexes() -> list[dict]:
 
 
 @mcp.tool()
+@log_mcp_tool
 def index_stats(
     index_name: Annotated[
         str | None,
@@ -1993,6 +2069,7 @@ def index_stats(
 
 
 @mcp.tool()
+@log_mcp_tool
 def clear_index(
     index_name: Annotated[str, Field(description="Name of the index to delete")],
 ) -> dict:
@@ -2012,6 +2089,7 @@ def clear_index(
 
 
 @mcp.tool()
+@log_mcp_tool
 def index_codebase(
     path: Annotated[str, Field(description="Path to the codebase directory to index")],
     index_name: Annotated[
@@ -2106,6 +2184,7 @@ def index_codebase(
 
 
 @mcp.tool()
+@log_mcp_tool
 async def get_file_dependencies(
     file: Annotated[str, Field(description="File path relative to project root")],
     ctx: Context,
@@ -2172,6 +2251,7 @@ async def get_file_dependencies(
 
 
 @mcp.tool()
+@log_mcp_tool
 async def get_file_impact(
     file: Annotated[str, Field(description="File path relative to project root")],
     ctx: Context,
