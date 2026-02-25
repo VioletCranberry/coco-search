@@ -7,8 +7,10 @@ import threading
 
 from cocosearch.mcp.log_stream import (
     BufferHandler,
+    FileLogHandler,
     LogBuffer,
     LogEntry,
+    RichLogHandler,
     StderrCapture,
     _QUEUE_MAXSIZE,
 )
@@ -428,3 +430,104 @@ class TestSetupLogCapture:
             assert mod.get_log_buffer() is None
         finally:
             mod._log_buffer = old_buf
+
+
+# ---------------------------------------------------------------------------
+# RichLogHandler
+# ---------------------------------------------------------------------------
+
+
+class TestRichLogHandler:
+    def test_formats_entry(self, capsys):
+        handler = RichLogHandler()
+        entry = LogEntry(
+            timestamp=1740000000.0,
+            level="INFO",
+            category="search",
+            message="Query received",
+            fields={"query": "hello", "results": 5},
+        )
+        handler.handle(entry)
+        captured = capsys.readouterr()
+        assert "search" in captured.err or "Query received" in captured.err
+
+    def test_formats_fields_inline(self, capsys):
+        handler = RichLogHandler()
+        entry = LogEntry(
+            timestamp=1740000000.0,
+            level="WARNING",
+            category="infra",
+            message="Connection failed",
+            fields={"error": "timeout"},
+        )
+        handler.handle(entry)
+        captured = capsys.readouterr()
+        assert "timeout" in captured.err or "error" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# FileLogHandler
+# ---------------------------------------------------------------------------
+
+
+class TestFileLogHandler:
+    def test_writes_to_file(self, tmp_path):
+        log_file = tmp_path / "test.log"
+        handler = FileLogHandler(str(log_file))
+        entry = LogEntry(
+            timestamp=1740000000.0,
+            level="INFO",
+            category="search",
+            message="Test log",
+            fields={"key": "value"},
+        )
+        handler.handle(entry)
+        handler.close()
+        content = log_file.read_text()
+        assert "Test log" in content
+        assert "search" in content
+        assert "key=value" in content
+
+    def test_rotation_config(self, tmp_path):
+        log_file = tmp_path / "test.log"
+        handler = FileLogHandler(str(log_file), max_bytes=1024, backup_count=2)
+        assert handler._max_bytes == 1024
+        assert handler._backup_count == 2
+        handler.close()
+
+
+# ---------------------------------------------------------------------------
+# LogBuffer handler integration
+# ---------------------------------------------------------------------------
+
+
+class TestLogBufferHandlers:
+    def test_add_handler_called_on_append(self):
+        buf = LogBuffer()
+        calls = []
+
+        class MockHandler:
+            def handle(self, entry):
+                calls.append(entry)
+
+        buf.add_handler(MockHandler())
+        entry = LogEntry(
+            timestamp=1.0, level="INFO", category="search", message="test", fields={}
+        )
+        buf.append(entry)
+        assert len(calls) == 1
+        assert calls[0] == entry
+
+    def test_handler_exception_does_not_break_append(self):
+        buf = LogBuffer()
+
+        class BadHandler:
+            def handle(self, entry):
+                raise RuntimeError("broken")
+
+        buf.add_handler(BadHandler())
+        entry = LogEntry(
+            timestamp=1.0, level="INFO", category="system", message="test", fields={}
+        )
+        buf.append(entry)  # Should not raise
+        assert len(buf.get_history()) == 1

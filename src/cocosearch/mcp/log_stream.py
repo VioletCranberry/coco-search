@@ -20,6 +20,9 @@ import logging
 import sys
 import threading
 import time
+from datetime import datetime
+from logging.handlers import RotatingFileHandler as _RotatingFileHandler
+from pathlib import Path
 from typing import Any, NamedTuple
 
 # ---------------------------------------------------------------------------
@@ -51,12 +54,23 @@ class LogBuffer:
         self._lock = threading.Lock()
         self._subscribers: dict[int, asyncio.Queue[LogEntry]] = {}
         self._next_id = 0
+        self._handlers: list = []
+
+    def add_handler(self, handler) -> None:
+        self._handlers.append(handler)
 
     # -- buffer ops --
 
     def append(self, entry: LogEntry) -> None:
         with self._lock:
             self._buf.append(entry)
+            # Fan out to handlers (terminal, file)
+            for h in self._handlers:
+                try:
+                    h.handle(entry)
+                except Exception:
+                    pass
+            # Fan out to SSE subscribers
             dead: list[int] = []
             for sub_id, q in self._subscribers.items():
                 try:
@@ -174,6 +188,99 @@ class StderrCapture(io.TextIOBase):
 
 
 # ---------------------------------------------------------------------------
+# Rich terminal handler
+# ---------------------------------------------------------------------------
+
+_CATEGORY_COLORS = {
+    "search": "cyan",
+    "index": "green",
+    "mcp": "magenta",
+    "cache": "yellow",
+    "infra": "blue",
+    "system": "white",
+    "deps": "bright_cyan",
+}
+
+_LEVEL_COLORS = {
+    "DEBUG": "dim",
+    "INFO": "green",
+    "WARNING": "yellow",
+    "ERROR": "red",
+    "CRITICAL": "red bold",
+    "STDERR": "dim italic",
+}
+
+
+class RichLogHandler:
+    """Prints structured LogEntry records to stderr using Rich markup."""
+
+    def __init__(self) -> None:
+        from rich.console import Console
+        self._console = Console(stderr=True)
+
+    def handle(self, entry: LogEntry) -> None:
+        ts = datetime.fromtimestamp(entry.timestamp).strftime("%H:%M:%S")
+        cat_color = _CATEGORY_COLORS.get(entry.category, "white")
+        lvl_color = _LEVEL_COLORS.get(entry.level, "white")
+
+        fields_str = ""
+        if entry.fields:
+            fields_str = "  " + " ".join(f"{k}={v}" for k, v in entry.fields.items())
+
+        self._console.print(
+            f"[dim]{ts}[/dim] [{cat_color}][{entry.category}][/{cat_color}] "
+            f"[{lvl_color}]{entry.level:<8}[/{lvl_color}] {entry.message}"
+            f"[dim]{fields_str}[/dim]",
+            highlight=False,
+        )
+
+
+# ---------------------------------------------------------------------------
+# File log handler
+# ---------------------------------------------------------------------------
+
+
+class FileLogHandler:
+    """Writes structured LogEntry records to a rotating log file."""
+
+    _DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+    _DEFAULT_BACKUP_COUNT = 3
+
+    def __init__(
+        self,
+        filepath: str,
+        max_bytes: int = _DEFAULT_MAX_BYTES,
+        backup_count: int = _DEFAULT_BACKUP_COUNT,
+    ) -> None:
+        self._max_bytes = max_bytes
+        self._backup_count = backup_count
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+        self._handler = _RotatingFileHandler(
+            filepath, maxBytes=max_bytes, backupCount=backup_count
+        )
+
+    def handle(self, entry: LogEntry) -> None:
+        ts = datetime.fromtimestamp(entry.timestamp).strftime("%Y-%m-%d %H:%M:%S")
+        fields_str = ""
+        if entry.fields:
+            fields_str = "  " + " ".join(f"{k}={v}" for k, v in entry.fields.items())
+        line = f"{ts} [{entry.category}] {entry.level:<8} {entry.message}{fields_str}"
+        record = logging.LogRecord(
+            name="cocosearch",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg=line,
+            args=(),
+            exc_info=None,
+        )
+        self._handler.emit(record)
+
+    def close(self) -> None:
+        self._handler.close()
+
+
+# ---------------------------------------------------------------------------
 # Singleton lifecycle
 # ---------------------------------------------------------------------------
 
@@ -181,7 +288,7 @@ _log_buffer: LogBuffer | None = None
 _setup_done = False
 
 
-def setup_log_capture() -> LogBuffer:
+def setup_log_capture(*, enable_rich: bool = True, log_file: bool = False) -> LogBuffer:
     """Idempotent setup: attach handler to root logger, wrap stderr.
 
     Returns the singleton LogBuffer.
@@ -203,6 +310,17 @@ def setup_log_capture() -> LogBuffer:
     # Wrap stderr to capture CocoIndex framework output
     if not isinstance(sys.stderr, StderrCapture):
         sys.stderr = StderrCapture(sys.stderr, _log_buffer)  # type: ignore[assignment]
+
+    # Rich terminal handler
+    if enable_rich:
+        _log_buffer.add_handler(RichLogHandler())
+
+    # Rotating file handler
+    if log_file:
+        import os
+
+        log_path = os.path.expanduser("~/.cocosearch/logs/cocosearch.log")
+        _log_buffer.add_handler(FileLogHandler(log_path))
 
     _setup_done = True
     return _log_buffer
