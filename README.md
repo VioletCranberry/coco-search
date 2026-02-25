@@ -169,6 +169,8 @@ claude plugin install cocosearch@cocosearch
 # All skills + MCP server configured automatically
 ```
 
+> **Tip:** If using a remote embedding provider (OpenAI, OpenRouter), export the environment variables in your shell profile (`~/.zshrc`, `~/.bashrc`) before starting Claude Code — the plugin's MCP server inherits them from your shell. Alternatively, use manual MCP registration with `--env` flags (see [MCP Configuration](./docs/mcp-configuration.md#remote-embedding-providers)).
+
 **Option B — Manual MCP registration:**
 
 ```bash
