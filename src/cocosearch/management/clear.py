@@ -78,18 +78,17 @@ def clear_index(index_name: str) -> dict:
 
             # Clean CocoIndex metadata so re-index creates tables fresh
             try:
-                from cocoindex.flow import get_flow_full_name, _flows
-
                 flow_name = f"CodeIndex_{index_name}"
-                full_name = get_flow_full_name(flow_name)
                 cur.execute(
                     "DELETE FROM cocoindex_setup_metadata WHERE flow_name = %s",
-                    (full_name,),
+                    (flow_name,),
                 )
                 conn.commit()
 
                 # Close in-memory flow to prevent stale state on re-index
                 # (critical for long-running processes like MCP server)
+                from cocoindex.flow import _flows
+
                 old = _flows.get(flow_name)
                 if old is not None:
                     old.close()

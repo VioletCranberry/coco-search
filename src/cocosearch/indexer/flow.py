@@ -50,17 +50,14 @@ def _clean_stale_flow_state(index_name: str, db_url: str) -> None:
     in the cocoindex_setup_metadata table.  Cleans up directly via SQL so
     a fresh flow can be created from scratch.
     """
-    from cocoindex.flow import get_flow_full_name
-
     flow_name = f"CodeIndex_{index_name}"
-    full_name = get_flow_full_name(flow_name)
     data_table = f"codeindex_{index_name}__{index_name}_chunks"
 
     with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM cocoindex_setup_metadata WHERE flow_name = %s",
-                (full_name,),
+                (flow_name,),
             )
             cur.execute(f"DROP TABLE IF EXISTS {data_table}")
             cur.execute(f"DROP TABLE IF EXISTS cocosearch_parse_results_{index_name}")

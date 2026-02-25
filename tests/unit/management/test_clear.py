@@ -87,21 +87,16 @@ class TestClearIndex:
         with patch(
             "cocosearch.management.clear.get_connection_pool", return_value=pool
         ):
-            with patch(
-                "cocoindex.flow.get_flow_full_name",
-                return_value="full::CodeIndex_myproject",
-            ) as mock_get_name:
-                clear_index("myproject")
-                mock_get_name.assert_called_once_with("CodeIndex_myproject")
+            clear_index("myproject")
 
-        # Verify DELETE query was issued for metadata
+        # Verify DELETE query was issued for metadata using flow name directly
         delete_queries = [
             (q, args)
             for q, args in cursor.calls
             if "DELETE FROM cocoindex_setup_metadata" in q
         ]
         assert len(delete_queries) == 1
-        assert delete_queries[0][1] == ("full::CodeIndex_myproject",)
+        assert delete_queries[0][1] == ("CodeIndex_myproject",)
 
     def test_closes_in_memory_flow(self, mock_db_pool):
         """Closes the in-memory CocoIndex flow to prevent stale state on re-index."""
@@ -112,12 +107,8 @@ class TestClearIndex:
         with patch(
             "cocosearch.management.clear.get_connection_pool", return_value=pool
         ):
-            with patch(
-                "cocoindex.flow.get_flow_full_name",
-                return_value="full::CodeIndex_myproject",
-            ):
-                with patch("cocoindex.flow._flows", mock_flows):
-                    clear_index("myproject")
+            with patch("cocoindex.flow._flows", mock_flows):
+                clear_index("myproject")
 
         mock_flow.close.assert_called_once()
 
@@ -129,11 +120,7 @@ class TestClearIndex:
         with patch(
             "cocosearch.management.clear.get_connection_pool", return_value=pool
         ):
-            with patch(
-                "cocoindex.flow.get_flow_full_name",
-                return_value="full::CodeIndex_myproject",
-            ):
-                with patch("cocoindex.flow._flows", mock_flows):
-                    result = clear_index("myproject")
+            with patch("cocoindex.flow._flows", mock_flows):
+                result = clear_index("myproject")
 
         assert result["success"] is True

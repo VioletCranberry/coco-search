@@ -5,6 +5,7 @@ This module provides common fixtures used across all test modules:
 - tmp_codebase: Creates temporary directory with sample Python files
 """
 
+import os
 import warnings
 
 import pytest
@@ -67,8 +68,17 @@ def reset_db_pool():
     from tests.mocks.db import MockConnection, MockConnectionPool, MockCursor
 
     db_module._pool = MockConnectionPool(connection=MockConnection(cursor=MockCursor()))
+    # Snapshot COCOINDEX_DATABASE_URL so we can restore it after the test.
+    # get_database_url() sets this as a side effect, and cocoindex functions
+    # like get_flow_full_name() will try to connect to it if present.
+    prev_cocoindex_url = os.environ.get("COCOINDEX_DATABASE_URL")
     yield
     db_module._pool = None
+    # Restore env var to prevent cross-test DB connection attempts
+    if prev_cocoindex_url is None:
+        os.environ.pop("COCOINDEX_DATABASE_URL", None)
+    else:
+        os.environ["COCOINDEX_DATABASE_URL"] = prev_cocoindex_url
 
 
 @pytest.fixture
