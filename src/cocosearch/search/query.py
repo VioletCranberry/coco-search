@@ -23,6 +23,13 @@ from cocosearch.validation import validate_query
 logger = logging.getLogger(__name__)
 
 
+def _get_cs_log():
+    """Lazy import to avoid circular dependency (search -> logging -> mcp -> search)."""
+    from cocosearch.logging import cs_log
+
+    return cs_log
+
+
 @dataclass
 class SearchResult:
     """A single search result.
@@ -284,6 +291,9 @@ def search(
     # Validate query input
     query = validate_query(query)
 
+    _get_cs_log().search("Query received", query=query[:200], index=index_name, limit=limit,
+                  language=language_filter, hybrid=use_hybrid)
+
     # Check cache first (exact match only at this point, semantic check after embedding)
     if not no_cache:
         cache = get_query_cache()
@@ -299,7 +309,7 @@ def search(
             query_embedding=None,  # No embedding yet for semantic check
         )
         if cached_results is not None:
-            logger.debug(f"Cache hit ({hit_type})")
+            _get_cs_log().cache(f"Cache hit ({hit_type})", query=query[:100])
             return cached_results
 
     # Validate and resolve language filter
@@ -325,10 +335,7 @@ def search(
     if _has_content_text_column and not _hybrid_warning_emitted:
         if not check_column_exists(table_name, "content_text"):
             _has_content_text_column = False
-            logger.warning(
-                "Index lacks hybrid search columns (content_text). "
-                "Run 'cocosearch index' to enable hybrid search."
-            )
+            _get_cs_log().infra("Index lacks hybrid search columns", level="WARNING")
             _hybrid_warning_emitted = True
 
     # Determine whether to use hybrid search
@@ -339,17 +346,15 @@ def search(
             should_use_hybrid = True
         else:
             # Fall back to vector-only silently (already warned above)
-            logger.debug(
-                "Hybrid search requested but content_text column missing, using vector-only"
-            )
+            _get_cs_log().search("Hybrid unavailable, using vector-only", level="DEBUG")
     elif use_hybrid is None:
         # Auto-detect: use hybrid if query has identifier patterns AND column exists
         if _has_content_text_column and has_identifier_pattern(query):
             should_use_hybrid = True
-            logger.debug(
-                "Auto-detected identifier pattern in query, using hybrid search"
-            )
     # use_hybrid is False: always use vector-only (no action needed)
+
+    _get_cs_log().search("Mode selected", mode="hybrid" if should_use_hybrid else "vector",
+                  auto_detected=use_hybrid is None and should_use_hybrid)
 
     # Execute hybrid search if applicable
     # Hybrid search now supports language and symbol filtering (applied before RRF fusion)
@@ -386,6 +391,8 @@ def search(
                         symbol_signature=hr.symbol_signature,
                     )
                 )
+
+        _get_cs_log().search("Search completed", mode="hybrid", results=len(results), query=query[:100])
 
         # Cache results for future queries (hybrid search doesn't have embedding)
         if not no_cache:
@@ -491,6 +498,8 @@ def search(
                 result.symbol_name = row[8] if row[8] else None
                 result.symbol_signature = row[9] if row[9] else None
             results.append(result)
+
+    _get_cs_log().search("Search completed", mode="vector", results=len(results), query=query[:100])
 
     # Cache results for future queries (vector search includes embedding for semantic matching)
     if not no_cache:

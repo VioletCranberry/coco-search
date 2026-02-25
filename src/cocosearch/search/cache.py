@@ -8,7 +8,6 @@ Cache is in-memory for the session and invalidates on reindex.
 """
 
 import hashlib
-import logging
 import os
 import threading
 import time
@@ -17,7 +16,13 @@ from typing import Any
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
+
+def _get_cs_log():
+    """Lazy import to avoid circular dependency (cache -> logging -> mcp -> indexer -> cache)."""
+    from cocosearch.logging import cs_log
+
+    return cs_log
+
 
 # Default cache directory (under user home)
 DEFAULT_CACHE_DIR = os.path.expanduser("~/.cache/cocosearch/queries")
@@ -150,7 +155,7 @@ class QueryCache:
         # Ensure cache directory exists
         os.makedirs(cache_dir, exist_ok=True)
 
-        logger.debug(f"Query cache initialized at {cache_dir}")
+        _get_cs_log().cache("Query cache initialized", level="DEBUG", path=cache_dir)
 
     def get(
         self,
@@ -199,7 +204,7 @@ class QueryCache:
                 entry = self._cache[cache_key]
                 # Check TTL
                 if time.time() - entry.timestamp < self.ttl:
-                    logger.debug(f"Cache hit (exact): {cache_key[:16]}...")
+                    _get_cs_log().cache("Cache hit (exact)", query=query[:100])
                     return entry.results, "exact"
                 else:
                     # Expired - remove from cache
@@ -219,9 +224,7 @@ class QueryCache:
 
                         sim = cosine_similarity(query_embedding, cached_embedding)
                         if sim >= self.semantic_threshold:
-                            logger.debug(
-                                f"Cache hit (semantic, sim={sim:.3f}): {key[:16]}..."
-                            )
+                            _get_cs_log().cache("Cache hit (semantic)", similarity=f"{sim:.3f}", query=query[:100])
                             return entry.results, "semantic"
 
         return None, "miss"
@@ -284,7 +287,7 @@ class QueryCache:
             if len(self._cache) > MAX_CACHE_ENTRIES:
                 self._evict_oldest()
 
-        logger.debug(f"Cache put: {cache_key[:16]}...")
+        _get_cs_log().cache("Cache store", query=query[:100], index=index_name)
 
     def invalidate_index(self, index_name: str) -> int:
         """Remove all cached entries for an index.
@@ -314,9 +317,7 @@ class QueryCache:
             if index_name in self._embedding_index:
                 del self._embedding_index[index_name]
 
-        logger.info(
-            f"Cache invalidated for index '{index_name}': {removed} entries removed"
-        )
+        _get_cs_log().cache("Cache invalidated", index=index_name, entries_removed=removed)
         return removed
 
     def _evict_oldest(self) -> None:
@@ -352,7 +353,7 @@ class QueryCache:
         with self._lock:
             self._cache.clear()
             self._embedding_index.clear()
-        logger.info("Cache cleared")
+        _get_cs_log().cache("Cache cleared")
 
 
 # Module-level singleton
