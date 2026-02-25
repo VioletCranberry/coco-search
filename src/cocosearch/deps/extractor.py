@@ -19,6 +19,11 @@ from cocosearch.search.db import get_connection_pool, get_table_name
 logger = logging.getLogger(__name__)
 
 
+def _get_cs_log():
+    from cocosearch.logging import cs_log
+    return cs_log
+
+
 def get_indexed_files(index_name: str) -> list[tuple[str, str]]:
     """Query the chunks table for distinct indexed file paths and languages.
 
@@ -101,6 +106,8 @@ def extract_dependencies(index_name: str, codebase_path: str) -> dict:
         Stats dict with keys: ``files_processed``, ``files_skipped``,
         ``edges_found``, ``errors``.
     """
+    _get_cs_log().deps("Dependency extraction started", index=index_name, path=codebase_path)
+
     indexed_files = get_indexed_files(index_name)
 
     drop_deps_table(index_name)
@@ -152,14 +159,8 @@ def extract_dependencies(index_name: str, codebase_path: str) -> dict:
 
     insert_edges(index_name, all_edges)
 
-    logger.info(
-        "Dependency extraction complete: %d files processed, "
-        "%d skipped, %d edges found, %d errors",
-        files_processed,
-        files_skipped,
-        edges_found,
-        errors,
-    )
+    _get_cs_log().deps("Dependency extraction completed",
+                        files_processed=files_processed, edges=edges_found, errors=errors)
 
     return {
         "files_processed": files_processed,

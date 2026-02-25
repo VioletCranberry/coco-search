@@ -15,6 +15,12 @@ from cocosearch.validation import validate_index_name
 
 logger = logging.getLogger(__name__)
 
+
+def _get_cs_log():
+    from cocosearch.logging import cs_log
+    return cs_log
+
+
 _pool: ConnectionPool | None = None
 _pool_lock = threading.Lock()
 
@@ -58,6 +64,7 @@ def get_connection_pool() -> ConnectionPool:
                     conninfo=conninfo,
                     configure=configure,
                 )
+                _get_cs_log().infra("Database connection pool created")
     return _pool
 
 

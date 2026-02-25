@@ -37,6 +37,11 @@ from cocosearch.validation import validate_index_name
 logger = logging.getLogger(__name__)
 
 
+def _get_cs_log():
+    from cocosearch.logging import cs_log
+    return cs_log
+
+
 def _clean_stale_flow_state(index_name: str, db_url: str) -> None:
     """Remove stale CocoIndex metadata and data tables for a flow.
 
@@ -219,6 +224,8 @@ def run_index(
     Returns:
         IndexUpdateInfo with statistics about the indexing run.
     """
+    _get_cs_log().index("Indexing started", index=index_name, path=codebase_path, fresh=fresh)
+
     # Validate index name before any database operations
     validate_index_name(index_name)
 
@@ -241,6 +248,8 @@ def run_index(
         embedding_model=embedding_model,
         provider=embedding_provider,
     )
+
+    _get_cs_log().infra("Preflight checks passed", provider=embedding_provider, model=embedding_model)
 
     # Mismatch detection: warn if index was built with different provider/model
     from cocosearch.management.metadata import get_index_metadata
@@ -348,6 +357,7 @@ def run_index(
                 "Stale CocoIndex state detected during setup/update — "
                 "resetting and retrying"
             )
+            _get_cs_log().index("Stale state detected, resetting", level="WARNING", index=index_name)
             try:
                 flow.close()
             except Exception:
@@ -364,6 +374,8 @@ def run_index(
             update_info = _setup_and_update()
         else:
             raise
+
+    _get_cs_log().index("Indexing completed", index=index_name)
 
     # Determine if any files actually changed
     has_changes = True  # conservative default
@@ -384,6 +396,7 @@ def run_index(
                 logger.info(
                     f"Invalidated {removed} cached queries for index '{index_name}'"
                 )
+                _get_cs_log().cache("Post-index cache invalidated", index=index_name, entries_removed=removed)
         except Exception as e:
             logger.warning(f"Cache invalidation failed (non-fatal): {e}")
 
