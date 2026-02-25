@@ -67,8 +67,9 @@ export function updateSummaryCards(stats) {
     // Embedding info in status line
     const embeddingEl = document.getElementById('embeddingInfo');
     if (stats.embedding_provider) {
-        const model = stats.embedding_model || 'default';
-        embeddingEl.textContent = 'PROVIDER: ' + stats.embedding_provider + ' MODEL: ' + model;
+        const provider = escapeHtml(stats.embedding_provider);
+        const model = escapeHtml(stats.embedding_model || 'default');
+        embeddingEl.innerHTML = 'PROVIDER: <span class="status-ok">' + provider.toUpperCase() + '</span> MODEL: <span class="status-ok">' + model + '</span>';
         embeddingEl.style.display = '';
     } else {
         embeddingEl.style.display = 'none';
