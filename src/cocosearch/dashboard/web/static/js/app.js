@@ -10,7 +10,7 @@ import {
     executeSearch, clearSearch, toggleCodeExpand, openInEditor, viewFile, closeFileModal,
     toggleDepsPanel, toggleDepsOverflow, openDepsGraph, closeDepsGraph, onDepsDepthChange,
 } from './search.js';
-import { startLogStream, toggleLogPanel, clearLogPanel, scrollLogsToBottom, applyLogFilters } from './logs.js';
+import { startLogStream, toggleLogPanel, clearLogPanel, scrollLogsToBottom } from './logs.js';
 
 // --- Expose functions needed by dynamically generated onclick handlers ---
 window.toggleLanguageDetails = toggleLanguageDetails;
@@ -56,22 +56,6 @@ document.querySelector('.logs-btn').addEventListener('click', toggleLogPanel);
 document.querySelector('.log-panel .log-header-btns button:first-child').addEventListener('click', clearLogPanel);
 document.querySelector('.log-panel .log-header-btns button:last-child').addEventListener('click', toggleLogPanel);
 document.getElementById('logScrollIndicator').addEventListener('click', scrollLogsToBottom);
-
-// Log category filter pills
-document.querySelectorAll('.log-cat-pill').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const cat = btn.dataset.cat;
-        btn.classList.toggle('active');
-        state.logCategoryFilters[cat] = btn.classList.contains('active');
-        applyLogFilters();
-    });
-});
-
-// Log level filter
-document.getElementById('logLevelFilter').addEventListener('change', (e) => {
-    state.logMinLevel = e.target.value;
-    applyLogFilters();
-});
 
 // Log auto-scroll detection
 document.getElementById('logPanelBody').addEventListener('scroll', function() {

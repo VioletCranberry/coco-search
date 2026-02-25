@@ -16,9 +16,4 @@ export const state = {
     isUnloading: false,
     toastTimer: null,
     depsGraphSimulation: null,
-    logCategoryFilters: {
-        search: true, index: true, mcp: true, cache: true,
-        infra: true, system: true, deps: true,
-    },
-    logMinLevel: 'INFO',
 };

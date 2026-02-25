@@ -1,9 +1,12 @@
 """Tests for cocosearch.mcp.log_stream module."""
 
+import asyncio
 import io
 import logging
 import sys
 import threading
+
+import pytest
 
 from cocosearch.mcp.log_stream import (
     BufferHandler,
@@ -186,6 +189,23 @@ class TestLogBuffer:
             )
         )
         assert len(snapshot) == 1  # snapshot unchanged
+
+    @pytest.mark.asyncio
+    async def test_subscribe_stores_event_loop(self):
+        """subscribe() captures the running event loop for thread-safe delivery."""
+        buf = LogBuffer()
+        sub_id, q = buf.subscribe()
+        loop, _ = buf._subscribers[sub_id]
+        assert loop is asyncio.get_running_loop()
+        buf.unsubscribe(sub_id)
+
+    def test_subscribe_no_loop_in_sync_context(self):
+        """subscribe() stores None for loop when no event loop is running."""
+        buf = LogBuffer()
+        sub_id, q = buf.subscribe()
+        loop, _ = buf._subscribers[sub_id]
+        assert loop is None
+        buf.unsubscribe(sub_id)
 
 
 # ---------------------------------------------------------------------------
@@ -481,6 +501,21 @@ class TestRichLogHandler:
         output = buf.getvalue()
         assert "Custom output" in output
         assert "INFO" in output
+
+    def test_category_visible_in_rich_output(self):
+        """Category badge like [search] must appear as visible text."""
+        buf = io.StringIO()
+        handler = RichLogHandler(file=buf)
+        entry = LogEntry(
+            timestamp=1740000000.0,
+            level="INFO",
+            category="search",
+            message="test",
+            fields={},
+        )
+        handler.handle(entry)
+        output = buf.getvalue()
+        assert "[search]" in output
 
 
 # ---------------------------------------------------------------------------

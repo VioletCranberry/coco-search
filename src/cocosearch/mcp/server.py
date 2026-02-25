@@ -270,7 +270,10 @@ async def api_logs(request) -> StreamingResponse:
 async def serve_dashboard(request) -> HTMLResponse:
     """Serve the web dashboard HTML."""
     html_content = get_dashboard_html()
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(
+        content=html_content,
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 # Static file serving for dashboard CSS/JS assets
@@ -292,7 +295,11 @@ async def serve_static(request) -> FileResponse | JSONResponse:
         return JSONResponse({"error": "Not found"}, status_code=404)
     suffix = file_path.suffix.lower()
     media_type = _CONTENT_TYPES.get(suffix)
-    return FileResponse(file_path, media_type=media_type)
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 # Stats API endpoints

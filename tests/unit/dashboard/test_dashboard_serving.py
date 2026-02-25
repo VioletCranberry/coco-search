@@ -40,14 +40,14 @@ class TestDashboardServing:
     async def test_dashboard_references_external_css(self, client):
         """Served HTML has a link to /static/css/styles.css."""
         response = await client.get("/dashboard")
-        assert '/static/css/styles.css"' in response.text
+        assert "/static/css/styles.css" in response.text
 
     @pytest.mark.asyncio
     async def test_dashboard_references_app_js_module(self, client):
         """Served HTML has a script tag for /static/js/app.js as a module."""
         response = await client.get("/dashboard")
         assert 'type="module"' in response.text
-        assert '/static/js/app.js"' in response.text
+        assert "/static/js/app.js" in response.text
 
     @pytest.mark.asyncio
     async def test_dashboard_has_cdn_scripts(self, client):

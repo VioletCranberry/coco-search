@@ -303,23 +303,6 @@
                 <button>Close</button>
             </div>
         </div>
-        <div class="log-filter-bar">
-            <div class="log-cat-filters">
-                <button class="log-cat-pill active" data-cat="search">search</button>
-                <button class="log-cat-pill active" data-cat="index">index</button>
-                <button class="log-cat-pill active" data-cat="mcp">mcp</button>
-                <button class="log-cat-pill active" data-cat="cache">cache</button>
-                <button class="log-cat-pill active" data-cat="infra">infra</button>
-                <button class="log-cat-pill active" data-cat="system">system</button>
-                <button class="log-cat-pill active" data-cat="deps">deps</button>
-            </div>
-            <select id="logLevelFilter" class="log-level-select">
-                <option value="DEBUG">DEBUG+</option>
-                <option value="INFO" selected>INFO+</option>
-                <option value="WARNING">WARN+</option>
-                <option value="ERROR">ERROR+</option>
-            </select>
-        </div>
         <div class="log-panel-body" id="logPanelBody"></div>
         <div class="log-panel-footer">
             <span id="logLineCount">0 lines</span>

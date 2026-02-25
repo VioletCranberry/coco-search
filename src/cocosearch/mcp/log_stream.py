@@ -52,7 +52,9 @@ class LogBuffer:
     def __init__(self, maxlen: int = _BUFFER_MAXLEN) -> None:
         self._buf: collections.deque[LogEntry] = collections.deque(maxlen=maxlen)
         self._lock = threading.Lock()
-        self._subscribers: dict[int, asyncio.Queue[LogEntry]] = {}
+        self._subscribers: dict[
+            int, tuple[asyncio.AbstractEventLoop | None, asyncio.Queue[LogEntry]]
+        ] = {}
         self._next_id = 0
         self._handlers: list = []
 
@@ -70,12 +72,15 @@ class LogBuffer:
                     h.handle(entry)
                 except Exception:
                     pass
-            # Fan out to SSE subscribers
+            # Fan out to SSE subscribers (thread-safe)
             dead: list[int] = []
-            for sub_id, q in self._subscribers.items():
+            for sub_id, (loop, q) in self._subscribers.items():
                 try:
-                    q.put_nowait(entry)
-                except asyncio.QueueFull:
+                    if loop is not None and loop.is_running():
+                        loop.call_soon_threadsafe(q.put_nowait, entry)
+                    else:
+                        q.put_nowait(entry)
+                except Exception:
                     dead.append(sub_id)
             for sub_id in dead:
                 self._subscribers.pop(sub_id, None)
@@ -88,10 +93,14 @@ class LogBuffer:
 
     def subscribe(self) -> tuple[int, asyncio.Queue[LogEntry]]:
         q: asyncio.Queue[LogEntry] = asyncio.Queue(maxsize=_QUEUE_MAXSIZE)
+        try:
+            loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
         with self._lock:
             sub_id = self._next_id
             self._next_id += 1
-            self._subscribers[sub_id] = q
+            self._subscribers[sub_id] = (loop, q)
         return sub_id, q
 
     def unsubscribe(self, sub_id: int) -> None:
@@ -237,7 +246,7 @@ class RichLogHandler:
             fields_str = "  " + " ".join(f"{k}={v}" for k, v in entry.fields.items())
 
         self._console.print(
-            f"[dim]{ts}[/dim] [{cat_color}][{entry.category}][/{cat_color}] "
+            f"[dim]{ts}[/dim] [{cat_color}]\\[{entry.category}][/{cat_color}] "
             f"[{lvl_color}]{entry.level:<8}[/{lvl_color}] {entry.message}"
             f"[dim]{fields_str}[/dim]",
             highlight=False,

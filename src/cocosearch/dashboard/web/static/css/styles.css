@@ -1158,45 +1158,6 @@ select option:checked {
 /* Structured fields */
 .log-fields { color: var(--text-muted); font-style: italic; }
 
-/* Filter bar */
-.log-filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-.log-cat-filters { display: flex; gap: 4px; flex-wrap: wrap; }
-.log-cat-pill {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 2px 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.log-cat-pill.active {
-    color: var(--text-primary);
-    border-color: var(--accent-orange);
-    background: rgba(255, 165, 0, 0.1);
-}
-.log-cat-pill:hover { border-color: var(--accent-orange); }
-.log-level-select {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 2px 6px;
-    background: var(--bg-card);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    margin-left: auto;
-}
-
 .log-panel-footer {
     display: flex;
     align-items: center;

@@ -2,7 +2,6 @@ import { state } from './state.js';
 
 const LOG_MAX_LINES = 1000;
 const LOG_MAX_RETRIES = 5;
-const LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'STDERR'];
 
 function _connectLogStream() {
     if (state.logEventSource) {
@@ -40,20 +39,6 @@ export function startLogStream() {
     if (state.logEventSource) return;
     state.logRetries = 0;
     _connectLogStream();
-}
-
-function _passesFilter(div) {
-    const cat = div.dataset.cat;
-    const level = div.dataset.level;
-    if (state.logCategoryFilters && state.logCategoryFilters[cat] === false) {
-        return false;
-    }
-    const minIdx = LOG_LEVELS.indexOf(state.logMinLevel || 'DEBUG');
-    const entryIdx = LOG_LEVELS.indexOf(level);
-    if (entryIdx >= 0 && entryIdx < minIdx) {
-        return false;
-    }
-    return true;
 }
 
 export function appendLogLine(entry) {
@@ -100,11 +85,6 @@ export function appendLogLine(entry) {
         div.appendChild(fieldsSpan);
     }
 
-    // Apply current filters
-    if (!_passesFilter(div)) {
-        div.style.display = 'none';
-    }
-
     body.appendChild(div);
 
     // Enforce max lines
@@ -127,13 +107,6 @@ export function appendLogLine(entry) {
     if (!panel.classList.contains('open')) {
         state.logUnreadCount++;
         document.getElementById('logBadge').classList.add('active');
-    }
-}
-
-export function applyLogFilters() {
-    const body = document.getElementById('logPanelBody');
-    for (const div of body.children) {
-        div.style.display = _passesFilter(div) ? '' : 'none';
     }
 }
 
