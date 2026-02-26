@@ -25,6 +25,7 @@ from cocosearch.config import (
     ConfigResolver,
     config_key_to_env_var,
     find_config_file,
+    generate_claude_md_routing,
     generate_config,
     load_config as load_project_config,
 )
@@ -1430,14 +1431,53 @@ def init_command(args: argparse.Namespace) -> int:
     console = Console()
     config_path = Path.cwd() / "cocosearch.yaml"
 
-    try:
-        generate_config(config_path)
-        console.print("[green]Created cocosearch.yaml[/green]")
-        console.print("[dim]Edit this file to customize CocoSearch behavior.[/dim]")
+    if config_path.exists():
+        console.print("[dim]cocosearch.yaml already exists, skipping.[/dim]")
+    else:
+        try:
+            generate_config(config_path)
+            console.print("[green]Created cocosearch.yaml[/green]")
+            console.print("[dim]Edit this file to customize CocoSearch behavior.[/dim]")
+        except ConfigLoadError as e:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+            return 1
+
+    # Offer to add tool routing to CLAUDE.md
+    no_claude_md = getattr(args, "no_claude_md", False)
+    if no_claude_md or not sys.stdin.isatty():
         return 0
-    except ConfigLoadError as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        return 1
+
+    console.print()
+    response = input("Add CocoSearch tool routing to CLAUDE.md? [y/N] ")
+    if response.lower() != "y":
+        return 0
+
+    console.print()
+    console.print("  [cyan]1[/cyan]  Local project CLAUDE.md (default)")
+    console.print("  [cyan]2[/cyan]  Global ~/.claude/CLAUDE.md")
+    console.print()
+    choice = input("Location [1]: ").strip() or "1"
+
+    if choice == "1":
+        target = Path.cwd() / "CLAUDE.md"
+    elif choice == "2":
+        target = Path.home() / ".claude" / "CLAUDE.md"
+    else:
+        console.print("[dim]Invalid choice, skipping CLAUDE.md setup.[/dim]")
+        return 0
+
+    try:
+        result = generate_claude_md_routing(target)
+        if result == "created":
+            console.print(f"[green]Created {target}[/green]")
+        elif result == "appended":
+            console.print(f"[green]Added tool routing to {target}[/green]")
+        else:
+            console.print(f"[dim]Tool routing already present in {target}[/dim]")
+    except OSError as e:
+        console.print(f"[yellow]Warning:[/yellow] Could not write {target}: {e}")
+
+    return 0
 
 
 def mcp_command(args: argparse.Namespace) -> int:
@@ -2424,10 +2464,16 @@ def main() -> None:
     )
 
     # Init subcommand
-    subparsers.add_parser(
+    init_parser = subparsers.add_parser(
         "init",
         help="Create a cocosearch.yaml configuration file",
         description="Generate a starter configuration file with all options documented.",
+    )
+    init_parser.add_argument(
+        "--no-claude-md",
+        action="store_true",
+        default=False,
+        help="Skip the CLAUDE.md tool routing prompt",
     )
 
     # MCP subcommand

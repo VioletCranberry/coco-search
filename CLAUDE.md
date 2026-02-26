@@ -68,7 +68,8 @@ uv run cocosearch list
 uv run cocosearch clear <index>
 uv run cocosearch languages              # List supported languages
 uv run cocosearch grammars               # List supported grammars
-uv run cocosearch init                   # Initialize cocosearch.yaml
+uv run cocosearch init                   # Initialize cocosearch.yaml + optional CLAUDE.md
+uv run cocosearch init --no-claude-md    # Initialize without CLAUDE.md prompt
 uv run cocosearch config show
 uv run cocosearch config path
 uv run cocosearch config check
@@ -239,3 +240,19 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 ### Prerequisites
 
 Docker running PostgreSQL 17 (pgvector) on port 5432 and Ollama on port 11434. Use `/cocosearch:cocosearch-quickstart` to verify.
+
+## CocoSearch Tool Routing
+
+When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration:
+
+| Task | Use this | NOT this |
+|------|----------|----------|
+| Code search / "how does X work?" | `search_code` | Grep, Glob, Task (Explore) |
+| Symbol lookup / "find function Y" | `search_code` with `symbol_name`/`symbol_type` | Grep for def/class patterns |
+| Dependency tracing / "what imports X?" | `get_file_dependencies` / `get_file_impact` | Grep for import statements |
+| Search debugging / "why no results?" | `analyze_query` | Manual pipeline investigation |
+
+Fall back to Grep/Glob ONLY for:
+- Exact literal string matches (e.g., a specific error message or config value)
+- File path pattern matching (e.g., "find all `*.test.ts` files")
+- Editing operations that need line numbers from a known file

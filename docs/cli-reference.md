@@ -216,6 +216,26 @@ The `--deps` flag on the `index` command combines indexing with dependency extra
 uv run cocosearch index . --deps
 ```
 
+### Configuration Generation
+
+**Initialize project configuration:** `uv run cocosearch init [--no-claude-md]`
+
+Creates a `cocosearch.yaml` starter configuration file in the current directory. After creating the config file, interactively offers to add a CocoSearch tool routing table to your CLAUDE.md (local project or global `~/.claude/CLAUDE.md`). The routing table tells Claude Code to prefer CocoSearch MCP tools over built-in Grep/Glob for code search.
+
+| Flag | Description |
+| ---- | ----------- |
+| `--no-claude-md` | Skip the CLAUDE.md tool routing prompt |
+
+```bash
+# Interactive: creates cocosearch.yaml, then prompts for CLAUDE.md setup
+uv run cocosearch init
+
+# Non-interactive: creates cocosearch.yaml only
+uv run cocosearch init --no-claude-md
+```
+
+The CLAUDE.md prompt is also skipped automatically when stdin is not a TTY (e.g., in CI pipelines or when piping input).
+
 ### Configuration Commands
 
 **Check configuration and connectivity:** `uv run cocosearch config check`

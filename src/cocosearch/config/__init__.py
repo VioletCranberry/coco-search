@@ -7,7 +7,13 @@ from .env_validation import (
     validate_required_env_vars,
 )
 from .errors import format_validation_errors, suggest_field_name
-from .generator import CONFIG_TEMPLATE, generate_config
+from .generator import (
+    CLAUDE_MD_DUPLICATE_MARKER,
+    CLAUDE_MD_ROUTING_SECTION,
+    CONFIG_TEMPLATE,
+    generate_claude_md_routing,
+    generate_config,
+)
 from .loader import find_config_file, load_config
 from .resolver import ConfigResolver, config_key_to_env_var, parse_env_value
 from .schema import (
@@ -33,7 +39,10 @@ __all__ = [
     "format_validation_errors",
     "suggest_field_name",
     "generate_config",
+    "generate_claude_md_routing",
     "CONFIG_TEMPLATE",
+    "CLAUDE_MD_ROUTING_SECTION",
+    "CLAUDE_MD_DUPLICATE_MARKER",
     "ConfigResolver",
     "config_key_to_env_var",
     "parse_env_value",

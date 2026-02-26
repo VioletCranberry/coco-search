@@ -159,6 +159,14 @@ uvx cocosearch index .
 # 3.3 Use AI and MCP - see below.
 ```
 
+- **Project setup** (optional):
+
+```bash
+# Generate cocosearch.yaml config and optionally add
+# tool routing to CLAUDE.md for Claude Code integration:
+uvx cocosearch init
+```
+
 - **Register with your AI assistant (pick one)**:
 
 **Option A — Plugin (recommended):**
@@ -509,7 +517,13 @@ A grammar is matched by file path patterns and optionally by content patterns. F
 
 ## Configuration
 
-Create `cocosearch.yaml` in your project root to customize indexing:
+Run `cocosearch init` to generate a starter config file and optionally set up CLAUDE.md tool routing for Claude Code integration:
+
+```bash
+uv run cocosearch init
+```
+
+Or create `cocosearch.yaml` in your project root manually to customize indexing:
 
 ```yaml
 indexing:
