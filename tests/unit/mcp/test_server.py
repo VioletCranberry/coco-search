@@ -854,8 +854,10 @@ class TestRunServer:
 class TestRegisterWithGit:
     """Tests for _register_with_git helper passing branch/commit metadata."""
 
-    def test_passes_branch_and_commit(self):
+    def test_passes_branch_and_commit(self, monkeypatch):
         """_register_with_git calls register_index_path with git metadata."""
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_MODEL", raising=False)
         from cocosearch.mcp.server import _register_with_git
 
         with patch(
@@ -885,8 +887,10 @@ class TestRegisterWithGit:
             embedding_model="nomic-embed-text",
         )
 
-    def test_passes_none_when_not_git_repo(self):
+    def test_passes_none_when_not_git_repo(self, monkeypatch):
         """_register_with_git passes None branch/commit for non-git dirs."""
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_MODEL", raising=False)
         from cocosearch.mcp.server import _register_with_git
 
         with patch("cocosearch.mcp.server.get_current_branch", return_value=None):
