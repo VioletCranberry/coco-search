@@ -207,6 +207,41 @@ class TestLogBuffer:
         assert loop is None
         buf.unsubscribe(sub_id)
 
+    @pytest.mark.asyncio
+    async def test_full_queue_in_async_context_drops_entries_silently(self):
+        """QueueFull in async subscriber must not cascade via event loop callbacks."""
+        buf = LogBuffer()
+        sub_id, q = buf.subscribe()
+
+        for i in range(_QUEUE_MAXSIZE):
+            buf.append(
+                LogEntry(
+                    timestamp=float(i),
+                    level="INFO",
+                    category="system",
+                    message=str(i),
+                    fields={},
+                )
+            )
+
+        # Queue is full; more appends should not raise or cascade
+        for i in range(10):
+            buf.append(
+                LogEntry(
+                    timestamp=1000.0 + i,
+                    level="INFO",
+                    category="system",
+                    message=f"overflow-{i}",
+                    fields={},
+                )
+            )
+
+        await asyncio.sleep(0.05)  # Let scheduled callbacks execute
+
+        assert sub_id in buf._subscribers  # NOT removed (entries silently dropped)
+        assert q.qsize() == _QUEUE_MAXSIZE  # Queue still full, overflow dropped
+        buf.unsubscribe(sub_id)
+
 
 # ---------------------------------------------------------------------------
 # BufferHandler

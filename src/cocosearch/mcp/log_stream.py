@@ -46,6 +46,14 @@ _BUFFER_MAXLEN = 1000
 _QUEUE_MAXSIZE = 500
 
 
+def _safe_enqueue(q: asyncio.Queue, entry: LogEntry) -> None:
+    """Enqueue without raising — prevents QueueFull cascade in event-loop callbacks."""
+    try:
+        q.put_nowait(entry)
+    except asyncio.QueueFull:
+        pass
+
+
 class LogBuffer:
     """Thread-safe ring buffer with async subscriber fan-out."""
 
@@ -77,7 +85,7 @@ class LogBuffer:
             for sub_id, (loop, q) in self._subscribers.items():
                 try:
                     if loop is not None and loop.is_running():
-                        loop.call_soon_threadsafe(q.put_nowait, entry)
+                        loop.call_soon_threadsafe(_safe_enqueue, q, entry)
                     else:
                         q.put_nowait(entry)
                 except Exception:
