@@ -29,6 +29,8 @@ _active_indexing: dict[str, tuple[threading.Thread, threading.Event]] = {}
 _indexing_lock = threading.Lock()
 _cocoindex_initialized = False
 _cocoindex_init_lock = threading.Lock()
+_cocoindex_init_failed_at: float = 0.0  # monotonic timestamp of last failure
+_COCOINDEX_RETRY_COOLDOWN = 30.0  # seconds before retrying after failure
 
 from pathlib import Path  # noqa: E402
 from typing import Annotated  # noqa: E402
@@ -77,20 +79,58 @@ def _get_cs_log():
     return cs_log
 
 
-def _ensure_cocoindex_init() -> None:
+def _ensure_cocoindex_init(timeout: float = 5.0) -> bool:
     """Initialize CocoIndex exactly once, thread-safely.
+
+    Returns True if init succeeded, False if it timed out or failed.
+    After a failure, returns False immediately for ``_COCOINDEX_RETRY_COOLDOWN``
+    seconds to avoid repeated timeout waits and downstream pool spam.
 
     cocoindex.init() is synchronous and triggers a RuntimeWarning when called
     inside an async event loop. By calling it once (guarded by a lock) we
     avoid the repeated sync-inside-async warnings from every HTTP/MCP handler.
     """
-    global _cocoindex_initialized
+    global _cocoindex_initialized, _cocoindex_init_failed_at
     if _cocoindex_initialized:
-        return
+        return True
+    # Cooldown: don't retry if we recently failed
+    if _cocoindex_init_failed_at and (
+        _time.monotonic() - _cocoindex_init_failed_at < _COCOINDEX_RETRY_COOLDOWN
+    ):
+        return False
     with _cocoindex_init_lock:
-        if not _cocoindex_initialized:
-            cocoindex.init()
+        if _cocoindex_initialized:
+            return True
+        # Re-check cooldown inside the lock (another thread may have just failed)
+        if _cocoindex_init_failed_at and (
+            _time.monotonic() - _cocoindex_init_failed_at < _COCOINDEX_RETRY_COOLDOWN
+        ):
+            return False
+
+        import concurrent.futures
+
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(cocoindex.init)
+        try:
+            future.result(timeout=timeout)
             _cocoindex_initialized = True
+            executor.shutdown(wait=False)
+            return True
+        except concurrent.futures.TimeoutError:
+            # Don't wait for the stuck thread — let the server proceed
+            executor.shutdown(wait=False, cancel_futures=True)
+            _cocoindex_init_failed_at = _time.monotonic()
+            logger.warning(
+                "CocoIndex init timed out after %.1fs — "
+                "infrastructure may be unavailable",
+                timeout,
+            )
+            return False
+        except Exception as e:
+            executor.shutdown(wait=False)
+            _cocoindex_init_failed_at = _time.monotonic()
+            logger.warning("CocoIndex init failed: %s", e)
+            return False
 
 
 def _apply_thread_liveness_status(
@@ -150,7 +190,8 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
     Shared by MCP API routes and the background dashboard server.
     Calls _ensure_cocoindex_init() internally.
     """
-    _ensure_cocoindex_init()
+    if not _ensure_cocoindex_init():
+        return []
     indexes = mgmt_list_indexes()
     logger.debug(
         "build_all_stats: found %d indexes: %s",
@@ -180,7 +221,10 @@ def build_single_stats(index_name: str, include_failures: bool = False) -> dict:
     Calls _ensure_cocoindex_init() internally.
     Raises ValueError if the index is not found.
     """
-    _ensure_cocoindex_init()
+    if not _ensure_cocoindex_init():
+        raise ValueError(
+            "Database not initialized. Start infrastructure with: docker compose up -d"
+        )
     stats = get_comprehensive_stats(index_name)
     result = stats.to_dict()
     _apply_thread_liveness_status(index_name, result, stats.status)
@@ -200,6 +244,59 @@ register_roots_notification(mcp)
 async def health_check(request) -> JSONResponse:
     """Health check endpoint. Also see /dashboard for web UI."""
     return JSONResponse({"status": "ok"})
+
+
+def _check_infra_sync() -> dict:
+    """Run infrastructure checks synchronously (called via to_thread)."""
+    import os
+
+    from cocosearch.config.env_validation import get_database_url
+    from cocosearch.config.schema import default_model_for_provider
+    from cocosearch.indexer.preflight import (
+        check_api_key,
+        check_ollama,
+        check_ollama_model,
+        check_postgres,
+    )
+
+    db_url = get_database_url()
+    provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    model = os.environ.get(
+        "COCOSEARCH_EMBEDDING_MODEL", default_model_for_provider(provider)
+    )
+    ollama_url = os.environ.get("COCOSEARCH_OLLAMA_URL", "http://localhost:11434")
+
+    # Check database
+    db_status: dict = {"ok": True}
+    try:
+        check_postgres(db_url)
+    except ConnectionError as e:
+        db_status = {"ok": False, "error": str(e)}
+
+    # Check embedding provider
+    embed_status: dict = {"ok": True, "provider": provider, "model": model}
+    try:
+        if provider == "ollama":
+            check_ollama(ollama_url)
+            check_ollama_model(ollama_url, model)
+        else:
+            check_api_key(provider)
+    except ConnectionError as e:
+        embed_status["ok"] = False
+        embed_status["error"] = str(e)
+
+    return {
+        "database": db_status,
+        "embedding": embed_status,
+        "all_ok": db_status["ok"] and embed_status["ok"],
+    }
+
+
+@mcp.custom_route("/api/infra", methods=["GET"])
+async def api_infra(request) -> JSONResponse:
+    """Infrastructure status — checks DB and embedding provider availability."""
+    result = await asyncio.to_thread(_check_infra_sync)
+    return JSONResponse(result)
 
 
 # SSE heartbeat endpoint for dashboard disconnect detection
@@ -537,7 +634,8 @@ def _build_project_response(env_path: str) -> JSONResponse:
     path_collision = False
     collision_message = None
     try:
-        _ensure_cocoindex_init()
+        if not _ensure_cocoindex_init():
+            raise ConnectionError("Infrastructure unavailable")
         indexes = mgmt_list_indexes()
         index_names = {idx["name"] for idx in indexes}
         is_indexed = index_name in index_names
@@ -765,7 +863,8 @@ async def api_delete_index(request) -> JSONResponse:
 def _build_list_response() -> JSONResponse:
     """Build index list response (sync, runs in thread pool)."""
     try:
-        _ensure_cocoindex_init()
+        if not _ensure_cocoindex_init():
+            return JSONResponse([])
         indexes = mgmt_list_indexes()
     except Exception:
         return JSONResponse([])
@@ -806,12 +905,12 @@ def _discover_projects() -> JSONResponse:
         return JSONResponse([])
 
     existing_indexes: set[str] = set()
-    try:
-        _ensure_cocoindex_init()
-        for idx in mgmt_list_indexes():
-            existing_indexes.add(idx["name"])
-    except Exception:
-        pass
+    if _ensure_cocoindex_init():
+        try:
+            for idx in mgmt_list_indexes():
+                existing_indexes.add(idx["name"])
+        except Exception:
+            pass
 
     projects = []
     try:
@@ -2409,13 +2508,15 @@ def run_server(
     no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
 
     # Initialize CocoIndex before the event loop starts to avoid
-    # "sync API called inside existing event loop" RuntimeWarning
-    try:
-        _ensure_cocoindex_init()
+    # "sync API called inside existing event loop" RuntimeWarning.
+    # Uses a timeout so the server starts even if infrastructure is down.
+    if _ensure_cocoindex_init():
         _get_cs_log().infra("CocoIndex initialized")
-    except Exception as e:
-        _get_cs_log().infra("CocoIndex pre-init failed", level="WARNING", error=str(e))
-        logger.warning(f"CocoIndex pre-init failed (will retry on demand): {e}")
+    else:
+        _get_cs_log().infra(
+            "CocoIndex init skipped — infrastructure may be unavailable",
+            level="WARNING",
+        )
 
     if transport == "stdio":
         if port != 3000:  # Non-default port specified

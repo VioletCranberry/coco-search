@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { loadProjectContext, fetchStats, fetchProjects } from './api.js';
+import { loadProjectContext, fetchStats, fetchProjects, fetchInfra } from './api.js';
 import { updateDashboard, updateSummaryCards } from './dashboard.js';
 
 export function setButtonsDisabled(disabled) {
@@ -99,17 +99,38 @@ export async function loadDashboard(indexIndex) {
     updateDashboard(stats);
 }
 
+function showInfraBanner(infra) {
+    const banner = document.getElementById('infraBanner');
+    const details = document.getElementById('infraDetails');
+    if (!banner || !details) return;
+    const issues = [];
+    if (!infra.database.ok) {
+        issues.push('Database: ' + (infra.database.error || 'unavailable'));
+    }
+    if (!infra.embedding.ok) {
+        issues.push('Embedding (' + infra.embedding.provider + '): ' + (infra.embedding.error || 'unavailable'));
+    }
+    details.textContent = issues.join(' | ');
+    banner.style.display = 'block';
+}
+
 export async function loadIndexList() {
     try {
-        // Load project context, stats, and discovered projects in parallel
-        const [ctx, data, projects] = await Promise.all([
+        // Load project context, stats, infra health, and discovered projects in parallel
+        const [ctx, data, projects, infra] = await Promise.all([
             loadProjectContext(),
-            fetchStats(),
+            fetchStats().catch(() => []),
             fetchProjects(),
+            fetchInfra(),
         ]);
         state.projectContext = ctx;
         state.allIndexes = Array.isArray(data) ? data : [data];
         state.allProjects = projects;
+
+        // Show infra banner if any component is down
+        if (infra && !infra.all_ok) {
+            showInfraBanner(infra);
+        }
 
         // Find unindexed projects (not already in allIndexes)
         const indexedNames = new Set(state.allIndexes.map(idx => idx.name));
@@ -181,6 +202,9 @@ export async function loadIndexList() {
             }
         } else if (unindexedProjects.length > 0) {
             // No indexed projects but discovered projects available
+            document.getElementById('loadingMessage').style.display = 'none';
+        } else if (infra && !infra.all_ok) {
+            // No indexes and infra is down — hide loading, banner is already visible
             document.getElementById('loadingMessage').style.display = 'none';
         }
     } catch (error) {

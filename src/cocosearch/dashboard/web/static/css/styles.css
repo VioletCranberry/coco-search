@@ -521,6 +521,25 @@ select option:checked {
     font-size: 13px;
 }
 
+.infra-banner {
+    background: var(--accent-red);
+    color: white;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.infra-banner h3 {
+    font-size: 18px;
+    margin-bottom: 6px;
+}
+
+.infra-banner p {
+    font-size: 14px;
+    margin-top: 6px;
+    word-break: break-word;
+}
+
 .parse-table {
     width: 100%;
     border-collapse: collapse;

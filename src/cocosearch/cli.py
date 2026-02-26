@@ -1759,9 +1759,6 @@ def dashboard_command(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for error).
     """
-    import threading
-    import webbrowser
-
     from cocosearch.mcp import run_server
 
     console = Console()
@@ -1795,15 +1792,8 @@ def dashboard_command(args: argparse.Namespace) -> int:
     console.print()
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 
-    # Auto-open browser (opt-out via COCOSEARCH_NO_DASHBOARD=1)
-    no_dashboard = os.environ.get("COCOSEARCH_NO_DASHBOARD", "").strip() == "1"
-    if not no_dashboard:
-        timer = threading.Timer(1.5, lambda: webbrowser.open(dashboard_url))
-        timer.daemon = True
-        timer.start()
-
-    # Suppress run_server()'s own browser open — we already opened above
-    os.environ["COCOSEARCH_NO_DASHBOARD"] = "1"
+    # Let run_server() handle browser open — it fires after init completes,
+    # right before uvicorn starts, so the URL is guaranteed to be reachable.
 
     # Use MCP server with SSE transport (provides HTTP routes)
     try:

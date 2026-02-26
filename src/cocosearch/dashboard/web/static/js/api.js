@@ -22,6 +22,20 @@ export async function fetchDepsGraph(file, indexName, depth = 3) {
     return await resp.json();
 }
 
+export async function fetchInfra() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+        const response = await fetch('/api/infra', { signal: controller.signal });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 export async function fetchStats(indexName = null) {
     let url = indexName
         ? `/api/stats?index=${encodeURIComponent(indexName)}&include_failures=true`

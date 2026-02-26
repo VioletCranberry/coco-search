@@ -47,6 +47,71 @@ class TestHealthEndpoint:
         assert "application/json" in response.headers["content-type"]
 
 
+class TestApiInfraSmoke:
+    """Tests for GET /api/infra through the ASGI stack."""
+
+    @pytest.mark.asyncio
+    async def test_infra_all_ok(self, client):
+        """Returns all_ok=True when all checks pass."""
+        with patch(
+            "cocosearch.mcp.server._check_infra_sync",
+            return_value={
+                "database": {"ok": True},
+                "embedding": {"ok": True, "provider": "ollama", "model": "nomic-embed-text"},
+                "all_ok": True,
+            },
+        ):
+            response = await client.get("/api/infra")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["all_ok"] is True
+        assert body["database"]["ok"] is True
+        assert body["embedding"]["ok"] is True
+
+    @pytest.mark.asyncio
+    async def test_infra_db_down(self, client):
+        """Returns all_ok=False when database is unreachable."""
+        with patch(
+            "cocosearch.mcp.server._check_infra_sync",
+            return_value={
+                "database": {"ok": False, "error": "PostgreSQL is not reachable"},
+                "embedding": {"ok": True, "provider": "ollama", "model": "nomic-embed-text"},
+                "all_ok": False,
+            },
+        ):
+            response = await client.get("/api/infra")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["all_ok"] is False
+        assert body["database"]["ok"] is False
+        assert "not reachable" in body["database"]["error"]
+
+    @pytest.mark.asyncio
+    async def test_infra_embedding_down(self, client):
+        """Returns all_ok=False when embedding provider is unreachable."""
+        with patch(
+            "cocosearch.mcp.server._check_infra_sync",
+            return_value={
+                "database": {"ok": True},
+                "embedding": {
+                    "ok": False,
+                    "provider": "ollama",
+                    "model": "nomic-embed-text",
+                    "error": "Ollama is not reachable",
+                },
+                "all_ok": False,
+            },
+        ):
+            response = await client.get("/api/infra")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["all_ok"] is False
+        assert body["embedding"]["ok"] is False
+
+
 class TestApiListSmoke:
     """Tests for GET /api/list through the ASGI stack."""
 
