@@ -214,7 +214,10 @@ def get_dependency_tree(
             if target is None:
                 # External/unresolved dependency — add as non-traversable leaf
                 ext_label = (
-                    edge.metadata.get("module") or edge.target_symbol or "unknown"
+                    edge.metadata.get("module")
+                    or edge.metadata.get("ref")
+                    or edge.target_symbol
+                    or "unknown"
                 )
                 child = DependencyTree(
                     file=ext_label,

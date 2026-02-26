@@ -74,6 +74,32 @@ _EXTERNAL_ONLY_DEPS = {
     ],
 }
 
+# External deps with ref metadata (e.g., GitHub Actions pre-fix data)
+_REF_METADATA_DEPS = {
+    "workflow.yml": [
+        _edge(
+            "workflow.yml",
+            None,
+            symbol=None,
+            metadata={"ref": "actions/checkout@v4"},
+        ),
+        _edge(
+            "workflow.yml",
+            None,
+            symbol=None,
+            metadata={"ref": "astral-sh/setup-uv@v5"},
+        ),
+        _edge(
+            "workflow.yml",
+            None,
+            symbol=None,
+            metadata={"module": "docker/build-push-action"},
+        ),
+        _edge("workflow.yml", None, symbol="bare_symbol"),
+        _edge("workflow.yml", None, symbol=None),
+    ],
+}
+
 
 def _mock_get_dependencies(graph):
     """Create a mock for get_dependencies using a predefined graph."""
@@ -247,6 +273,44 @@ class TestGetDependencyTree:
         # "os" edge has no metadata.module, should use target_symbol
         os_nodes = [c for c in tree.children if c.file == "os"]
         assert len(os_nodes) == 1
+
+    def test_external_deps_fallback_to_ref(self):
+        """When no metadata.module but metadata.ref exists, use ref as label."""
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_REF_METADATA_DEPS),
+        ):
+            tree = get_dependency_tree("test", "workflow.yml", max_depth=5)
+
+        ext = [c for c in tree.children if c.is_external]
+        assert len(ext) == 5
+        ext_files = {c.file for c in ext}
+
+        # module wins over ref
+        assert "docker/build-push-action" in ext_files
+        # ref used when no module
+        assert "actions/checkout@v4" in ext_files
+        assert "astral-sh/setup-uv@v5" in ext_files
+        # symbol used when no module or ref
+        assert "bare_symbol" in ext_files
+        # unknown when nothing available
+        assert "unknown" in ext_files
+
+    def test_external_deps_distinct_nodes(self):
+        """Multiple distinct external deps should not collapse into one node."""
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_REF_METADATA_DEPS),
+        ):
+            tree = get_dependency_tree("test", "workflow.yml", max_depth=5)
+
+        ext = [c for c in tree.children if c.is_external]
+        ext_files = [c.file for c in ext]
+        # All 5 are separate children (no collapsing)
+        assert len(ext_files) == 5
+        # 4 of 5 have unique names
+        unique_named = [f for f in ext_files if f != "unknown"]
+        assert len(set(unique_named)) == len(unique_named)
 
 
 # ============================================================================

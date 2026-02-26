@@ -165,6 +165,55 @@ class TestApiDepsGraph:
         response = await client.get("/api/deps/graph", params={"file": "a.py"})
         assert response.status_code == 400
 
+    @pytest.mark.asyncio
+    async def test_external_nodes_in_graph(self, client):
+        """External nodes should appear with is_external flag and correct labels."""
+        tree = DependencyTree(
+            file="workflow.yml",
+            symbol=None,
+            dep_type="root",
+            children=[
+                DependencyTree(
+                    file="actions/checkout@v4",
+                    symbol=None,
+                    dep_type="reference",
+                    children=[],
+                    is_external=True,
+                ),
+                DependencyTree(
+                    file="astral-sh/setup-uv@v5",
+                    symbol=None,
+                    dep_type="reference",
+                    children=[],
+                    is_external=True,
+                ),
+            ],
+        )
+        empty_tree = DependencyTree(
+            file="workflow.yml", symbol=None, dep_type="root", children=[]
+        )
+
+        with (
+            patch("cocosearch.deps.query.get_dependency_tree", return_value=tree),
+            patch("cocosearch.deps.query.get_impact", return_value=empty_tree),
+        ):
+            response = await client.get(
+                "/api/deps/graph", params={"file": "workflow.yml", "index": "test"}
+            )
+
+        assert response.status_code == 200
+        body = response.json()
+
+        # 3 nodes: workflow.yml + 2 external
+        assert len(body["nodes"]) == 3
+        ext_nodes = [n for n in body["nodes"] if n.get("is_external")]
+        assert len(ext_nodes) == 2
+        ext_ids = {n["id"] for n in ext_nodes}
+        assert ext_ids == {"actions/checkout@v4", "astral-sh/setup-uv@v5"}
+
+        # 2 edges from workflow.yml to each external node
+        assert len(body["edges"]) == 2
+
 
 # ============================================================================
 # Tests: MCP tool get_file_dependencies

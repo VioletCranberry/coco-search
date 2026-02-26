@@ -496,7 +496,7 @@ Beyond language-level support, CocoSearch recognizes **grammars** — domain-spe
 ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━┩
 │ docker-compose │ yaml        │ docker-compose*.yml, docker-compose*.yaml, compose*.yml, compose*.yaml           │  ✓   │
 │ github-actions │ yaml        │ .github/workflows/*.yml, .github/workflows/*.yaml                                │  ✓   │
-│ gitlab-ci      │ yaml        │ .gitlab-ci.yml                                                                   │  ✗   │
+│ gitlab-ci      │ yaml        │ .gitlab-ci.yml                                                                   │  ✓   │
 │ helm-chart     │ yaml        │ **/Chart.yaml, **/Chart.yml                                                      │  ✓   │
 │ helm-template  │ gotmpl      │ **/templates/*.yaml, **/templates/**/*.yaml, **/templates/*.yml,                 │  ✓   │
 │                │             │ **/templates/**/*.yml                                                            │      │

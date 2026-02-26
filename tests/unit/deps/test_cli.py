@@ -490,3 +490,27 @@ class TestGrammarsCommandDeps:
         output = json.loads(capsys.readouterr().out)
         gl_grammar = next(g for g in output if g["name"] == "gitlab-ci")
         assert gl_grammar["deps"] is False
+
+    @patch(
+        "cocosearch.deps.registry.get_all_extractor_language_ids",
+        return_value={
+            "docker-compose",
+            "github-actions",
+            "gitlab-ci",
+            "terraform",
+            "helm-template",
+            "helm-values",
+        },
+    )
+    def test_gitlab_ci_has_deps_true(self, mock_dep_ids, capsys):
+        """gitlab-ci grammar should have deps=True when extractor is registered."""
+        args = MagicMock()
+        args.json = True
+
+        from cocosearch.cli import grammars_command
+
+        grammars_command(args)
+
+        output = json.loads(capsys.readouterr().out)
+        gl_grammar = next(g for g in output if g["name"] == "gitlab-ci")
+        assert gl_grammar["deps"] is True
