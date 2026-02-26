@@ -374,7 +374,9 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 - **cocosearch-subway** ([SKILL.md](./skills/cocosearch-subway/SKILL.md)): Use when the user wants to visualize codebase structure as an interactive London Underground-style subway map. AI-generated visualization using CocoSearch tools for exploration.
 - **cocosearch-add-language** ([SKILL.md](./skills/cocosearch-add-language/SKILL.md)): Use when adding support for a new programming language or config format. Guides through handlers, symbol extraction, and context expansion with registration checklists.
 - **cocosearch-add-grammar** ([SKILL.md](./skills/cocosearch-add-grammar/SKILL.md)): Use when adding a grammar handler for domain-specific formats within a base language (e.g., GitHub Actions within YAML). Guides matches() design, separator spec, metadata extraction, and testing.
+- **cocosearch-deps** ([SKILL.md](./skills/cocosearch-deps/SKILL.md)): Use when exploring dependency relationships, tracing file connections, analyzing change impact, or identifying hub files. Guides dependency graph exploration using CocoSearch.
 - **cocosearch-add-extractor** ([SKILL.md](./skills/cocosearch-add-extractor/SKILL.md)): Use when adding a dependency extractor for a language or grammar. Guides through pre-checks, extractor implementation, optional module resolver, tests, and registration.
+- **cocosearch-review-pr** ([SKILL.md](./skills/cocosearch-review-pr/SKILL.md)): Use when reviewing a GitHub PR or GitLab MR by URL. Fetches diff and metadata via API, then uses CocoSearch for blast radius analysis, dependency impact, pattern consistency, and test coverage assessment.
 
 ## How Search Works
 

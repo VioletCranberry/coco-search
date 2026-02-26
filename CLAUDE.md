@@ -236,6 +236,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 - `/cocosearch:cocosearch-add-language` — Add language support (handlers, symbols, context expansion)
 - `/cocosearch:cocosearch-add-grammar` — Add grammar handler (domain-specific formats within a base language)
 - `/cocosearch:cocosearch-add-extractor` — Add dependency extractor (enables `deps tree`, `deps impact`, dependency-enriched search)
+- `/cocosearch:cocosearch-review-pr` — Review GitHub PRs / GitLab MRs with blast radius and dependency analysis
 
 ### Prerequisites
 
