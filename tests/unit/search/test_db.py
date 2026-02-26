@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 import cocosearch.search.db as db_module
-from cocosearch.search.db import get_connection_pool, get_table_name
+from cocosearch.search.db import close_pool, get_connection_pool, get_table_name
 
 
 class TestGetConnectionPool:
@@ -31,6 +31,52 @@ class TestGetConnectionPool:
         assert "cocosearch:cocosearch" in call_kwargs.kwargs.get(
             "conninfo", call_kwargs.args[0] if call_kwargs.args else ""
         )
+
+
+class TestClosePool:
+    """Tests for close_pool function."""
+
+    def test_closes_existing_pool(self):
+        """Should close the pool and reset the singleton to None."""
+        mock_pool = MagicMock()
+        db_module._pool = mock_pool
+
+        close_pool()
+
+        mock_pool.close.assert_called_once()
+        assert db_module._pool is None
+
+    def test_noop_when_no_pool(self):
+        """Should do nothing when pool is None."""
+        db_module._pool = None
+
+        close_pool()  # Should not raise
+
+        assert db_module._pool is None
+
+    def test_swallows_close_errors(self):
+        """Should not raise if pool.close() fails."""
+        mock_pool = MagicMock()
+        mock_pool.close.side_effect = Exception("connection error")
+        db_module._pool = mock_pool
+
+        close_pool()  # Should not raise
+
+        assert db_module._pool is None
+
+    def test_registered_with_atexit_on_pool_creation(self):
+        """Should register close_pool with atexit when pool is created."""
+        db_module._pool = None
+
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("cocosearch.search.db.ConnectionPool") as mock_pool_cls,
+            patch("cocosearch.search.db.atexit") as mock_atexit,
+        ):
+            mock_pool_cls.return_value = MagicMock()
+            get_connection_pool()
+
+            mock_atexit.register.assert_called_once_with(close_pool)
 
 
 class TestGetTableName:

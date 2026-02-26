@@ -4,6 +4,7 @@ Provides connection pool management and table name resolution for
 querying CocoIndex-created vector tables in PostgreSQL.
 """
 
+import atexit
 import logging
 import threading
 
@@ -65,8 +66,25 @@ def get_connection_pool() -> ConnectionPool:
                     conninfo=conninfo,
                     configure=configure,
                 )
+                atexit.register(close_pool)
                 _get_cs_log().infra("Database connection pool created")
     return _pool
+
+
+def close_pool() -> None:
+    """Close the database connection pool.
+
+    Registered with atexit when the pool is created so worker threads
+    are stopped cleanly on process exit, avoiding the psycopg
+    "couldn't stop thread" warnings.
+    """
+    global _pool
+    if _pool is not None:
+        try:
+            _pool.close()
+        except Exception:
+            pass
+        _pool = None
 
 
 def get_table_name(index_name: str) -> str:
