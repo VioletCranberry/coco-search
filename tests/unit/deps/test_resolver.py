@@ -5,6 +5,7 @@ from cocosearch.deps.resolver import (
     GoResolver,
     JavaScriptResolver,
     PythonResolver,
+    TerraformResolver,
     get_resolver,
     get_resolvers,
 )
@@ -352,3 +353,103 @@ class TestResolverRegistry:
         resolvers = get_resolvers()
         assert resolvers["js"] is resolvers["ts"]
         assert resolvers["js"] is resolvers["tsx"]
+
+    def test_terraform_resolver_registered(self):
+        assert isinstance(get_resolver("terraform"), TerraformResolver)
+
+
+# ============================================================================
+# Helpers: Terraform edges
+# ============================================================================
+
+
+def _make_tf_edge(source_file, value, target_file=None):
+    return DependencyEdge(
+        source_file=source_file,
+        source_symbol=None,
+        target_file=target_file,
+        target_symbol=None,
+        dep_type=DepType.REFERENCE,
+        metadata={"kind": "module_source", "value": value},
+    )
+
+
+# ============================================================================
+# Tests: TerraformResolver.build_index
+# ============================================================================
+
+
+class TestTerraformResolverBuildIndex:
+    """Tests for TerraformResolver.build_index()."""
+
+    def test_indexes_terraform_directories(self):
+        resolver = TerraformResolver()
+        files = [
+            ("infra/main.tf", "terraform"),
+            ("modules/vpc/main.tf", "terraform"),
+        ]
+        index = resolver.build_index(files)
+
+        assert "infra" in index
+        assert "modules/vpc" in index
+
+    def test_skips_non_terraform_files(self):
+        resolver = TerraformResolver()
+        files = [("src/main.py", "py"), ("cmd/main.go", "go")]
+        index = resolver.build_index(files)
+
+        assert index == {}
+
+    def test_first_file_wins_per_directory(self):
+        resolver = TerraformResolver()
+        files = [
+            ("modules/vpc/main.tf", "terraform"),
+            ("modules/vpc/variables.tf", "terraform"),
+        ]
+        index = resolver.build_index(files)
+
+        assert index["modules/vpc"] == "modules/vpc/main.tf"
+
+
+# ============================================================================
+# Tests: TerraformResolver.resolve
+# ============================================================================
+
+
+class TestTerraformResolverResolve:
+    """Tests for TerraformResolver.resolve()."""
+
+    def test_resolves_local_module_source(self):
+        resolver = TerraformResolver()
+        module_index = {"modules/vpc": "modules/vpc/main.tf"}
+        edge = _make_tf_edge("main.tf", "./modules/vpc")
+        assert resolver.resolve(edge, module_index) == "modules/vpc/main.tf"
+
+    def test_resolves_parent_relative_source(self):
+        resolver = TerraformResolver()
+        module_index = {"shared/vpc": "shared/vpc/main.tf"}
+        edge = _make_tf_edge("infra/main.tf", "../shared/vpc")
+        assert resolver.resolve(edge, module_index) == "shared/vpc/main.tf"
+
+    def test_registry_source_returns_none(self):
+        resolver = TerraformResolver()
+        module_index = {"modules/vpc": "modules/vpc/main.tf"}
+        edge = _make_tf_edge("main.tf", "terraform-aws-modules/vpc/aws")
+        assert resolver.resolve(edge, module_index) is None
+
+    def test_no_value_in_metadata_returns_none(self):
+        resolver = TerraformResolver()
+        edge = DependencyEdge(
+            source_file="main.tf",
+            source_symbol=None,
+            target_file=None,
+            target_symbol=None,
+            dep_type=DepType.REFERENCE,
+            metadata={"kind": "module_source"},
+        )
+        assert resolver.resolve(edge, {}) is None
+
+    def test_unresolvable_local_returns_none(self):
+        resolver = TerraformResolver()
+        edge = _make_tf_edge("main.tf", "./nonexistent")
+        assert resolver.resolve(edge, {}) is None

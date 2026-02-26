@@ -62,8 +62,10 @@ class TestConfigCheckConnectivity:
         assert "unreachable" in output
         assert "docker compose up -d" in output
 
-    def test_ollama_unreachable_skips_model_check(self, capsys):
+    def test_ollama_unreachable_skips_model_check(self, capsys, monkeypatch):
         """Exit 1, model check skipped when Ollama is unreachable."""
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_API_KEY", raising=False)
         mock_conn = MagicMock()
         with patch(
             "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
@@ -79,8 +81,10 @@ class TestConfigCheckConnectivity:
         assert "skipped" in output
         assert "--profile" in output
 
-    def test_model_missing_returns_one(self, capsys):
+    def test_model_missing_returns_one(self, capsys, monkeypatch):
         """Exit 1 with 'ollama pull' hint when model is not found."""
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_API_KEY", raising=False)
         mock_conn = MagicMock()
         with patch(
             "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
@@ -96,8 +100,10 @@ class TestConfigCheckConnectivity:
         assert "not found" in output
         assert "ollama pull" in output
 
-    def test_all_services_down_shows_all_failures(self, capsys):
+    def test_all_services_down_shows_all_failures(self, capsys, monkeypatch):
         """All failures shown (not just first) when everything is down."""
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_API_KEY", raising=False)
         with patch(
             "cocosearch.indexer.preflight.psycopg.connect",
             side_effect=psycopg.OperationalError("connection refused"),
@@ -163,8 +169,10 @@ class TestConfigCheckConnectivity:
 class TestConfigCheckProvider:
     """Tests for provider-aware config check behavior."""
 
-    def test_ollama_provider_shows_ollama_checks(self, capsys):
+    def test_ollama_provider_shows_ollama_checks(self, capsys, monkeypatch):
         """Ollama provider shows Ollama connectivity checks."""
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_PROVIDER", raising=False)
+        monkeypatch.delenv("COCOSEARCH_EMBEDDING_API_KEY", raising=False)
         mock_conn = MagicMock()
         with patch(
             "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
