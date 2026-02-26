@@ -592,7 +592,10 @@ def _enrich_with_deps(results: list[SearchResult], index_name: str) -> None:
                     "target_file": e.target_file,
                     "target_symbol": e.target_symbol,
                     "dep_type": e.dep_type,
-                    "module": e.metadata.get("module"),
+                    "module": e.metadata.get("module")
+                    or e.metadata.get("ref")
+                    or e.metadata.get("source")
+                    or e.metadata.get("name"),
                 }
                 for e in deps
             ]
