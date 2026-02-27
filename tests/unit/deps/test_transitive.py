@@ -3,7 +3,12 @@
 from unittest.mock import patch
 
 from cocosearch.deps.models import DependencyEdge, DepType
-from cocosearch.deps.query import get_dependency_tree, get_impact
+from cocosearch.deps.query import (
+    get_dependency_tree,
+    get_dependency_tree_batch,
+    get_impact,
+    get_impact_batch,
+)
 
 
 def _edge(source, target, dep_type=DepType.IMPORT, symbol=None, metadata=None):
@@ -355,6 +360,199 @@ class TestGetImpact:
 
         assert tree.file == "leaf.py"
         assert tree.children == []
+
+
+# ============================================================================
+# Tests: get_dependency_tree_batch
+# ============================================================================
+
+
+class TestGetDependencyTreeBatch:
+    """Tests for get_dependency_tree_batch() shared-visited BFS."""
+
+    def test_empty_list_returns_empty(self):
+        trees = get_dependency_tree_batch("test", [])
+        assert trees == []
+
+    def test_single_file_equivalent_to_non_batch(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_LINEAR_DEPS),
+        ):
+            batch = get_dependency_tree_batch("test", ["a.py"], max_depth=5)
+            single = get_dependency_tree("test", "a.py", max_depth=5)
+
+        assert len(batch) == 1
+        assert batch[0].file == single.file
+        assert len(batch[0].children) == len(single.children)
+
+    def test_shared_visited_deduplication(self):
+        """Batch on [a.py, b.py]: roots are pre-visited, non-root nodes deduplicated."""
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_LINEAR_DEPS),
+        ):
+            trees = get_dependency_tree_batch("test", ["a.py", "b.py"], max_depth=5)
+
+        assert len(trees) == 2
+        assert trees[0].file == "a.py"
+        assert trees[1].file == "b.py"
+
+        # a.py's edge to b.py is skipped (b.py pre-visited as root), only x.py added
+        a_child_files = {c.file for c in trees[0].children}
+        assert a_child_files == {"x.py"}
+
+        # b.py still gets its own subtree (c.py → d.py) since those aren't roots
+        b_child_files = {c.file for c in trees[1].children}
+        assert "c.py" in b_child_files
+
+        # c.py and d.py only appear once across both trees (shared visited)
+        all_files = _collect_files(trees[0]) + _collect_files(trees[1])
+        assert all_files.count("c.py") == 1
+        assert all_files.count("d.py") == 1
+
+    def test_diamond_overlap(self):
+        """Batch on [b.py, c.py] with diamond graph — d.py appears only once total."""
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_DIAMOND_DEPS),
+        ):
+            trees = get_dependency_tree_batch("test", ["b.py", "c.py"], max_depth=5)
+
+        assert len(trees) == 2
+        all_files = _collect_files(trees[0]) + _collect_files(trees[1])
+        assert all_files.count("d.py") == 1
+
+    def test_cycle_safety(self):
+        """Batch with files in a cycle doesn't loop."""
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_CYCLE_DEPS),
+        ):
+            trees = get_dependency_tree_batch(
+                "test", ["a.py", "b.py", "c.py"], max_depth=10
+            )
+
+        assert len(trees) == 3
+        all_files = []
+        for t in trees:
+            all_files.extend(_collect_files(t))
+        # Each file appears exactly once as a root (children are empty since
+        # all are pre-visited)
+        assert all_files.count("a.py") == 1
+        assert all_files.count("b.py") == 1
+        assert all_files.count("c.py") == 1
+
+    def test_order_preserved(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_LINEAR_DEPS),
+        ):
+            trees = get_dependency_tree_batch(
+                "test", ["c.py", "a.py", "b.py"], max_depth=5
+            )
+
+        assert [t.file for t in trees] == ["c.py", "a.py", "b.py"]
+
+    def test_external_deps_in_batch(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_MIXED_DEPS),
+        ):
+            trees = get_dependency_tree_batch(
+                "test", ["main.go", "pkg/utils.go"], max_depth=5
+            )
+
+        assert len(trees) == 2
+        main_ext = [c for c in trees[0].children if c.is_external]
+        assert len(main_ext) == 2
+
+    def test_root_nodes_have_root_dep_type(self):
+        with patch(
+            "cocosearch.deps.query.get_dependencies",
+            side_effect=_mock_get_dependencies(_LINEAR_DEPS),
+        ):
+            trees = get_dependency_tree_batch("test", ["a.py", "b.py"])
+
+        for t in trees:
+            assert t.dep_type == "root"
+
+
+# ============================================================================
+# Tests: get_impact_batch
+# ============================================================================
+
+
+class TestGetImpactBatch:
+    """Tests for get_impact_batch() shared-visited reverse BFS."""
+
+    def test_empty_list_returns_empty(self):
+        trees = get_impact_batch("test", [])
+        assert trees == []
+
+    def test_single_file_equivalent_to_non_batch(self):
+        with patch(
+            "cocosearch.deps.query.get_dependents",
+            side_effect=_mock_get_dependents(_LINEAR_DEPENDENTS),
+        ):
+            batch = get_impact_batch("test", ["d.py"], max_depth=5)
+            single = get_impact("test", "d.py", max_depth=5)
+
+        assert len(batch) == 1
+        assert batch[0].file == single.file
+        assert len(batch[0].children) == len(single.children)
+
+    def test_shared_visited_deduplication(self):
+        """Batch on [d.py, c.py]: roots pre-visited, non-root nodes deduplicated."""
+        with patch(
+            "cocosearch.deps.query.get_dependents",
+            side_effect=_mock_get_dependents(_LINEAR_DEPENDENTS),
+        ):
+            trees = get_impact_batch("test", ["d.py", "c.py"], max_depth=5)
+
+        assert len(trees) == 2
+        assert trees[0].file == "d.py"
+        assert trees[1].file == "c.py"
+
+        # d.py's dependent c.py is skipped (c.py pre-visited as root)
+        assert trees[0].children == []
+
+        # c.py gets its own subtree: b.py → a.py
+        c_child_files = {c.file for c in trees[1].children}
+        assert "b.py" in c_child_files
+
+        # b.py only appears once across both trees
+        all_files = _collect_files(trees[0]) + _collect_files(trees[1])
+        assert all_files.count("b.py") == 1
+
+    def test_order_preserved(self):
+        with patch(
+            "cocosearch.deps.query.get_dependents",
+            side_effect=_mock_get_dependents(_LINEAR_DEPENDENTS),
+        ):
+            trees = get_impact_batch("test", ["c.py", "d.py", "b.py"], max_depth=5)
+
+        assert [t.file for t in trees] == ["c.py", "d.py", "b.py"]
+
+    def test_cycle_safety(self):
+        """Batch with cycle deps doesn't loop."""
+        cycle_dependents = {
+            "a.py": [_edge("c.py", "a.py")],
+            "b.py": [_edge("a.py", "b.py")],
+            "c.py": [_edge("b.py", "c.py")],
+        }
+        with patch(
+            "cocosearch.deps.query.get_dependents",
+            side_effect=_mock_get_dependents(cycle_dependents),
+        ):
+            trees = get_impact_batch("test", ["a.py", "b.py"], max_depth=10)
+
+        assert len(trees) == 2
+        all_files = []
+        for t in trees:
+            all_files.extend(_collect_files(t))
+        assert all_files.count("a.py") == 1
+        assert all_files.count("b.py") == 1
 
 
 # ============================================================================

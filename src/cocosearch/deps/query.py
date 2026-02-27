@@ -293,6 +293,134 @@ def get_impact(
     return root
 
 
+def get_dependency_tree_batch(
+    index_name: str,
+    files: list[str],
+    max_depth: int = 5,
+    dep_type: str | None = None,
+) -> list[DependencyTree]:
+    """Forward BFS for multiple files with a shared visited set.
+
+    Like ``get_dependency_tree`` but seeds BFS with all *files* at once,
+    sharing a single ``visited`` set.  This eliminates redundant traversal
+    when files have overlapping transitive dependency subgraphs.
+
+    Args:
+        index_name: The index name.
+        files: List of root file paths.
+        max_depth: Maximum traversal depth (default 5).
+        dep_type: Optional dependency type filter.
+
+    Returns:
+        List of DependencyTree roots in the same order as *files*.
+    """
+    if not files:
+        return []
+
+    roots: list[DependencyTree] = []
+    visited: set[str] = set(files)
+    queue: deque[tuple[DependencyTree, int]] = deque()
+
+    for f in files:
+        root = DependencyTree(file=f, symbol=None, dep_type="root", children=[])
+        roots.append(root)
+        queue.append((root, 0))
+
+    while queue:
+        node, depth = queue.popleft()
+        if depth >= max_depth:
+            continue
+
+        edges = get_dependencies(index_name, node.file, dep_type=dep_type)
+        for edge in edges:
+            target = edge.target_file
+            if target is None:
+                ext_label = (
+                    edge.metadata.get("module")
+                    or edge.metadata.get("ref")
+                    or edge.target_symbol
+                    or "unknown"
+                )
+                child = DependencyTree(
+                    file=ext_label,
+                    symbol=edge.target_symbol,
+                    dep_type=edge.dep_type,
+                    children=[],
+                    is_external=True,
+                )
+                node.children.append(child)
+                continue
+            if target in visited:
+                continue
+            visited.add(target)
+            child = DependencyTree(
+                file=target,
+                symbol=edge.target_symbol,
+                dep_type=edge.dep_type,
+                children=[],
+            )
+            node.children.append(child)
+            queue.append((child, depth + 1))
+
+    return roots
+
+
+def get_impact_batch(
+    index_name: str,
+    files: list[str],
+    max_depth: int = 5,
+    dep_type: str | None = None,
+) -> list[DependencyTree]:
+    """Reverse BFS for multiple files with a shared visited set.
+
+    Like ``get_impact`` but seeds BFS with all *files* at once,
+    sharing a single ``visited`` set.  This eliminates redundant traversal
+    when files have overlapping reverse-dependency subgraphs.
+
+    Args:
+        index_name: The index name.
+        files: List of root file paths.
+        max_depth: Maximum traversal depth (default 5).
+        dep_type: Optional dependency type filter.
+
+    Returns:
+        List of DependencyTree roots in the same order as *files*.
+    """
+    if not files:
+        return []
+
+    roots: list[DependencyTree] = []
+    visited: set[str] = set(files)
+    queue: deque[tuple[DependencyTree, int]] = deque()
+
+    for f in files:
+        root = DependencyTree(file=f, symbol=None, dep_type="root", children=[])
+        roots.append(root)
+        queue.append((root, 0))
+
+    while queue:
+        node, depth = queue.popleft()
+        if depth >= max_depth:
+            continue
+
+        edges = get_dependents(index_name, node.file, dep_type=dep_type)
+        for edge in edges:
+            source = edge.source_file
+            if source in visited:
+                continue
+            visited.add(source)
+            child = DependencyTree(
+                file=source,
+                symbol=edge.source_symbol,
+                dep_type=edge.dep_type,
+                children=[],
+            )
+            node.children.append(child)
+            queue.append((child, depth + 1))
+
+    return roots
+
+
 def get_dep_stats_detailed(index_name: str) -> dict:
     """Get detailed dependency graph statistics.
 
