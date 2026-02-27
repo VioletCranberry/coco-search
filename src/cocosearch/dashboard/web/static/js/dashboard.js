@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { formatNumber, formatDate, escapeHtml } from './utils.js';
 import { updateLanguageChart, updateSymbolChart, updateGrammarChart } from './charts.js';
 
-export function updateTabStatus(status) {
+export function updateTabStatus(status, indexName) {
     const colorMap = {
         indexing: { primary: '#FF9800', secondary: '#e07840' },
         indexed:  { primary: '#4CAF50', secondary: '#388E3C' },
@@ -12,11 +12,12 @@ export function updateTabStatus(status) {
     const defaultColors = { primary: '#f0a060', secondary: '#e07840' };
     const colors = colorMap[status] || defaultColors;
 
+    const suffix = indexName ? ` \u00b7 ${indexName}` : '';
     const titleMap = {
-        indexing: 'Indexing\u2026 \u00b7 Coco[-S]earch',
-        indexed:  'Indexed \u00b7 Coco[-S]earch',
-        stale:    'Stale \u00b7 Coco[-S]earch',
-        error:    'Error \u00b7 Coco[-S]earch',
+        indexing: 'Indexing\u2026' + suffix + ' \u00b7 Coco[-S]earch',
+        indexed:  'Indexed' + suffix + ' \u00b7 Coco[-S]earch',
+        stale:    'Stale' + suffix + ' \u00b7 Coco[-S]earch',
+        error:    'Error' + suffix + ' \u00b7 Coco[-S]earch',
     };
     document.title = titleMap[status] || 'Coco[-S]earch';
 
@@ -130,7 +131,7 @@ export function updateSummaryCards(stats) {
         statusEl.style.color = 'var(--accent-green)';
         statusLabelEl.textContent = 'Ready to search';
     }
-    updateTabStatus(isStaleState ? 'stale' : status);
+    updateTabStatus(isStaleState ? 'stale' : status, stats.name);
 
     // Parse Health
     const parseHealthEl = document.getElementById('parseHealth');
