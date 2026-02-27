@@ -16,6 +16,7 @@ from cocosearch.management.metadata import (
     get_index_for_path,
     register_index_path,
     clear_index_path,
+    set_deps_extracted_at,
     set_index_status,
 )
 
@@ -33,8 +34,9 @@ class TestEnsureMetadataTable:
             ensure_metadata_table()
 
         # Should execute CREATE TABLE, ALTER TABLE (status, branch, commit_hash,
-        # branch_commit_count), and CREATE INDEX
-        assert len(cursor.calls) >= 6
+        # branch_commit_count, embedding_provider, embedding_model,
+        # deps_extracted_at), and CREATE INDEX
+        assert len(cursor.calls) >= 7
         sql = cursor.calls[0][0]
         assert "CREATE TABLE IF NOT EXISTS" in sql
         assert "cocosearch_index_metadata" in sql
@@ -126,8 +128,8 @@ class TestEnsureMetadataTable:
         ):
             ensure_metadata_table()
 
-        # Eighth SQL: CREATE INDEX (after CREATE TABLE + 6 ALTER TABLEs)
-        sql = cursor.calls[7][0]
+        # Ninth SQL: CREATE INDEX (after CREATE TABLE + 7 ALTER TABLEs)
+        sql = cursor.calls[8][0]
         assert "CREATE INDEX IF NOT EXISTS" in sql
         assert "canonical_path" in sql
 
@@ -922,3 +924,67 @@ class TestRowcountAttribute:
         pool, cursor, conn = mock_db_pool()
         cursor.rowcount = 5
         assert cursor.rowcount == 5
+
+
+class TestSetDepsExtractedAt:
+    """Tests for set_deps_extracted_at function."""
+
+    def test_updates_timestamp(self, mock_db_pool):
+        """set_deps_extracted_at issues UPDATE with NOW()."""
+        pool, cursor, conn = mock_db_pool(results=[])
+        cursor.rowcount = 1
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = set_deps_extracted_at("myindex")
+
+        assert result is True
+        sql = cursor.calls[0][0]
+        assert "UPDATE" in sql
+        assert "deps_extracted_at" in sql
+        assert "NOW()" in sql
+
+    def test_returns_false_when_not_found(self, mock_db_pool):
+        """set_deps_extracted_at returns False when no row matches."""
+        pool, cursor, conn = mock_db_pool(results=[])
+        cursor.rowcount = 0
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = set_deps_extracted_at("nonexistent")
+
+        assert result is False
+
+    def test_commits_transaction(self, mock_db_pool):
+        """set_deps_extracted_at commits transaction after update."""
+        pool, cursor, conn = mock_db_pool(results=[])
+        cursor.rowcount = 1
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            set_deps_extracted_at("myindex")
+
+        assert conn.committed
+
+    def test_returns_false_on_missing_table(self):
+        """set_deps_extracted_at returns False when metadata table doesn't exist."""
+        from psycopg.errors import UndefinedTable
+
+        with patch("cocosearch.management.metadata.get_connection_pool") as mock_pool:
+            mock_conn = MagicMock()
+            mock_cursor = MagicMock()
+            mock_cursor.execute.side_effect = UndefinedTable("relation does not exist")
+            mock_conn.cursor.return_value.__enter__ = MagicMock(
+                return_value=mock_cursor
+            )
+            mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+            mock_conn.__enter__ = MagicMock(return_value=mock_conn)
+            mock_conn.__exit__ = MagicMock(return_value=False)
+            mock_pool.return_value.connection.return_value = mock_conn
+
+            result = set_deps_extracted_at("myindex")
+
+        assert result is False

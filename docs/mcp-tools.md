@@ -789,6 +789,35 @@ Get impact analysis for multiple files in a single batch call. More efficient th
 
 **Note:** The shared visited set means if `src/api/users.py` depends on both `user.py` and `order.py`, it will only appear in the first tree where it's encountered.
 
+### Staleness Warnings (all dependency tools)
+
+All four dependency tools (`get_file_dependencies`, `get_file_impact`, `get_batch_dependencies`, `get_batch_impact`) perform best-effort staleness checks and may include a `"warnings"` key in the response when dependency data is outdated. Warning types:
+
+| Type | Meaning |
+|------|---------|
+| `deps_not_extracted` | No dependency data exists, or extraction timestamp is missing. Run `cocosearch deps extract .` |
+| `deps_outdated` | The index was re-indexed after the last dependency extraction. Run `cocosearch deps extract .` |
+| `deps_branch_drift` | Git branch or commit has changed since the index was last built. Run `cocosearch index . --deps` |
+
+Example response with warnings:
+
+```json
+{
+  "file": "src/auth/jwt.py",
+  "dependencies": [],
+  "total": 0,
+  "warnings": [
+    {
+      "type": "deps_not_extracted",
+      "warning": "Dependencies not extracted",
+      "message": "No dependency data found for this index. Run `cocosearch deps extract .` to extract dependencies."
+    }
+  ]
+}
+```
+
+The `"warnings"` key is omitted when dependency data is fresh.
+
 ---
 
 ## Implementation

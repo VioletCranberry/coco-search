@@ -28,6 +28,7 @@ from cocosearch.deps.db import (
 from cocosearch.deps.models import DependencyEdge
 from cocosearch.deps.registry import get_extractor
 from cocosearch.deps.resolver import get_resolver
+from cocosearch.management.metadata import set_deps_extracted_at
 from cocosearch.search.db import get_connection_pool, get_table_name
 
 logger = logging.getLogger(__name__)
@@ -314,6 +315,11 @@ def extract_dependencies(
         current_hashes = _compute_file_hashes(indexed_files, codebase_path)
         update_tracking(index_name, current_hashes)
 
+        try:
+            set_deps_extracted_at(index_name)
+        except Exception:
+            pass  # Best-effort — don't break extraction on metadata failure
+
         _get_cs_log().deps(
             "Dependency extraction completed (full)",
             files_processed=files_processed,
@@ -381,6 +387,11 @@ def extract_dependencies(
 
     # Update tracking
     update_tracking(index_name, current_hashes)
+
+    try:
+        set_deps_extracted_at(index_name)
+    except Exception:
+        pass  # Best-effort — don't break extraction on metadata failure
 
     files_unchanged = len(current_hashes) - len(dirty_files)
 

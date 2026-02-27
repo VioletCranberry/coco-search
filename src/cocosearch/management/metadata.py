@@ -63,6 +63,10 @@ def ensure_metadata_table() -> None:
                     ADD COLUMN IF NOT EXISTS embedding_model TEXT
             """)
             cur.execute("""
+                ALTER TABLE cocosearch_index_metadata
+                    ADD COLUMN IF NOT EXISTS deps_extracted_at TIMESTAMPTZ
+            """)
+            cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_cocosearch_metadata_path
                     ON cocosearch_index_metadata(canonical_path)
             """)
@@ -91,7 +95,7 @@ def get_index_metadata(index_name: str) -> dict | None:
                     """
                     SELECT index_name, canonical_path, created_at, updated_at, status,
                            branch, commit_hash, branch_commit_count,
-                           embedding_provider, embedding_model
+                           embedding_provider, embedding_model, deps_extracted_at
                     FROM cocosearch_index_metadata
                     WHERE index_name = %s
                     """,
@@ -114,6 +118,7 @@ def get_index_metadata(index_name: str) -> dict | None:
                     "branch_commit_count": row[7] if len(row) > 7 else None,
                     "embedding_provider": row[8] if len(row) > 8 else None,
                     "embedding_model": row[9] if len(row) > 9 else None,
+                    "deps_extracted_at": row[10] if len(row) > 10 else None,
                 }
 
                 # Provide elapsed time so callers can warn about
@@ -360,6 +365,39 @@ def set_index_status(
                         """,
                         (status, index_name),
                     )
+                updated = cur.rowcount > 0
+            conn.commit()
+        return updated
+    except Exception:
+        # Table doesn't exist yet (fresh database)
+        return False
+
+
+def set_deps_extracted_at(index_name: str) -> bool:
+    """Stamp the current time as the last dependency extraction time.
+
+    Called at the end of a successful dependency extraction run so that
+    staleness checks can compare it against the index ``updated_at``.
+
+    Args:
+        index_name: The name of the index.
+
+    Returns:
+        True if a row was updated, False if not found (including when
+        metadata table doesn't exist yet on fresh database).
+    """
+    pool = get_connection_pool()
+    try:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE cocosearch_index_metadata
+                    SET deps_extracted_at = NOW()
+                    WHERE index_name = %s
+                    """,
+                    (index_name,),
+                )
                 updated = cur.rowcount > 0
             conn.commit()
         return updated

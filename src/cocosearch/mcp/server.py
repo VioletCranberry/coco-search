@@ -2331,6 +2331,25 @@ def index_codebase(
 # ============================================================================
 
 
+def _append_deps_warnings(result: dict, index_name: str) -> dict:
+    """Append dependency staleness warnings to a result dict (best-effort).
+
+    Checks whether the dependency data for *index_name* is stale and, if so,
+    adds a ``"warnings"`` key containing structured warning dicts.  Errors are
+    silently swallowed so that a staleness-check failure never breaks the tool
+    response.
+    """
+    try:
+        from cocosearch.management.stats import check_deps_staleness
+
+        warnings = check_deps_staleness(index_name)
+        if warnings:
+            result["warnings"] = warnings
+    except Exception:
+        pass
+    return result
+
+
 @mcp.tool()
 @log_mcp_tool
 async def get_file_dependencies(
@@ -2375,7 +2394,7 @@ async def get_file_dependencies(
         depth = min(depth, 20)
         if depth <= 1:
             edges = _get_deps(index_name, file, dep_type=dep_type)
-            return {
+            result = {
                 "file": file,
                 "depth": 1,
                 "dependencies": [
@@ -2393,11 +2412,12 @@ async def get_file_dependencies(
             tree = get_dependency_tree(
                 index_name, file, max_depth=depth, dep_type=dep_type
             )
-            return {
+            result = {
                 "file": file,
                 "depth": depth,
                 "tree": _dep_tree_to_dict(tree),
             }
+        return _append_deps_warnings(result, index_name)
     except Exception as e:
         return {"error": str(e)}
 
@@ -2441,11 +2461,12 @@ async def get_file_impact(
 
         depth = min(depth, 20)
         tree = _get_impact(index_name, file, max_depth=depth, dep_type=dep_type)
-        return {
+        result = {
             "file": file,
             "depth": depth,
             "impact_tree": _dep_tree_to_dict(tree),
         }
+        return _append_deps_warnings(result, index_name)
     except Exception as e:
         return {"error": str(e)}
 
@@ -2496,10 +2517,10 @@ async def get_batch_dependencies(
         depth = min(depth, 20)
 
         if depth <= 1:
-            results = []
+            per_file = []
             for f in files:
                 edges = _get_deps(index_name, f, dep_type=dep_type)
-                results.append(
+                per_file.append(
                     {
                         "file": f,
                         "dependencies": [
@@ -2514,22 +2535,23 @@ async def get_batch_dependencies(
                         "total": len(edges),
                     }
                 )
-            return {
+            result = {
                 "files_requested": len(files),
                 "depth": 1,
-                "results": results,
+                "results": per_file,
             }
         else:
             trees = get_dependency_tree_batch(
                 index_name, files, max_depth=depth, dep_type=dep_type
             )
-            return {
+            result = {
                 "files_requested": len(files),
                 "depth": depth,
                 "results": [
                     {"file": t.file, "tree": _dep_tree_to_dict(t)} for t in trees
                 ],
             }
+        return _append_deps_warnings(result, index_name)
     except Exception as e:
         return {"error": str(e)}
 
@@ -2574,13 +2596,14 @@ async def get_batch_impact(
 
         depth = min(depth, 20)
         trees = _get_impact_batch(index_name, files, max_depth=depth, dep_type=dep_type)
-        return {
+        result = {
             "files_requested": len(files),
             "depth": depth,
             "results": [
                 {"file": t.file, "impact_tree": _dep_tree_to_dict(t)} for t in trees
             ],
         }
+        return _append_deps_warnings(result, index_name)
     except Exception as e:
         return {"error": str(e)}
 
