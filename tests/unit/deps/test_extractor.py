@@ -360,3 +360,53 @@ class TestExtractDependenciesModuleResolution:
         edges = mock_insert.call_args[0][1]
         assert len(edges) == 1
         assert edges[0].target_file is None  # numpy is external
+
+    def test_directory_reference_expands_to_all_files(self, mock_db_pool, tmp_path):
+        """Markdown directory references should create edges to all files in the dir."""
+        # Create a doc file referencing a directory
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "guide.md").write_text(
+            "See [the search module](../src/search/) for details.\n"
+        )
+
+        # Create multiple files in the referenced directory
+        (tmp_path / "src" / "search").mkdir(parents=True)
+        (tmp_path / "src" / "search" / "engine.py").write_text("class Engine: pass\n")
+        (tmp_path / "src" / "search" / "cache.py").write_text("class Cache: pass\n")
+
+        indexed_files = [
+            ("docs/guide.md", "md"),
+            ("src/search/engine.py", "py"),
+            ("src/search/cache.py", "py"),
+        ]
+
+        with (
+            patch(
+                "cocosearch.deps.extractor.get_indexed_files",
+                return_value=indexed_files,
+            ),
+            patch(
+                "cocosearch.deps.extractor.drop_deps_table",
+            ),
+            patch(
+                "cocosearch.deps.extractor.create_deps_table",
+            ),
+            patch(
+                "cocosearch.deps.extractor.insert_edges",
+            ) as mock_insert,
+        ):
+            from cocosearch.deps.extractor import extract_dependencies
+
+            extract_dependencies("test", str(tmp_path))
+
+        edges = mock_insert.call_args[0][1]
+
+        # Find edges from the doc file with doc_link kind
+        doc_edges = [
+            e
+            for e in edges
+            if e.source_file == "docs/guide.md"
+            and e.metadata.get("kind") == "doc_link"
+        ]
+        target_files = {e.target_file for e in doc_edges}
+        assert target_files == {"src/search/engine.py", "src/search/cache.py"}

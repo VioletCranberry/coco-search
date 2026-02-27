@@ -77,8 +77,11 @@ def _resolve_all_edges(
         resolver_map[rid][1].add(lang)
 
     # Run resolution per resolver
+    extra_edges: list[DependencyEdge] = []
+
     for resolver, lang_ids in resolver_map.values():
         module_index = resolver.build_index(indexed_files)
+        has_resolve_many = hasattr(resolver, "resolve_many")
 
         for edge in all_edges:
             if edge.target_file is not None:
@@ -86,9 +89,29 @@ def _resolve_all_edges(
             source_lang = file_lang.get(edge.source_file)
             if source_lang not in lang_ids:
                 continue
-            resolved = resolver.resolve(edge, module_index)
-            if resolved is not None:
-                edge.target_file = resolved
+
+            # Use resolve_many when available (e.g., directory expansion)
+            if has_resolve_many:
+                targets = resolver.resolve_many(edge, module_index)
+                if targets:
+                    edge.target_file = targets[0]
+                    for extra_target in targets[1:]:
+                        extra_edges.append(
+                            DependencyEdge(
+                                source_file=edge.source_file,
+                                source_symbol=edge.source_symbol,
+                                target_file=extra_target,
+                                target_symbol=edge.target_symbol,
+                                dep_type=edge.dep_type,
+                                metadata=dict(edge.metadata),
+                            )
+                        )
+            else:
+                resolved = resolver.resolve(edge, module_index)
+                if resolved is not None:
+                    edge.target_file = resolved
+
+    all_edges.extend(extra_edges)
 
 
 def extract_dependencies(index_name: str, codebase_path: str) -> dict:

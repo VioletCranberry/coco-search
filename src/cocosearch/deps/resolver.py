@@ -376,22 +376,34 @@ class MarkdownResolver:
     Handles relative paths (``../src/cli.py`` from ``docs/guide.md``)
     and project-relative paths (``src/cli.py``).  Supports both file-level
     and directory-level references.
+
+    Directory references are expanded to all files within the directory
+    via :meth:`resolve_many`, so that ``deps impact`` on any file in
+    a referenced directory surfaces the documentation.
     """
+
+    def __init__(self) -> None:
+        self._dir_files: dict[str, list[str]] = {}
 
     def build_index(self, indexed_files: list[tuple[str, str]]) -> dict[str, str]:
         index: dict[str, str] = {}
+        dir_files: dict[str, list[str]] = {}
 
         for filepath, _language_id in indexed_files:
             filepath_posix = filepath.replace("\\", "/")
             # Map each file path to itself
             index[filepath_posix] = filepath
 
-            # Also map directory prefixes to a representative file
+            # Track all files per directory (for expand-on-resolve)
             dir_path = str(PurePosixPath(filepath_posix).parent)
-            if dir_path != "." and dir_path not in index:
-                index[dir_path] = filepath
-                index[dir_path + "/"] = filepath
+            if dir_path != ".":
+                dir_files.setdefault(dir_path, []).append(filepath)
+                # Map directory to first file (for single-resolve fallback)
+                if dir_path not in index:
+                    index[dir_path] = filepath
+                    index[dir_path + "/"] = filepath
 
+        self._dir_files = dir_files
         return index
 
     def resolve(self, edge: DependencyEdge, module_index: dict[str, str]) -> str | None:
@@ -404,20 +416,7 @@ class MarkdownResolver:
 
         # Relative paths: normalise against source file's directory
         if module.startswith("./") or module.startswith("../"):
-            source_posix = edge.source_file.replace("\\", "/")
-            source_dir = str(PurePosixPath(source_posix).parent)
-
-            if source_dir == ".":
-                candidate = module_stripped
-            else:
-                candidate = os.path.normpath(f"{source_dir}/{module_stripped}").replace(
-                    "\\", "/"
-                )
-
-            # Strip leading ./
-            if candidate.startswith("./"):
-                candidate = candidate[2:]
-
+            candidate = self._normalize_relative(edge.source_file, module_stripped)
             if candidate in module_index:
                 return module_index[candidate]
             if candidate + "/" in module_index:
@@ -431,6 +430,56 @@ class MarkdownResolver:
             return module_index[module_stripped + "/"]
 
         return None
+
+    def resolve_many(
+        self, edge: DependencyEdge, module_index: dict[str, str]
+    ) -> list[str] | None:
+        """Resolve a single edge, potentially to multiple target files.
+
+        For directory references, returns all files within the directory.
+        For file references, returns a single-element list.
+
+        Returns:
+            List of resolved file paths, or ``None`` if unresolvable.
+        """
+        module = edge.metadata.get("module")
+        if not module:
+            return None
+
+        module_stripped = module.rstrip("/")
+
+        # Determine the normalised directory key
+        if module.startswith("./") or module.startswith("../"):
+            candidate = self._normalize_relative(edge.source_file, module_stripped)
+        else:
+            candidate = module_stripped
+
+        # Check for directory expansion
+        if candidate in self._dir_files:
+            return list(self._dir_files[candidate])
+
+        # Fall back to single-file resolution
+        result = self.resolve(edge, module_index)
+        return [result] if result else None
+
+    @staticmethod
+    def _normalize_relative(source_file: str, module_stripped: str) -> str:
+        """Normalize a relative path against the source file's directory."""
+        source_posix = source_file.replace("\\", "/")
+        source_dir = str(PurePosixPath(source_posix).parent)
+
+        if source_dir == ".":
+            candidate = module_stripped
+        else:
+            candidate = os.path.normpath(f"{source_dir}/{module_stripped}").replace(
+                "\\", "/"
+            )
+
+        # Strip leading ./
+        if candidate.startswith("./"):
+            candidate = candidate[2:]
+
+        return candidate
 
 
 # ============================================================================
