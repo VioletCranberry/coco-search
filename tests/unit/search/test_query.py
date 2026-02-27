@@ -151,6 +151,22 @@ class TestValidateLanguageFilter:
         with pytest.raises(ValueError, match="Unknown language"):
             validate_language_filter("python,foobar")
 
+    def test_extension_tsx_resolves_to_typescript(self):
+        """Extension 'tsx' should resolve to 'typescript'."""
+        assert validate_language_filter("tsx") == ["typescript"]
+
+    def test_extension_jsx_resolves_to_javascript(self):
+        """Extension 'jsx' should resolve to 'javascript'."""
+        assert validate_language_filter("jsx") == ["javascript"]
+
+    def test_extension_py_resolves_to_python(self):
+        """Extension 'py' should resolve to 'python'."""
+        assert validate_language_filter("py") == ["python"]
+
+    def test_extension_rs_resolves_to_rust(self):
+        """Extension 'rs' should resolve to 'rust'."""
+        assert validate_language_filter("rs") == ["rust"]
+
 
 class TestSearch:
     """Tests for search function with mocked dependencies."""
