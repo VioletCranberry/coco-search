@@ -343,7 +343,14 @@ def extract_dependencies(
     dirty_files = changed | added
 
     if not dirty_files and not deleted:
-        # Nothing changed — early return
+        # Nothing changed — query actual edge count from DB
+        try:
+            from cocosearch.deps.query import get_dep_stats
+
+            total_edges = get_dep_stats(index_name).get("total_edges", 0)
+        except Exception:
+            total_edges = 0
+
         _get_cs_log().deps(
             "Dependency extraction skipped (no changes)",
             files_unchanged=len(indexed_files),
@@ -352,7 +359,7 @@ def extract_dependencies(
         return {
             "files_processed": 0,
             "files_skipped": 0,
-            "edges_found": 0,
+            "edges_found": total_edges,
             "errors": 0,
             "incremental": True,
             "files_unchanged": len(current_hashes),

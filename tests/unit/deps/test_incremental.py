@@ -264,7 +264,7 @@ class TestExtractDependenciesIncremental:
         mock_update.assert_called_once()
 
     def test_no_changes_skips_extraction(self, mock_db_pool, tmp_path):
-        """Same hashes should produce early return with zero files processed."""
+        """Same hashes should produce early return with actual edge count from DB."""
         py_file = tmp_path / "src" / "main.py"
         py_file.parent.mkdir(parents=True)
         py_file.write_text("import os\n")
@@ -291,6 +291,10 @@ class TestExtractDependenciesIncremental:
             ),
             patch("cocosearch.deps.extractor.truncate_deps_table") as mock_trunc,
             patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch(
+                "cocosearch.deps.query.get_dep_stats",
+                return_value={"total_edges": 42},
+            ),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -299,6 +303,7 @@ class TestExtractDependenciesIncremental:
         assert stats["files_processed"] == 0
         assert stats["incremental"] is True
         assert stats["files_unchanged"] == 1
+        assert stats["edges_found"] == 42
         # Should NOT truncate or insert when nothing changed
         mock_trunc.assert_not_called()
         mock_insert.assert_not_called()
