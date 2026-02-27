@@ -79,6 +79,8 @@ CocoSearch exposes seven MCP tools for AI assistant integration:
 - `clear_index` — Delete an index and all associated data (including parse results)
 - `get_file_dependencies` — Forward dependency query: what does a file depend on? `depth=1` returns flat edge list, `depth>1` returns transitive tree with cycle detection.
 - `get_file_impact` — Reverse impact query: what depends on this file? Returns transitive impact tree for change analysis.
+- `get_batch_dependencies` — Batch forward dependency query for multiple files. Shared visited set eliminates redundant traversal of overlapping subgraphs.
+- `get_batch_impact` — Batch reverse impact query for multiple files. Shared visited set across all roots for efficient change blast radius analysis.
 
 **Transport Support:** stdio (Claude Code), SSE (server-sent events), HTTP (Claude Desktop via mcp-remote bridge)
 
