@@ -71,6 +71,7 @@ uv run cocosearch grammars               # List supported grammars
 uv run cocosearch init                   # Initialize cocosearch.yaml + optional CLAUDE.md/AGENTS.md
 uv run cocosearch init --no-claude-md    # Initialize without CLAUDE.md prompt
 uv run cocosearch init --no-agents-md    # Initialize without AGENTS.md prompt
+uv run cocosearch init --no-opencode-mcp # Initialize without OpenCode MCP registration prompt
 uv run cocosearch config show
 uv run cocosearch config path
 uv run cocosearch config check

@@ -28,6 +28,7 @@ from cocosearch.config import (
     generate_agents_md_routing,
     generate_claude_md_routing,
     generate_config,
+    generate_opencode_mcp_config,
     load_config as load_project_config,
 )
 from cocosearch.dashboard import run_terminal_dashboard
@@ -936,7 +937,9 @@ def format_parse_failures(failures: list[dict], console: Console) -> None:
         status_style = (
             "red"
             if f["parse_status"] == "error"
-            else "yellow" if f["parse_status"] == "partial" else "dim"
+            else "yellow"
+            if f["parse_status"] == "partial"
+            else "dim"
         )
         table.add_row(
             f["file_path"],
@@ -1514,6 +1517,44 @@ def init_command(args: argparse.Namespace) -> int:
                 except OSError as e:
                     console.print(
                         f"[yellow]Warning:[/yellow] Could not write {target}: {e}"
+                    )
+
+    # Offer to register MCP server with OpenCode
+    no_opencode_mcp = getattr(args, "no_opencode_mcp", False)
+    if not no_opencode_mcp:
+        console.print()
+        response = input("Register CocoSearch MCP server with OpenCode? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print("  [cyan]1[/cyan]  Project opencode.json (default)")
+            console.print("  [cyan]2[/cyan]  Global ~/.config/opencode/opencode.json")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
+
+            if choice == "1":
+                target = Path.cwd() / "opencode.json"
+            elif choice == "2":
+                target = Path.home() / ".config" / "opencode" / "opencode.json"
+            else:
+                console.print("[dim]Invalid choice, skipping OpenCode MCP setup.[/dim]")
+                target = None
+
+            if target:
+                try:
+                    result = generate_opencode_mcp_config(target)
+                    if result == "created":
+                        console.print(f"[green]Created {target}[/green]")
+                    elif result == "added":
+                        console.print(
+                            f"[green]Added CocoSearch MCP server to {target}[/green]"
+                        )
+                    else:
+                        console.print(
+                            f"[dim]CocoSearch MCP server already registered in {target}[/dim]"
+                        )
+                except (OSError, ConfigLoadError) as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not update {target}: {e}"
                     )
 
     return 0
@@ -2519,6 +2560,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Skip the AGENTS.md tool routing prompt (OpenCode)",
+    )
+    init_parser.add_argument(
+        "--no-opencode-mcp",
+        action="store_true",
+        default=False,
+        help="Skip the OpenCode MCP server registration prompt",
     )
 
     # MCP subcommand

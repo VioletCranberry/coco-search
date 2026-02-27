@@ -1,5 +1,6 @@
 """Configuration file generator for CocoSearch."""
 
+import json
 from pathlib import Path
 
 from .schema import ConfigError
@@ -135,3 +136,70 @@ def generate_agents_md_routing(path: Path) -> str:
     return _append_routing_section(
         path, CLAUDE_MD_DUPLICATE_MARKER, CLAUDE_MD_ROUTING_SECTION
     )
+
+
+OPENCODE_MCP_ENTRY = {
+    "type": "local",
+    "command": [
+        "uvx",
+        "--from",
+        "cocosearch",
+        "cocosearch",
+        "mcp",
+        "--project-from-cwd",
+    ],
+    "enabled": True,
+}
+
+OPENCODE_SCHEMA_URL = "https://opencode.ai/config.json"
+
+
+def generate_opencode_mcp_config(path: Path) -> str:
+    """Register CocoSearch MCP server in an OpenCode config file.
+
+    Merges the CocoSearch MCP server entry into an existing opencode.json,
+    or creates a new one. Preserves all existing configuration.
+
+    Args:
+        path: Path to the opencode.json file.
+
+    Returns:
+        "created" if a new file was created,
+        "added" if the entry was added to an existing file,
+        "skipped" if the entry already exists.
+    """
+    if path.exists():
+        raw = path.read_text()
+        try:
+            config = json.loads(raw)
+        except json.JSONDecodeError:
+            raise ConfigError(
+                f"Cannot parse {path} as JSON. "
+                "If it uses JSONC (comments), please add the CocoSearch MCP entry manually."
+            )
+
+        if not isinstance(config, dict):
+            raise ConfigError(
+                f"Expected a JSON object in {path}, got {type(config).__name__}"
+            )
+
+        mcp = config.get("mcp")
+        if isinstance(mcp, dict) and "cocosearch" in mcp:
+            return "skipped"
+
+        if not isinstance(mcp, dict):
+            config["mcp"] = {}
+        config["mcp"]["cocosearch"] = OPENCODE_MCP_ENTRY
+
+        path.write_text(json.dumps(config, indent=2) + "\n")
+        return "added"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    config = {
+        "$schema": OPENCODE_SCHEMA_URL,
+        "mcp": {
+            "cocosearch": OPENCODE_MCP_ENTRY,
+        },
+    }
+    path.write_text(json.dumps(config, indent=2) + "\n")
+    return "created"
