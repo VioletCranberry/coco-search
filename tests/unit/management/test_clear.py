@@ -71,15 +71,17 @@ class TestClearIndex:
 
         # Find the DROP TABLE queries and verify table names are included
         drop_queries = [q for q, _ in cursor.calls if "DROP TABLE" in q]
-        assert len(drop_queries) == 4
+        assert len(drop_queries) == 5
         # Chunks table drop
         assert "codeindex_" in drop_queries[0] or "myproject" in drop_queries[0]
         # Parse results table drop
         assert "cocosearch_parse_results_myproject" in drop_queries[1]
         # Dependencies table drop
         assert "cocosearch_deps_myproject" in drop_queries[2]
-        # Tracking table drop
-        assert "codeindex_myproject__cocoindex_tracking" in drop_queries[3]
+        # Deps tracking table drop
+        assert "cocosearch_deps_tracking_myproject" in drop_queries[3]
+        # CocoIndex tracking table drop
+        assert "codeindex_myproject__cocoindex_tracking" in drop_queries[4]
 
     def test_cleans_cocoindex_metadata(self, mock_db_pool):
         """Cleans CocoIndex setup metadata so re-index creates tables fresh."""

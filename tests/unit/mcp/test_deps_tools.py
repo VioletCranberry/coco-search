@@ -1,7 +1,7 @@
 """Tests for dependency graph MCP tools and API endpoints.
 
 Tests mock the query layer to verify correct parameter passing
-and response structure.
+and response structure, including staleness warnings.
 """
 
 from unittest.mock import MagicMock, patch
@@ -11,6 +11,19 @@ import pytest
 import pytest_asyncio
 
 from cocosearch.deps.models import DependencyEdge, DependencyTree, DepType
+
+
+# ============================================================================
+# Staleness warning fixture
+# ============================================================================
+
+STALE_WARNINGS = [
+    {
+        "type": "deps_not_extracted",
+        "warning": "Dependencies not extracted",
+        "message": "No dependency data found.",
+    }
+]
 
 
 @pytest.fixture
@@ -286,3 +299,384 @@ class TestGetFileImpactTool:
 
         assert result["file"] == "utils.py"
         assert "impact_tree" in result
+
+
+# ============================================================================
+# Tests: MCP tool get_batch_dependencies
+# ============================================================================
+
+
+class TestGetBatchDependenciesTool:
+    """Tests for the get_batch_dependencies MCP tool."""
+
+    @pytest.mark.asyncio
+    async def test_direct_dependencies(self):
+        """depth=1 returns flat dependency lists per file."""
+        edges_a = [
+            DependencyEdge(
+                source_file="a.py",
+                source_symbol=None,
+                target_file="b.py",
+                target_symbol="helper",
+                dep_type=DepType.IMPORT,
+                metadata={"module": "b"},
+            )
+        ]
+        edges_c = [
+            DependencyEdge(
+                source_file="c.py",
+                source_symbol=None,
+                target_file="d.py",
+                target_symbol=None,
+                dep_type=DepType.IMPORT,
+                metadata={"module": "d"},
+            )
+        ]
+
+        def mock_get_deps(index_name, file, dep_type=None):
+            return {"a.py": edges_a, "c.py": edges_c}.get(file, [])
+
+        with patch("cocosearch.deps.query.get_dependencies", side_effect=mock_get_deps):
+            from cocosearch.mcp.server import get_batch_dependencies
+
+            ctx = MagicMock()
+            result = await get_batch_dependencies(
+                files=["a.py", "c.py"], ctx=ctx, index_name="test", depth=1
+            )
+
+        assert result["files_requested"] == 2
+        assert result["depth"] == 1
+        assert len(result["results"]) == 2
+        assert result["results"][0]["file"] == "a.py"
+        assert result["results"][0]["total"] == 1
+        assert result["results"][0]["dependencies"][0]["target_file"] == "b.py"
+        assert result["results"][1]["file"] == "c.py"
+        assert result["results"][1]["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_transitive_dependencies(self):
+        """depth>1 returns dependency trees per file."""
+        trees = [
+            DependencyTree(
+                file="a.py",
+                symbol=None,
+                dep_type="root",
+                children=[
+                    DependencyTree(
+                        file="b.py",
+                        symbol=None,
+                        dep_type="import",
+                        children=[],
+                    )
+                ],
+            ),
+            DependencyTree(file="c.py", symbol=None, dep_type="root", children=[]),
+        ]
+
+        with patch(
+            "cocosearch.deps.query.get_dependency_tree_batch", return_value=trees
+        ):
+            from cocosearch.mcp.server import get_batch_dependencies
+
+            ctx = MagicMock()
+            result = await get_batch_dependencies(
+                files=["a.py", "c.py"], ctx=ctx, index_name="test", depth=3
+            )
+
+        assert result["files_requested"] == 2
+        assert result["depth"] == 3
+        assert len(result["results"]) == 2
+        assert result["results"][0]["file"] == "a.py"
+        assert "tree" in result["results"][0]
+        assert result["results"][1]["file"] == "c.py"
+
+    @pytest.mark.asyncio
+    async def test_empty_files_list(self):
+        """Empty files list returns empty results."""
+        from cocosearch.mcp.server import get_batch_dependencies
+
+        ctx = MagicMock()
+        result = await get_batch_dependencies(
+            files=[], ctx=ctx, index_name="test", depth=1
+        )
+
+        assert result["files_requested"] == 0
+        assert result["results"] == []
+
+    @pytest.mark.asyncio
+    async def test_depth_capped_at_20(self):
+        """Depth is capped at 20 even if a higher value is passed."""
+        trees = [DependencyTree(file="a.py", symbol=None, dep_type="root", children=[])]
+
+        with patch(
+            "cocosearch.deps.query.get_dependency_tree_batch", return_value=trees
+        ) as mock_batch:
+            from cocosearch.mcp.server import get_batch_dependencies
+
+            ctx = MagicMock()
+            result = await get_batch_dependencies(
+                files=["a.py"], ctx=ctx, index_name="test", depth=50
+            )
+
+        mock_batch.assert_called_once_with(
+            "test", ["a.py"], max_depth=20, dep_type=None
+        )
+        assert result["depth"] == 20
+
+
+# ============================================================================
+# Tests: MCP tool get_batch_impact
+# ============================================================================
+
+
+class TestGetBatchImpactTool:
+    """Tests for the get_batch_impact MCP tool."""
+
+    @pytest.mark.asyncio
+    async def test_impact_trees(self):
+        """Returns impact trees per file."""
+        trees = [
+            DependencyTree(
+                file="utils.py",
+                symbol=None,
+                dep_type="root",
+                children=[
+                    DependencyTree(
+                        file="main.py",
+                        symbol=None,
+                        dep_type="import",
+                        children=[],
+                    )
+                ],
+            ),
+            DependencyTree(file="config.py", symbol=None, dep_type="root", children=[]),
+        ]
+
+        with patch("cocosearch.deps.query.get_impact_batch", return_value=trees):
+            from cocosearch.mcp.server import get_batch_impact
+
+            ctx = MagicMock()
+            result = await get_batch_impact(
+                files=["utils.py", "config.py"], ctx=ctx, index_name="test", depth=3
+            )
+
+        assert result["files_requested"] == 2
+        assert result["depth"] == 3
+        assert len(result["results"]) == 2
+        assert result["results"][0]["file"] == "utils.py"
+        assert "impact_tree" in result["results"][0]
+        assert result["results"][1]["file"] == "config.py"
+
+    @pytest.mark.asyncio
+    async def test_empty_files_list(self):
+        """Empty files list returns empty results."""
+        with patch("cocosearch.deps.query.get_impact_batch", return_value=[]):
+            from cocosearch.mcp.server import get_batch_impact
+
+            ctx = MagicMock()
+            result = await get_batch_impact(
+                files=[], ctx=ctx, index_name="test", depth=3
+            )
+
+        assert result["files_requested"] == 0
+        assert result["results"] == []
+
+    @pytest.mark.asyncio
+    async def test_depth_capped_at_20(self):
+        """Depth is capped at 20 even if a higher value is passed."""
+        trees = [DependencyTree(file="a.py", symbol=None, dep_type="root", children=[])]
+
+        with patch(
+            "cocosearch.deps.query.get_impact_batch", return_value=trees
+        ) as mock_batch:
+            from cocosearch.mcp.server import get_batch_impact
+
+            ctx = MagicMock()
+            result = await get_batch_impact(
+                files=["a.py"], ctx=ctx, index_name="test", depth=50
+            )
+
+        mock_batch.assert_called_once_with(
+            "test", ["a.py"], max_depth=20, dep_type=None
+        )
+        assert result["depth"] == 20
+
+
+# ============================================================================
+# Tests: Staleness warnings in MCP dep tools
+# ============================================================================
+
+
+class TestDepToolsStalenessWarnings:
+    """Tests that MCP dep tools include staleness warnings when deps are stale."""
+
+    @pytest.mark.asyncio
+    async def test_get_file_dependencies_includes_warnings(self):
+        """get_file_dependencies appends warnings when deps are stale."""
+        edges = [
+            DependencyEdge(
+                source_file="a.py",
+                source_symbol=None,
+                target_file="b.py",
+                target_symbol=None,
+                dep_type=DepType.IMPORT,
+                metadata={"module": "b"},
+            )
+        ]
+
+        with (
+            patch("cocosearch.deps.query.get_dependencies", return_value=edges),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=STALE_WARNINGS,
+            ),
+        ):
+            from cocosearch.mcp.server import get_file_dependencies
+
+            ctx = MagicMock()
+            result = await get_file_dependencies(
+                file="a.py", ctx=ctx, index_name="test", depth=1
+            )
+
+        assert "warnings" in result
+        assert result["warnings"][0]["type"] == "deps_not_extracted"
+
+    @pytest.mark.asyncio
+    async def test_get_file_impact_includes_warnings(self):
+        """get_file_impact appends warnings when deps are stale."""
+        tree = DependencyTree(
+            file="utils.py", symbol=None, dep_type="root", children=[]
+        )
+
+        with (
+            patch("cocosearch.deps.query.get_impact", return_value=tree),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=STALE_WARNINGS,
+            ),
+        ):
+            from cocosearch.mcp.server import get_file_impact
+
+            ctx = MagicMock()
+            result = await get_file_impact(
+                file="utils.py", ctx=ctx, index_name="test", depth=3
+            )
+
+        assert "warnings" in result
+        assert result["warnings"][0]["type"] == "deps_not_extracted"
+
+    @pytest.mark.asyncio
+    async def test_get_batch_dependencies_includes_warnings(self):
+        """get_batch_dependencies appends warnings when deps are stale."""
+        edges = [
+            DependencyEdge(
+                source_file="a.py",
+                source_symbol=None,
+                target_file="b.py",
+                target_symbol=None,
+                dep_type=DepType.IMPORT,
+                metadata={"module": "b"},
+            )
+        ]
+
+        with (
+            patch("cocosearch.deps.query.get_dependencies", return_value=edges),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=STALE_WARNINGS,
+            ),
+        ):
+            from cocosearch.mcp.server import get_batch_dependencies
+
+            ctx = MagicMock()
+            result = await get_batch_dependencies(
+                files=["a.py"], ctx=ctx, index_name="test", depth=1
+            )
+
+        assert "warnings" in result
+        assert result["warnings"][0]["type"] == "deps_not_extracted"
+
+    @pytest.mark.asyncio
+    async def test_get_batch_impact_includes_warnings(self):
+        """get_batch_impact appends warnings when deps are stale."""
+        trees = [
+            DependencyTree(file="utils.py", symbol=None, dep_type="root", children=[])
+        ]
+
+        with (
+            patch("cocosearch.deps.query.get_impact_batch", return_value=trees),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=STALE_WARNINGS,
+            ),
+        ):
+            from cocosearch.mcp.server import get_batch_impact
+
+            ctx = MagicMock()
+            result = await get_batch_impact(
+                files=["utils.py"], ctx=ctx, index_name="test", depth=3
+            )
+
+        assert "warnings" in result
+        assert result["warnings"][0]["type"] == "deps_not_extracted"
+
+    @pytest.mark.asyncio
+    async def test_no_warnings_when_deps_fresh(self):
+        """Dep tools omit warnings key when deps are fresh."""
+        edges = [
+            DependencyEdge(
+                source_file="a.py",
+                source_symbol=None,
+                target_file="b.py",
+                target_symbol=None,
+                dep_type=DepType.IMPORT,
+                metadata={"module": "b"},
+            )
+        ]
+
+        with (
+            patch("cocosearch.deps.query.get_dependencies", return_value=edges),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            from cocosearch.mcp.server import get_file_dependencies
+
+            ctx = MagicMock()
+            result = await get_file_dependencies(
+                file="a.py", ctx=ctx, index_name="test", depth=1
+            )
+
+        assert "warnings" not in result
+
+    @pytest.mark.asyncio
+    async def test_staleness_error_does_not_break_tool(self):
+        """Staleness check failure doesn't affect tool result."""
+        edges = [
+            DependencyEdge(
+                source_file="a.py",
+                source_symbol=None,
+                target_file="b.py",
+                target_symbol=None,
+                dep_type=DepType.IMPORT,
+                metadata={"module": "b"},
+            )
+        ]
+
+        with (
+            patch("cocosearch.deps.query.get_dependencies", return_value=edges),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                side_effect=Exception("db error"),
+            ),
+        ):
+            from cocosearch.mcp.server import get_file_dependencies
+
+            ctx = MagicMock()
+            result = await get_file_dependencies(
+                file="a.py", ctx=ctx, index_name="test", depth=1
+            )
+
+        assert result["total"] == 1
+        assert "warnings" not in result

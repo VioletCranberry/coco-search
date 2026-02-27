@@ -68,6 +68,14 @@ def clear_index(index_name: str) -> dict:
             except Exception:
                 pass  # Table may not exist for indexes without deps extraction
 
+            # Drop deps tracking table if it exists (non-critical)
+            deps_tracking_table = f"cocosearch_deps_tracking_{index_name}"
+            try:
+                cur.execute(f"DROP TABLE IF EXISTS {deps_tracking_table}")
+                conn.commit()
+            except Exception:
+                pass  # Table may not exist for indexes without deps extraction
+
             # Drop CocoIndex tracking table if it exists (non-critical)
             tracking_table = f"codeindex_{index_name}__cocoindex_tracking"
             try:

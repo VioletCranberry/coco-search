@@ -2331,6 +2331,25 @@ def index_codebase(
 # ============================================================================
 
 
+def _append_deps_warnings(result: dict, index_name: str) -> dict:
+    """Append dependency staleness warnings to a result dict (best-effort).
+
+    Checks whether the dependency data for *index_name* is stale and, if so,
+    adds a ``"warnings"`` key containing structured warning dicts.  Errors are
+    silently swallowed so that a staleness-check failure never breaks the tool
+    response.
+    """
+    try:
+        from cocosearch.management.stats import check_deps_staleness
+
+        warnings = check_deps_staleness(index_name)
+        if warnings:
+            result["warnings"] = warnings
+    except Exception:
+        pass
+    return result
+
+
 @mcp.tool()
 @log_mcp_tool
 async def get_file_dependencies(
@@ -2375,7 +2394,7 @@ async def get_file_dependencies(
         depth = min(depth, 20)
         if depth <= 1:
             edges = _get_deps(index_name, file, dep_type=dep_type)
-            return {
+            result = {
                 "file": file,
                 "depth": 1,
                 "dependencies": [
@@ -2393,11 +2412,12 @@ async def get_file_dependencies(
             tree = get_dependency_tree(
                 index_name, file, max_depth=depth, dep_type=dep_type
             )
-            return {
+            result = {
                 "file": file,
                 "depth": depth,
                 "tree": _dep_tree_to_dict(tree),
             }
+        return _append_deps_warnings(result, index_name)
     except Exception as e:
         return {"error": str(e)}
 
@@ -2441,11 +2461,149 @@ async def get_file_impact(
 
         depth = min(depth, 20)
         tree = _get_impact(index_name, file, max_depth=depth, dep_type=dep_type)
-        return {
+        result = {
             "file": file,
             "depth": depth,
             "impact_tree": _dep_tree_to_dict(tree),
         }
+        return _append_deps_warnings(result, index_name)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp.tool()
+@log_mcp_tool
+async def get_batch_dependencies(
+    files: Annotated[
+        list[str], Field(description="File paths relative to project root")
+    ],
+    ctx: Context,
+    index_name: Annotated[
+        str | None,
+        Field(description="Index name. Auto-detects from project if not provided."),
+    ] = None,
+    depth: Annotated[
+        int,
+        Field(
+            description="Traversal depth. 1=direct only, >1=transitive with shared visited set"
+        ),
+    ] = 1,
+    dep_type: Annotated[
+        str | None,
+        Field(description="Filter by type: import, call, reference"),
+    ] = None,
+) -> dict:
+    """Get dependencies for multiple files in a single batch call.
+
+    More efficient than calling get_file_dependencies per file when analyzing
+    multiple changed files (e.g., from a git diff). With depth>1, uses a shared
+    visited set across all files to eliminate redundant traversal of overlapping
+    dependency subgraphs.
+
+    With depth=1, returns direct dependencies as flat lists per file.
+    With depth>1, returns transitive dependency trees per file.
+    """
+    try:
+        from cocosearch.deps.query import (
+            get_dependencies as _get_deps,
+            get_dependency_tree_batch,
+        )
+
+        if not index_name:
+            index_name = await _auto_detect_index(ctx)
+            if not index_name:
+                return {"error": "Could not auto-detect index. Provide index_name."}
+
+        depth = min(depth, 20)
+
+        if depth <= 1:
+            per_file = []
+            for f in files:
+                edges = _get_deps(index_name, f, dep_type=dep_type)
+                per_file.append(
+                    {
+                        "file": f,
+                        "dependencies": [
+                            {
+                                "target_file": e.target_file,
+                                "target_symbol": e.target_symbol,
+                                "dep_type": e.dep_type,
+                                "module": e.metadata.get("module"),
+                            }
+                            for e in edges
+                        ],
+                        "total": len(edges),
+                    }
+                )
+            result = {
+                "files_requested": len(files),
+                "depth": 1,
+                "results": per_file,
+            }
+        else:
+            trees = get_dependency_tree_batch(
+                index_name, files, max_depth=depth, dep_type=dep_type
+            )
+            result = {
+                "files_requested": len(files),
+                "depth": depth,
+                "results": [
+                    {"file": t.file, "tree": _dep_tree_to_dict(t)} for t in trees
+                ],
+            }
+        return _append_deps_warnings(result, index_name)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp.tool()
+@log_mcp_tool
+async def get_batch_impact(
+    files: Annotated[
+        list[str], Field(description="File paths relative to project root")
+    ],
+    ctx: Context,
+    index_name: Annotated[
+        str | None,
+        Field(description="Index name. Auto-detects from project if not provided."),
+    ] = None,
+    depth: Annotated[
+        int,
+        Field(description="Traversal depth for transitive impact analysis (max 20)"),
+    ] = 3,
+    dep_type: Annotated[
+        str | None,
+        Field(description="Filter by type: import, call, reference"),
+    ] = None,
+) -> dict:
+    """Get impact analysis for multiple files in a single batch call.
+
+    More efficient than calling get_file_impact per file when analyzing
+    multiple changed files (e.g., from a git diff). Uses a shared visited set
+    across all files to eliminate redundant traversal of overlapping reverse-
+    dependency subgraphs.
+
+    Returns impact trees per file showing what would be affected if each
+    file changes.
+    """
+    try:
+        from cocosearch.deps.query import get_impact_batch as _get_impact_batch
+
+        if not index_name:
+            index_name = await _auto_detect_index(ctx)
+            if not index_name:
+                return {"error": "Could not auto-detect index. Provide index_name."}
+
+        depth = min(depth, 20)
+        trees = _get_impact_batch(index_name, files, max_depth=depth, dep_type=dep_type)
+        result = {
+            "files_requested": len(files),
+            "depth": depth,
+            "results": [
+                {"file": t.file, "impact_tree": _dep_tree_to_dict(t)} for t in trees
+            ],
+        }
+        return _append_deps_warnings(result, index_name)
     except Exception as e:
         return {"error": str(e)}
 

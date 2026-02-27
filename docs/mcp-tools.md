@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-CocoSearch provides 6 Model Context Protocol (MCP) tools for semantic code search and index management. These tools enable AI agents and LLMs to search indexed codebases, manage indexes, analyze search pipelines, and retrieve statistics programmatically.
+CocoSearch provides 10 Model Context Protocol (MCP) tools for semantic code search, dependency analysis, and index management. These tools enable AI agents and LLMs to search indexed codebases, trace dependencies, manage indexes, analyze search pipelines, and retrieve statistics programmatically.
 
 **Available transports:** stdio, SSE, streamable HTTP
 
@@ -498,11 +498,334 @@ Index the codebase at "/Users/dev/my-new-project" so it can be searched.
 
 ---
 
+## get_file_dependencies
+
+Get dependencies for a file (what it depends on). Returns structured dependency data with transitive traversal. With `depth=1`, returns direct dependencies as a flat list. With `depth>1`, returns a transitive dependency tree showing the full chain of dependencies.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| file | string | Yes | - | File path relative to project root |
+| index_name | string \| null | No | null | Index name. Auto-detects from project if not provided. |
+| depth | integer | No | 1 | Traversal depth. 1=direct only, >1=transitive |
+| dep_type | string \| null | No | null | Filter by type: import, call, reference |
+
+### JSON Request
+
+```json
+{
+  "file": "src/auth/jwt.py",
+  "depth": 2,
+  "dep_type": "import"
+}
+```
+
+### JSON Response (depth=1)
+
+```json
+{
+  "file": "src/auth/jwt.py",
+  "dependencies": [
+    {
+      "target_file": "src/config/settings.py",
+      "target_symbol": "SECRET_KEY",
+      "dep_type": "import",
+      "module": "config.settings"
+    },
+    {
+      "target_file": null,
+      "target_symbol": "jwt",
+      "dep_type": "import",
+      "module": "jwt"
+    }
+  ],
+  "total": 2
+}
+```
+
+### JSON Response (depth>1)
+
+```json
+{
+  "file": "src/auth/jwt.py",
+  "tree": {
+    "file": "src/auth/jwt.py",
+    "symbol": null,
+    "dep_type": "root",
+    "children": [
+      {
+        "file": "src/config/settings.py",
+        "symbol": "SECRET_KEY",
+        "dep_type": "import",
+        "children": []
+      }
+    ]
+  }
+}
+```
+
+---
+
+## get_file_impact
+
+Get impact analysis for a file (what would be affected if it changes). Returns a transitive reverse-dependency tree showing files that depend on the given file, useful for understanding blast radius of changes.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| file | string | Yes | - | File path relative to project root |
+| index_name | string \| null | No | null | Index name. Auto-detects from project if not provided. |
+| depth | integer | No | 3 | Traversal depth for transitive impact analysis (max 20) |
+| dep_type | string \| null | No | null | Filter by type: import, call, reference |
+
+### JSON Request
+
+```json
+{
+  "file": "src/models/user.py",
+  "depth": 2
+}
+```
+
+### JSON Response
+
+```json
+{
+  "file": "src/models/user.py",
+  "impact_tree": {
+    "file": "src/models/user.py",
+    "symbol": null,
+    "dep_type": "root",
+    "children": [
+      {
+        "file": "src/api/users.py",
+        "symbol": null,
+        "dep_type": "import",
+        "children": [
+          {
+            "file": "src/api/admin.py",
+            "symbol": null,
+            "dep_type": "import",
+            "children": []
+          }
+        ]
+      },
+      {
+        "file": "tests/test_user.py",
+        "symbol": null,
+        "dep_type": "import",
+        "children": []
+      }
+    ]
+  }
+}
+```
+
+---
+
+## get_batch_dependencies
+
+Get dependencies for multiple files in a single batch call. More efficient than calling `get_file_dependencies` per file when analyzing multiple changed files (e.g., from a git diff). With `depth>1`, uses a shared visited set across all files to eliminate redundant traversal of overlapping dependency subgraphs.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| files | array\<string\> | Yes | - | File paths relative to project root |
+| index_name | string \| null | No | null | Index name. Auto-detects from project if not provided. |
+| depth | integer | No | 1 | Traversal depth. 1=direct only, >1=transitive with shared visited set |
+| dep_type | string \| null | No | null | Filter by type: import, call, reference |
+
+### JSON Request
+
+```json
+{
+  "files": ["src/auth/jwt.py", "src/auth/oauth.py"],
+  "depth": 2
+}
+```
+
+### JSON Response (depth=1)
+
+```json
+{
+  "files_requested": 2,
+  "depth": 1,
+  "results": [
+    {
+      "file": "src/auth/jwt.py",
+      "dependencies": [
+        {
+          "target_file": "src/config/settings.py",
+          "target_symbol": "SECRET_KEY",
+          "dep_type": "import",
+          "module": "config.settings"
+        }
+      ],
+      "total": 1
+    },
+    {
+      "file": "src/auth/oauth.py",
+      "dependencies": [
+        {
+          "target_file": "src/config/settings.py",
+          "target_symbol": "OAUTH_CLIENT_ID",
+          "dep_type": "import",
+          "module": "config.settings"
+        }
+      ],
+      "total": 1
+    }
+  ]
+}
+```
+
+### JSON Response (depth>1)
+
+```json
+{
+  "files_requested": 2,
+  "depth": 2,
+  "results": [
+    {
+      "file": "src/auth/jwt.py",
+      "tree": {
+        "file": "src/auth/jwt.py",
+        "symbol": null,
+        "dep_type": "root",
+        "children": [
+          {
+            "file": "src/config/settings.py",
+            "symbol": "SECRET_KEY",
+            "dep_type": "import",
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "file": "src/auth/oauth.py",
+      "tree": {
+        "file": "src/auth/oauth.py",
+        "symbol": null,
+        "dep_type": "root",
+        "children": []
+      }
+    }
+  ]
+}
+```
+
+**Note:** With `depth>1`, `src/config/settings.py` appears only in the first tree's children — the shared visited set prevents redundant traversal.
+
+---
+
+## get_batch_impact
+
+Get impact analysis for multiple files in a single batch call. More efficient than calling `get_file_impact` per file when analyzing multiple changed files (e.g., from a git diff). Uses a shared visited set across all files to eliminate redundant traversal of overlapping reverse-dependency subgraphs.
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| files | array\<string\> | Yes | - | File paths relative to project root |
+| index_name | string \| null | No | null | Index name. Auto-detects from project if not provided. |
+| depth | integer | No | 3 | Traversal depth for transitive impact analysis (max 20) |
+| dep_type | string \| null | No | null | Filter by type: import, call, reference |
+
+### JSON Request
+
+```json
+{
+  "files": ["src/models/user.py", "src/models/order.py"],
+  "depth": 2
+}
+```
+
+### JSON Response
+
+```json
+{
+  "files_requested": 2,
+  "depth": 2,
+  "results": [
+    {
+      "file": "src/models/user.py",
+      "impact_tree": {
+        "file": "src/models/user.py",
+        "symbol": null,
+        "dep_type": "root",
+        "children": [
+          {
+            "file": "src/api/users.py",
+            "symbol": null,
+            "dep_type": "import",
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "file": "src/models/order.py",
+      "impact_tree": {
+        "file": "src/models/order.py",
+        "symbol": null,
+        "dep_type": "root",
+        "children": [
+          {
+            "file": "src/api/orders.py",
+            "symbol": null,
+            "dep_type": "import",
+            "children": []
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Note:** The shared visited set means if `src/api/users.py` depends on both `user.py` and `order.py`, it will only appear in the first tree where it's encountered.
+
+### Staleness Warnings (all dependency tools)
+
+All four dependency tools (`get_file_dependencies`, `get_file_impact`, `get_batch_dependencies`, `get_batch_impact`) perform best-effort staleness checks and may include a `"warnings"` key in the response when dependency data is outdated. Warning types:
+
+| Type | Meaning |
+|------|---------|
+| `deps_not_extracted` | No dependency data exists, or extraction timestamp is missing. Run `cocosearch deps extract .` |
+| `deps_outdated` | The index was re-indexed after the last dependency extraction. Run `cocosearch deps extract .` |
+| `deps_branch_drift` | Git branch or commit has changed since the index was last built. Run `cocosearch index . --deps` |
+
+Example response with warnings:
+
+```json
+{
+  "file": "src/auth/jwt.py",
+  "dependencies": [],
+  "total": 0,
+  "warnings": [
+    {
+      "type": "deps_not_extracted",
+      "warning": "Dependencies not extracted",
+      "message": "No dependency data found for this index. Run `cocosearch deps extract .` to extract dependencies."
+    }
+  ]
+}
+```
+
+The `"warnings"` key is omitted when dependency data is fresh.
+
+---
+
 ## Implementation
 
 All tools are implemented in `src/cocosearch/mcp/server.py` using the FastMCP framework.
 
 **Core search engine:** `src/cocosearch/search/query.py`
+**Dependency queries:** `src/cocosearch/deps/query.py`
 **Index management:** `src/cocosearch/management/__init__.py`
 **Statistics:** `src/cocosearch/management/stats.py`
 **Parse tracking:** `src/cocosearch/indexer/parse_tracking.py`

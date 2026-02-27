@@ -523,6 +523,122 @@ def get_parse_failures(
     ]
 
 
+def check_deps_staleness(index_name: str) -> list[dict]:
+    """Check if dependency data is stale for an index.
+
+    Performs best-effort checks and returns a list of warning dicts
+    (empty list if deps are fresh). Checks in order:
+
+    1. Deps table doesn't exist → ``deps_not_extracted``
+    2. ``deps_extracted_at`` is NULL → ``deps_not_extracted``
+    3. Index updated after deps extracted → ``deps_outdated``
+    4. Git branch/commit drift since deps extraction → ``deps_branch_drift``
+
+    Each warning is a dict with keys: ``type``, ``warning``, ``message``.
+
+    Args:
+        index_name: The name of the index.
+
+    Returns:
+        List of warning dicts (empty if all good or on error).
+    """
+    try:
+        pool = get_connection_pool()
+        validate_index_name(index_name)
+        deps_table = f"cocosearch_deps_{index_name}"
+
+        # 1. Check if deps table exists
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'public'
+                          AND table_name = %s
+                    )
+                    """,
+                    (deps_table,),
+                )
+                (exists,) = cur.fetchone()
+
+        if not exists:
+            return [
+                {
+                    "type": "deps_not_extracted",
+                    "warning": "Dependencies not extracted",
+                    "message": (
+                        "No dependency data found for this index. "
+                        "Run `cocosearch deps extract .` to extract dependencies."
+                    ),
+                }
+            ]
+
+        # 2. Check deps_extracted_at in metadata
+        metadata = get_index_metadata(index_name)
+        if metadata is None:
+            return []
+
+        deps_extracted_at = metadata.get("deps_extracted_at")
+        if deps_extracted_at is None:
+            return [
+                {
+                    "type": "deps_not_extracted",
+                    "warning": "Dependencies not extracted",
+                    "message": (
+                        "Dependency extraction timestamp not recorded. "
+                        "Run `cocosearch deps extract .` to extract dependencies."
+                    ),
+                }
+            ]
+
+        # 3. Check if index was updated after deps were extracted
+        warnings = []
+        updated_at = metadata.get("updated_at")
+        if updated_at is not None and deps_extracted_at is not None:
+            # Normalize timezones for comparison
+            from datetime import timezone as tz
+
+            if updated_at.tzinfo is None:
+                updated_at = updated_at.replace(tzinfo=tz.utc)
+            if deps_extracted_at.tzinfo is None:
+                deps_extracted_at = deps_extracted_at.replace(tzinfo=tz.utc)
+
+            if deps_extracted_at < updated_at:
+                warnings.append(
+                    {
+                        "type": "deps_outdated",
+                        "warning": "Dependencies outdated",
+                        "message": (
+                            "Index was re-indexed after last dependency extraction. "
+                            "Run `cocosearch deps extract .` to update dependencies."
+                        ),
+                    }
+                )
+
+        # 4. Check branch/commit drift
+        try:
+            branch_info = check_branch_staleness(index_name)
+            if branch_info.get("commits_changed") or branch_info.get("branch_changed"):
+                warnings.append(
+                    {
+                        "type": "deps_branch_drift",
+                        "warning": "Dependencies may be outdated",
+                        "message": (
+                            "Git state has changed since last indexing. "
+                            "Dependency data may not reflect current code. "
+                            "Run `cocosearch index . --deps` to update."
+                        ),
+                    }
+                )
+        except Exception:
+            pass  # Best-effort — git may not be available
+
+        return warnings
+    except Exception:
+        return []
+
+
 def check_staleness(index_name: str, threshold_days: int = 7) -> tuple[bool, int]:
     """Check if an index is stale (not updated recently).
 

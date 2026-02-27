@@ -94,3 +94,19 @@ def get_deps_table_name(index_name: str) -> str:
     """
     validate_index_name(index_name)
     return f"cocosearch_deps_{index_name}"
+
+
+def get_tracking_table_name(index_name: str) -> str:
+    """Return the PostgreSQL table name for dependency tracking hashes.
+
+    Args:
+        index_name: The index name (validated for safe SQL use).
+
+    Returns:
+        Table name in the form ``cocosearch_deps_tracking_{index_name}``.
+
+    Raises:
+        IndexValidationError: If the index name is invalid.
+    """
+    validate_index_name(index_name)
+    return f"cocosearch_deps_tracking_{index_name}"

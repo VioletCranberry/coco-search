@@ -148,7 +148,7 @@ You can query dependencies at two levels:
 - **Direct:** `cocosearch deps show <file>` — what does this file import, and what imports it?
 - **Transitive:** `cocosearch deps tree <file>` — full forward dependency tree (BFS with cycle detection). `cocosearch deps impact <file>` — reverse impact tree showing what would be affected by changes to a file.
 
-Both MCP tools (`get_file_dependencies`, `get_file_impact`) and API endpoints (`/api/deps`, `/api/deps/impact`, `/api/deps/graph`) expose dependency queries for AI assistants and dashboard integration. The `search_code` tool also accepts `include_deps=True` to attach dependency info alongside search results.
+MCP tools (`get_file_dependencies`, `get_file_impact`, `get_batch_dependencies`, `get_batch_impact`) and API endpoints (`/api/deps`, `/api/deps/impact`, `/api/deps/graph`) expose dependency queries for AI assistants and dashboard integration. The batch variants use a shared visited set across all root files, eliminating redundant traversal of overlapping subgraphs — useful for analyzing multiple changed files from a git diff. The `search_code` tool also accepts `include_deps=True` to attach dependency info alongside search results.
 
 See [Architecture Overview](architecture.md) for implementation details and [CLI Reference](cli-reference.md) for commands.
 
