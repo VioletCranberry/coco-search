@@ -62,6 +62,7 @@ def _clean_stale_flow_state(index_name: str, db_url: str) -> None:
             cur.execute(f"DROP TABLE IF EXISTS {data_table}")
             cur.execute(f"DROP TABLE IF EXISTS cocosearch_parse_results_{index_name}")
             cur.execute(f"DROP TABLE IF EXISTS cocosearch_deps_{index_name}")
+            cur.execute(f"DROP TABLE IF EXISTS cocosearch_deps_tracking_{index_name}")
             cur.execute(
                 f"DROP TABLE IF EXISTS codeindex_{index_name}__cocoindex_tracking"
             )

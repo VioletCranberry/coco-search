@@ -109,23 +109,23 @@ class TestExtractDependencies:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table") as mock_create,
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
-            ) as mock_drop,
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ) as mock_create,
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
+            ),
+            patch("cocosearch.deps.extractor.truncate_deps_table") as mock_truncate,
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
             stats = extract_dependencies("test", str(tmp_path))
 
-        # Should drop and recreate the table
-        mock_drop.assert_called_once_with("test")
+        # Should create table and truncate before insert (full run)
         mock_create.assert_called_once_with("test")
+        mock_truncate.assert_called_once_with("test")
 
         # Should have inserted edges
         mock_insert.assert_called_once()
@@ -158,15 +158,15 @@ class TestExtractDependencies:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -190,15 +190,15 @@ class TestExtractDependencies:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -229,15 +229,15 @@ class TestExtractDependencies:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ),
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges"),
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -260,15 +260,15 @@ class TestExtractDependencies:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -308,15 +308,15 @@ class TestExtractDependenciesModuleResolution:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -343,15 +343,15 @@ class TestExtractDependenciesModuleResolution:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
@@ -385,15 +385,15 @@ class TestExtractDependenciesModuleResolution:
                 "cocosearch.deps.extractor.get_indexed_files",
                 return_value=indexed_files,
             ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
             patch(
-                "cocosearch.deps.extractor.drop_deps_table",
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value={},
             ),
-            patch(
-                "cocosearch.deps.extractor.create_deps_table",
-            ),
-            patch(
-                "cocosearch.deps.extractor.insert_edges",
-            ) as mock_insert,
+            patch("cocosearch.deps.extractor.truncate_deps_table"),
+            patch("cocosearch.deps.extractor.insert_edges") as mock_insert,
+            patch("cocosearch.deps.extractor.update_tracking"),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 

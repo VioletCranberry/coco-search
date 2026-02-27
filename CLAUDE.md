@@ -80,9 +80,10 @@ uv run cocosearch config path
 uv run cocosearch config check
 uv run cocosearch dashboard              # Terminal dashboard
 
-# Dependency graph
+# Dependency graph (incremental by default, use --fresh for full re-extraction)
 uv run cocosearch index . --deps          # Index + extract dependencies
-uv run cocosearch deps extract .          # Extract dependencies (standalone)
+uv run cocosearch deps extract .          # Extract dependencies (incremental)
+uv run cocosearch deps extract . --fresh  # Force full re-extraction
 uv run cocosearch deps show <file>        # Show dependencies for a file
 uv run cocosearch deps tree <file>        # Forward dependency tree (transitive)
 uv run cocosearch deps impact <file>      # Reverse impact tree (what depends on this)
@@ -126,7 +127,7 @@ uv run cocosearch mcp --project-from-cwd
 - CocoIndex framework orchestrates the indexing pipeline in `indexer/flow.py`
 - **CocoIndex table naming:** `codeindex_{index_name}__{index_name}_chunks` (flow name `CodeIndex_{name}` is lowercased by CocoIndex). Parse results go to `cocosearch_parse_results_{index_name}`.
 - Parse status categories: `ok`, `partial`, `error`, `no_grammar`. Text-only formats (md, yaml, json, etc.) are skipped from parse tracking entirely via `_SKIP_PARSE_EXTENSIONS` in `indexer/parse_tracking.py`.
-- Dependency extractor autodiscovery: any `deps/extractors/*.py` (not prefixed with `_`) implementing `DependencyExtractor` protocol is auto-registered. Lookup by `language_id` (file extension or grammar name, e.g., "py", "js", "go", "md", "mdx", "docker-compose", "github-actions", "terraform", "helm-template", "helm-values", "helm-chart"). Dependency edges stored in `cocosearch_deps_{index_name}`. Module resolvers in `deps/resolver.py` are registered per language_id and resolve module names to file paths after extraction.
+- Dependency extractor autodiscovery: any `deps/extractors/*.py` (not prefixed with `_`) implementing `DependencyExtractor` protocol is auto-registered. Lookup by `language_id` (file extension or grammar name, e.g., "py", "js", "go", "md", "mdx", "docker-compose", "github-actions", "terraform", "helm-template", "helm-values", "helm-chart"). Dependency edges stored in `cocosearch_deps_{index_name}`. Module resolvers in `deps/resolver.py` are registered per language_id and resolve module names to file paths after extraction. Extraction is incremental by default: SHA-256 content hashes tracked in `cocosearch_deps_tracking_{index_name}` detect changed/added/deleted files; only dirty files are re-extracted, then ALL edges are re-resolved for correctness. Use `--fresh` to force full re-extraction.
 
 ## Testing
 

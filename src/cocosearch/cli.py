@@ -303,11 +303,21 @@ def index_command(args: argparse.Namespace) -> int:
         if getattr(args, "deps", False):
             console.print("\n[bold]Extracting dependencies...[/bold]")
             try:
-                dep_stats = extract_dependencies(index_name, codebase_path)
-                console.print(
-                    f"  [green]{dep_stats['edges_found']} edges[/green] from "
-                    f"{dep_stats['files_processed']} files"
+                dep_fresh = getattr(args, "fresh", False)
+                dep_stats = extract_dependencies(
+                    index_name, codebase_path, fresh=dep_fresh
                 )
+                if dep_stats.get("incremental"):
+                    console.print(
+                        f"  [green]{dep_stats['edges_found']} edges[/green] "
+                        f"({dep_stats['files_processed']} changed, "
+                        f"{dep_stats['files_unchanged']} unchanged)"
+                    )
+                else:
+                    console.print(
+                        f"  [green]{dep_stats['edges_found']} edges[/green] from "
+                        f"{dep_stats['files_processed']} files"
+                    )
             except Exception as e:
                 console.print(f"  [yellow]Dependency extraction failed: {e}[/yellow]")
 
@@ -2043,13 +2053,18 @@ def deps_extract_command(args: argparse.Namespace) -> int:
 
     codebase_path = os.path.abspath(args.path)
 
+    fresh = getattr(args, "fresh", False)
+
     try:
-        stats = extract_dependencies(index_name, codebase_path)
+        stats = extract_dependencies(index_name, codebase_path, fresh=fresh)
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         return 1
 
     console.print("[green]Dependency extraction complete[/green]")
+    if stats.get("incremental"):
+        console.print("  [dim]Mode:            incremental[/dim]")
+        console.print(f"  Files unchanged: {stats['files_unchanged']}")
     console.print(f"  Files processed: {stats['files_processed']}")
     console.print(f"  Files skipped:   {stats['files_skipped']}")
     console.print(f"  Edges found:     {stats['edges_found']}")
@@ -2761,6 +2776,11 @@ def main() -> None:
         "--name",
         config_key="indexName",
         help_text="Index name",
+    )
+    deps_extract_parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Ignore tracking and re-extract all dependencies from scratch",
     )
 
     # deps show

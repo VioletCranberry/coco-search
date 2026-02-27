@@ -31,13 +31,14 @@ class TestDepsExtractCommand:
         args = MagicMock()
         args.name = None
         args.path = "/tmp/codebase"
+        args.fresh = False
 
         from cocosearch.cli import deps_extract_command
 
         result = deps_extract_command(args)
 
         assert result == 0
-        mock_extract.assert_called_once_with("myindex", "/tmp/codebase")
+        mock_extract.assert_called_once_with("myindex", "/tmp/codebase", fresh=False)
 
     @patch("cocosearch.cli.extract_dependencies")
     @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
