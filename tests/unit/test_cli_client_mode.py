@@ -12,7 +12,6 @@ import pytest
 
 from cocosearch.client import _LOCAL_ONLY_COMMANDS, run_client_command
 
-
 # ---------------------------------------------------------------------------
 # TestClientModeDispatch — tests for main() client mode branching
 # ---------------------------------------------------------------------------

@@ -163,7 +163,7 @@ uvx cocosearch index .
 
 ```bash
 # Generate cocosearch.yaml config and optionally add
-# tool routing to CLAUDE.md for Claude Code integration:
+# tool routing to CLAUDE.md / AGENTS.md:
 uvx cocosearch init
 ```
 
@@ -186,6 +186,25 @@ claude mcp add --scope user cocosearch -- uvx cocosearch mcp --project-from-cwd
 ```
 
 > **Note:** The MCP server automatically opens a web dashboard in your browser on a random port. Set `COCOSEARCH_DASHBOARD_PORT=8080` to pin it to a fixed port, or `COCOSEARCH_NO_DASHBOARD=1` to disable it.
+
+**Option C — OpenCode:**
+
+Add to `~/.config/opencode/opencode.json` (global) or `opencode.json` (project):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "cocosearch": {
+      "type": "local",
+      "command": ["uvx", "--from", "cocosearch", "cocosearch", "mcp", "--project-from-cwd"],
+      "enabled": true
+    }
+  }
+}
+```
+
+> **Note:** OpenCode uses `AGENTS.md` for project instructions (equivalent to `CLAUDE.md`). Run `uvx cocosearch init` to generate it, or create a symlink: `ln -s CLAUDE.md AGENTS.md`. Skills are compatible — see [Skills README](./skills/README.md) for installation.
 
 ## Running in Docker
 

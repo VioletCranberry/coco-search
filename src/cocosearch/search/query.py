@@ -374,9 +374,11 @@ def search(
             limit,
             symbol_type=symbol_type,
             symbol_name=symbol_name,
-            language_filter=",".join(validated_languages)
-            if validated_languages
-            else language_filter,
+            language_filter=(
+                ",".join(validated_languages)
+                if validated_languages
+                else language_filter
+            ),
         )
 
         # Convert HybridSearchResult to SearchResult, applying min_score filter

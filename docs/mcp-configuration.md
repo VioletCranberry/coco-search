@@ -42,6 +42,24 @@ To verify:
 claude mcp list
 ```
 
+### Claude Code Plugin (Alternative)
+
+CocoSearch is also available as a Claude Code plugin, which provides the same MCP tools plus workflow skills:
+
+```bash
+claude plugin marketplace add VioletCranberry/coco-search
+claude plugin install cocosearch@cocosearch
+```
+
+Or use the interactive setup:
+
+```bash
+uv run cocosearch init
+# Follow the prompts to install the Claude Code plugin
+```
+
+The plugin is installed globally and available in all your projects. It is managed by Claude Code's plugin system -- installed plugins are tracked in `~/.claude/plugins/installed_plugins.json`.
+
 ### Claude Desktop
 
 Claude Desktop does not support MCP Roots, so it relies on `--project-from-cwd` for project detection.

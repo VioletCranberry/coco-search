@@ -62,3 +62,7 @@ docker_data/**
 .worktrees/
 .playwright-mcp/
 docs/plans/**
+
+# OpenCode
+opencode.json
+.opencode/

@@ -9,7 +9,6 @@ import pytest
 from cocosearch.logging import CsLog, LogCategory, cs_log
 from cocosearch.mcp.log_stream import LogBuffer
 
-
 # ---------------------------------------------------------------------------
 # LogCategory enum
 # ---------------------------------------------------------------------------

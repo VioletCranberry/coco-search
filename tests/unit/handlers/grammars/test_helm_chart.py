@@ -2,7 +2,6 @@
 
 from cocosearch.handlers.grammars.helm_chart import HelmChartHandler
 
-
 # ============================================================================
 # Tests: Path and content matching
 # ============================================================================

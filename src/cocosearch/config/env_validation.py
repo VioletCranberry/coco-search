@@ -8,7 +8,6 @@ import os
 from typing import NamedTuple
 from urllib.parse import urlparse, urlunparse
 
-
 DEFAULT_DATABASE_URL = "postgresql://cocosearch:cocosearch@localhost:5432/cocosearch"
 
 

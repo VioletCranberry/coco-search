@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -23,10 +24,15 @@ from cocosearch.config import (
     CocoSearchConfig,
     ConfigError as ConfigLoadError,
     ConfigResolver,
+    check_claude_plugin_installed,
     config_key_to_env_var,
     find_config_file,
+    generate_agents_md_routing,
     generate_claude_md_routing,
     generate_config,
+    generate_opencode_mcp_config,
+    generate_opencode_skills,
+    install_claude_plugin,
     load_config as load_project_config,
 )
 from cocosearch.dashboard import run_terminal_dashboard
@@ -379,16 +385,16 @@ def search_command(args: argparse.Namespace) -> int:
     # Resolve search settings with precedence
     limit, _ = resolver.resolve(
         "search.resultLimit",
-        cli_value=args.limit
-        if args.limit != 10
-        else None,  # Only use CLI if not default
+        cli_value=(
+            args.limit if args.limit != 10 else None
+        ),  # Only use CLI if not default
         env_var="COCOSEARCH_SEARCH_RESULT_LIMIT",
     )
     min_score, _ = resolver.resolve(
         "search.minScore",
-        cli_value=args.min_score
-        if args.min_score != 0.3
-        else None,  # Only use CLI if not default
+        cli_value=(
+            args.min_score if args.min_score != 0.3 else None
+        ),  # Only use CLI if not default
         env_var="COCOSEARCH_SEARCH_MIN_SCORE",
     )
 
@@ -1442,40 +1448,195 @@ def init_command(args: argparse.Namespace) -> int:
             console.print(f"[bold red]Error:[/bold red] {e}")
             return 1
 
+    if not sys.stdin.isatty():
+        return 0
+
     # Offer to add tool routing to CLAUDE.md
     no_claude_md = getattr(args, "no_claude_md", False)
-    if no_claude_md or not sys.stdin.isatty():
-        return 0
+    if not no_claude_md:
+        console.print()
+        response = input("Add CocoSearch tool routing to CLAUDE.md? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print("  [cyan]1[/cyan]  Local project CLAUDE.md (default)")
+            console.print("  [cyan]2[/cyan]  Global ~/.claude/CLAUDE.md")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
 
-    console.print()
-    response = input("Add CocoSearch tool routing to CLAUDE.md? [y/N] ")
-    if response.lower() != "y":
-        return 0
+            if choice == "1":
+                target = Path.cwd() / "CLAUDE.md"
+            elif choice == "2":
+                target = Path.home() / ".claude" / "CLAUDE.md"
+            else:
+                console.print("[dim]Invalid choice, skipping CLAUDE.md setup.[/dim]")
+                target = None
 
-    console.print()
-    console.print("  [cyan]1[/cyan]  Local project CLAUDE.md (default)")
-    console.print("  [cyan]2[/cyan]  Global ~/.claude/CLAUDE.md")
-    console.print()
-    choice = input("Location [1]: ").strip() or "1"
+            if target:
+                try:
+                    result = generate_claude_md_routing(target)
+                    if result == "created":
+                        console.print(f"[green]Created {target}[/green]")
+                    elif result == "appended":
+                        console.print(f"[green]Added tool routing to {target}[/green]")
+                    else:
+                        console.print(
+                            f"[dim]Tool routing already present in {target}[/dim]"
+                        )
+                except OSError as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not write {target}: {e}"
+                    )
 
-    if choice == "1":
-        target = Path.cwd() / "CLAUDE.md"
-    elif choice == "2":
-        target = Path.home() / ".claude" / "CLAUDE.md"
-    else:
-        console.print("[dim]Invalid choice, skipping CLAUDE.md setup.[/dim]")
-        return 0
+    # Offer to add tool routing to AGENTS.md (OpenCode)
+    no_agents_md = getattr(args, "no_agents_md", False)
+    if not no_agents_md:
+        console.print()
+        response = input("Add CocoSearch tool routing to AGENTS.md? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print("  [cyan]1[/cyan]  Local project AGENTS.md (default)")
+            console.print("  [cyan]2[/cyan]  Global ~/.config/opencode/AGENTS.md")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
 
-    try:
-        result = generate_claude_md_routing(target)
-        if result == "created":
-            console.print(f"[green]Created {target}[/green]")
-        elif result == "appended":
-            console.print(f"[green]Added tool routing to {target}[/green]")
+            if choice == "1":
+                target = Path.cwd() / "AGENTS.md"
+            elif choice == "2":
+                target = Path.home() / ".config" / "opencode" / "AGENTS.md"
+            else:
+                console.print("[dim]Invalid choice, skipping AGENTS.md setup.[/dim]")
+                target = None
+
+            if target:
+                try:
+                    result = generate_agents_md_routing(target)
+                    if result == "created":
+                        console.print(f"[green]Created {target}[/green]")
+                    elif result == "appended":
+                        console.print(f"[green]Added tool routing to {target}[/green]")
+                    else:
+                        console.print(
+                            f"[dim]Tool routing already present in {target}[/dim]"
+                        )
+                except OSError as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not write {target}: {e}"
+                    )
+
+    # Offer to register MCP server with OpenCode
+    no_opencode_mcp = getattr(args, "no_opencode_mcp", False)
+    if not no_opencode_mcp:
+        console.print()
+        response = input("Register CocoSearch MCP server with OpenCode? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print("  [cyan]1[/cyan]  Project opencode.json (default)")
+            console.print("  [cyan]2[/cyan]  Global ~/.config/opencode/opencode.json")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
+
+            if choice == "1":
+                target = Path.cwd() / "opencode.json"
+            elif choice == "2":
+                target = Path.home() / ".config" / "opencode" / "opencode.json"
+            else:
+                console.print("[dim]Invalid choice, skipping OpenCode MCP setup.[/dim]")
+                target = None
+
+            if target:
+                try:
+                    result = generate_opencode_mcp_config(target)
+                    if result == "created":
+                        console.print(f"[green]Created {target}[/green]")
+                    elif result == "added":
+                        console.print(
+                            f"[green]Added CocoSearch MCP server to {target}[/green]"
+                        )
+                    else:
+                        console.print(
+                            f"[dim]CocoSearch MCP server already registered in {target}[/dim]"
+                        )
+                except (OSError, ConfigLoadError) as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not update {target}: {e}"
+                    )
+
+    # Offer to install CocoSearch workflow skills for OpenCode
+    no_opencode_skills = getattr(args, "no_opencode_skills", False)
+    if not no_opencode_skills:
+        console.print()
+        response = input("Install CocoSearch workflow skills for OpenCode? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print("  [cyan]1[/cyan]  Project .opencode/skills/ (default)")
+            console.print("  [cyan]2[/cyan]  Global ~/.config/opencode/skills/")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
+
+            if choice == "1":
+                target = Path.cwd() / ".opencode" / "skills"
+            elif choice == "2":
+                target = Path.home() / ".config" / "opencode" / "skills"
+            else:
+                console.print(
+                    "[dim]Invalid choice, skipping skills installation.[/dim]"
+                )
+                target = None
+
+            if target:
+                try:
+                    result = generate_opencode_skills(target)
+                    installed = result["installed"]
+                    skipped = result["skipped"]
+                    if installed > 0:
+                        console.print(
+                            f"[green]Installed {installed} skill(s) to {target}[/green]"
+                        )
+                    if skipped > 0:
+                        console.print(
+                            f"[dim]{skipped} skill(s) already installed, skipped.[/dim]"
+                        )
+                    if installed == 0 and skipped > 0:
+                        console.print("[dim]All skills already installed.[/dim]")
+                except OSError as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not install skills: {e}"
+                    )
+
+    # Offer to install CocoSearch plugin for Claude Code
+    no_claude_mcp = getattr(args, "no_claude_mcp", False)
+    if not no_claude_mcp:
+        console.print()
+        try:
+            already_installed = check_claude_plugin_installed()
+        except Exception:
+            already_installed = False
+
+        if already_installed:
+            console.print(
+                "[dim]CocoSearch plugin already installed in Claude Code.[/dim]"
+            )
         else:
-            console.print(f"[dim]Tool routing already present in {target}[/dim]")
-    except OSError as e:
-        console.print(f"[yellow]Warning:[/yellow] Could not write {target}: {e}")
+            response = input("Install CocoSearch plugin for Claude Code? [y/N] ")
+            if response.lower() == "y":
+                try:
+                    result = install_claude_plugin()
+                    if result == "installed":
+                        console.print(
+                            "[green]Installed CocoSearch plugin for Claude Code[/green]"
+                        )
+                    else:
+                        console.print(
+                            "[dim]CocoSearch plugin already installed in Claude Code.[/dim]"
+                        )
+                except (OSError, ConfigLoadError) as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not install Claude Code plugin: {e}"
+                    )
+                except subprocess.TimeoutExpired:
+                    console.print(
+                        "[yellow]Warning:[/yellow] Claude CLI command timed out."
+                    )
 
     return 0
 
@@ -2474,6 +2635,30 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Skip the CLAUDE.md tool routing prompt",
+    )
+    init_parser.add_argument(
+        "--no-agents-md",
+        action="store_true",
+        default=False,
+        help="Skip the AGENTS.md tool routing prompt (OpenCode)",
+    )
+    init_parser.add_argument(
+        "--no-opencode-mcp",
+        action="store_true",
+        default=False,
+        help="Skip the OpenCode MCP server registration prompt",
+    )
+    init_parser.add_argument(
+        "--no-opencode-skills",
+        action="store_true",
+        default=False,
+        help="Skip the OpenCode workflow skills installation prompt",
+    )
+    init_parser.add_argument(
+        "--no-claude-mcp",
+        action="store_true",
+        default=False,
+        help="Skip the Claude Code plugin installation prompt",
     )
 
     # MCP subcommand

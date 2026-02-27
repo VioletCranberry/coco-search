@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Project Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents (Claude Code, OpenCode, and others) when working with code in this repository. It is the single source of truth — `AGENTS.md` is a symlink to this file.
 
 ## Project Overview
 
@@ -68,8 +68,12 @@ uv run cocosearch list
 uv run cocosearch clear <index>
 uv run cocosearch languages              # List supported languages
 uv run cocosearch grammars               # List supported grammars
-uv run cocosearch init                   # Initialize cocosearch.yaml + optional CLAUDE.md
+uv run cocosearch init                   # Initialize cocosearch.yaml + optional CLAUDE.md/AGENTS.md
 uv run cocosearch init --no-claude-md    # Initialize without CLAUDE.md prompt
+uv run cocosearch init --no-agents-md    # Initialize without AGENTS.md prompt
+uv run cocosearch init --no-opencode-mcp # Initialize without OpenCode MCP registration prompt
+uv run cocosearch init --no-opencode-skills # Initialize without OpenCode skills installation prompt
+uv run cocosearch init --no-claude-mcp   # Initialize without Claude Code plugin prompt
 uv run cocosearch config show
 uv run cocosearch config path
 uv run cocosearch config check
@@ -192,7 +196,7 @@ claude mcp add --scope user cocosearch --url http://localhost:3000/sse
 
 **Always update documentation when making code changes.** This includes:
 
-- **CLAUDE.md** — Update module descriptions, counts, patterns, and commands when adding/removing/modifying modules, handlers, CLI commands, MCP tools, or architectural patterns
+- **CLAUDE.md / AGENTS.md** — Update module descriptions, counts, patterns, and commands when adding/removing/modifying modules, handlers, CLI commands, MCP tools, or architectural patterns. `AGENTS.md` is a symlink to `CLAUDE.md`, so only one file needs editing.
 - **docs/** — Update relevant docs (`architecture.md`, `how-it-works.md`, `retrieval.md`, `adding-languages.md`) when changing the systems they describe
 - **README.md** — Update feature lists, usage examples, or screenshots when user-facing behavior changes
 - **`.claude-plugin/`** — Plugin version files (`plugin.json`, `marketplace.json`) and `src/cocosearch/__init__.py` must stay in sync with `pyproject.toml`. The release workflow handles this automatically. If editing `marketplace.json` descriptions or `plugin.json` metadata manually, ensure accuracy (skill count, server command).

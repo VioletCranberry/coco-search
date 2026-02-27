@@ -11,8 +11,13 @@ from .generator import (
     CLAUDE_MD_DUPLICATE_MARKER,
     CLAUDE_MD_ROUTING_SECTION,
     CONFIG_TEMPLATE,
+    check_claude_plugin_installed,
+    generate_agents_md_routing,
     generate_claude_md_routing,
     generate_config,
+    generate_opencode_mcp_config,
+    generate_opencode_skills,
+    install_claude_plugin,
 )
 from .loader import find_config_file, load_config
 from .resolver import ConfigResolver, config_key_to_env_var, parse_env_value
@@ -40,6 +45,11 @@ __all__ = [
     "suggest_field_name",
     "generate_config",
     "generate_claude_md_routing",
+    "generate_agents_md_routing",
+    "generate_opencode_mcp_config",
+    "generate_opencode_skills",
+    "check_claude_plugin_installed",
+    "install_claude_plugin",
     "CONFIG_TEMPLATE",
     "CLAUDE_MD_ROUTING_SECTION",
     "CLAUDE_MD_DUPLICATE_MARKER",

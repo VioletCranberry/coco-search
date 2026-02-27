@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 from cocosearch.deps.models import DependencyEdge, DependencyTree
 
-
 # ============================================================================
 # Tests: deps_extract_command
 # ============================================================================
