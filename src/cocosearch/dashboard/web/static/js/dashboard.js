@@ -337,14 +337,56 @@ export function toggleGrammarDetails(grammarName, rowId) {
     </table>`;
 }
 
+// Extension-to-canonical language mapping (mirrors backend LANGUAGE_ALIASES)
+const EXTENSION_TO_CANONICAL = {
+    c: 'c', h: 'c',
+    cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
+    cs: 'csharp',
+    css: 'css', scss: 'css',
+    dtd: 'dtd',
+    f: 'fortran', f90: 'fortran', f95: 'fortran', f03: 'fortran',
+    go: 'go',
+    html: 'html', htm: 'html',
+    java: 'java',
+    js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript', javascript: 'javascript',
+    json: 'json',
+    kt: 'kotlin', kts: 'kotlin',
+    md: 'markdown', mdx: 'markdown', markdown: 'markdown',
+    pas: 'pascal', dpr: 'pascal',
+    php: 'php',
+    py: 'python', pyw: 'python', pyi: 'python', python: 'python',
+    r: 'r', R: 'r',
+    rb: 'ruby', ruby: 'ruby',
+    rs: 'rust', rust: 'rust',
+    scala: 'scala',
+    groovy: 'groovy', gradle: 'groovy',
+    sol: 'solidity', solidity: 'solidity',
+    sql: 'sql',
+    swift: 'swift',
+    toml: 'toml',
+    ts: 'typescript', tsx: 'typescript', mts: 'typescript', cts: 'typescript', typescript: 'typescript',
+    xml: 'xml',
+    yaml: 'yaml', yml: 'yaml',
+};
+
 export function populateLanguageFilter(languages) {
     const select = document.getElementById('searchLanguage');
     const current = select.value;
     const options = ['<option value="">All</option>'];
     if (languages && languages.length > 0) {
-        const langs = [...languages].sort((a, b) => b.chunk_count - a.chunk_count);
-        for (const l of langs) {
-            options.push(`<option value="${escapeHtml(l.language)}">${escapeHtml(l.language)}</option>`);
+        // Group raw language_id values by canonical name
+        const grouped = {};
+        for (const l of languages) {
+            const canonical = EXTENSION_TO_CANONICAL[l.language] || l.language;
+            if (!grouped[canonical]) {
+                grouped[canonical] = { chunk_count: 0, file_count: 0 };
+            }
+            grouped[canonical].chunk_count += l.chunk_count || 0;
+            grouped[canonical].file_count += l.file_count || 0;
+        }
+        const sorted = Object.entries(grouped).sort((a, b) => b[1].chunk_count - a[1].chunk_count);
+        for (const [lang] of sorted) {
+            options.push(`<option value="${escapeHtml(lang)}">${escapeHtml(lang)}</option>`);
         }
     }
     select.innerHTML = options.join('');

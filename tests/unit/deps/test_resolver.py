@@ -4,6 +4,7 @@ from cocosearch.deps.models import DependencyEdge, DepType
 from cocosearch.deps.resolver import (
     GoResolver,
     JavaScriptResolver,
+    MarkdownResolver,
     PythonResolver,
     TerraformResolver,
     get_resolver,
@@ -357,6 +358,14 @@ class TestResolverRegistry:
     def test_terraform_resolver_registered(self):
         assert isinstance(get_resolver("terraform"), TerraformResolver)
 
+    def test_markdown_resolver_registered(self):
+        assert isinstance(get_resolver("md"), MarkdownResolver)
+        assert isinstance(get_resolver("mdx"), MarkdownResolver)
+
+    def test_md_variants_share_instance(self):
+        resolvers = get_resolvers()
+        assert resolvers["md"] is resolvers["mdx"]
+
 
 # ============================================================================
 # Helpers: Terraform edges
@@ -453,3 +462,276 @@ class TestTerraformResolverResolve:
         resolver = TerraformResolver()
         edge = _make_tf_edge("main.tf", "./nonexistent")
         assert resolver.resolve(edge, {}) is None
+
+
+# ============================================================================
+# Helpers: Markdown edges
+# ============================================================================
+
+
+def _make_md_edge(source_file, module, target_file=None):
+    return DependencyEdge(
+        source_file=source_file,
+        source_symbol=None,
+        target_file=target_file,
+        target_symbol=None,
+        dep_type=DepType.REFERENCE,
+        metadata={"kind": "doc_link", "module": module, "line": 1},
+    )
+
+
+# ============================================================================
+# Tests: MarkdownResolver.build_index
+# ============================================================================
+
+
+class TestMarkdownResolverBuildIndex:
+    """Tests for MarkdownResolver.build_index()."""
+
+    def test_indexes_all_file_types(self):
+        resolver = MarkdownResolver()
+        files = [
+            ("src/cli.py", "py"),
+            ("src/search/engine.py", "py"),
+            ("docs/guide.md", "md"),
+        ]
+        index = resolver.build_index(files)
+
+        assert "src/cli.py" in index
+        assert "src/search/engine.py" in index
+        assert "docs/guide.md" in index
+
+    def test_indexes_directories(self):
+        resolver = MarkdownResolver()
+        files = [("src/search/engine.py", "py")]
+        index = resolver.build_index(files)
+
+        assert "src/search" in index
+        assert "src/search/" in index
+
+    def test_first_file_wins_per_directory(self):
+        resolver = MarkdownResolver()
+        files = [
+            ("src/search/engine.py", "py"),
+            ("src/search/cache.py", "py"),
+        ]
+        index = resolver.build_index(files)
+
+        assert index["src/search"] == "src/search/engine.py"
+
+
+# ============================================================================
+# Tests: MarkdownResolver.resolve
+# ============================================================================
+
+
+class TestMarkdownResolverResolve:
+    """Tests for MarkdownResolver.resolve()."""
+
+    def test_resolves_project_relative_path(self):
+        resolver = MarkdownResolver()
+        module_index = {"src/cli.py": "src/cli.py"}
+        edge = _make_md_edge("docs/guide.md", "src/cli.py")
+        assert resolver.resolve(edge, module_index) == "src/cli.py"
+
+    def test_resolves_relative_path_parent(self):
+        resolver = MarkdownResolver()
+        module_index = {"src/cli.py": "src/cli.py"}
+        edge = _make_md_edge("docs/guide.md", "../src/cli.py")
+        assert resolver.resolve(edge, module_index) == "src/cli.py"
+
+    def test_resolves_dot_relative_path(self):
+        resolver = MarkdownResolver()
+        module_index = {"docs/other.md": "docs/other.md"}
+        edge = _make_md_edge("docs/guide.md", "./other.md")
+        assert resolver.resolve(edge, module_index) == "docs/other.md"
+
+    def test_resolves_directory_reference(self):
+        resolver = MarkdownResolver()
+        module_index = {
+            "src/search": "src/search/engine.py",
+            "src/search/": "src/search/engine.py",
+        }
+        edge = _make_md_edge("docs/guide.md", "src/search/")
+        assert resolver.resolve(edge, module_index) == "src/search/engine.py"
+
+    def test_unresolvable_path_returns_none(self):
+        resolver = MarkdownResolver()
+        edge = _make_md_edge("docs/guide.md", "nonexistent/file.py")
+        assert resolver.resolve(edge, {}) is None
+
+    def test_no_module_in_metadata_returns_none(self):
+        resolver = MarkdownResolver()
+        edge = DependencyEdge(
+            source_file="docs/guide.md",
+            source_symbol=None,
+            target_file=None,
+            target_symbol=None,
+            dep_type=DepType.REFERENCE,
+            metadata={"kind": "doc_link", "line": 1},
+        )
+        assert resolver.resolve(edge, {}) is None
+
+    def test_resolves_directory_without_trailing_slash(self):
+        resolver = MarkdownResolver()
+        module_index = {
+            "src/search": "src/search/engine.py",
+            "src/search/": "src/search/engine.py",
+        }
+        edge = _make_md_edge("docs/guide.md", "src/search")
+        assert resolver.resolve(edge, module_index) == "src/search/engine.py"
+
+
+# ============================================================================
+# Tests: MarkdownResolver.resolve_many
+# ============================================================================
+
+
+class TestMarkdownResolverResolveMany:
+    """Tests for MarkdownResolver.resolve_many() directory expansion."""
+
+    def test_directory_expands_to_all_files(self):
+        resolver = MarkdownResolver()
+        files = [
+            ("src/search/engine.py", "py"),
+            ("src/search/cache.py", "py"),
+            ("src/search/db.py", "py"),
+        ]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("docs/guide.md", "src/search/")
+        result = resolver.resolve_many(edge, index)
+        assert result is not None
+        assert set(result) == {
+            "src/search/engine.py",
+            "src/search/cache.py",
+            "src/search/db.py",
+        }
+
+    def test_directory_without_trailing_slash_expands(self):
+        resolver = MarkdownResolver()
+        files = [
+            ("src/search/engine.py", "py"),
+            ("src/search/cache.py", "py"),
+        ]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("docs/guide.md", "src/search")
+        result = resolver.resolve_many(edge, index)
+        assert result is not None
+        assert set(result) == {"src/search/engine.py", "src/search/cache.py"}
+
+    def test_file_reference_returns_single_element_list(self):
+        resolver = MarkdownResolver()
+        files = [("src/cli.py", "py")]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("docs/guide.md", "src/cli.py")
+        result = resolver.resolve_many(edge, index)
+        assert result == ["src/cli.py"]
+
+    def test_relative_directory_expands(self):
+        resolver = MarkdownResolver()
+        files = [
+            ("src/search/engine.py", "py"),
+            ("src/search/cache.py", "py"),
+        ]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("docs/guide.md", "../src/search/")
+        result = resolver.resolve_many(edge, index)
+        assert result is not None
+        assert set(result) == {"src/search/engine.py", "src/search/cache.py"}
+
+    def test_unresolvable_returns_none(self):
+        resolver = MarkdownResolver()
+        files = [("src/cli.py", "py")]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("docs/guide.md", "nonexistent/")
+        assert resolver.resolve_many(edge, index) is None
+
+    def test_no_module_returns_none(self):
+        resolver = MarkdownResolver()
+        index = resolver.build_index([("src/cli.py", "py")])
+        edge = DependencyEdge(
+            source_file="docs/guide.md",
+            source_symbol=None,
+            target_file=None,
+            target_symbol=None,
+            dep_type=DepType.REFERENCE,
+            metadata={"kind": "doc_link", "line": 1},
+        )
+        assert resolver.resolve_many(edge, index) is None
+
+    def test_does_not_include_subdirectory_files(self):
+        """Only direct children, not nested subdirectories."""
+        resolver = MarkdownResolver()
+        files = [
+            ("src/search/engine.py", "py"),
+            ("src/search/sub/deep.py", "py"),
+        ]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("docs/guide.md", "src/search/")
+        result = resolver.resolve_many(edge, index)
+        assert result is not None
+        # Only direct children of src/search, not src/search/sub/
+        assert set(result) == {"src/search/engine.py"}
+
+
+# ============================================================================
+# Tests: MarkdownResolver prefix probing (parent-directory indexing)
+# ============================================================================
+
+
+class TestMarkdownResolverPrefixProbing:
+    """Tests for ancestor-prefix probing when indexed from a parent directory."""
+
+    def test_resolves_project_relative_with_prefix(self):
+        """File at project/src/cli.py, markdown at project/docs/guide.md
+        referencing src/cli.py — should resolve via prefix probing."""
+        resolver = MarkdownResolver()
+        module_index = {"project/src/cli.py": "project/src/cli.py"}
+        edge = _make_md_edge("project/docs/guide.md", "src/cli.py")
+        assert resolver.resolve(edge, module_index) == "project/src/cli.py"
+
+    def test_resolves_directory_with_prefix(self):
+        """Directory at project/src/search/, markdown at project/docs/guide.md
+        referencing src/search/ — should resolve via prefix probing."""
+        resolver = MarkdownResolver()
+        module_index = {
+            "project/src/search": "project/src/search/engine.py",
+            "project/src/search/": "project/src/search/engine.py",
+        }
+        edge = _make_md_edge("project/docs/guide.md", "src/search/")
+        assert resolver.resolve(edge, module_index) == "project/src/search/engine.py"
+
+    def test_resolve_many_directory_with_prefix(self):
+        """resolve_many expands prefixed directory to all files."""
+        resolver = MarkdownResolver()
+        files = [
+            ("project/src/search/engine.py", "py"),
+            ("project/src/search/cache.py", "py"),
+        ]
+        index = resolver.build_index(files)
+        edge = _make_md_edge("project/docs/guide.md", "src/search/")
+        result = resolver.resolve_many(edge, index)
+        assert result is not None
+        assert set(result) == {
+            "project/src/search/engine.py",
+            "project/src/search/cache.py",
+        }
+
+    def test_prefix_not_applied_to_relative_paths(self):
+        """Relative paths (./  ../) should not use prefix probing."""
+        resolver = MarkdownResolver()
+        module_index = {"project/docs/other.md": "project/docs/other.md"}
+        # ./other.md normalises relative to source dir — no prefix needed
+        edge = _make_md_edge("project/docs/guide.md", "./other.md")
+        assert resolver.resolve(edge, module_index) == "project/docs/other.md"
+
+    def test_no_prefix_when_direct_match_exists(self):
+        """Direct match takes priority over prefixed match."""
+        resolver = MarkdownResolver()
+        module_index = {
+            "src/cli.py": "src/cli.py",
+            "project/src/cli.py": "project/src/cli.py",
+        }
+        edge = _make_md_edge("project/docs/guide.md", "src/cli.py")
+        # Direct match wins — no prefix probing needed
+        assert resolver.resolve(edge, module_index) == "src/cli.py"

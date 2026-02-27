@@ -228,7 +228,21 @@ get_file_impact(file="<renamed_file>", depth=1)
 
 Compare the impact list against the PR's changed files. Any dependent NOT in the PR is a potential missed update.
 
-- **Documentation:** If public API signatures changed, check if docs were updated.
+- **Documentation references:** For each changed source file, query documentation dependents:
+
+  ```
+  get_file_impact(file="<changed_source_file>", depth=1, dep_type="reference")
+  ```
+
+  Filter results for files ending in `.md` or `.mdx`. These are docs that reference
+  the changed code. If any doc file is NOT in the PR's changed file list, flag it:
+
+  "**Doc update needed:** `docs/architecture.md` references `src/cli.py`
+  (doc_link, line 42) but was not updated in this PR."
+
+  Include metadata.kind and metadata.line to help locate the specific reference.
+  If no dependency data exists (deps not extracted), fall back to the manual check:
+  "If public API signatures changed, check if docs were updated."
 
 ### Hub File Changes
 

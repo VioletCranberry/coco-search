@@ -134,6 +134,13 @@ LANGUAGE_ALIASES = {
     "sh": "bash",
 }
 
+# Auto-generate extension-based aliases (e.g., tsx -> typescript, py -> python)
+for _lang, _exts in LANGUAGE_EXTENSIONS.items():
+    for _ext in _exts:
+        _ext_name = _ext.lstrip(".")
+        if _ext_name != _lang and _ext_name not in LANGUAGE_ALIASES:
+            LANGUAGE_ALIASES[_ext_name] = _lang
+
 # Combined set of all recognized language names for validation/suggestions.
 # Alias keys are NOT included -- they are resolved before validation.
 # Grammar names (e.g., github-actions, docker-compose) are added lazily

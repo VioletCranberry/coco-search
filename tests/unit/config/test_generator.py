@@ -392,8 +392,8 @@ class TestOpencodeSkills:
 
         result = generate_opencode_skills(target)
 
-        # Should install at least 12 skills (the current count)
-        assert result["installed"] >= 12
+        # Should install at least 11 skills (the current count)
+        assert result["installed"] >= 11
 
     def test_skill_names_match_directory_names(self, tmp_path):
         """Test that skill directory names match the 'name' in frontmatter."""

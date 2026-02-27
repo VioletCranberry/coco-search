@@ -10,6 +10,9 @@ import conventions, so each resolver encapsulates language-specific logic:
   (``*.js``, ``*.ts``, ``*/index.*``).  Bare specifiers are external.
 - **GoResolver** — full import paths; matches internal packages by
   directory structure.  External packages are unresolvable.
+- **MarkdownResolver** — resolves documentation references to source files.
+  Handles relative paths (``../src/cli.py``) and project-relative paths.
+  Supports both file and directory references.
 
 The orchestrator in ``extractor.py`` calls :func:`get_resolvers` to obtain
 all registered resolvers, then dispatches edges by language.
@@ -55,6 +58,12 @@ class ModuleResolver(Protocol):
     1. Building an index from indexed files that maps some form of
        module identifier to relative file paths.
     2. Using that index to resolve individual dependency edges.
+
+    **Optional extension:** A resolver may also implement
+    ``resolve_many(edge, module_index) -> list[str] | None`` to support
+    one-to-many resolution (e.g., directory references expanding to all
+    contained files).  The orchestrator in ``extractor.py`` checks for
+    this via ``hasattr`` and prefers it over :meth:`resolve` when present.
     """
 
     def build_index(self, indexed_files: list[tuple[str, str]]) -> dict[str, str]:
@@ -363,6 +372,145 @@ class TerraformResolver:
 
 
 # ============================================================================
+# Markdown resolver
+# ============================================================================
+
+
+class MarkdownResolver:
+    """Resolve Markdown documentation references to file paths.
+
+    Handles relative paths (``../src/cli.py`` from ``docs/guide.md``)
+    and project-relative paths (``src/cli.py``).  Supports both file-level
+    and directory-level references.
+
+    Directory references are expanded to all files within the directory
+    via :meth:`resolve_many`, so that ``deps impact`` on any file in
+    a referenced directory surfaces the documentation.
+    """
+
+    def __init__(self) -> None:
+        self._dir_files: dict[str, list[str]] = {}
+
+    def build_index(self, indexed_files: list[tuple[str, str]]) -> dict[str, str]:
+        index: dict[str, str] = {}
+        dir_files: dict[str, list[str]] = {}
+
+        for filepath, _language_id in indexed_files:
+            filepath_posix = filepath.replace("\\", "/")
+            # Map each file path to itself
+            index[filepath_posix] = filepath
+
+            # Track all files per directory (for expand-on-resolve)
+            dir_path = str(PurePosixPath(filepath_posix).parent)
+            if dir_path != ".":
+                dir_files.setdefault(dir_path, []).append(filepath)
+                # Map directory to first file (for single-resolve fallback)
+                if dir_path not in index:
+                    index[dir_path] = filepath
+                    index[dir_path + "/"] = filepath
+
+        self._dir_files = dir_files
+        return index
+
+    def resolve(self, edge: DependencyEdge, module_index: dict[str, str]) -> str | None:
+        module = edge.metadata.get("module")
+        if not module:
+            return None
+
+        # Normalise: strip trailing / for lookup (we try both)
+        module_stripped = module.rstrip("/")
+
+        # Relative paths: normalise against source file's directory
+        if module.startswith("./") or module.startswith("../"):
+            candidate = self._normalize_relative(edge.source_file, module_stripped)
+            if candidate in module_index:
+                return module_index[candidate]
+            if candidate + "/" in module_index:
+                return module_index[candidate + "/"]
+            return None
+
+        # Project-relative paths: direct lookup, then ancestor-prefix probing
+        match = self._find_with_prefix(edge.source_file, module_stripped, module_index)
+        if match is not None:
+            return module_index[match]
+        match = self._find_with_prefix(
+            edge.source_file, module_stripped + "/", module_index
+        )
+        if match is not None:
+            return module_index[match]
+
+        return None
+
+    def resolve_many(
+        self, edge: DependencyEdge, module_index: dict[str, str]
+    ) -> list[str] | None:
+        """Resolve a single edge, potentially to multiple target files.
+
+        For directory references, returns all files within the directory.
+        For file references, returns a single-element list.
+
+        Returns:
+            List of resolved file paths, or ``None`` if unresolvable.
+        """
+        module = edge.metadata.get("module")
+        if not module:
+            return None
+
+        module_stripped = module.rstrip("/")
+
+        # Determine the normalised directory key
+        if module.startswith("./") or module.startswith("../"):
+            candidate = self._normalize_relative(edge.source_file, module_stripped)
+        else:
+            candidate = module_stripped
+
+        # Check for directory expansion (with ancestor-prefix probing)
+        dir_match = self._find_with_prefix(edge.source_file, candidate, self._dir_files)
+        if dir_match is not None:
+            return list(self._dir_files[dir_match])
+
+        # Fall back to single-file resolution
+        result = self.resolve(edge, module_index)
+        return [result] if result else None
+
+    @staticmethod
+    def _find_with_prefix(source_file: str, candidate: str, lookup: dict) -> str | None:
+        """Try candidate directly, then with source file ancestor prefixes."""
+        if candidate in lookup:
+            return candidate
+
+        source_posix = source_file.replace("\\", "/")
+        parts = PurePosixPath(source_posix).parts
+        # Try each ancestor (shallowest first: "project/", "project/sub/", ...)
+        for i in range(1, len(parts)):  # exclude filename
+            prefix = "/".join(parts[:i])
+            prefixed = f"{prefix}/{candidate}"
+            if prefixed in lookup:
+                return prefixed
+
+        return None
+
+    @staticmethod
+    def _normalize_relative(source_file: str, module_stripped: str) -> str:
+        """Normalize a relative path against the source file's directory."""
+        source_posix = source_file.replace("\\", "/")
+        source_dir = str(PurePosixPath(source_posix).parent)
+
+        if source_dir == ".":
+            candidate = module_stripped
+        else:
+            candidate = os.path.normpath(f"{source_dir}/{module_stripped}").replace(
+                "\\", "/"
+            )
+
+        # Strip leading ./
+        if candidate.startswith("./"):
+            candidate = candidate[2:]
+
+        return candidate
+
+
+# ============================================================================
 # Registry
 # ============================================================================
 
@@ -386,6 +534,10 @@ def _build_resolver_registry() -> dict[str, ModuleResolver]:
 
     tf = TerraformResolver()
     registry["terraform"] = tf
+
+    md = MarkdownResolver()
+    registry["md"] = md
+    registry["mdx"] = md
 
     return registry
 
