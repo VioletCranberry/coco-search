@@ -21,7 +21,15 @@ Reusable AI coding assistant skills that leverage CocoSearch's semantic and symb
 
 ## Installation
 
-### Claude Code Plugin (Recommended)
+### Automated (Recommended)
+
+```bash
+cocosearch init
+```
+
+The `init` command interactively offers to install skills to either project-local (`.opencode/skills/`) or global (`~/.config/opencode/skills/`) directories. It also handles MCP registration and CLAUDE.md/AGENTS.md setup.
+
+### Claude Code Plugin
 
 ```bash
 claude plugin marketplace add VioletCranberry/coco-search

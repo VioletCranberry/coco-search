@@ -17,6 +17,7 @@ from cocosearch.config import (
     generate_claude_md_routing,
     generate_config,
     generate_opencode_mcp_config,
+    generate_opencode_skills,
     install_claude_plugin,
 )
 
@@ -289,6 +290,125 @@ class TestOpencodeMcpConfig:
         command = config["mcp"]["cocosearch"]["command"]
         assert "--project-from-cwd" in command
         assert "uvx" == command[0]
+
+
+class TestOpencodeSkills:
+    """Tests for generate_opencode_skills."""
+
+    def test_installs_all_bundled_skills(self, tmp_path):
+        """Test that all bundled skills are installed to the target directory."""
+        target = tmp_path / "skills"
+
+        result = generate_opencode_skills(target)
+
+        assert result["installed"] > 0
+        assert result["skipped"] == 0
+        # Verify each installed skill has a SKILL.md
+        for skill_dir in sorted(target.iterdir()):
+            assert skill_dir.is_dir()
+            assert (skill_dir / "SKILL.md").exists()
+            assert skill_dir.name.startswith("cocosearch-")
+
+    def test_creates_target_directory(self, tmp_path):
+        """Test that it creates the target directory if it doesn't exist."""
+        target = tmp_path / "nested" / "dir" / "skills"
+
+        result = generate_opencode_skills(target)
+
+        assert target.exists()
+        assert result["installed"] > 0
+
+    def test_skips_existing_skills(self, tmp_path):
+        """Test that existing skills are not overwritten."""
+        target = tmp_path / "skills"
+
+        # First install
+        result1 = generate_opencode_skills(target)
+        installed_count = result1["installed"]
+
+        # Modify one skill to verify it's not overwritten
+        first_skill = sorted(target.iterdir())[0]
+        original_content = (first_skill / "SKILL.md").read_text()
+        (first_skill / "SKILL.md").write_text("custom content")
+
+        # Second install
+        result2 = generate_opencode_skills(target)
+
+        assert result2["installed"] == 0
+        assert result2["skipped"] == installed_count
+        # Verify the modified skill was not overwritten
+        assert (first_skill / "SKILL.md").read_text() == "custom content"
+
+    def test_installs_only_missing_skills(self, tmp_path):
+        """Test that only missing skills are installed when some already exist."""
+        target = tmp_path / "skills"
+
+        # First install all skills
+        result1 = generate_opencode_skills(target)
+        total = result1["installed"]
+        assert total > 1
+
+        # Remove one skill
+        skill_dirs = sorted(target.iterdir())
+        removed_name = skill_dirs[0].name
+        import shutil
+
+        shutil.rmtree(skill_dirs[0])
+
+        # Second install should install only the removed one
+        result2 = generate_opencode_skills(target)
+
+        assert result2["installed"] == 1
+        assert result2["skipped"] == total - 1
+        assert (target / removed_name / "SKILL.md").exists()
+
+    def test_skill_content_is_valid(self, tmp_path):
+        """Test that installed SKILL.md files have valid YAML frontmatter."""
+        target = tmp_path / "skills"
+
+        generate_opencode_skills(target)
+
+        for skill_dir in target.iterdir():
+            content = (skill_dir / "SKILL.md").read_text()
+            # Each SKILL.md should start with YAML frontmatter
+            assert content.startswith("---\n"), (
+                f"{skill_dir.name}/SKILL.md missing YAML frontmatter"
+            )
+            # Extract frontmatter
+            parts = content.split("---\n", 2)
+            assert len(parts) >= 3, (
+                f"{skill_dir.name}/SKILL.md has malformed frontmatter"
+            )
+            frontmatter = yaml.safe_load(parts[1])
+            assert "name" in frontmatter, (
+                f"{skill_dir.name}/SKILL.md missing 'name' in frontmatter"
+            )
+            assert "description" in frontmatter, (
+                f"{skill_dir.name}/SKILL.md missing 'description' in frontmatter"
+            )
+
+    def test_installs_expected_skill_count(self, tmp_path):
+        """Test that the expected number of skills are installed."""
+        target = tmp_path / "skills"
+
+        result = generate_opencode_skills(target)
+
+        # Should install at least 12 skills (the current count)
+        assert result["installed"] >= 12
+
+    def test_skill_names_match_directory_names(self, tmp_path):
+        """Test that skill directory names match the 'name' in frontmatter."""
+        target = tmp_path / "skills"
+
+        generate_opencode_skills(target)
+
+        for skill_dir in target.iterdir():
+            content = (skill_dir / "SKILL.md").read_text()
+            parts = content.split("---\n", 2)
+            frontmatter = yaml.safe_load(parts[1])
+            assert frontmatter["name"] == skill_dir.name, (
+                f"Directory '{skill_dir.name}' doesn't match frontmatter name '{frontmatter['name']}'"
+            )
 
 
 class TestClaudePluginDetection:

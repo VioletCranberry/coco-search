@@ -14,6 +14,7 @@ def _make_args(**kwargs):
         "no_claude_md": True,
         "no_agents_md": True,
         "no_opencode_mcp": True,
+        "no_opencode_skills": True,
         "no_claude_mcp": True,
     }
     defaults.update(kwargs)
@@ -695,3 +696,169 @@ def test_all_four_prompts_together(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "opencode.json").exists()
     captured = capsys.readouterr()
     assert "Installed CocoSearch plugin" in captured.out
+
+
+# --- OpenCode skills installation tests ---
+
+
+def test_skips_skills_prompt_with_no_opencode_skills_flag(tmp_path, monkeypatch):
+    """Test that --no-opencode-skills skips the skills installation prompt."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_opencode_skills=True)
+
+    with patch("builtins.input") as mock_input:
+        result = init_command(args)
+
+    assert result == 0
+    mock_input.assert_not_called()
+
+
+def test_user_accepts_local_opencode_skills(tmp_path, monkeypatch, capsys):
+    """Test that user choosing local installs skills to .opencode/skills/."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_opencode_skills=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    skills_dir = tmp_path / ".opencode" / "skills"
+    assert skills_dir.exists()
+    # At least one skill should be installed
+    skill_dirs = list(skills_dir.glob("cocosearch-*/SKILL.md"))
+    assert len(skill_dirs) > 0
+    captured = capsys.readouterr()
+    assert "Installed" in captured.out
+    assert "skill(s)" in captured.out
+
+
+def test_user_accepts_global_opencode_skills(tmp_path, monkeypatch, capsys):
+    """Test that user choosing global installs skills to ~/.config/opencode/skills/."""
+    monkeypatch.chdir(tmp_path)
+    fake_home = tmp_path / "fakehome"
+    args = _make_args(no_opencode_skills=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "2"]):
+            with patch("pathlib.Path.home", return_value=fake_home):
+                result = init_command(args)
+
+    assert result == 0
+    skills_dir = fake_home / ".config" / "opencode" / "skills"
+    assert skills_dir.exists()
+    skill_dirs = list(skills_dir.glob("cocosearch-*/SKILL.md"))
+    assert len(skill_dirs) > 0
+    captured = capsys.readouterr()
+    assert "Installed" in captured.out
+
+
+def test_user_declines_opencode_skills(tmp_path, monkeypatch):
+    """Test that user declining 'n' skips skills installation."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_opencode_skills=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", return_value="n"):
+            result = init_command(args)
+
+    assert result == 0
+    assert not (tmp_path / ".opencode" / "skills").exists()
+
+
+def test_invalid_opencode_skills_choice_skips_gracefully(tmp_path, monkeypatch, capsys):
+    """Test that invalid skills location choice skips without error."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_opencode_skills=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "3"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Invalid choice" in captured.out
+
+
+def test_opencode_skills_already_installed_shows_skipped(tmp_path, monkeypatch, capsys):
+    """Test that already-installed skills are reported as skipped."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_opencode_skills=False)
+
+    # Pre-install skills via the generator first
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            init_command(args)
+
+    # Run again — all skills should be skipped
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "already installed" in captured.out
+
+
+def test_opencode_skills_write_error_does_not_fail_command(
+    tmp_path, monkeypatch, capsys
+):
+    """Test that OSError on skills write still returns 0."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_opencode_skills=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            with patch(
+                "cocosearch.cli.generate_opencode_skills",
+                side_effect=OSError("Permission denied"),
+            ):
+                result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Warning" in captured.out
+    assert "Permission denied" in captured.out
+
+
+def test_all_five_prompts_together(tmp_path, monkeypatch, capsys):
+    """Test that all five prompts (CLAUDE.md, AGENTS.md, OpenCode MCP, OpenCode skills, Claude plugin) work together."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(
+        no_claude_md=False,
+        no_agents_md=False,
+        no_opencode_mcp=False,
+        no_opencode_skills=False,
+        no_claude_mcp=False,
+    )
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        # CLAUDE.md (y, 1), AGENTS.md (y, 1), OpenCode MCP (y, 1), OpenCode skills (y, 1), Claude plugin (y)
+        with patch(
+            "builtins.input",
+            side_effect=["y", "1", "y", "1", "y", "1", "y", "1", "y"],
+        ):
+            with patch(
+                "cocosearch.cli.check_claude_plugin_installed", return_value=False
+            ):
+                with patch(
+                    "cocosearch.cli.install_claude_plugin", return_value="installed"
+                ):
+                    result = init_command(args)
+
+    assert result == 0
+    assert (tmp_path / "CLAUDE.md").exists()
+    assert (tmp_path / "AGENTS.md").exists()
+    assert (tmp_path / "opencode.json").exists()
+    assert (tmp_path / ".opencode" / "skills").exists()
+    captured = capsys.readouterr()
+    assert "Installed CocoSearch plugin" in captured.out
+    assert "skill(s)" in captured.out

@@ -72,6 +72,7 @@ uv run cocosearch init                   # Initialize cocosearch.yaml + optional
 uv run cocosearch init --no-claude-md    # Initialize without CLAUDE.md prompt
 uv run cocosearch init --no-agents-md    # Initialize without AGENTS.md prompt
 uv run cocosearch init --no-opencode-mcp # Initialize without OpenCode MCP registration prompt
+uv run cocosearch init --no-opencode-skills # Initialize without OpenCode skills installation prompt
 uv run cocosearch init --no-claude-mcp   # Initialize without Claude Code plugin prompt
 uv run cocosearch config show
 uv run cocosearch config path

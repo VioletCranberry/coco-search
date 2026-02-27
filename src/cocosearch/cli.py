@@ -31,6 +31,7 @@ from cocosearch.config import (
     generate_claude_md_routing,
     generate_config,
     generate_opencode_mcp_config,
+    generate_opencode_skills,
     install_claude_plugin,
     load_config as load_project_config,
 )
@@ -1560,6 +1561,48 @@ def init_command(args: argparse.Namespace) -> int:
                         f"[yellow]Warning:[/yellow] Could not update {target}: {e}"
                     )
 
+    # Offer to install CocoSearch workflow skills for OpenCode
+    no_opencode_skills = getattr(args, "no_opencode_skills", False)
+    if not no_opencode_skills:
+        console.print()
+        response = input("Install CocoSearch workflow skills for OpenCode? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print("  [cyan]1[/cyan]  Project .opencode/skills/ (default)")
+            console.print("  [cyan]2[/cyan]  Global ~/.config/opencode/skills/")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
+
+            if choice == "1":
+                target = Path.cwd() / ".opencode" / "skills"
+            elif choice == "2":
+                target = Path.home() / ".config" / "opencode" / "skills"
+            else:
+                console.print(
+                    "[dim]Invalid choice, skipping skills installation.[/dim]"
+                )
+                target = None
+
+            if target:
+                try:
+                    result = generate_opencode_skills(target)
+                    installed = result["installed"]
+                    skipped = result["skipped"]
+                    if installed > 0:
+                        console.print(
+                            f"[green]Installed {installed} skill(s) to {target}[/green]"
+                        )
+                    if skipped > 0:
+                        console.print(
+                            f"[dim]{skipped} skill(s) already installed, skipped.[/dim]"
+                        )
+                    if installed == 0 and skipped > 0:
+                        console.print("[dim]All skills already installed.[/dim]")
+                except OSError as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not install skills: {e}"
+                    )
+
     # Offer to install CocoSearch plugin for Claude Code
     no_claude_mcp = getattr(args, "no_claude_mcp", False)
     if not no_claude_mcp:
@@ -2604,6 +2647,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Skip the OpenCode MCP server registration prompt",
+    )
+    init_parser.add_argument(
+        "--no-opencode-skills",
+        action="store_true",
+        default=False,
+        help="Skip the OpenCode workflow skills installation prompt",
     )
     init_parser.add_argument(
         "--no-claude-mcp",

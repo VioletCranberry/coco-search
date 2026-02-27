@@ -16,6 +16,7 @@ from .generator import (
     generate_claude_md_routing,
     generate_config,
     generate_opencode_mcp_config,
+    generate_opencode_skills,
     install_claude_plugin,
 )
 from .loader import find_config_file, load_config
@@ -46,6 +47,7 @@ __all__ = [
     "generate_claude_md_routing",
     "generate_agents_md_routing",
     "generate_opencode_mcp_config",
+    "generate_opencode_skills",
     "check_claude_plugin_installed",
     "install_claude_plugin",
     "CONFIG_TEMPLATE",

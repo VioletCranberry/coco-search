@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from importlib.resources import files
 from pathlib import Path
 
 from .schema import ConfigError
@@ -281,3 +282,58 @@ def install_claude_plugin() -> str:
         )
 
     return "installed"
+
+
+def _get_bundled_skills() -> dict[str, str]:
+    """Discover bundled SKILL.md files from the cocosearch.skills package.
+
+    Returns:
+        Dict mapping skill name to SKILL.md content.
+    """
+    skills_pkg = files("cocosearch.skills")
+    skills: dict[str, str] = {}
+
+    for item in skills_pkg.iterdir():
+        if not item.name.startswith("cocosearch-"):
+            continue
+        skill_md = item / "SKILL.md"
+        if skill_md.is_file():
+            skills[item.name] = skill_md.read_text()
+
+    return skills
+
+
+def generate_opencode_skills(target_dir: Path) -> dict[str, int]:
+    """Install CocoSearch workflow skills into an OpenCode discovery directory.
+
+    Copies bundled SKILL.md files into the target directory (e.g.,
+    ``.opencode/skills/`` or ``~/.config/opencode/skills/``). Each skill
+    is placed in its own subdirectory matching the skill name.
+
+    Skills that already exist at the target are skipped.
+
+    Args:
+        target_dir: Directory where skills should be installed
+            (e.g., ``<project>/.opencode/skills`` or
+            ``~/.config/opencode/skills``).
+
+    Returns:
+        Dict with ``installed`` and ``skipped`` counts.
+    """
+    bundled = _get_bundled_skills()
+    installed = 0
+    skipped = 0
+
+    for name, content in sorted(bundled.items()):
+        skill_dir = target_dir / name
+        skill_file = skill_dir / "SKILL.md"
+
+        if skill_file.exists():
+            skipped += 1
+            continue
+
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        skill_file.write_text(content)
+        installed += 1
+
+    return {"installed": installed, "skipped": skipped}
