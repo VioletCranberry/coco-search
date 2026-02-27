@@ -72,9 +72,9 @@ class TestDockerfileLanguage:
                 instructions_index = i
         assert from_index is not None, "FROM separator not found"
         assert instructions_index is not None, "Instructions separator not found"
-        assert (
-            from_index < instructions_index
-        ), "FROM should be higher priority (lower index) than instructions"
+        assert from_index < instructions_index, (
+            "FROM should be higher priority (lower index) than instructions"
+        )
 
     def test_no_lookaheads_in_separators(self):
         """Dockerfile separators must not contain lookahead or lookbehind patterns."""
@@ -136,18 +136,18 @@ class TestAllSeparatorsNoLookaheads:
         """All separators across all languages must use standard Rust regex only."""
         for lang in HANDLER_CUSTOM_LANGUAGES:
             for sep in lang.separators_regex:
-                assert (
-                    "(?=" not in sep
-                ), f"Lookahead (?=) found in {lang.language_name} separator: {sep}"
-                assert (
-                    "(?<=" not in sep
-                ), f"Lookbehind (?<=) found in {lang.language_name} separator: {sep}"
-                assert (
-                    "(?!" not in sep
-                ), f"Negative lookahead (?!) found in {lang.language_name} separator: {sep}"
-                assert (
-                    "(?<!" not in sep
-                ), f"Negative lookbehind (?<!) found in {lang.language_name} separator: {sep}"
+                assert "(?=" not in sep, (
+                    f"Lookahead (?=) found in {lang.language_name} separator: {sep}"
+                )
+                assert "(?<=" not in sep, (
+                    f"Lookbehind (?<=) found in {lang.language_name} separator: {sep}"
+                )
+                assert "(?!" not in sep, (
+                    f"Negative lookahead (?!) found in {lang.language_name} separator: {sep}"
+                )
+                assert "(?<!" not in sep, (
+                    f"Negative lookbehind (?<!) found in {lang.language_name} separator: {sep}"
+                )
 
     def test_all_separators_are_valid_python_regex(self):
         """All separators should compile as valid Python regex (subset of Rust regex)."""

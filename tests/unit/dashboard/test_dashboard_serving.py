@@ -97,9 +97,9 @@ class TestStaticFileServing:
     async def test_all_js_modules_return_200(self, client, module):
         """Each JS module file returns 200."""
         response = await client.get(f"/static/js/{module}")
-        assert (
-            response.status_code == 200
-        ), f"/static/js/{module} returned {response.status_code}"
+        assert response.status_code == 200, (
+            f"/static/js/{module} returned {response.status_code}"
+        )
 
     @pytest.mark.asyncio
     async def test_path_traversal_blocked(self, client):
@@ -131,9 +131,9 @@ class TestDashboardStaticIntegration:
         assert len(hrefs) > 0, "No CSS references found in HTML"
         for href in hrefs:
             css_response = await client.get(href)
-            assert (
-                css_response.status_code == 200
-            ), f"{href} returned {css_response.status_code}"
+            assert css_response.status_code == 200, (
+                f"{href} returned {css_response.status_code}"
+            )
 
     @pytest.mark.asyncio
     async def test_all_js_references_in_html_resolve(self, client):
@@ -143,6 +143,6 @@ class TestDashboardStaticIntegration:
         assert len(srcs) > 0, "No JS references found in HTML"
         for src in srcs:
             js_response = await client.get(src)
-            assert (
-                js_response.status_code == 200
-            ), f"{src} returned {js_response.status_code}"
+            assert js_response.status_code == 200, (
+                f"{src} returned {js_response.status_code}"
+            )

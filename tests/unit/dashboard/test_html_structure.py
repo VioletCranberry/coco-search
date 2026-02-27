@@ -17,9 +17,9 @@ def test_required_ids_exist(soup, referenced_ids):
     html_ids = {tag["id"] for tag in soup.find_all(id=True)}
 
     missing = referenced_ids - html_ids
-    assert (
-        not missing
-    ), f"JS references these element IDs that don't exist in HTML: {sorted(missing)}"
+    assert not missing, (
+        f"JS references these element IDs that don't exist in HTML: {sorted(missing)}"
+    )
 
 
 def test_js_files_exist(soup):
@@ -76,9 +76,9 @@ def test_no_inline_script_blocks(soup):
     for script in soup.find_all("script"):
         if script.string and script.string.strip():
             # Allow CDN scripts that might have inline fallbacks
-            assert (
-                False
-            ), f"Found inline <script> block with content: {script.string[:80]}..."
+            assert False, (
+                f"Found inline <script> block with content: {script.string[:80]}..."
+            )
 
 
 def test_no_inline_style_blocks(soup):
@@ -94,9 +94,9 @@ def test_app_js_is_module(soup):
     """The app.js script tag must use type='module'."""
     app_scripts = [s for s in soup.find_all("script", src=True) if "app.js" in s["src"]]
     assert len(app_scripts) == 1, "Expected exactly one app.js script tag"
-    assert (
-        app_scripts[0].get("type") == "module"
-    ), "app.js must be loaded as type='module'"
+    assert app_scripts[0].get("type") == "module", (
+        "app.js must be loaded as type='module'"
+    )
 
 
 def test_css_file_not_empty():
@@ -171,6 +171,6 @@ def test_deps_graph_depth_selector_exists(soup):
     assert select is not None, "Missing #depsGraphDepth select element"
     options = select.find_all("option")
     values = [opt.get("value") for opt in options]
-    assert (
-        "1" in values and "3" in values
-    ), f"Expected depth options 1 and 3, got {values}"
+    assert "1" in values and "3" in values, (
+        f"Expected depth options 1 and 3, got {values}"
+    )

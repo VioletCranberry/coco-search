@@ -62,9 +62,9 @@ class TestHclHandlerSeparatorSpec:
             assert "(?=" not in sep, f"Lookahead found in HCL separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in HCL separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found in HCL separator: {sep}"
-            assert (
-                "(?<!" not in sep
-            ), f"Negative lookbehind found in HCL separator: {sep}"
+            assert "(?<!" not in sep, (
+                f"Negative lookbehind found in HCL separator: {sep}"
+            )
 
 
 @pytest.mark.unit

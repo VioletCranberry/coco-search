@@ -40,12 +40,12 @@ class TestScalaHandlerSeparatorSpec:
         for sep in handler.SEPARATOR_SPEC.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Scala separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Scala separator: {sep}"
-            assert (
-                "(?!" not in sep
-            ), f"Negative lookahead found in Scala separator: {sep}"
-            assert (
-                "(?<!" not in sep
-            ), f"Negative lookbehind found in Scala separator: {sep}"
+            assert "(?!" not in sep, (
+                f"Negative lookahead found in Scala separator: {sep}"
+            )
+            assert "(?<!" not in sep, (
+                f"Negative lookbehind found in Scala separator: {sep}"
+            )
 
 
 @pytest.mark.unit

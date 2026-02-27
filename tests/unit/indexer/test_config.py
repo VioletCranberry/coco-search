@@ -64,9 +64,9 @@ class TestHandlerPatterns:
         config = IndexingConfig()
         existing = ["*.py", "*.js", "*.ts", "*.go", "*.rs", "*.java", "*.rb"]
         for pattern in existing:
-            assert (
-                pattern in config.include_patterns
-            ), f"Existing pattern '{pattern}' missing after handler additions"
+            assert pattern in config.include_patterns, (
+                f"Existing pattern '{pattern}' missing after handler additions"
+            )
 
 
 class TestLoadConfig:
