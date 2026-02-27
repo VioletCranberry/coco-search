@@ -16,7 +16,6 @@ from cocosearch.search.query import (
     validate_language_filter,
 )
 
-
 # Note: Module state reset is now handled by reset_search_module_state fixture
 # in tests/fixtures/db.py which is an autouse fixture.
 

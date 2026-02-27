@@ -86,9 +86,9 @@ class TestTerraformSeparatorSpec:
             "check",
         ]
         for keyword in expected_keywords:
-            assert keyword in level1, (
-                f"Missing Terraform keyword '{keyword}' in Level 1 separator"
-            )
+            assert (
+                keyword in level1
+            ), f"Missing Terraform keyword '{keyword}' in Level 1 separator"
 
     def test_has_nested_block_separator(self):
         """Level 2 separator should match nested block openings."""

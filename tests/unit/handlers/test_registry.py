@@ -25,9 +25,9 @@ class TestHandlerRegistryDiscovery:
         """_template.py should be excluded from discovery."""
         # No extension starting with underscore should be in registry
         for ext in _HANDLER_REGISTRY.keys():
-            assert not ext.startswith("_"), (
-                f"Template extension {ext} should not be registered"
-            )
+            assert not ext.startswith(
+                "_"
+            ), f"Template extension {ext} should not be registered"
 
     def test_hcl_extensions_registered(self):
         """.hcl should be in registry (.tf/.tfvars handled by Terraform grammar)."""
@@ -161,9 +161,9 @@ class TestTextHandlerNotInRegistry:
         """TextHandler should not be registered for any extension."""
         # No extension should map to TextHandler in registry
         for ext, handler in _HANDLER_REGISTRY.items():
-            assert not isinstance(handler, TextHandler), (
-                f"TextHandler should not be in registry, found at {ext}"
-            )
+            assert not isinstance(
+                handler, TextHandler
+            ), f"TextHandler should not be in registry, found at {ext}"
 
     def test_text_handler_used_as_fallback(self):
         """TextHandler should be used as fallback via get_handler()."""

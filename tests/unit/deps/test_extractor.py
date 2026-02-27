@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from cocosearch.deps.models import DepType
 
-
 # ============================================================================
 # Tests: get_indexed_files
 # ============================================================================

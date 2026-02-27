@@ -72,8 +72,7 @@ class TerraformHandler:
 
     # Match nested blocks (2+ space indented identifier + optional label + brace)
     _NESTED_BLOCK_RE = re.compile(
-        r"^\s{2,}([a-z_][a-z0-9_]*)"
-        r'(?:\s+"([^"]*)")?\s*\{',
+        r"^\s{2,}([a-z_][a-z0-9_]*)" r'(?:\s+"([^"]*)")?\s*\{',
     )
 
     # Match attribute assignments (identifier = value)

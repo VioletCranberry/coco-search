@@ -35,9 +35,7 @@ def _row_to_edge(row: tuple) -> DependencyEdge:
     metadata = (
         metadata_json
         if isinstance(metadata_json, dict)
-        else json.loads(metadata_json)
-        if metadata_json is not None
-        else {}
+        else json.loads(metadata_json) if metadata_json is not None else {}
     )
     return DependencyEdge(
         source_file=source_file,

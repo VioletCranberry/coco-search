@@ -47,12 +47,12 @@ class TestBashHandlerSeparatorSpec:
         for sep in handler.SEPARATOR_SPEC.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Bash separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Bash separator: {sep}"
-            assert "(?!" not in sep, (
-                f"Negative lookahead found in Bash separator: {sep}"
-            )
-            assert "(?<!" not in sep, (
-                f"Negative lookbehind found in Bash separator: {sep}"
-            )
+            assert (
+                "(?!" not in sep
+            ), f"Negative lookahead found in Bash separator: {sep}"
+            assert (
+                "(?<!" not in sep
+            ), f"Negative lookbehind found in Bash separator: {sep}"
 
 
 @pytest.mark.unit

@@ -45,12 +45,12 @@ class TestGroovyHandlerSeparatorSpec:
         for sep in handler.SEPARATOR_SPEC.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Groovy separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Groovy separator: {sep}"
-            assert "(?!" not in sep, (
-                f"Negative lookahead found in Groovy separator: {sep}"
-            )
-            assert "(?<!" not in sep, (
-                f"Negative lookbehind found in Groovy separator: {sep}"
-            )
+            assert (
+                "(?!" not in sep
+            ), f"Negative lookahead found in Groovy separator: {sep}"
+            assert (
+                "(?<!" not in sep
+            ), f"Negative lookbehind found in Groovy separator: {sep}"
 
 
 @pytest.mark.unit

@@ -380,16 +380,16 @@ def search_command(args: argparse.Namespace) -> int:
     # Resolve search settings with precedence
     limit, _ = resolver.resolve(
         "search.resultLimit",
-        cli_value=args.limit
-        if args.limit != 10
-        else None,  # Only use CLI if not default
+        cli_value=(
+            args.limit if args.limit != 10 else None
+        ),  # Only use CLI if not default
         env_var="COCOSEARCH_SEARCH_RESULT_LIMIT",
     )
     min_score, _ = resolver.resolve(
         "search.minScore",
-        cli_value=args.min_score
-        if args.min_score != 0.3
-        else None,  # Only use CLI if not default
+        cli_value=(
+            args.min_score if args.min_score != 0.3 else None
+        ),  # Only use CLI if not default
         env_var="COCOSEARCH_SEARCH_MIN_SCORE",
     )
 
@@ -936,9 +936,7 @@ def format_parse_failures(failures: list[dict], console: Console) -> None:
         status_style = (
             "red"
             if f["parse_status"] == "error"
-            else "yellow"
-            if f["parse_status"] == "partial"
-            else "dim"
+            else "yellow" if f["parse_status"] == "partial" else "dim"
         )
         table.add_row(
             f["file_path"],
@@ -1486,9 +1484,7 @@ def init_command(args: argparse.Namespace) -> int:
     no_agents_md = getattr(args, "no_agents_md", False)
     if not no_agents_md:
         console.print()
-        response = input(
-            "Add CocoSearch tool routing to AGENTS.md (for OpenCode)? [y/N] "
-        )
+        response = input("Add CocoSearch tool routing to AGENTS.md? [y/N] ")
         if response.lower() == "y":
             console.print()
             console.print("  [cyan]1[/cyan]  Local project AGENTS.md (default)")

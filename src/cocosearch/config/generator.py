@@ -116,7 +116,9 @@ def generate_claude_md_routing(path: Path) -> str:
         "appended" if the section was appended to an existing file,
         "skipped" if the section already exists.
     """
-    return _append_routing_section(path, CLAUDE_MD_DUPLICATE_MARKER, CLAUDE_MD_ROUTING_SECTION)
+    return _append_routing_section(
+        path, CLAUDE_MD_DUPLICATE_MARKER, CLAUDE_MD_ROUTING_SECTION
+    )
 
 
 def generate_agents_md_routing(path: Path) -> str:
@@ -130,4 +132,6 @@ def generate_agents_md_routing(path: Path) -> str:
         "appended" if the section was appended to an existing file,
         "skipped" if the section already exists.
     """
-    return _append_routing_section(path, CLAUDE_MD_DUPLICATE_MARKER, CLAUDE_MD_ROUTING_SECTION)
+    return _append_routing_section(
+        path, CLAUDE_MD_DUPLICATE_MARKER, CLAUDE_MD_ROUTING_SECTION
+    )

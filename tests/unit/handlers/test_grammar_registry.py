@@ -38,16 +38,16 @@ class TestGrammarRegistryDiscovery:
     def test_all_grammars_have_base_language(self):
         """All grammars should declare a BASE_LANGUAGE."""
         for handler in _GRAMMAR_REGISTRY:
-            assert handler.BASE_LANGUAGE, (
-                f"Grammar {handler.GRAMMAR_NAME} missing BASE_LANGUAGE"
-            )
+            assert (
+                handler.BASE_LANGUAGE
+            ), f"Grammar {handler.GRAMMAR_NAME} missing BASE_LANGUAGE"
 
     def test_all_grammars_have_path_patterns(self):
         """All grammars should declare PATH_PATTERNS."""
         for handler in _GRAMMAR_REGISTRY:
-            assert len(handler.PATH_PATTERNS) > 0, (
-                f"Grammar {handler.GRAMMAR_NAME} missing PATH_PATTERNS"
-            )
+            assert (
+                len(handler.PATH_PATTERNS) > 0
+            ), f"Grammar {handler.GRAMMAR_NAME} missing PATH_PATTERNS"
 
     def test_template_excluded_from_discovery(self):
         """_template.py should be excluded from grammar discovery."""

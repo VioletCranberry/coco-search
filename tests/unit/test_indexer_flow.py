@@ -26,14 +26,14 @@ class TestFlowContentText:
         source = inspect.getsource(create_code_index_flow)
 
         # Verify content_text is collected
-        assert "content_text=" in source, (
-            "Flow should collect content_text field for keyword search"
-        )
+        assert (
+            "content_text=" in source
+        ), "Flow should collect content_text field for keyword search"
 
         # Verify it receives chunk text (not transformed)
-        assert 'content_text=chunk["text"]' in source, (
-            "content_text should receive raw chunk text"
-        )
+        assert (
+            'content_text=chunk["text"]' in source
+        ), "content_text should receive raw chunk text"
 
     def test_flow_has_hybrid_search_documentation(self):
         """Verify flow documents content_text purpose for maintainability."""
@@ -46,9 +46,9 @@ class TestFlowContentText:
             or "bm25" in source.lower()
         )
 
-        assert has_hybrid_comment, (
-            "Flow should document content_text purpose for hybrid/keyword search"
-        )
+        assert (
+            has_hybrid_comment
+        ), "Flow should document content_text purpose for hybrid/keyword search"
 
     def test_flow_collects_all_required_fields(self):
         """Verify flow collects all fields needed for search functionality."""

@@ -7,7 +7,6 @@ from cocosearch.deps.registry import (
     get_registered_extractors,
 )
 
-
 # ============================================================================
 # Test helpers: valid and invalid extractor-like classes
 # ============================================================================
