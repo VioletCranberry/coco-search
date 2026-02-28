@@ -22,14 +22,25 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
 3. `index_stats(index_name="<configured-name>")` to check freshness
    - No index → offer to index before reviewing. Review without search data misses the value of this skill.
    - Stale (>7 days) → warn: "Index is X days old -- blast radius analysis may not reflect recent changes. Want me to reindex first?"
-4. Parse the PR/MR URL to detect platform:
+4. Check dependency freshness — call `get_file_dependencies` on any known file (e.g., the first changed file from the PR):
+
+   ```
+   get_file_dependencies(file="<any-known-file>", depth=1)
+   ```
+
+   - **If response contains `warnings`** with type `deps_outdated` or `deps_branch_drift`:
+     Warn: "Dependency data is outdated — blast radius analysis may be incomplete. Want me to re-extract dependencies first? (`index_codebase` with `extract_deps=True`)"
+   - **If response contains `warnings`** with type `deps_not_extracted`:
+     Warn: "No dependency data found. Blast radius and impact analysis will be limited to search-only. Want me to extract dependencies first?"
+   - **If no warnings:** Proceed normally.
+5. Parse the PR/MR URL to detect platform:
    - `github.com/{owner}/{repo}/pull/{number}` → GitHub
    - `{host}/{group}/{project}/-/merge_requests/{iid}` → GitLab (self-hosted or gitlab.com)
    - If no URL provided, ask: "Which PR/MR should I review? Paste the URL."
-5. Verify auth token:
+6. Verify auth token:
    - **GitHub:** Check `GITHUB_TOKEN` env var exists. If missing: "Set `GITHUB_TOKEN` to access the GitHub API. You can create one at https://github.com/settings/tokens (needs `repo` scope for private repos, no scope needed for public repos)."
    - **GitLab:** Check `GITLAB_TOKEN` env var exists. If missing: "Set `GITLAB_TOKEN` to access the GitLab API. You can create one at `https://{host}/-/user_settings/personal_access_tokens` (needs `read_api` scope)."
-6. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
+7. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
 
 ## Step 1: Fetch PR/MR Data
 

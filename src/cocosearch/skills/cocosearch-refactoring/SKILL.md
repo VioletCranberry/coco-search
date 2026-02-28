@@ -16,6 +16,18 @@ A systematic workflow for safe code refactoring. This skill guides you through c
 3. `index_stats(index_name="<configured-name>")` to check freshness
 - No index → indexing is REQUIRED. Refactoring needs 100% accurate dependency data.
 - Stale (>7 days) → **strongly recommend reindexing**. Stale data can miss critical dependencies.
+4. Check dependency freshness — call `get_file_dependencies` on the target file (or any known file):
+
+   ```
+   get_file_dependencies(file="<target-file>", depth=1)
+   ```
+
+   - **If response contains `warnings`** with type `deps_outdated` or `deps_branch_drift`:
+     **Strongly recommend re-extracting.** Refactoring on stale dependency data risks missing affected files.
+     "Dependency data is outdated. I strongly recommend re-extracting before proceeding. Want me to run dependency extraction? (`index_codebase` with `extract_deps=True`)"
+   - **If response contains `warnings`** with type `deps_not_extracted`:
+     "No dependency data found. I'll fall back to search-based impact analysis, but dependency data provides more reliable coverage. Want me to extract dependencies first?"
+   - **If no warnings:** Proceed with dependency-based impact analysis.
 
 ## Step 1: Understand the Refactoring Goal
 

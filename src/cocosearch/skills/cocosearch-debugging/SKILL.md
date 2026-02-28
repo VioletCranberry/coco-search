@@ -12,6 +12,17 @@ description: Use when debugging an error, unexpected behavior, or tracing how co
 3. `index_stats(index_name="<configured-name>")` to check freshness
 - No index → offer to index before debugging
 - Stale (>7 days) → warn: "Index is X days old -- results may not reflect recent changes. Want me to reindex first?"
+4. Check dependency freshness — call `get_file_dependencies` on any known file from the error context:
+
+   ```
+   get_file_dependencies(file="<file-from-error>", depth=1)
+   ```
+
+   - **If response contains `warnings`** with type `deps_outdated` or `deps_branch_drift`:
+     Warn: "Dependency data is outdated — call chain tracing may be incomplete. Want me to re-extract dependencies first?"
+   - **If response contains `warnings`** with type `deps_not_extracted`:
+     Note: "No dependency data found. I'll use search-based call tracing instead. Dependency data can improve tracing accuracy — want me to extract dependencies?"
+   - **If no warnings:** Proceed normally (use dependency Fast Path when applicable).
 
 ## Step 1: Understand the Symptom
 
