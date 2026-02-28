@@ -18,64 +18,230 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
 ## Pre-flight Check
 
 1. Read `cocosearch.yaml` for `indexName` (critical -- use this for all operations)
-2. `list_indexes()` to confirm project is indexed
-3. `index_stats(index_name="<configured-name>")` to check freshness
-   - No index → offer to index before reviewing. Review without search data misses the value of this skill.
-   - Stale (>7 days) → warn: "Index is X days old -- blast radius analysis may not reflect recent changes. Want me to reindex first?"
-4. Parse the PR/MR URL to detect platform:
-   - `github.com/{owner}/{repo}/pull/{number}` → GitHub
-   - `{host}/{group}/{project}/-/merge_requests/{iid}` → GitLab (self-hosted or gitlab.com)
+2. **Inventory API tokens.** Check which tokens are available before anything else:
+
+   ```bash
+   python3 -c "
+   import os
+   tokens = {
+       'GITHUB_TOKEN': bool(os.environ.get('GITHUB_TOKEN')),
+       'GH_TOKEN': bool(os.environ.get('GH_TOKEN')),
+       'GITLAB_TOKEN': bool(os.environ.get('GITLAB_TOKEN')),
+       'GITLAB_PAT': bool(os.environ.get('GITLAB_PAT')),
+   }
+   found = [k for k, v in tokens.items() if v]
+   print(f'Available tokens: {found if found else \"none\"}')"
+   ```
+
+   Record what's available. If nothing found, warn early: "No API tokens detected -- will need one after determining platform."
+
+3. `list_indexes()` to confirm project is indexed
+4. `index_stats(index_name="<configured-name>")` to check freshness
+   - No index -> offer to index before reviewing. Review without search data misses the value of this skill.
+   - Stale (>7 days) -> warn: "Index is X days old -- blast radius analysis may not reflect recent changes. Want me to reindex first?"
+5. Check dependency freshness -- call `get_file_dependencies` on any known file (e.g., the first changed file from the PR):
+
+   ```
+   get_file_dependencies(file="<any-known-file>", depth=1)
+   ```
+
+   - **If response contains `warnings`** with type `deps_outdated` or `deps_branch_drift`:
+     Warn: "Dependency data is outdated -- blast radius analysis may be incomplete. Want me to re-extract dependencies first? (`index_codebase` with `extract_deps=True`)"
+   - **If response contains `warnings`** with type `deps_not_extracted`:
+     Warn: "No dependency data found. Blast radius and impact analysis will be limited to search-only. Want me to extract dependencies first?"
+   - **If no warnings:** Proceed normally.
+6. Parse the PR/MR URL to detect platform:
+   - `github.com/{owner}/{repo}/pull/{number}` -> GitHub
+   - `{host}/{group}/{project}/-/merge_requests/{iid}` -> GitLab (self-hosted or gitlab.com)
    - If no URL provided, ask: "Which PR/MR should I review? Paste the URL."
-5. Verify auth token:
-   - **GitHub:** Check `GITHUB_TOKEN` env var exists. If missing: "Set `GITHUB_TOKEN` to access the GitHub API. You can create one at https://github.com/settings/tokens (needs `repo` scope for private repos, no scope needed for public repos)."
-   - **GitLab:** Check `GITLAB_TOKEN` env var exists. If missing: "Set `GITLAB_TOKEN` to access the GitLab API. You can create one at `https://{host}/-/user_settings/personal_access_tokens` (needs `read_api` scope)."
-6. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
+7. **Match platform to tokens:**
+   - **GitHub:** prefer `GITHUB_TOKEN` over `GH_TOKEN`. If neither set: "Set `GITHUB_TOKEN` (or `GH_TOKEN`) to access the GitHub API. Create one at https://github.com/settings/tokens (needs `repo` scope for private repos, no scope needed for public repos)." Stop.
+   - **GitLab:** prefer `GITLAB_TOKEN` over `GITLAB_PAT`. If neither set: "Set `GITLAB_TOKEN` (or `GITLAB_PAT`) to access the GitLab API. Create one at `https://{host}/-/user_settings/personal_access_tokens` (needs `read_api` scope)." Stop.
+8. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
 
 ## Step 1: Fetch PR/MR Data
 
 ### GitHub
 
-**Fetch metadata:**
+**Fetch metadata (Python -- primary):**
 
 ```bash
-curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+python3 << 'PYEOF'
+import json, os, sys, urllib.request, urllib.error
+
+token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN", "")
+if not token:
+    print("Error: No GitHub token found (checked GITHUB_TOKEN, GH_TOKEN)", file=sys.stderr)
+    sys.exit(1)
+
+url = "https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
+req = urllib.request.Request(url, headers={
+    "Authorization": f"Bearer {token}",
+    "Accept": "application/vnd.github+json",
+})
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode())
+        print(json.dumps({
+            "title": data["title"],
+            "body": (data.get("body") or "")[:500],
+            "author": data["user"]["login"],
+            "state": data["state"],
+            "base_branch": data["base"]["ref"],
+            "head_branch": data["head"]["ref"],
+            "additions": data["additions"],
+            "deletions": data["deletions"],
+            "changed_files": data["changed_files"],
+        }, indent=2))
+except urllib.error.HTTPError as e:
+    print(f"GitHub API error {e.code}: {e.read().decode()}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+```
+
+**Fallback (curl):**
+
+```bash
+curl -sf -H "Authorization: Bearer ${GITHUB_TOKEN:-$GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{owner}/{repo}/pulls/{number}"
 ```
 
-Extract: title, body (description), user.login (author), state, base.ref (target branch), head.ref (source branch), additions, deletions, changed_files count.
-
-**Fetch changed files list:**
+**Fetch changed files (Python -- primary):**
 
 ```bash
-curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+python3 << 'PYEOF'
+import json, os, sys, urllib.request, urllib.error
+
+token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN", "")
+url = "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/files?per_page=100"
+all_files = []
+while url:
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            all_files.extend(json.loads(resp.read().decode()))
+            # Follow Link header for pagination
+            link = resp.headers.get("Link", "")
+            url = None
+            for part in link.split(","):
+                if 'rel="next"' in part:
+                    url = part.split("<")[1].split(">")[0]
+    except urllib.error.HTTPError as e:
+        print(f"GitHub API error {e.code}: {e.read().decode()}", file=sys.stderr)
+        sys.exit(1)
+
+for f in all_files:
+    print(json.dumps({
+        "filename": f["filename"],
+        "status": f["status"],
+        "additions": f["additions"],
+        "deletions": f["deletions"],
+        "patch": f.get("patch", "")[:2000],
+    }))
+PYEOF
+```
+
+**Fallback (curl):**
+
+```bash
+curl -sf -H "Authorization: Bearer ${GITHUB_TOKEN:-$GH_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/files?per_page=100"
 ```
 
-Extract per file: filename, status (added/modified/removed/renamed), additions, deletions, patch (inline diff).
-
-For PRs with >100 files, paginate with `&page=2`, `&page=3`, etc.
+For PRs with >100 files, pagination is handled automatically by the Python script (follows `Link` header). With curl, paginate manually with `&page=2`, `&page=3`, etc.
 
 ### GitLab
 
-**Fetch metadata:**
+**Fetch metadata (Python -- primary):**
 
 ```bash
-curl -s -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-  "https://{host}/api/v4/projects/{id}/merge_requests/{iid}"
-```
+python3 << 'PYEOF'
+import json, os, sys, urllib.request, urllib.error
 
-Extract: title, description, author.username, state, target_branch, source_branch, changes_count.
+token = os.environ.get("GITLAB_TOKEN") or os.environ.get("GITLAB_PAT", "")
+if not token:
+    print("Error: No GitLab token found (checked GITLAB_TOKEN, GITLAB_PAT)", file=sys.stderr)
+    sys.exit(1)
+
+url = "https://{host}/api/v4/projects/{id}/merge_requests/{iid}"
+req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token})
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode())
+        print(json.dumps({
+            "title": data["title"],
+            "description": (data.get("description") or "")[:500],
+            "author": data["author"]["username"],
+            "state": data["state"],
+            "target_branch": data["target_branch"],
+            "source_branch": data["source_branch"],
+            "changes_count": data.get("changes_count"),
+        }, indent=2))
+except urllib.error.HTTPError as e:
+    print(f"GitLab API error {e.code}: {e.read().decode()}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+```
 
 Note: `{id}` is the URL-encoded project path (e.g., `group%2Fproject`) or numeric project ID.
 
-**Fetch changed files with diffs:**
+**Fallback (curl):**
 
 ```bash
-curl -s -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-  "https://{host}/api/v4/projects/{id}/merge_requests/{iid}/diffs"
+curl -sf -H "PRIVATE-TOKEN: ${GITLAB_TOKEN:-$GITLAB_PAT}" \
+  "https://{host}/api/v4/projects/{id}/merge_requests/{iid}"
 ```
 
-Extract per file: old_path, new_path, new_file/renamed_file/deleted_file flags, diff content.
+**Fetch changed files with diffs (Python -- primary):**
+
+```bash
+python3 << 'PYEOF'
+import json, os, sys, urllib.request, urllib.error
+
+token = os.environ.get("GITLAB_TOKEN") or os.environ.get("GITLAB_PAT", "")
+url = "https://{host}/api/v4/projects/{id}/merge_requests/{iid}/diffs?per_page=100"
+all_diffs = []
+while url:
+    req = urllib.request.Request(url, headers={"PRIVATE-TOKEN": token})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            all_diffs.extend(json.loads(resp.read().decode()))
+            # Follow x-next-page header for pagination
+            next_page = resp.headers.get("x-next-page", "")
+            if next_page:
+                base = url.split("?")[0]
+                url = f"{base}?per_page=100&page={next_page}"
+            else:
+                url = None
+    except urllib.error.HTTPError as e:
+        print(f"GitLab API error {e.code}: {e.read().decode()}", file=sys.stderr)
+        sys.exit(1)
+
+for d in all_diffs:
+    print(json.dumps({
+        "old_path": d["old_path"],
+        "new_path": d["new_path"],
+        "new_file": d.get("new_file", False),
+        "renamed_file": d.get("renamed_file", False),
+        "deleted_file": d.get("deleted_file", False),
+        "diff": d.get("diff", "")[:2000],
+    }))
+PYEOF
+```
+
+**Fallback (curl):**
+
+```bash
+curl -sf -H "PRIVATE-TOKEN: ${GITLAB_TOKEN:-$GITLAB_PAT}" \
+  "https://{host}/api/v4/projects/{id}/merge_requests/{iid}/diffs?per_page=100"
+```
+
+For MRs with >100 diffs, pagination is handled automatically by the Python script (follows `x-next-page` header). With curl, paginate manually with `&page=2`, etc.
 
 ### Present PR Summary
 
@@ -89,6 +255,34 @@ Files changed: {count} | +{additions} -{deletions}
 Description:
 {body/description, first ~500 chars}
 ```
+
+### Branch Setup
+
+After presenting the summary, check whether the local branch matches the PR's source branch for accurate analysis.
+
+1. **Save current branch:**
+
+   ```bash
+   ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+   ```
+
+2. **Compare with `{head_branch}`** from PR metadata.
+
+3. **If they match:** Note "Local branch matches PR -- analysis reflects PR changes." Set `SWITCHED_BRANCH=false`. Proceed to checkpoint.
+
+4. **If they differ:**
+
+   - Check for uncommitted changes:
+
+     ```bash
+     git status --porcelain
+     ```
+
+   - If dirty: warn "You have uncommitted changes" and offer `git stash` first.
+   - Present options:
+     - **Switch branches** -- `git stash` (if dirty), `git fetch origin {head_branch}`, `git checkout {head_branch}`, then `index_codebase()` + `index_codebase(extract_deps=True)` to reindex on the PR branch. Set `SWITCHED_BRANCH=true`. Note: "Earlier freshness checks are superseded by fresh indexing."
+     - **Stay on current branch** -- set `SWITCHED_BRANCH=false`, proceed with caveat: "Analysis may miss PR-specific additions since the local branch differs."
+   - If the branch doesn't exist locally or on the remote: note the issue, set `SWITCHED_BRANCH=false`, proceed on current branch.
 
 **Checkpoint:** "Ready to analyze {count} changed files. Proceed?"
 
@@ -311,12 +505,29 @@ Assemble the full review in this structure:
 
 **Checkpoint:** "Want me to dig deeper into any file or finding? I can also check specific patterns or trace additional dependencies."
 
+### Branch Cleanup
+
+After presenting the review, handle branch lifecycle cleanup.
+
+1. **If `SWITCHED_BRANCH=false`:** Skip -- nothing to clean up.
+
+2. **If `SWITCHED_BRANCH=true`:**
+
+   - Offer: "Review complete. Want me to switch back to `{ORIGINAL_BRANCH}`?"
+   - If yes:
+     - `git checkout {ORIGINAL_BRANCH}`
+     - `git stash pop` (only if we stashed earlier)
+     - Optionally: "Want me to reindex for `{ORIGINAL_BRANCH}`? (Only needed if you plan to use CocoSearch on this branch next.)"
+   - If no: "Staying on `{head_branch}`. Remember to switch back when done."
+
+3. Final note: "Review of PR #{number} is complete."
+
 ## Tips
 
 - **Start with the highest-impact files.** Review files with many dependents first -- they carry the most risk.
 - **Use dependency data to verify completeness.** The impact tree tells you what SHOULD have changed alongside a file.
 - **Don't flag style nits.** Focus on correctness, security, and blast radius. Leave formatting to linters.
-- **Check the base branch.** If the PR targets a non-default branch, the context may differ from what's indexed.
+- **Branch lifecycle.** The workflow automatically offers to switch to the PR's branch for accurate analysis and switch back when done. If you skip the switch, blast radius results are based on your current branch.
 - **Large PRs benefit from scoping.** Ask the user to focus on specific areas rather than reviewing 50+ files superficially.
 - **Re-index if stale.** Blast radius analysis is only as good as the index. If the codebase changed significantly since last index, reindex first.
 

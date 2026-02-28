@@ -22,16 +22,19 @@ A guided workflow for understanding how files connect through dependencies. Use 
 
 1. Read `cocosearch.yaml` for `indexName` (critical -- use this for all operations)
 2. `list_indexes()` to confirm project is indexed
-3. Verify dependency index exists -- call `get_file_dependencies` on any known file:
+3. Verify dependency index exists and is fresh — call `get_file_dependencies` on any known file:
 
 ```
 get_file_dependencies(file="<any-known-file>", depth=1)
 ```
 
-- **If results returned:** Dependency index is ready, proceed.
 - **If error or empty:** Dependency index is missing. Offer:
-  - "No dependency data found. Want me to extract dependencies? This requires running `index_codebase` with deps extraction or `cocosearch deps extract .` via CLI."
-  - Do NOT proceed without dependency data -- this skill relies entirely on it.
+  "No dependency data found. Want me to extract dependencies? This requires running `index_codebase` with deps extraction or `cocosearch deps extract .` via CLI."
+  Do NOT proceed without dependency data -- this skill relies entirely on it.
+- **If response contains `warnings`** with type `deps_outdated` or `deps_branch_drift`:
+  Warn: "Dependency data is outdated and may not reflect recent changes. Want me to re-extract dependencies first? (`index_codebase` with `extract_deps=True`)"
+  Do NOT proceed without user acknowledgment -- stale deps can lead to incorrect analysis.
+- **If results returned with no warnings:** Dependency index is ready, proceed.
 
 ## Step 1: Classify Intent
 
