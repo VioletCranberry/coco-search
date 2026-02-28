@@ -57,11 +57,19 @@
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Terraform-844FBA?logo=terraform&logoColor=white" alt="Terraform"></a>
 </p>
 
-> *Typical code RAG splits files into chunks that break across function and class boundaries, losing the structure that makes code meaningful. CocoSearch preserves it — [CocoIndex](https://github.com/cocoindex-io/cocoindex) and Tree-sitter provide syntax-aware chunking that keeps functions, classes, and config blocks intact; search results expand to enclosing scope boundaries via Tree-sitter AST; grammar handlers split infrastructure configs at domain-aware boundaries (Terraform resources, CI/CD jobs, Compose services); and a dependency graph maps how files connect across code, config, and documentation. For AI assistants, this means complete, self-contained code units with dependency context in fewer retrieval calls — less guessing about boundaries, less noise in the context window, more accurate answers about how the code actually works. This powers RAG-based code search that replaces iterative grep/glob cycles with a few semantic queries, and dependency-aware PR reviews that surface blast radius, missing test coverage, and pattern inconsistencies across the changeset.*
+> *Typical code RAG splits files into chunks that break across function and class boundaries, losing the structure that makes code meaningful. CocoSearch preserves it — [CocoIndex](https://github.com/cocoindex-io/cocoindex) and Tree-sitter provide syntax-aware chunking that keeps functions, classes, and config blocks intact; search results expand to enclosing scope boundaries via Tree-sitter AST; grammar handlers split infrastructure configs at domain-aware boundaries (Terraform resources, CI/CD jobs, Compose services); and a dependency graph maps how files connect across code, config, and documentation.*
 
 Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, [PostgreSQL](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) for storage, and [Ollama](https://ollama.com/) for local embeddings by default. Optional remote embedding providers ([OpenAI](https://platform.openai.com/), [OpenRouter](https://openrouter.ai/)) available for teams that prefer managed infrastructure — your code still never leaves your machine, only chunk text is sent for embedding.
 
 Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental indexing, `.gitignore`-aware. Supports 32 languages with symbol-level filtering for 15+, plus domain-specific grammars for structured config files. Since 0.1.22: dependency graph extraction with forward trees (`deps tree`), reverse impact analysis (`deps impact`), and dependency-enriched search — for Python, JavaScript/TypeScript, Go, Docker Compose, GitHub Actions, Terraform, and Helm.
+
+### Why CocoSearch?
+
+**Structure-preserving retrieval** — syntax-aware chunking keeps functions, classes, and config blocks intact instead of splitting them across arbitrary boundaries. Search results expand to enclosing scope via Tree-sitter AST, so you always get complete, self-contained code units.
+
+**AI-native context** — complete code units with dependency context in fewer retrieval calls. Less guessing about boundaries, less noise in the context window, more accurate answers about how the code actually works.
+
+**Dependency-aware analysis** — RAG-based code search that replaces iterative grep/glob cycles with a few semantic queries, and dependency-aware PR reviews that surface blast radius, missing test coverage, and pattern inconsistencies across the changeset.
 
 <details>
 <summary>Screenshots</summary>
