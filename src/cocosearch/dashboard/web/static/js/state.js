@@ -8,6 +8,7 @@ export const state = {
     parseFailuresData: [],
     grammarFailuresData: [],
     pollInterval: null,
+    stalenessInterval: null,
     logEventSource: null,
     logAutoScroll: true,
     logUnreadCount: 0,

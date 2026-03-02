@@ -36,10 +36,11 @@ export async function fetchInfra() {
     }
 }
 
-export async function fetchStats(indexName = null) {
-    let url = indexName
-        ? `/api/stats?index=${encodeURIComponent(indexName)}&include_failures=true`
-        : '/api/stats?include_failures=true';
+export async function fetchStats(indexName = null, includeFailures = true) {
+    const params = new URLSearchParams();
+    if (indexName) params.set('index', indexName);
+    if (includeFailures) params.set('include_failures', 'true');
+    const url = '/api/stats' + (params.size ? '?' + params : '');
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);

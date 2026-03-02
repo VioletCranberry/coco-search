@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { loadProjectContext, fetchStats, fetchProjects, fetchInfra } from './api.js';
-import { updateDashboard, updateSummaryCards } from './dashboard.js';
+import { updateDashboard, updateSummaryCards, updateWarnings } from './dashboard.js';
 
 export function setButtonsDisabled(disabled) {
     document.getElementById('reindexBtn').disabled = disabled;
@@ -35,8 +35,45 @@ export function stopPolling() {
     }
 }
 
+export function stopStalenessPolling() {
+    if (state.stalenessInterval) {
+        clearInterval(state.stalenessInterval);
+        state.stalenessInterval = null;
+    }
+}
+
+export function startStalenessPolling() {
+    stopStalenessPolling();
+    state.stalenessInterval = setInterval(async () => {
+        if (state.pollInterval) return; // fast poll is active, skip
+        try {
+            const data = await fetchStats(null, false);
+            state.allIndexes = Array.isArray(data) ? data : [data];
+
+            const select = document.getElementById('indexSelect');
+            const indexIndex = parseInt(select.value);
+            const stats = state.allIndexes[indexIndex];
+            if (!stats) return;
+
+            updateWarnings(stats.warnings);
+            updateSummaryCards(stats);
+
+            // Auto-detect externally-started indexing
+            if (stats.status === 'indexing') {
+                stopStalenessPolling();
+                setButtonsDisabled(true);
+                showStatusBanner('Indexing in progress...', 'info');
+                startPolling();
+            }
+        } catch {
+            // Silently swallow errors — background poll
+        }
+    }, 30000);
+}
+
 export function startPolling(reloadListOnComplete = false) {
     stopPolling();
+    stopStalenessPolling();
     state.pollInterval = setInterval(async () => {
         try {
             const data = await fetchStats();
@@ -63,6 +100,7 @@ export function startPolling(reloadListOnComplete = false) {
                     const status = state.allIndexes[matchIdx].status || 'indexed';
                     if (status !== 'indexing') {
                         stopPolling();
+                        startStalenessPolling();
                         setButtonsDisabled(false);
                         showStatusBanner('Indexing complete', 'success');
                         setTimeout(hideStatusBanner, 5000);
@@ -78,6 +116,7 @@ export function startPolling(reloadListOnComplete = false) {
                 const status = state.allIndexes[indexIndex].status || 'indexed';
                 if (status !== 'indexing') {
                     stopPolling();
+                    startStalenessPolling();
                     setButtonsDisabled(false);
                     showStatusBanner('Indexing complete', 'success');
                     setTimeout(hideStatusBanner, 5000);
@@ -199,6 +238,8 @@ export async function loadIndexList() {
                 setButtonsDisabled(true);
                 showStatusBanner('Indexing in progress...', 'info');
                 startPolling();
+            } else {
+                startStalenessPolling();
             }
         } else if (unindexedProjects.length > 0) {
             // No indexed projects but discovered projects available
@@ -294,6 +335,7 @@ export async function stopIndexing() {
         const data = await resp.json();
         if (resp.ok) {
             stopPolling();
+            startStalenessPolling();
             setButtonsDisabled(false);
             showStatusBanner('Indexing stopped', 'info');
             setTimeout(hideStatusBanner, 5000);
