@@ -247,7 +247,7 @@ embeddings = [
 
 [[package]]
 name = "cocosearch"
-version = "0.1.33"
+version = "0.1.34"
 source = { editable = "." }
 dependencies = [
     { name = "cocoindex", extra = ["embeddings"] },
