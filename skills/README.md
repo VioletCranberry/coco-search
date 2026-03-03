@@ -17,6 +17,7 @@ Reusable AI coding assistant skills that leverage CocoSearch's semantic and symb
 | [cocosearch-add-grammar](./cocosearch-add-grammar/SKILL.md) | Add grammar handler: domain-specific formats within a base language | Yes |
 | [cocosearch-add-extractor](./cocosearch-add-extractor/SKILL.md) | Add dependency extractor: enables `deps tree`, `deps impact`, and dependency-enriched search | Yes |
 | [cocosearch-review-pr](./cocosearch-review-pr/SKILL.md) | Review GitHub PRs / GitLab MRs with blast radius and dependency analysis | Yes |
+| [cocosearch-commit](./cocosearch-commit/SKILL.md) | Smart commit messages: analyzes diffs with semantic search and dependency impact | Yes |
 
 ## Installation
 
@@ -35,7 +36,7 @@ claude plugin marketplace add VioletCranberry/coco-search
 claude plugin install cocosearch@cocosearch
 ```
 
-This automatically configures the MCP server and all 11 skills. No symlinks or manual setup needed.
+This automatically configures the MCP server and all 12 skills. No symlinks or manual setup needed.
 
 ### Claude Code (project-local)
 
@@ -43,7 +44,7 @@ Symlink skills from a cloned CocoSearch repo into your project:
 
 ```bash
 mkdir -p .claude/skills
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr cocosearch-commit; do
     ln -sfn "../../skills/$skill" ".claude/skills/$skill"
 done
 ```
@@ -53,7 +54,7 @@ done
 Copy skills to your global Claude config:
 
 ```bash
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr cocosearch-commit; do
     mkdir -p ~/.claude/skills/$skill
     cp skills/$skill/SKILL.md ~/.claude/skills/$skill/SKILL.md
 done
@@ -67,7 +68,7 @@ OpenCode discovers skills from `.opencode/skills/`, `.claude/skills/`, and `.age
 
 ```bash
 mkdir -p .opencode/skills
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr cocosearch-commit; do
     ln -sfn "../../skills/$skill" ".opencode/skills/$skill"
 done
 ```
@@ -75,7 +76,7 @@ done
 **Global:**
 
 ```bash
-for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr; do
+for skill in cocosearch-onboarding cocosearch-refactoring cocosearch-debugging cocosearch-deps cocosearch-quickstart cocosearch-explore cocosearch-new-feature cocosearch-add-language cocosearch-add-grammar cocosearch-add-extractor cocosearch-review-pr cocosearch-commit; do
     mkdir -p ~/.config/opencode/skills/$skill
     cp skills/$skill/SKILL.md ~/.config/opencode/skills/$skill/SKILL.md
 done

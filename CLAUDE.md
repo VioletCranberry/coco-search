@@ -167,6 +167,20 @@ Three independent systems — a language can use any combination. See `docs/addi
 2. For YAML-based grammars, inherit `YamlGrammarBase` and implement `_has_content_markers()` and `_extract_grammar_metadata()`
 3. Create `tests/unit/handlers/grammars/test_<grammar>.py`
 
+## Adding Skills
+
+Workflow skills are SKILL.md files that guide AI coding assistants through structured workflows using CocoSearch MCP tools.
+
+1. Create `skills/cocosearch-<name>/SKILL.md` with YAML frontmatter (`name`, `description`) and the workflow steps
+2. Copy to `src/cocosearch/skills/cocosearch-<name>/SKILL.md` (bundled with the Python package for `cocosearch init`)
+3. Add to the skills table in `skills/README.md`
+4. Add to all installation `for` loops in `skills/README.md` (Claude Code project-local, global, OpenCode project-local, global)
+5. Update skill count in `skills/README.md` ("all N skills")
+6. Add to the Workflow Skills list in the Plugin Usage section of this file
+7. Update `tests/unit/config/test_generator.py` expected skill count
+
+Skills are autodiscovered by `_get_bundled_skills()` in `src/cocosearch/config/generator.py` — any `cocosearch-*` subdirectory under `src/cocosearch/skills/` with a `SKILL.md` is included automatically. No manual registration in code is needed.
+
 ## Configuration
 
 Project config via `cocosearch.yaml` (no leading dot) in project root. The `indexName` field sets the index name used by all commands. Environment variables prefixed with `COCOSEARCH_` (e.g., `COCOSEARCH_DATABASE_URL`, `COCOSEARCH_OLLAMA_URL`). Config keys map to env vars via camelCase→UPPER_SNAKE conversion (e.g., `indexName` → `COCOSEARCH_INDEX_NAME`). `COCOSEARCH_EDITOR` is a runtime env var (not a config field) for the dashboard's "Open in Editor" feature — falls back to `$EDITOR` then `$VISUAL`. See `.env.example` for available options.
@@ -244,6 +258,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 - `/cocosearch:cocosearch-add-grammar` — Add grammar handler (domain-specific formats within a base language)
 - `/cocosearch:cocosearch-add-extractor` — Add dependency extractor (enables `deps tree`, `deps impact`, dependency-enriched search)
 - `/cocosearch:cocosearch-review-pr` — Review GitHub PRs / GitLab MRs with blast radius and dependency analysis
+- `/cocosearch:cocosearch-commit` — Smart commit messages: analyzes diffs with semantic search and dependency impact
 
 ### Prerequisites
 
