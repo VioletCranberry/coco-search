@@ -25,12 +25,14 @@ class TestGetConnectionPool:
                 mock_pool_cls.return_value = MagicMock()
                 get_connection_pool()
 
-        # Verify ConnectionPool was called with the default URL
+        # Verify ConnectionPool was called with the default URL and bounded size
         mock_pool_cls.assert_called_once()
         call_kwargs = mock_pool_cls.call_args
         assert "cocosearch:cocosearch" in call_kwargs.kwargs.get(
             "conninfo", call_kwargs.args[0] if call_kwargs.args else ""
         )
+        assert call_kwargs.kwargs.get("min_size") == 2
+        assert call_kwargs.kwargs.get("max_size") == 10
 
 
 class TestClosePool:
