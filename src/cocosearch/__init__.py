@@ -1,3 +1,3 @@
 """CocoSearch: Local-first semantic code search."""
 
-__version__ = "0.1.35"
+__version__ = "0.1.36"
