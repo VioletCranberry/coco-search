@@ -1434,6 +1434,8 @@ def _get_treesitter_language(ext: str) -> str | None:
         "cts": "typescript",
         "go": "go",
         "rs": "rust",
+        "yaml": "yaml",
+        "yml": "yaml",
     }
     return mapping.get(ext)
 

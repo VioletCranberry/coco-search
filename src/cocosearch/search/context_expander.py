@@ -54,6 +54,7 @@ DEFINITION_NODE_TYPES: dict[str, set[str]] = {
     "hcl": {"block"},
     "terraform": {"block"},
     "dockerfile": {"from_instruction"},
+    "yaml": {"block_mapping_pair"},
 }
 
 # Languages that support smart context expansion (derived from DEFINITION_NODE_TYPES)
@@ -85,6 +86,9 @@ EXTENSION_TO_LANGUAGE: dict[str, str] = {
     ".tfvars": "terraform",
     # Dockerfile
     ".dockerfile": "dockerfile",
+    # YAML
+    ".yaml": "yaml",
+    ".yml": "yaml",
 }
 
 
