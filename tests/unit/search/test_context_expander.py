@@ -168,6 +168,37 @@ output "instance_id" {
 
 
 @pytest.fixture
+def sample_yaml_file(tmp_path):
+    """Create sample YAML file with multiple top-level keys."""
+    content = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-server
+  namespace: production
+  labels:
+    app: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.25
+          ports:
+            - containerPort: 80
+"""
+    filepath = tmp_path / "deployment.yaml"
+    filepath.write_text(content)
+    return str(filepath)
+
+
+@pytest.fixture
 def large_python_function(tmp_path):
     """Create Python file with function larger than 50 lines."""
     lines = ["def large_function():"]
@@ -238,7 +269,8 @@ class TestGetLanguageFromPath:
         assert _get_language_from_path("file.json") is None
         assert _get_language_from_path("file.md") is None
         assert _get_language_from_path("file.txt") is None
-        assert _get_language_from_path("file.yaml") is None
+        assert _get_language_from_path("file.yaml") == "yaml"
+        assert _get_language_from_path("file.yml") == "yaml"
 
     def test_case_insensitive(self):
         """Should handle uppercase extensions."""
@@ -348,6 +380,22 @@ z = x + y
         # tree-sitter "block" node should encompass the resource block
         assert start <= 3
         assert end >= 3
+
+    def test_yaml_block_mapping_pair_detection(self, expander, sample_yaml_file):
+        """Should find enclosing block_mapping_pair in YAML."""
+        # Line 10 is inside "spec:" block (spec: starts on line 8)
+        start, end = expander.find_enclosing_scope(sample_yaml_file, 10, 10, "yaml")
+        # Should expand to include the spec: key-value pair
+        assert start <= 8  # spec: line
+        assert end >= 10  # selector line
+
+    def test_yaml_metadata_block_detection(self, expander, sample_yaml_file):
+        """Should find enclosing block_mapping_pair for metadata section."""
+        # Line 4 is inside "metadata:" block (metadata: starts on line 3)
+        start, end = expander.find_enclosing_scope(sample_yaml_file, 4, 4, "yaml")
+        # Should expand to include the metadata: key-value pair
+        assert start <= 3  # metadata: line
+        assert end >= 5  # namespace line
 
     def test_unsupported_language_returns_original(self, expander, sample_json_file):
         """Unsupported language should return original range."""
@@ -568,6 +616,36 @@ class TestGetContextLines:
         )
 
         # Should expand (language detected from .tf extension)
+        all_lines = before + match + after
+        assert len(all_lines) >= 1
+
+    def test_smart_expands_yaml_file(self, expander, sample_yaml_file):
+        """smart=True should expand context for .yaml files."""
+        before, match, after, is_bof, is_eof = expander.get_context_lines(
+            sample_yaml_file,
+            start_line=10,  # Inside spec block
+            end_line=10,
+            smart=True,
+        )
+
+        # Should expand (language auto-detected from .yaml extension)
+        all_lines = before + match + after
+        assert len(all_lines) > 1
+        assert 10 in [num for num, _ in all_lines]
+
+    def test_auto_detect_yaml_from_yml(self, expander, tmp_path):
+        """Should auto-detect yaml from .yml extension."""
+        content = "key: value\nnested:\n  child: data\n"
+        filepath = tmp_path / "config.yml"
+        filepath.write_text(content)
+
+        before, match, after, is_bof, is_eof = expander.get_context_lines(
+            str(filepath),
+            start_line=3,  # child: data inside nested:
+            end_line=3,
+            smart=True,
+        )
+
         all_lines = before + match + after
         assert len(all_lines) >= 1
 
