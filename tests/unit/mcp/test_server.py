@@ -7,6 +7,9 @@ from unittest.mock import patch, MagicMock
 
 from cocosearch.management.stats import IndexStats
 from cocosearch.mcp.server import (
+    mcp,
+    _server_lifespan,
+    run_server,
     search_code,
     list_indexes,
     index_stats,
@@ -1153,3 +1156,55 @@ class TestApiReindex:
         body = json.loads(response.body.decode())
         assert response.status_code == 400
         assert "index_name is required" in body["error"]
+
+
+class TestServerLifespan:
+    """Tests for the FastMCP lifespan context manager."""
+
+    def test_lifespan_is_registered(self):
+        """FastMCP instance has a lifespan configured."""
+        assert mcp.settings.lifespan is not None
+
+    @pytest.mark.asyncio
+    async def test_lifespan_teardown_closes_pool(self):
+        """Lifespan teardown calls close_pool to release DB connections."""
+        with patch("cocosearch.search.db.close_pool") as mock_close:
+            async with _server_lifespan(mcp):
+                pass  # simulate server running
+            mock_close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_lifespan_teardown_cancels_indexing_threads(self):
+        """Lifespan teardown signals and joins active indexing threads."""
+        stop_event = threading.Event()
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = False
+
+        import cocosearch.mcp.server as srv
+
+        with patch("cocosearch.search.db.close_pool"):
+            # Inject a fake active indexing entry
+            with srv._indexing_lock:
+                srv._active_indexing["test_idx"] = (mock_thread, stop_event)
+            try:
+                async with _server_lifespan(mcp):
+                    pass
+                assert stop_event.is_set()
+                mock_thread.join.assert_called_once_with(timeout=2.0)
+            finally:
+                with srv._indexing_lock:
+                    srv._active_indexing.pop("test_idx", None)
+
+    def test_run_server_finally_closes_pool(self):
+        """run_server closes the DB pool in its finally block."""
+        with (
+            patch("cocosearch.mcp.server._ensure_cocoindex_init", return_value=True),
+            patch("cocosearch.mcp.log_stream.setup_log_capture"),
+            patch.object(mcp, "run", side_effect=KeyboardInterrupt),
+            patch("cocosearch.search.db.close_pool") as mock_close,
+        ):
+            try:
+                run_server(transport="sse", host="127.0.0.1", port=9999)
+            except KeyboardInterrupt:
+                pass
+            mock_close.assert_called_once()
