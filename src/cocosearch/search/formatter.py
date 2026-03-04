@@ -174,6 +174,8 @@ _TREE_SITTER_LANG_MAP = {
     "cts": "typescript",
     "go": "go",
     "rs": "rust",
+    "yaml": "yaml",
+    "yml": "yaml",
 }
 
 

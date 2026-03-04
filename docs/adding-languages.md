@@ -238,11 +238,15 @@ Priority: Grammar match > Language match > TextHandler fallback.
 
 | Grammar | Base Language | Path Patterns | Content Markers |
 |---------|-------------|---------------|-----------------|
+| `argocd` | yaml | `*.yaml`, `*.yml` | `apiVersion:` + `argoproj.io/` + `kind:` |
+| `docker-compose` | yaml | `docker-compose*.yml`, `compose*.yml` | `services:` |
 | `github-actions` | yaml | `.github/workflows/*.yml` | `on:` + `jobs:` |
 | `gitlab-ci` | yaml | `.gitlab-ci.yml` | `stages:` or (`script:` + `image:`/`stage:`) |
-| `docker-compose` | yaml | `docker-compose*.yml`, `compose*.yml` | `services:` |
+| `helm-chart` | yaml | `**/Chart.yaml`, `**/Chart.yml` | `apiVersion:` + `name:` |
 | `helm-template` | gotmpl | `templates/*.yaml`, `templates/*.tpl` | `apiVersion:` or `{{` |
 | `helm-values` | yaml | `values*.yaml` in chart dirs | `## @section` or YAML with comments |
+| `kubernetes` | yaml | `*.yaml`, `*.yml` | `apiVersion:` + `kind:` (excludes Helm/ArgoCD) |
+| `terraform` | hcl | `**/*.tf`, `**/*.tfvars` | HCL resource/data/module blocks |
 
 ## Path E: Adding Context Expansion (Smart Boundaries)
 

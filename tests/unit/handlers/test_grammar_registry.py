@@ -24,6 +24,7 @@ class TestGrammarRegistryDiscovery:
         """All expected grammar names should be registered."""
         names = {h.GRAMMAR_NAME for h in _GRAMMAR_REGISTRY}
         expected = {
+            "argocd",
             "github-actions",
             "gitlab-ci",
             "docker-compose",
@@ -82,6 +83,14 @@ class TestDetectGrammar:
             "services:\n  web:\n    image: nginx",
         )
         assert result == "docker-compose"
+
+    def test_detects_argocd(self):
+        """detect_grammar should identify ArgoCD manifests."""
+        result = detect_grammar(
+            "argocd/app.yaml",
+            "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: my-app",
+        )
+        assert result == "argocd"
 
     def test_detects_kubernetes(self):
         """detect_grammar should identify Kubernetes manifests."""
@@ -156,6 +165,12 @@ class TestGetGrammarHandler:
         assert handler is not None
         assert handler.GRAMMAR_NAME == "helm-values"
 
+    def test_get_argocd(self):
+        """get_grammar_handler returns handler for 'argocd'."""
+        handler = get_grammar_handler("argocd")
+        assert handler is not None
+        assert handler.GRAMMAR_NAME == "argocd"
+
     def test_get_kubernetes(self):
         """get_grammar_handler returns handler for 'kubernetes'."""
         handler = get_grammar_handler("kubernetes")
@@ -182,6 +197,7 @@ class TestGetCustomLanguagesWithGrammars:
         specs = get_custom_languages()
         language_names = {spec.language_name for spec in specs}
         expected = {
+            "argocd",
             "github-actions",
             "gitlab-ci",
             "docker-compose",
@@ -197,6 +213,7 @@ class TestGetCustomLanguagesWithGrammars:
         """get_custom_languages() should include grammar language names."""
         specs = get_custom_languages()
         language_names = {spec.language_name for spec in specs}
+        assert "argocd" in language_names
         assert "github-actions" in language_names
         assert "gitlab-ci" in language_names
         assert "docker-compose" in language_names
@@ -261,6 +278,14 @@ class TestExtractChunkMetadataGrammarDispatch:
         result = extract_chunk_metadata(text, "docker-compose")
         assert result.language_id == "docker-compose"
         assert result.block_type == "service"
+
+    def test_dispatches_to_argocd(self):
+        """extract_chunk_metadata dispatches to ArgoCD handler."""
+        text = "kind: Application\nmetadata:\n  name: my-app"
+        result = extract_chunk_metadata(text, "argocd")
+        assert result.language_id == "argocd"
+        assert result.block_type == "Application"
+        assert result.hierarchy == "kind:Application"
 
     def test_dispatches_to_kubernetes(self):
         """extract_chunk_metadata dispatches to Kubernetes handler."""

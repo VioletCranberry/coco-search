@@ -61,6 +61,12 @@ class TestKubernetesMatching:
         content = 'apiVersion: v1\nkind: ConfigMap\n{{- include "helpers" . }}'
         assert handler.matches("configmap.yaml", content) is False
 
+    def test_rejects_argocd_content(self):
+        """Rejects files containing ArgoCD apiVersion markers."""
+        handler = KubernetesHandler()
+        content = "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: my-app"
+        assert handler.matches("app.yaml", content) is False
+
     def test_matches_nested_path(self):
         """Matches K8s manifests in nested directories."""
         handler = KubernetesHandler()
