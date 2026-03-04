@@ -1,10 +1,10 @@
-"""Grammar handler for Kubernetes manifest YAML files.
+"""Grammar handler for ArgoCD manifest YAML files.
 
-Provides domain-specific chunking and metadata extraction for plain Kubernetes
-manifests (Deployments, Services, ConfigMaps, etc.) without Helm directives.
+Provides domain-specific chunking and metadata extraction for ArgoCD
+Application, ApplicationSet, and AppProject custom resources.
 
-Matches: *.yaml, *.yml (broad -- content validation filters to K8s manifests)
-Content markers: 'apiVersion:' and 'kind:'
+Matches: *.yaml, *.yml (broad -- content validation filters to ArgoCD manifests)
+Content markers: 'apiVersion:' with 'argoproj.io/' and 'kind:'
 """
 
 import fnmatch
@@ -13,26 +13,27 @@ import re
 import cocoindex
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
-from cocosearch.handlers.grammars.argocd import _ARGOCD_MARKER
 from cocosearch.handlers.grammars.helm_template import _HELM_MARKERS
 
+_ARGOCD_MARKER = "argoproj.io/"
 
-class KubernetesHandler(YamlGrammarBase):
-    """Grammar handler for Kubernetes manifest YAML files."""
 
-    GRAMMAR_NAME = "kubernetes"
+class ArgoCDHandler(YamlGrammarBase):
+    """Grammar handler for ArgoCD manifest YAML files."""
+
+    GRAMMAR_NAME = "argocd"
     PATH_PATTERNS = ["*.yaml", "*.yml"]
 
     SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
-        language_name="kubernetes",
+        language_name="argocd",
         separators_regex=[
             # Level 1: YAML document separator (multi-resource files)
             r"\n---",
-            # Level 2: K8s resource boundary
+            # Level 2: ArgoCD resource boundary
             r"\napiVersion:",
-            # Level 3: Top-level keys (kind, metadata, spec, data, status)
+            # Level 3: Top-level keys (kind, metadata, spec, operation, status)
             r"\n[a-zA-Z_][\w-]*:",
-            # Level 4: Second-level keys (name, namespace, replicas, containers)
+            # Level 4: Second-level keys (source, destination, syncPolicy)
             r"\n  [a-zA-Z_][\w-]*:",
             # Level 5: Blank lines
             r"\n\n+",
@@ -44,34 +45,26 @@ class KubernetesHandler(YamlGrammarBase):
         aliases=[],
     )
 
-    # Match K8s kind field
+    # Match ArgoCD kind field
     _KIND_RE = re.compile(r"^kind:\s*(\S+)", re.MULTILINE)
 
-    # Kubernetes top-level keywords (not section names)
+    # ArgoCD CRD kinds
+    _ARGOCD_KINDS = frozenset({"Application", "ApplicationSet", "AppProject"})
+
+    # ArgoCD top-level keywords
     _TOP_LEVEL_KEYS = frozenset(
         {
             "apiVersion",
             "kind",
             "metadata",
             "spec",
-            "data",
-            "stringData",
+            "operation",
             "status",
-            "type",
-            "rules",
-            "subjects",
-            "roleRef",
-            "webhooks",
-            "template",
-            "parameters",
-            "provisioner",
-            "allowVolumeExpansion",
-            "reclaimPolicy",
         }
     )
 
     def matches(self, filepath: str, content: str | None = None) -> bool:
-        """Check if file is a Kubernetes manifest.
+        """Check if file is an ArgoCD manifest.
 
         Uses broad path patterns (any YAML file), so always requires content
         validation. Returns False when content is None.
@@ -81,7 +74,7 @@ class KubernetesHandler(YamlGrammarBase):
             content: Optional file content for deeper matching.
 
         Returns:
-            True if this is a Kubernetes manifest file.
+            True if this is an ArgoCD manifest file.
         """
         basename = filepath.rsplit("/", 1)[-1] if "/" in filepath else filepath
         for pattern in self.PATH_PATTERNS:
@@ -90,30 +83,34 @@ class KubernetesHandler(YamlGrammarBase):
                     return False
                 if "apiVersion:" not in content or "kind:" not in content:
                     return False
-                if any(marker in content for marker in _HELM_MARKERS):
+                if _ARGOCD_MARKER not in content:
                     return False
-                if _ARGOCD_MARKER in content:
+                if any(marker in content for marker in _HELM_MARKERS):
                     return False
                 return True
         return False
 
     def _has_content_markers(self, content: str) -> bool:
         # Not used -- matches() is fully overridden
-        return "apiVersion:" in content and "kind:" in content
+        return (
+            "apiVersion:" in content
+            and "kind:" in content
+            and _ARGOCD_MARKER in content
+        )
 
     def _extract_grammar_metadata(self, stripped: str, text: str) -> dict | None:
-        """Extract metadata from Kubernetes manifest chunk.
+        """Extract metadata from ArgoCD manifest chunk.
 
-        Identifies K8s resource kinds, section keys, nested keys,
-        list items, and value continuations.
+        Identifies ArgoCD resource kinds (Application, ApplicationSet, AppProject),
+        then falls through to section-key/nested-key/list-item/top-level-key.
 
         Examples:
-            Kind chunk: block_type="Deployment", hierarchy="kind:Deployment"
-            Section key: block_type="section-key", hierarchy="section-key:containers"
-            Nested: block_type="nested-key", hierarchy="nested-key:image"
+            Kind chunk: block_type="Application", hierarchy="kind:Application"
+            Section key: block_type="section-key", hierarchy="section-key:source"
+            Nested: block_type="nested-key", hierarchy="nested-key:repoURL"
             List item: block_type="list-item", hierarchy="list-item:name"
         """
-        # Check for K8s kind
+        # Check for ArgoCD kind
         kind_match = self._KIND_RE.search(stripped)
         if kind_match:
             kind = kind_match.group(1)
