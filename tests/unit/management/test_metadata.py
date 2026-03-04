@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import pytest
 from unittest.mock import patch, MagicMock
 
+from cocosearch.management import metadata as metadata_module
 from cocosearch.management.metadata import (
     auto_recover_stale_indexing,
     ensure_metadata_table,
@@ -301,6 +302,11 @@ class TestStaleIndexingDetection:
 class TestAutoRecoverStaleIndexing:
     """Tests for auto_recover_stale_indexing function."""
 
+    @pytest.fixture(autouse=True)
+    def clear_recovered_indexes(self):
+        """Clear the recovered indexes tracking set between tests."""
+        metadata_module._recovered_indexes.clear()
+
     def test_recovers_stale_indexing_status(self, mock_db_pool):
         """auto_recover_stale_indexing flips 'indexing' to 'indexed' after threshold."""
         stale_time = datetime.now() - timedelta(seconds=3600 + 60)
@@ -379,6 +385,41 @@ class TestAutoRecoverStaleIndexing:
 
         assert result is False
         assert len(cursor.calls) == 1
+
+    def test_skips_already_recovered_index(self, mock_db_pool):
+        """auto_recover_stale_indexing skips indexes already recovered this process."""
+        stale_time = datetime.now() - timedelta(seconds=3600 + 60)
+        pool, cursor, conn = mock_db_pool(
+            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        )
+        cursor.rowcount = 1
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            # First call recovers
+            result1 = auto_recover_stale_indexing("myindex")
+            assert result1 is True
+
+            # Second call skips — no additional DB queries
+            calls_before = len(cursor.calls)
+            result2 = auto_recover_stale_indexing("myindex")
+            assert result2 is False
+            assert len(cursor.calls) == calls_before
+
+    def test_set_index_status_indexing_clears_recovery_tracking(self, mock_db_pool):
+        """set_index_status('indexing') clears recovery tracking so it can fire again."""
+        metadata_module._recovered_indexes.add("myindex")
+
+        pool, cursor, conn = mock_db_pool()
+        cursor.rowcount = 1
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            set_index_status("myindex", "indexing")
+
+        assert "myindex" not in metadata_module._recovered_indexes
 
 
 class TestRegisterIndexPath:

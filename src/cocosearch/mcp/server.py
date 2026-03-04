@@ -13,10 +13,13 @@ Provides Model Context Protocol server with tools for:
 import asyncio
 import functools
 import os
+import signal
 import sys
 import logging
 import threading
 import time as _time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -248,8 +251,32 @@ def build_single_stats(index_name: str, include_failures: bool = False) -> dict:
     return result
 
 
+@asynccontextmanager
+async def _server_lifespan(app: FastMCP) -> AsyncIterator[None]:
+    """Lifespan context manager for the MCP server.
+
+    Teardown closes the DB connection pool and cancels active indexing threads
+    so PostgreSQL connections are released promptly on server shutdown — even
+    when atexit handlers don't fire (e.g. SIGTERM/SIGKILL).
+    """
+    yield
+    # --- teardown ---
+    _get_cs_log().system("Server shutting down — releasing resources")
+    # Cancel active indexing threads
+    with _indexing_lock:
+        for name, (thread, stop_event) in list(_active_indexing.items()):
+            stop_event.set()
+    with _indexing_lock:
+        for name, (thread, stop_event) in list(_active_indexing.items()):
+            thread.join(timeout=2.0)
+    # Close the database connection pool
+    from cocosearch.search.db import close_pool
+
+    close_pool()
+
+
 # Create FastMCP server instance
-mcp = FastMCP("cocosearch")
+mcp = FastMCP("cocosearch", lifespan=_server_lifespan)
 register_roots_notification(mcp)
 
 
@@ -2695,54 +2722,77 @@ def run_server(
             level="WARNING",
         )
 
+    # SIGTERM handler for stdio mode: a broken pipe may cause abrupt exit
+    # without the finally block running.
     if transport == "stdio":
-        if port != 3000:  # Non-default port specified
-            logger.warning("--port is ignored with stdio transport")
 
-        # Start background dashboard server for stdio mode
-        if not no_dashboard:
-            from cocosearch.dashboard.server import start_dashboard_server
+        def _sigterm_handler(signum, frame):
+            from cocosearch.search.db import close_pool
 
-            dashboard_url = start_dashboard_server()
-            if dashboard_url:
+            close_pool()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, _sigterm_handler)
+
+    try:
+        if transport == "stdio":
+            if port != 3000:  # Non-default port specified
+                logger.warning("--port is ignored with stdio transport")
+
+            # Start background dashboard server for stdio mode
+            if not no_dashboard:
+                from cocosearch.dashboard.server import start_dashboard_server
+
+                dashboard_url = start_dashboard_server()
+                if dashboard_url:
+                    _open_browser(dashboard_url)
+
+            _get_cs_log().system("Server listening", transport="stdio")
+            mcp.run(transport="stdio")
+        elif transport == "sse":
+            # Suppress verbose per-request access logs from uvicorn
+            logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+            # Configure host/port for network transport
+            mcp.settings.host = host
+            mcp.settings.port = port
+            logger.info(f"Connect at http://{host}:{port}/sse")
+            logger.info(f"Health check at http://{host}:{port}/health")
+
+            if not no_dashboard:
+                dashboard_url = f"http://127.0.0.1:{port}/dashboard"
                 _open_browser(dashboard_url)
 
-        _get_cs_log().system("Server listening", transport="stdio")
-        mcp.run(transport="stdio")
-    elif transport == "sse":
-        # Suppress verbose per-request access logs from uvicorn
-        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-        # Configure host/port for network transport
-        mcp.settings.host = host
-        mcp.settings.port = port
-        logger.info(f"Connect at http://{host}:{port}/sse")
-        logger.info(f"Health check at http://{host}:{port}/health")
+            _get_cs_log().system(
+                "Server listening", transport="sse", url=f"http://{host}:{port}"
+            )
+            mcp.run(transport="sse")
+        elif transport == "http":
+            # Suppress verbose per-request access logs from uvicorn
+            logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+            # Configure host/port for network transport
+            mcp.settings.host = host
+            mcp.settings.port = port
+            logger.info(f"Connect at http://{host}:{port}/mcp")
+            logger.info(f"Health check at http://{host}:{port}/health")
 
-        if not no_dashboard:
-            dashboard_url = f"http://127.0.0.1:{port}/dashboard"
-            _open_browser(dashboard_url)
+            if not no_dashboard:
+                dashboard_url = f"http://127.0.0.1:{port}/dashboard"
+                _open_browser(dashboard_url)
 
-        _get_cs_log().system(
-            "Server listening", transport="sse", url=f"http://{host}:{port}"
-        )
-        mcp.run(transport="sse")
-    elif transport == "http":
-        # Suppress verbose per-request access logs from uvicorn
-        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-        # Configure host/port for network transport
-        mcp.settings.host = host
-        mcp.settings.port = port
-        logger.info(f"Connect at http://{host}:{port}/mcp")
-        logger.info(f"Health check at http://{host}:{port}/health")
+            _get_cs_log().system(
+                "Server listening",
+                transport="http",
+                url=f"http://{host}:{port}",
+            )
+            mcp.run(transport="streamable-http")
+        else:
+            # Should not reach here if CLI validates
+            raise ValueError(f"Invalid transport: {transport}")
+    finally:
+        # Close DB pool on server exit — runs after mcp.run() returns,
+        # whether from clean shutdown, KeyboardInterrupt, or any exception.
+        # This is the primary cleanup path; atexit in db.py is defense-in-depth.
+        from cocosearch.search.db import close_pool
 
-        if not no_dashboard:
-            dashboard_url = f"http://127.0.0.1:{port}/dashboard"
-            _open_browser(dashboard_url)
-
-        _get_cs_log().system(
-            "Server listening", transport="http", url=f"http://{host}:{port}"
-        )
-        mcp.run(transport="streamable-http")
-    else:
-        # Should not reach here if CLI validates
-        raise ValueError(f"Invalid transport: {transport}")
+        close_pool()
+        _get_cs_log().system("Server stopped — connection pool closed")

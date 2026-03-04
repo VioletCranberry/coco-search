@@ -290,6 +290,10 @@ def clear_index_path(index_name: str) -> bool:
 
 _STALE_INDEXING_THRESHOLD_SECONDS = 3600  # 1 hour
 
+# Track indexes already recovered this process to avoid log spam
+# from repeated polling (e.g., dashboard refreshing every 3 seconds).
+_recovered_indexes: set[str] = set()
+
 
 def auto_recover_stale_indexing(index_name: str) -> bool:
     """Auto-recover an index stuck in 'indexing' status.
@@ -299,12 +303,18 @@ def auto_recover_stale_indexing(index_name: str) -> bool:
     where the indexing process completed but was interrupted before the
     finally block could update the status.
 
+    Tracks already-recovered indexes to avoid repeated warnings when
+    called from polling endpoints (e.g., dashboard stats refresh).
+
     Args:
         index_name: The name of the index.
 
     Returns:
         True if status was recovered, False otherwise.
     """
+    if index_name in _recovered_indexes:
+        return False
+
     metadata = get_index_metadata(index_name)
     if metadata is None:
         return False
@@ -323,7 +333,10 @@ def auto_recover_stale_indexing(index_name: str) -> bool:
         elapsed,
         _STALE_INDEXING_THRESHOLD_SECONDS,
     )
-    return set_index_status(index_name, "indexed", update_timestamp=False)
+    recovered = set_index_status(index_name, "indexed", update_timestamp=False)
+    if recovered:
+        _recovered_indexes.add(index_name)
+    return recovered
 
 
 def set_index_status(
@@ -367,6 +380,13 @@ def set_index_status(
                     )
                 updated = cur.rowcount > 0
             conn.commit()
+
+        # When an index starts indexing again, clear the recovery
+        # tracking so auto_recover_stale_indexing can fire if it
+        # gets stuck again in the future.
+        if status == "indexing":
+            _recovered_indexes.discard(index_name)
+
         return updated
     except Exception:
         # Table doesn't exist yet (fresh database)

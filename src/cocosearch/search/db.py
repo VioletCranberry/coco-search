@@ -64,6 +64,8 @@ def get_connection_pool() -> ConnectionPool:
 
                 _pool = ConnectionPool(
                     conninfo=conninfo,
+                    min_size=2,
+                    max_size=10,
                     configure=configure,
                 )
                 atexit.register(close_pool)
