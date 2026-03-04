@@ -525,7 +525,7 @@ Beyond language-level support, CocoSearch recognizes **grammars** — domain-spe
 ┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┓
 ┃ Grammar        ┃ File Format ┃ Path Patterns                                                                    ┃ Deps ┃
 ┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━┩
-│ argocd         │ yaml        │ *.yaml, *.yml                                                                    │  ✗   │
+│ argocd         │ yaml        │ *.yaml, *.yml                                                                    │  ✓   │
 │ docker-compose │ yaml        │ docker-compose*.yml, docker-compose*.yaml, compose*.yml, compose*.yaml           │  ✓   │
 │ github-actions │ yaml        │ .github/workflows/*.yml, .github/workflows/*.yaml                                │  ✓   │
 │ gitlab-ci      │ yaml        │ .gitlab-ci.yml                                                                   │  ✓   │
