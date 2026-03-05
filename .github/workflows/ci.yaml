@@ -9,8 +9,34 @@ env:
   PYTHON_VERSION: "3.11"
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      versions: ${{ steps.filter.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'src/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            versions:
+              - 'pyproject.toml'
+              - 'src/cocosearch/__init__.py'
+              - '.claude-plugin/**'
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +52,8 @@ jobs:
 
   validate-versions:
     name: Validate Versions
+    needs: changes
+    if: needs.changes.outputs.versions == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +84,8 @@ jobs:
 
   unit-tests:
     name: Unit Tests
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
