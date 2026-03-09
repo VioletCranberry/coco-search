@@ -163,6 +163,21 @@ class TestEmbeddingSection:
         with pytest.raises(ValidationError, match="Invalid embedding provider"):
             EmbeddingSection(provider="invalid-provider")
 
+    def test_base_url_default_none(self):
+        """baseUrl defaults to None."""
+        section = EmbeddingSection()
+        assert section.baseUrl is None
+
+    def test_base_url_accepts_string(self):
+        """baseUrl accepts a string URL."""
+        section = EmbeddingSection(baseUrl="http://localhost:8080")
+        assert section.baseUrl == "http://localhost:8080"
+
+    def test_base_url_rejects_non_string(self):
+        """baseUrl rejects non-string values in strict mode."""
+        with pytest.raises(ValidationError):
+            EmbeddingSection(baseUrl=8080)
+
 
 class TestLoggingSection:
     """Test LoggingSection model."""

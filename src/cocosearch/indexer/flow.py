@@ -248,6 +248,7 @@ def run_index(
         ollama_url=os.environ.get("COCOSEARCH_OLLAMA_URL"),
         embedding_model=embedding_model,
         provider=embedding_provider,
+        base_url=os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL"),
     )
 
     _get_cs_log().infra(

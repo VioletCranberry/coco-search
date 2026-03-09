@@ -219,6 +219,42 @@ class TestCheckInfrastructure:
                         provider="openai",
                     )
 
+    def test_openai_with_base_url_skips_api_key_check(self):
+        """OpenAI with base_url skips API key check (local server)."""
+        mock_conn = MagicMock()
+        with patch(
+            "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
+        ):
+            with patch.dict("os.environ", {}, clear=False):
+                import os
+
+                os.environ.pop("COCOSEARCH_EMBEDDING_API_KEY", None)
+                # Should NOT raise even without API key
+                check_infrastructure(
+                    "postgresql://localhost/test",
+                    None,
+                    provider="openai",
+                    base_url="http://localhost:8080",
+                )
+
+    def test_openai_without_base_url_requires_api_key(self):
+        """OpenAI without base_url still requires API key."""
+        mock_conn = MagicMock()
+        with patch(
+            "cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn
+        ):
+            with patch.dict("os.environ", {}, clear=False):
+                import os
+
+                os.environ.pop("COCOSEARCH_EMBEDDING_API_KEY", None)
+                with pytest.raises(ConnectionError, match="requires an API key"):
+                    check_infrastructure(
+                        "postgresql://localhost/test",
+                        None,
+                        provider="openai",
+                        base_url=None,
+                    )
+
 
 class TestCheckApiKey:
     """Tests for check_api_key."""

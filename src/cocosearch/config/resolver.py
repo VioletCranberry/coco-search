@@ -268,10 +268,16 @@ class ConfigResolver:
             "embedding.outputDimension", None, "COCOSEARCH_EMBEDDING_OUTPUT_DIMENSION"
         )
 
+        base_url, _ = self.resolve(
+            "embedding.baseUrl", None, "COCOSEARCH_EMBEDDING_BASE_URL"
+        )
+
         os.environ["COCOSEARCH_EMBEDDING_PROVIDER"] = str(provider)
         os.environ["COCOSEARCH_EMBEDDING_MODEL"] = str(model)
         if dim is not None:
             os.environ["COCOSEARCH_EMBEDDING_OUTPUT_DIMENSION"] = str(dim)
+        if base_url is not None:
+            os.environ["COCOSEARCH_EMBEDDING_BASE_URL"] = str(base_url)
 
         return provider, model
 
