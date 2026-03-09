@@ -73,7 +73,7 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 - Uses CocoIndex's shared transform — embedding function evaluated once and reused across all chunks in the flow
 - The filename prefix is only used for embedding input — the stored `content_text` column retains the raw chunk text
 - Same embedding function used during search queries to ensure consistency (search queries are NOT prefixed with filenames — intentional asymmetry: document embeddings are enriched, queries stay natural)
-- Ollama server address configured via `COCOSEARCH_OLLAMA_URL` environment variable (defaults to http://localhost:11434)
+- Server address configured via `COCOSEARCH_EMBEDDING_BASE_URL` (or `embedding.baseUrl` in config) for any provider, overriding the default endpoint. For the `ollama` provider specifically, `COCOSEARCH_OLLAMA_URL` is the fallback (defaults to http://localhost:11434)
 
 **Implementation:** `src/cocosearch/indexer/embedder.py` — `add_filename_context`, `code_to_embedding`
 

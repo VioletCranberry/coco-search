@@ -253,9 +253,9 @@ class ConfigResolver:
     def bridge_embedding_config(self) -> tuple[str, str]:
         """Resolve embedding config and bridge to env vars.
 
-        Ensures COCOSEARCH_EMBEDDING_PROVIDER, COCOSEARCH_EMBEDDING_MODEL, and
-        COCOSEARCH_EMBEDDING_OUTPUT_DIMENSION env vars reflect the full
-        precedence chain (env > config file > default).
+        Ensures COCOSEARCH_EMBEDDING_PROVIDER, COCOSEARCH_EMBEDDING_MODEL,
+        COCOSEARCH_EMBEDDING_OUTPUT_DIMENSION, and COCOSEARCH_EMBEDDING_BASE_URL
+        env vars reflect the full precedence chain (env > config file > default).
 
         Returns:
             Tuple of (provider, model).

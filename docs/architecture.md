@@ -12,7 +12,7 @@ CocoSearch is a local-first hybrid semantic code search system. This document pr
 
 ## System Components
 
-**Embedding Provider:** Generates 768-dimensional vectors from code chunks. By default, Ollama runs `nomic-embed-text` locally — no API keys, no network calls. Optional remote providers (OpenAI with `text-embedding-3-small`, OpenRouter) are available for teams that prefer managed infrastructure. Implementation: `src/cocosearch/indexer/embedder.py`
+**Embedding Provider:** Generates 768-dimensional vectors from code chunks. By default, Ollama runs `nomic-embed-text` locally — no API keys, no network calls. Optional remote providers (OpenAI with `text-embedding-3-small`, OpenRouter) are available for teams that prefer managed infrastructure. Any provider can be pointed at a custom endpoint via `baseUrl` for local OpenAI-compatible servers (Infinity, text-embeddings-inference, vLLM). Implementation: `src/cocosearch/indexer/embedder.py`
 
 **PostgreSQL + pgvector:** Database storing code chunks with their vector embeddings. The pgvector extension enables efficient cosine similarity search over embedding vectors. Also provides full-text search via tsvector columns for keyword matching. Implementation: `src/cocosearch/search/db.py`
 
@@ -90,7 +90,7 @@ See [MCP Tools Reference](mcp-tools.md) for complete parameter documentation, re
 
 ## Key Design Decisions
 
-**Local-first:** All processing happens on your machine by default. Ollama runs the embedding model locally, PostgreSQL stores data locally. Optional remote embedding providers (OpenAI, OpenRouter) send only chunk text for embedding — all indexing, storage, and search remain local. Your code never leaves your environment.
+**Local-first:** All processing happens on your machine by default. Ollama runs the embedding model locally, PostgreSQL stores data locally. Optional remote embedding providers (OpenAI, OpenRouter) send only chunk text for embedding — all indexing, storage, and search remain local. Any provider can also target a local OpenAI-compatible server via `baseUrl`, keeping embeddings fully on-machine without Ollama. Your code never leaves your environment.
 
 **Infra-only Docker:** Docker provides PostgreSQL+pgvector and Ollama infrastructure only. CocoSearch runs natively via `uvx` for faster iteration and simpler updates. This keeps the Docker image lightweight and avoids Python dependency management inside containers.
 
