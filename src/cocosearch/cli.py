@@ -1873,6 +1873,14 @@ def config_check_command(args: argparse.Namespace) -> int:
         )
         table.add_row("COCOSEARCH_OLLAMA_URL", ollama_url, ollama_url_source)
 
+    # EMBEDDING_BASE_URL (optional, any provider)
+    base_url, base_url_source = check_resolver.resolve(
+        "embedding.baseUrl", None, "COCOSEARCH_EMBEDDING_BASE_URL"
+    )
+    if base_url is not None:
+        base_url_source = _source_label(base_url_source)
+        table.add_row("COCOSEARCH_EMBEDDING_BASE_URL", base_url, base_url_source)
+
     console.print(table)
     console.print()
 

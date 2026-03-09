@@ -575,6 +575,7 @@ indexing:
 embedding:
   provider: ollama  # ollama (default), openai, openrouter
   model: nomic-embed-text  # default depends on provider
+  # baseUrl: http://localhost:8080  # custom OpenAI-compatible endpoint
 ```
 
 ### Remote Embedding Providers
@@ -599,10 +600,23 @@ uv run cocosearch config check
 | Provider | Default Model | API Key Required |
 |----------|--------------|-----------------|
 | `ollama` | `nomic-embed-text` | No (local) |
-| `openai` | `text-embedding-3-small` | Yes |
-| `openrouter` | `openai/text-embedding-3-small` | Yes |
+| `openai` | `text-embedding-3-small` | Yes (optional with `baseUrl`) |
+| `openrouter` | `openai/text-embedding-3-small` | Yes (optional with `baseUrl`) |
 
 Switching providers on an existing index requires `--fresh` to reindex with the new embedding model.
+
+#### Custom Endpoints
+
+Use `embedding.baseUrl` (or `COCOSEARCH_EMBEDDING_BASE_URL`) to point any provider at a local OpenAI-compatible server such as [Infinity](https://github.com/michaelfeil/infinity), [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference), or [vLLM](https://github.com/vllm-project/vllm):
+
+```yaml
+embedding:
+  provider: openai
+  model: BAAI/bge-small-en-v1.5
+  baseUrl: http://localhost:8080
+```
+
+When `baseUrl` is set, the API key is not required. For the `ollama` provider, `baseUrl` overrides `COCOSEARCH_OLLAMA_URL`.
 
 ## Testing
 

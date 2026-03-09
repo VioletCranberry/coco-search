@@ -134,7 +134,7 @@ By default, everything described above runs on your machine:
 
 The only external dependencies are Docker (to run Postgres and Ollama) and the embedding model weights (downloaded once by Ollama). After that, you could run CocoSearch on an airplane.
 
-**Optional remote embeddings:** If you prefer managed infrastructure or don't want to run Ollama locally, CocoSearch supports OpenAI and OpenRouter as embedding providers. When using a remote provider, only chunk text is sent for embedding — all indexing logic, storage, and search remain fully local. Configure via `embedding.provider` in `cocosearch.yaml` or the `COCOSEARCH_EMBEDDING_PROVIDER` environment variable.
+**Optional remote embeddings:** If you prefer managed infrastructure or don't want to run Ollama locally, CocoSearch supports OpenAI and OpenRouter as embedding providers. When using a remote provider, only chunk text is sent for embedding — all indexing logic, storage, and search remain fully local. Configure via `embedding.provider` in `cocosearch.yaml` or the `COCOSEARCH_EMBEDDING_PROVIDER` environment variable. You can also use `embedding.baseUrl` (or `COCOSEARCH_EMBEDDING_BASE_URL`) to point any provider at a local OpenAI-compatible server (Infinity, text-embeddings-inference, vLLM) — in that case, no API key is required and embeddings stay fully local.
 
 ## Beyond Search: Dependency Graph
 

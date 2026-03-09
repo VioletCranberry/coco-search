@@ -144,14 +144,17 @@ def code_to_embedding(
 
     kwargs: dict = {"api_type": api_type, "model": model}
 
-    if provider == "ollama":
-        kwargs["address"] = os.environ.get("COCOSEARCH_OLLAMA_URL")
-    else:
-        api_key = os.environ.get("COCOSEARCH_EMBEDDING_API_KEY")
-        if api_key:
-            kwargs["api_key"] = cocoindex.auth_registry.add_transient_auth_entry(
-                api_key
-            )
+    # Resolve address: COCOSEARCH_EMBEDDING_BASE_URL (universal) > COCOSEARCH_OLLAMA_URL (ollama fallback)
+    address = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
+    if address is None and provider == "ollama":
+        address = os.environ.get("COCOSEARCH_OLLAMA_URL")
+    if address:
+        kwargs["address"] = address
+
+    # API key (any provider — local servers just won't set it)
+    api_key = os.environ.get("COCOSEARCH_EMBEDDING_API_KEY")
+    if api_key:
+        kwargs["api_key"] = cocoindex.auth_registry.add_transient_auth_entry(api_key)
 
     output_dim = _resolve_output_dimension(model)
     if output_dim is not None:

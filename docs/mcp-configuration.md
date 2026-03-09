@@ -197,6 +197,14 @@ claude mcp add --scope user \
   --env COCOSEARCH_EMBEDDING_API_KEY=sk-... \
   cocosearch -- \
   uvx --from cocosearch cocosearch mcp --project-from-cwd
+
+# Or with a local OpenAI-compatible server (no API key needed):
+claude mcp add --scope user \
+  --env COCOSEARCH_EMBEDDING_PROVIDER=openai \
+  --env COCOSEARCH_EMBEDDING_BASE_URL=http://localhost:8080 \
+  --env COCOSEARCH_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5 \
+  cocosearch -- \
+  uvx --from cocosearch cocosearch mcp --project-from-cwd
 ```
 
 **Claude Desktop / OpenCode (JSON config):**
@@ -212,7 +220,19 @@ Add to your server's `"env"` block (or `"environment"` for OpenCode):
 }
 ```
 
-Supported providers: `ollama` (default), `openai`, `openrouter`. With a remote provider, you do not need Ollama running — only PostgreSQL is required.
+For a local OpenAI-compatible server, use `COCOSEARCH_EMBEDDING_BASE_URL` instead of an API key:
+
+```json
+{
+  "env": {
+    "COCOSEARCH_EMBEDDING_PROVIDER": "openai",
+    "COCOSEARCH_EMBEDDING_BASE_URL": "http://localhost:8080",
+    "COCOSEARCH_EMBEDDING_MODEL": "BAAI/bge-small-en-v1.5"
+  }
+}
+```
+
+Supported providers: `ollama` (default), `openai`, `openrouter`. With a remote provider, you do not need Ollama running — only PostgreSQL is required. Use `COCOSEARCH_EMBEDDING_BASE_URL` (or `embedding.baseUrl` in config) to point any provider at a custom endpoint.
 
 ### Project Detection
 

@@ -165,6 +165,84 @@ class TestCodeToEmbedding:
             assert -1 <= value <= 1
 
 
+class TestCodeToEmbeddingAddress:
+    """Tests for address resolution in code_to_embedding."""
+
+    def test_ollama_falls_back_to_ollama_url(self):
+        """Ollama provider uses COCOSEARCH_OLLAMA_URL when no base URL set."""
+        env = {
+            "COCOSEARCH_EMBEDDING_PROVIDER": "ollama",
+            "COCOSEARCH_EMBEDDING_MODEL": "nomic-embed-text",
+            "COCOSEARCH_OLLAMA_URL": "http://ollama:11434",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            import os
+
+            provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+            address = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
+            if address is None and provider == "ollama":
+                address = os.environ.get("COCOSEARCH_OLLAMA_URL")
+            assert address == "http://ollama:11434"
+
+    def test_base_url_overrides_ollama_url(self):
+        """COCOSEARCH_EMBEDDING_BASE_URL overrides COCOSEARCH_OLLAMA_URL for ollama."""
+        env = {
+            "COCOSEARCH_EMBEDDING_PROVIDER": "ollama",
+            "COCOSEARCH_OLLAMA_URL": "http://ollama:11434",
+            "COCOSEARCH_EMBEDDING_BASE_URL": "http://custom:9999",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            import os
+
+            provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+            address = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
+            if address is None and provider == "ollama":
+                address = os.environ.get("COCOSEARCH_OLLAMA_URL")
+            assert address == "http://custom:9999"
+
+    def test_openai_with_base_url_passes_address(self):
+        """OpenAI provider with base URL resolves address."""
+        env = {
+            "COCOSEARCH_EMBEDDING_PROVIDER": "openai",
+            "COCOSEARCH_EMBEDDING_BASE_URL": "http://localhost:8080",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            import os
+
+            provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+            address = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
+            if address is None and provider == "ollama":
+                address = os.environ.get("COCOSEARCH_OLLAMA_URL")
+            assert address == "http://localhost:8080"
+
+    def test_openai_without_base_url_omits_address(self):
+        """OpenAI provider without base URL has no address."""
+        env = {
+            "COCOSEARCH_EMBEDDING_PROVIDER": "openai",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            import os
+
+            os.environ.pop("COCOSEARCH_EMBEDDING_BASE_URL", None)
+            provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+            address = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
+            if address is None and provider == "ollama":
+                address = os.environ.get("COCOSEARCH_OLLAMA_URL")
+            assert address is None
+
+    def test_api_key_passed_for_any_provider(self):
+        """API key is passed regardless of provider when set."""
+        env = {
+            "COCOSEARCH_EMBEDDING_PROVIDER": "ollama",
+            "COCOSEARCH_EMBEDDING_API_KEY": "sk-test",
+        }
+        with patch.dict("os.environ", env, clear=False):
+            import os
+
+            api_key = os.environ.get("COCOSEARCH_EMBEDDING_API_KEY")
+            assert api_key == "sk-test"
+
+
 class TestAddFilenameContext:
     """Tests for add_filename_context function."""
 

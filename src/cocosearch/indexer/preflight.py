@@ -24,11 +24,14 @@ def check_infrastructure(
     ollama_url: str | None = None,
     embedding_model: str = "nomic-embed-text",
     provider: str = "ollama",
+    base_url: str | None = None,
 ) -> None:
     """Check infrastructure is reachable. Raises ConnectionError if not.
 
     For Ollama provider: checks PostgreSQL, Ollama server, and model availability.
     For remote providers (OpenAI, OpenRouter): checks PostgreSQL and API key.
+    When base_url is set for remote providers, API key check is skipped
+    (local OpenAI-compatible server, key optional).
     """
     check_postgres(db_url)
     if provider == "ollama":
@@ -36,7 +39,8 @@ def check_infrastructure(
         check_ollama(resolved_url)
         check_ollama_model(resolved_url, embedding_model)
     else:
-        check_api_key(provider)
+        if base_url is None:
+            check_api_key(provider)
 
 
 def check_postgres(db_url: str) -> None:

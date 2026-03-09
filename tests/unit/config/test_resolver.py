@@ -297,6 +297,7 @@ class TestBridgeEmbeddingConfig:
         "COCOSEARCH_EMBEDDING_PROVIDER",
         "COCOSEARCH_EMBEDDING_MODEL",
         "COCOSEARCH_EMBEDDING_OUTPUT_DIMENSION",
+        "COCOSEARCH_EMBEDDING_BASE_URL",
     )
 
     @pytest.fixture(autouse=True)
@@ -377,3 +378,22 @@ class TestBridgeEmbeddingConfig:
         resolver.bridge_embedding_config()
 
         assert "COCOSEARCH_EMBEDDING_OUTPUT_DIMENSION" not in os.environ
+
+    def test_bridge_base_url_from_config(self):
+        """baseUrl is bridged to env var when set in config."""
+        config = CocoSearchConfig()
+        config.embedding.baseUrl = "http://localhost:8080"
+        resolver = ConfigResolver(config, config_path=Path("/config.yaml"))
+
+        resolver.bridge_embedding_config()
+
+        assert os.environ["COCOSEARCH_EMBEDDING_BASE_URL"] == "http://localhost:8080"
+
+    def test_bridge_base_url_not_set_when_none(self):
+        """baseUrl env var is not set when value is None."""
+        config = CocoSearchConfig()  # baseUrl defaults to None
+        resolver = ConfigResolver(config)
+
+        resolver.bridge_embedding_config()
+
+        assert "COCOSEARCH_EMBEDDING_BASE_URL" not in os.environ
