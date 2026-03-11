@@ -9,9 +9,11 @@ Get a project indexed and searchable in under 2 minutes. This skill checks prere
 
 ## Step 1: Check Infrastructure
 
-Before indexing, verify the required services are running.
+Before indexing, verify the required services are running. The checks depend on which embedding provider is configured.
 
-**Run these checks:**
+**First, determine the provider:** Check `cocosearch.yaml` for `embedding.provider` (or the `COCOSEARCH_EMBEDDING_PROVIDER` env var). If neither is set, the default is `ollama`. Also check for `embedding.baseUrl` (or `COCOSEARCH_EMBEDDING_BASE_URL`).
+
+**All providers need PostgreSQL:**
 
 1. **PostgreSQL (pgvector):**
    ```bash
@@ -19,16 +21,32 @@ Before indexing, verify the required services are running.
    ```
    - If not running: `docker compose up -d` (from the CocoSearch project root)
 
-2. **Ollama (embedding model):**
+**Then check the embedding provider:**
+
+2a. **If provider is `ollama` (default):**
    ```bash
    curl -s http://localhost:11434/api/tags | head -c 200
    ```
    - If not running: `docker compose --profile ollama up -d` or `ollama serve`
    - If running but no model: `ollama pull nomic-embed-text`
+   - If `baseUrl` is set, check that URL instead of localhost:11434
 
-**If both are running:** Proceed to Step 2.
+2b. **If provider is `openai` or `openrouter`:**
+   - **Without `baseUrl`:** Verify `COCOSEARCH_EMBEDDING_API_KEY` is set:
+     ```bash
+     echo ${COCOSEARCH_EMBEDDING_API_KEY:+"API key is set"}
+     ```
+     If not set: `export COCOSEARCH_EMBEDDING_API_KEY=sk-...`
+     No Ollama needed.
+   - **With `baseUrl`:** Verify the custom endpoint is reachable:
+     ```bash
+     curl -s <baseUrl>/v1/models | head -c 200
+     ```
+     API key is not required (local OpenAI-compatible servers typically don't need one).
 
-**If neither is running and user has CocoSearch cloned:**
+**If PostgreSQL + provider checks pass:** Proceed to Step 2.
+
+**If nothing is running and user has CocoSearch cloned (Ollama provider):**
 ```bash
 cd /path/to/cocosearch && docker compose --profile ollama up -d
 ```
@@ -58,7 +76,7 @@ index_codebase(path="<current-project-root>", index_name="<configured-name>")
 **Always pass `index_name` explicitly** to match the project config. If no `cocosearch.yaml` exists, the auto-derived name is fine. Indexing will:
 - Discover all supported files (Python, TypeScript, Go, Rust, Java, C/C++, HCL, Dockerfile, Bash, Markdown, YAML)
 - Parse symbols via Tree-sitter (functions, classes, methods)
-- Generate embeddings via Ollama (nomic-embed-text)
+- Generate embeddings via the configured provider (ollama/nomic-embed-text by default)
 - Store everything in PostgreSQL with pgvector
 
 **Typical timing:** ~30s for small projects (<100 files), 1-2 min for medium (100-500 files), 3-5 min for large (500+ files).
@@ -95,7 +113,9 @@ search_code(query="main entry point", index_name="<name>")
 **Bad result:** Returns unrelated code or no results.
 
 **If results are poor:**
-- Check that Ollama is running and the embedding model is loaded
+- **Ollama provider:** Check that Ollama is running and the embedding model is loaded (`curl -s http://localhost:11434/api/tags`)
+- **Remote provider (openai/openrouter):** Verify `COCOSEARCH_EMBEDDING_API_KEY` is set correctly
+- **Any provider with `baseUrl`:** Verify the custom endpoint is reachable
 - Try reindexing: `index_codebase(path="<path>", index_name="<configured-name>")`
 - Try a more specific query related to your project
 
