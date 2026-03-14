@@ -62,6 +62,7 @@ uv run ruff format src/ tests/          # Format code
 uv run cocosearch index .
 uv run cocosearch search "query"
 uv run cocosearch search -i          # Interactive REPL
+uv run cocosearch search --indexes "repo_a,repo_b" "query"  # Cross-index search
 uv run cocosearch analyze "query"    # Pipeline analysis with diagnostics
 uv run cocosearch analyze "query" --json  # JSON pipeline analysis
 uv run cocosearch stats
@@ -109,7 +110,8 @@ uv run cocosearch mcp --project-from-cwd
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (16 languages via `.scm` queries in `indexer/queries/`), multi-provider embedding (`embedder.py` — Ollama/OpenAI/OpenRouter via `PROVIDER_MAP`), tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py` — conditional Ollama vs API key checks), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
-- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries for 10 languages (`context_expander.py`, exports `CONTEXT_EXPANSION_LANGUAGES`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), optional dependency enrichment (`include_deps` attaches direct dependencies/dependents to search results), interactive REPL (`repl.py`), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics (`analyze.py`)
+- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries for 10 languages (`context_expander.py`, exports `CONTEXT_EXPANSION_LANGUAGES`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), optional dependency enrichment (`include_deps` attaches direct dependencies/dependents to search results), interactive REPL (`repl.py`), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics (`analyze.py`), cross-index orchestrator (`multi.py`)
+- **`search/multi.py`** — Cross-index search orchestrator: `multi_search()` queries multiple indexes in parallel via `ThreadPoolExecutor`, pre-computes query embedding once, tags results with source `index_name`, merges by score. Handles partial failures gracefully.
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution (`env_substitution.py`), Pydantic schema validation (`schema.py` with `extra="forbid"`, `strict=True`, `EmbeddingSection` with `provider` field, provider-aware model defaults, and optional `baseUrl` for custom endpoints, `LoggingSection` with `file` toggle), user-friendly error formatting with fuzzy field suggestions (`errors.py`), env var validation (`env_validation.py`)
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py` — includes `check_deps_staleness()` for dependency freshness checks), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection, status tracking, embedding provider/model tracking, and `deps_extracted_at` timestamp (`metadata.py`), project root detection (`context.py`)
@@ -118,7 +120,7 @@ uv run cocosearch mcp --project-from-cwd
 - **`dashboard/`** — Terminal (Rich) and web (Chart.js) dashboards. In stdio MCP mode, `server.py` launches uvicorn in a daemon thread running the MCP server's `sse_app()` — all routes are served from a single source of truth (no duplicated handlers). Web static assets are split into ES modules: `dashboard/web/static/index.html` (HTML only), `css/styles.css`, and `js/` with modules (`app.js` entry point, `state.js` shared state, `api.js`, `utils.js`, `charts.js`, `dashboard.js`, `index-mgmt.js`, `search.js`, `logs.js`). Static files served via `/static/{path}` route with path traversal protection.
 - **`.claude-plugin/`** — Claude Code plugin metadata: `plugin.json` (MCP server definition, version, keywords) and `marketplace.json` (marketplace listing). Versions must match `pyproject.toml` — the release workflow syncs them automatically.
 
-**Data flow:** Files → Tree-sitter parse → symbol extraction → chunking → embeddings (Ollama/OpenAI/OpenRouter) → PostgreSQL (pgvector). Search queries → embedding → hybrid RRF (vector similarity + tsvector keyword) → context expansion → results.
+**Data flow:** Files → Tree-sitter parse → symbol extraction → chunking → embeddings (Ollama/OpenAI/OpenRouter) → PostgreSQL (pgvector). Search queries → embedding → hybrid RRF (vector similarity + tsvector keyword) → context expansion → results. Cross-index search: query → single embedding → parallel per-index search → score-based merge → unified results.
 
 **Key patterns:**
 
@@ -225,7 +227,7 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 
 ### MCP Tools
 
-- `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`. Optional `include_deps=True` attaches dependency info to results.
+- `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`. Optional `include_deps=True` attaches dependency info to results. Optional `index_names` parameter for cross-index search across multiple projects.
 - `analyze_query` — Pipeline diagnostics: see why a query returns specific results (stage timings, mode selection, RRF fusion breakdown)
 - `index_codebase` — Index a directory for search
 - `list_indexes` — List all available indexes

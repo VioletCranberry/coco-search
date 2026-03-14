@@ -14,10 +14,11 @@ export async function executeSearch() {
     const query = document.getElementById('searchInput').value.trim();
     if (!query) return;
 
+    const searchAll = document.getElementById('searchAllIndexes').checked;
     const select = document.getElementById('indexSelect');
     const indexIndex = parseInt(select.value);
     const stats = state.allIndexes[indexIndex];
-    if (!stats) return;
+    if (!searchAll && !stats) return;
 
     const language = document.getElementById('searchLanguage').value || undefined;
     const symbolType = document.getElementById('searchSymbolType').value || undefined;
@@ -42,10 +43,28 @@ export async function executeSearch() {
     try {
         const body = {
             query: query,
-            index_name: stats.name,
             limit: limit,
             min_score: minScore,
         };
+
+        if (searchAll) {
+            // Cross-index search: send all indexed project names
+            const indexedNames = state.allIndexes
+                .filter(idx => idx.status === 'indexed' || idx.status === 'ready')
+                .map(idx => idx.name);
+            if (indexedNames.length >= 2) {
+                body.index_names = indexedNames;
+            } else if (indexedNames.length === 1) {
+                body.index_name = indexedNames[0];
+            } else {
+                document.getElementById('searchError').textContent = 'No indexed projects available';
+                document.getElementById('searchError').style.display = 'block';
+                return;
+            }
+        } else {
+            body.index_name = stats.name;
+        }
+
         if (language) body.language = language;
         if (symbolType) body.symbol_type = symbolType;
         if (useHybrid !== undefined) body.use_hybrid = useHybrid;
@@ -188,6 +207,7 @@ function displaySearchResults(data) {
         const scoreClass = r.score >= 0.7 ? 'badge-score-high' : r.score >= 0.4 ? 'badge-score-mid' : 'badge-score-low';
         const matchBadge = r.match_type ? `<span class="search-result-badge badge-match">${escapeHtml(r.match_type)}</span>` : '';
         const langBadge = r.language_id ? `<span class="search-result-badge badge-lang">${escapeHtml(r.language_id)}</span>` : '';
+        const indexBadge = r.index_name ? `<span class="search-result-badge badge-index">${escapeHtml(r.index_name)}</span>` : '';
         const lineRange = r.start_line && r.end_line ? `Lines ${r.start_line}-${r.end_line}` : '';
         const escapedPath = escapeHtml(r.file_path).replace(/'/g, "\\'");
 
@@ -216,6 +236,7 @@ function displaySearchResults(data) {
                     <span class="search-result-badge ${scoreClass}">${r.score.toFixed(2)}</span>
                     ${matchBadge}
                     ${langBadge}
+                    ${indexBadge}
                     ${badgesHtml}
                 </div>
             </div>

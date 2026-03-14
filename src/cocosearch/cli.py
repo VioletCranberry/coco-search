@@ -389,8 +389,28 @@ def search_command(args: argparse.Namespace) -> int:
     # Create resolver with loaded config
     resolver = ConfigResolver(project_config, config_path)
 
-    # Resolve index name with CLI > env > config > git > cwd fallback
-    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+    # Check for cross-index search mode
+    indexes_arg = getattr(args, "indexes", None)
+    if indexes_arg and args.index:
+        console.print(
+            "[bold red]Error:[/bold red] --index and --indexes are mutually exclusive"
+        )
+        return 1
+
+    use_multi_search = False
+    multi_index_names: list[str] = []
+    if indexes_arg:
+        multi_index_names = [n.strip() for n in indexes_arg.split(",") if n.strip()]
+        if len(multi_index_names) < 2:
+            console.print(
+                "[bold red]Error:[/bold red] --indexes requires at least 2 comma-separated index names"
+            )
+            return 1
+        use_multi_search = True
+        index_name = multi_index_names[0]  # For display purposes
+    else:
+        # Resolve index name with CLI > env > config > git > cwd fallback
+        index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
 
     # Resolve search settings with precedence
     limit, _ = resolver.resolve(
@@ -409,13 +429,17 @@ def search_command(args: argparse.Namespace) -> int:
     )
 
     # Always print "Using index:" hint (per CONTEXT.md requirement)
+    if use_multi_search:
+        index_label = f"cross-index: {', '.join(multi_index_names)}"
+    else:
+        index_label = index_name
     if args.pretty or args.interactive:
-        console.print(f"[dim]Using index: {index_name}[/dim]")
+        console.print(f"[dim]Using index: {index_label}[/dim]")
     else:
         # For JSON mode, print to stderr to keep stdout clean
         import sys as _sys
 
-        print(f"Using index: {index_name}", file=_sys.stderr)
+        print(f"Using index: {index_label}", file=_sys.stderr)
 
     # Check for branch staleness and warn if needed
     if args.pretty or args.interactive:
@@ -506,17 +530,32 @@ def search_command(args: argparse.Namespace) -> int:
 
     # Execute search
     try:
-        results = search(
-            query=query,
-            index_name=index_name,
-            limit=limit,
-            min_score=min_score,
-            language_filter=lang_filter,
-            use_hybrid=use_hybrid,
-            symbol_type=symbol_type,
-            symbol_name=symbol_name,
-            no_cache=no_cache,
-        )
+        if use_multi_search:
+            from cocosearch.search.multi import multi_search
+
+            results = multi_search(
+                query=query,
+                index_names=multi_index_names,
+                limit=limit,
+                min_score=min_score,
+                language_filter=lang_filter,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+            )
+        else:
+            results = search(
+                query=query,
+                index_name=index_name,
+                limit=limit,
+                min_score=min_score,
+                language_filter=lang_filter,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+            )
     except Exception as e:
         if args.pretty:
             console.print(f"[bold red]Error:[/bold red] {e}")
@@ -2465,6 +2504,11 @@ def main() -> None:
         "--no-cache",
         action="store_true",
         help="Bypass query cache (force fresh search)",
+    )
+    search_parser.add_argument(
+        "--indexes",
+        help="Comma-separated index names for cross-index search (e.g., 'repo_a,repo_b'). "
+        "Mutually exclusive with --index.",
     )
 
     # Analyze subcommand

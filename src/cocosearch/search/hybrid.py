@@ -214,6 +214,7 @@ def execute_vector_search(
     limit: int = 10,
     where_clause: str = "",
     where_params: list | None = None,
+    query_embedding: list[float] | None = None,
 ) -> list[VectorResult]:
     """Execute vector similarity search.
 
@@ -233,8 +234,9 @@ def execute_vector_search(
     """
     pool = get_connection_pool()
 
-    # Embed query
-    query_embedding = code_to_embedding.eval(query)
+    # Embed query (skip if pre-computed)
+    if query_embedding is None:
+        query_embedding = code_to_embedding.eval(query)
 
     # Build WHERE clause if provided
     where_sql = f"WHERE {where_clause}" if where_clause else ""
@@ -486,6 +488,7 @@ def hybrid_search(
     symbol_type: str | list[str] | None = None,
     symbol_name: str | None = None,
     language_filter: str | None = None,
+    query_embedding: list[float] | None = None,
 ) -> list[HybridSearchResult]:
     """Execute hybrid search combining vector and keyword matching.
 
@@ -559,6 +562,7 @@ def hybrid_search(
         vector_limit,
         where_clause,
         where_params if where_params else None,
+        query_embedding=query_embedding,
     )
     keyword_results = execute_keyword_search(
         query,

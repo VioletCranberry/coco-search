@@ -71,7 +71,7 @@ from cocosearch.management.stats import (  # noqa: E402
     get_grammar_failures,
     get_parse_failures,
 )
-from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
+from cocosearch.search import byte_to_line, multi_search, read_chunk_content, search  # noqa: E402
 from cocosearch.search.analyze import analyze as run_analyze  # noqa: E402
 from cocosearch.search.context_expander import ContextExpander  # noqa: E402
 
@@ -1119,11 +1119,20 @@ async def api_search(request) -> JSONResponse:
 
     query = body.get("query", "").strip()
     index_name = body.get("index_name")
+    index_names_param = body.get("index_names")  # list[str] for cross-index search
 
     if not query:
         return JSONResponse({"error": "query is required"}, status_code=400)
-    if not index_name:
-        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    # Determine search mode: cross-index vs single-index
+    is_multi = isinstance(index_names_param, list) and len(index_names_param) >= 2
+
+    if not is_multi:
+        # Single-index: resolve from index_names (single entry) or index_name
+        if isinstance(index_names_param, list) and len(index_names_param) == 1:
+            index_name = index_names_param[0]
+        if not index_name:
+            return JSONResponse({"error": "index_name is required"}, status_code=400)
 
     limit = body.get("limit", 10)
     language = body.get("language") or None
@@ -1144,24 +1153,56 @@ async def api_search(request) -> JSONResponse:
         )
 
     start_time = time.monotonic()
-    try:
-        results = search(
-            query=query,
-            index_name=index_name,
-            limit=limit,
-            min_score=min_score,
-            language_filter=language,
-            use_hybrid=use_hybrid,
-            symbol_type=symbol_type,
-            symbol_name=symbol_name,
-            no_cache=no_cache,
-            include_deps=include_deps,
-        )
-    except ValueError as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+    if is_multi:
+        # Cross-index search
+        try:
+            results = multi_search(
+                query=query,
+                index_names=index_names_param,
+                limit=limit,
+                min_score=min_score,
+                language_filter=language,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+                include_deps=include_deps,
+            )
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        except Exception as e:
+            logger.error(f"Cross-index search failed: {e}")
+            return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+        # Build per-index metadata for path resolution
+        metadata_by_index: dict[str, dict] = {}
+        for idx_name in index_names_param:
+            meta = get_index_metadata(idx_name)
+            if meta:
+                metadata_by_index[idx_name] = meta
+    else:
+        # Single-index search (existing behavior)
+        try:
+            results = search(
+                query=query,
+                index_name=index_name,
+                limit=limit,
+                min_score=min_score,
+                language_filter=language,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+                include_deps=include_deps,
+            )
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+        metadata_by_index = None
 
     query_time_ms = round((time.monotonic() - start_time) * 1000)
 
@@ -1171,15 +1212,29 @@ async def api_search(request) -> JSONResponse:
         expander = ContextExpander()
 
     # Resolve relative DB paths to absolute using the index's canonical_path
-    metadata = get_index_metadata(index_name)
-    source_path = metadata.get("canonical_path") if metadata else None
+    if not is_multi:
+        metadata = get_index_metadata(index_name)
+        source_path = metadata.get("canonical_path") if metadata else None
 
     output = []
     try:
         for r in results:
-            filepath = (
-                os.path.join(source_path, r.filename) if source_path else r.filename
-            )
+            if is_multi:
+                # Per-result path resolution for cross-index
+                r_source_path = None
+                if r.index_name and metadata_by_index and r.index_name in metadata_by_index:
+                    r_source_path = metadata_by_index[r.index_name].get("canonical_path")
+                filepath = (
+                    os.path.join(r_source_path, r.filename)
+                    if r_source_path
+                    else r.filename
+                )
+            else:
+                filepath = (
+                    os.path.join(source_path, r.filename)
+                    if source_path
+                    else r.filename
+                )
             start_line = byte_to_line(filepath, r.start_byte)
             end_line = byte_to_line(filepath, r.end_byte)
             content = read_chunk_content(filepath, r.start_byte, r.end_byte)
@@ -1197,6 +1252,10 @@ async def api_search(request) -> JSONResponse:
                 "symbol_name": r.symbol_name,
                 "symbol_signature": r.symbol_signature,
             }
+
+            # Include index_name for cross-index results
+            if is_multi and r.index_name is not None:
+                result_dict["index_name"] = r.index_name
 
             # Apply context expansion if requested
             if expander is not None:
@@ -1804,6 +1863,15 @@ async def search_code(
             "When True, each result includes 'dependencies' and 'dependents' lists."
         ),
     ] = True,
+    index_names: Annotated[
+        list[str] | None,
+        Field(
+            description="List of index names to search across multiple projects. "
+            "Searches all specified indexes and returns merged results ranked by relevance. "
+            "Use list_indexes to discover available indexes. "
+            "Mutually exclusive with index_name (index_names takes precedence)."
+        ),
+    ] = None,
 ) -> list[dict]:
     """Search indexed code using natural language.
 
@@ -1821,7 +1889,30 @@ async def search_code(
     for better results when searching for code identifiers.
     If index_name is not provided, auto-detects from current working directory.
     Set include_deps=True to attach dependency information to each result.
+    Use index_names to search across multiple projects in one call.
     """
+    # Handle cross-index search
+    if index_names is not None and len(index_names) >= 2:
+        if index_name is not None:
+            logger.warning(
+                "Both index_name and index_names provided — index_names takes precedence"
+            )
+        return await _multi_index_search(
+            query=query,
+            index_names=index_names,
+            limit=limit,
+            language=language,
+            use_hybrid_search=use_hybrid_search,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            context_before=context_before,
+            context_after=context_after,
+            smart_context=smart_context,
+            include_deps=include_deps,
+        )
+    elif index_names is not None and len(index_names) == 1:
+        index_name = index_names[0]
+
     # Track root_path for search header (set during auto-detection)
     root_path: Path | None = None
     auto_detected_source = None  # Track detection source for hint
@@ -2083,6 +2174,136 @@ async def search_code(
                 "staleness_days": staleness_days,
             }
         )
+
+    return output
+
+
+async def _multi_index_search(
+    query: str,
+    index_names: list[str],
+    limit: int,
+    language: str | None,
+    use_hybrid_search: bool | None,
+    symbol_type: str | list[str] | None,
+    symbol_name: str | None,
+    context_before: int | None,
+    context_after: int | None,
+    smart_context: bool,
+    include_deps: bool,
+) -> list[dict]:
+    """Execute cross-index search and format results."""
+    if not _ensure_cocoindex_init():
+        return [
+            {
+                "error": "Database not initialized",
+                "message": "Index a codebase first using index_codebase(path='.')",
+                "results": [],
+            }
+        ]
+
+    try:
+        results = multi_search(
+            query=query,
+            index_names=index_names,
+            limit=limit,
+            language_filter=language,
+            use_hybrid=use_hybrid_search,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            include_deps=include_deps,
+        )
+    except ValueError as e:
+        return [{"error": "Cross-index search error", "message": str(e), "results": []}]
+
+    # Build per-index metadata lookup for path resolution
+    metadata_by_index: dict[str, dict] = {}
+    for idx_name in index_names:
+        meta = get_index_metadata(idx_name)
+        if meta:
+            metadata_by_index[idx_name] = meta
+
+    expander = ContextExpander()
+
+    output: list[dict] = [
+        {
+            "type": "search_context",
+            "searching": "cross-index",
+            "index_names": index_names,
+        }
+    ]
+
+    try:
+        for r in results:
+            # Resolve source_path from per-index metadata
+            source_path = None
+            if r.index_name and r.index_name in metadata_by_index:
+                source_path = metadata_by_index[r.index_name].get("canonical_path")
+
+            filepath = (
+                os.path.join(source_path, r.filename) if source_path else r.filename
+            )
+            start_line = byte_to_line(filepath, r.start_byte)
+            end_line = byte_to_line(filepath, r.end_byte)
+            content = read_chunk_content(filepath, r.start_byte, r.end_byte)
+
+            context_before_text = ""
+            context_after_text = ""
+
+            if context_before is not None or context_after is not None or smart_context:
+                ext = os.path.splitext(r.filename)[1].lstrip(".")
+                language_name = _get_treesitter_language(ext)
+
+                before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
+                    expander.get_context_lines(
+                        filepath,
+                        start_line,
+                        end_line,
+                        context_before=context_before or 0,
+                        context_after=context_after or 0,
+                        smart=smart_context
+                        and (context_before is None and context_after is None),
+                        language=language_name,
+                    )
+                )
+
+                context_before_text = "\n".join(line for _, line in before_lines)
+                context_after_text = "\n".join(line for _, line in after_lines)
+
+            result_dict = {
+                "file_path": r.filename,
+                "start_line": start_line,
+                "end_line": end_line,
+                "score": r.score,
+                "content": content,
+                "block_type": r.block_type,
+                "hierarchy": r.hierarchy,
+                "language_id": r.language_id,
+                "symbol_type": r.symbol_type,
+                "symbol_name": r.symbol_name,
+                "symbol_signature": r.symbol_signature,
+            }
+
+            if r.index_name is not None:
+                result_dict["index_name"] = r.index_name
+
+            if context_before_text or context_after_text:
+                result_dict["context_before"] = context_before_text
+                result_dict["context_after"] = context_after_text
+
+            if r.match_type:
+                result_dict["match_type"] = r.match_type
+            if r.vector_score is not None:
+                result_dict["vector_score"] = r.vector_score
+            if r.keyword_score is not None:
+                result_dict["keyword_score"] = r.keyword_score
+
+            if include_deps and r.dependencies is not None:
+                result_dict["dependencies"] = r.dependencies
+                result_dict["dependents"] = r.dependents
+
+            output.append(result_dict)
+    finally:
+        expander.clear_cache()
 
     return output
 

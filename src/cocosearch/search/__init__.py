@@ -8,6 +8,7 @@ improved results on code identifier queries.
 """
 
 from cocosearch.search.analyze import AnalysisResult, analyze
+from cocosearch.search.multi import multi_search
 from cocosearch.search.query import SearchResult, search
 from cocosearch.search.utils import byte_to_line, read_chunk_content
 
@@ -17,6 +18,7 @@ from cocosearch.search.utils import byte_to_line, read_chunk_content
 __all__ = [
     # Core search
     "search",
+    "multi_search",
     "SearchResult",
     # Pipeline analysis
     "analyze",

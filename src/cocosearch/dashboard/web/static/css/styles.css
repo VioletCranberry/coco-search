@@ -889,6 +889,19 @@ select option:checked {
 .badge-score-low { background: var(--text-muted); color: white; }
 .badge-match { background: var(--accent-blue); color: white; }
 .badge-lang { background: var(--border-color); color: var(--text-primary); }
+.badge-index { background: #8b5cf6; color: white; }
+
+.search-scope {
+    margin: 6px 0 0 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.search-scope label {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
 
 .search-result-symbol {
     padding: 6px 14px;

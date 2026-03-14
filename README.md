@@ -385,7 +385,7 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 ### Available MCP Tools
 
 - `index_codebase` -- index a directory for semantic search
-- `search_code` -- search indexed code with natural language queries (optional `include_deps` for dependency info)
+- `search_code` -- search indexed code with natural language queries (optional `include_deps` for dependency info, `index_names` for cross-index search)
 - `analyze_query` -- pipeline diagnostics: understand why a query returns specific results
 - `list_indexes` -- list all available indexes
 - `index_stats` -- get statistics and parse health for an index
