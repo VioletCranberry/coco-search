@@ -356,6 +356,8 @@ search_code(
 )
 ```
 
+> **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For PRs touching shared code, pass `index_names=["project1", "project2"]` to check consistency across codebases.
+
 For example, if a file changes how errors are handled, search for error handling patterns across the codebase to check if this change is consistent or introduces a divergence.
 
 ### 3d. Test Coverage

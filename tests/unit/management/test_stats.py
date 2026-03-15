@@ -480,6 +480,78 @@ class TestCollectWarnings:
 
         assert warnings == []
 
+    def test_linked_index_missing_warning(self, mock_db_pool):
+        """Warns when linkedIndexes references a non-existent index."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a", "repo_b"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch(
+                "cocosearch.config.load_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert len(warnings) == 1
+        assert "repo_b" in warnings[0]
+        assert "not found" in warnings[0]
+
+    def test_linked_index_all_exist_no_warning(self, mock_db_pool):
+        """No warning when all linkedIndexes exist."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a", "repo_b"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch(
+                "cocosearch.config.load_config",
+                return_value=mock_config,
+            ),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}, {"name": "repo_b"}],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert warnings == []
+
+    def test_linked_index_no_config_no_warning(self, mock_db_pool):
+        """No warning when no config file exists."""
+        with patch(
+            "cocosearch.config.find_config_file",
+            return_value=None,
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert warnings == []
+
+    def test_linked_index_config_error_no_warning(self, mock_db_pool):
+        """Config errors are silently ignored."""
+        with patch(
+            "cocosearch.config.find_config_file",
+            side_effect=Exception("config error"),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert warnings == []
+
 
 class TestCheckBranchStaleness:
     """Tests for check_branch_staleness function."""

@@ -872,6 +872,26 @@ def collect_warnings(
     # (COUNT(DISTINCT filename) with and without WHERE 1=1) were
     # identical and the results were never used.
 
+    # Linked indexes validation
+    try:
+        from cocosearch.config import find_config_file, load_config
+        from cocosearch.management.discovery import list_indexes
+
+        config_path = find_config_file()
+        if config_path:
+            cfg = load_config(config_path)
+            if cfg.linkedIndexes:
+                all_indexes = {idx["name"] for idx in list_indexes()}
+                for li in cfg.linkedIndexes:
+                    if li not in all_indexes:
+                        warnings.append(
+                            f"Linked index '{li}' not found — "
+                            f"run 'cocosearch index' on that project "
+                            f"or remove from cocosearch.yaml"
+                        )
+    except Exception:
+        pass  # Best-effort — don't block stats on config check
+
     return warnings
 
 

@@ -88,6 +88,8 @@ search_code(
 )
 ```
 
+> **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For ad-hoc multi-project refactoring, pass `index_names=["project1", "project2"]` to find usages across codebases.
+
 Use glob patterns in `symbol_name` to catch variants. For example:
 
 - Target: "User" → `symbol_name="User*"` finds User, UserProfile, UserService, UserRepository
