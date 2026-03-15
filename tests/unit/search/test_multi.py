@@ -100,9 +100,7 @@ class TestMultiSearch:
         for call in mock_search.call_args_list:
             assert call.kwargs["query_embedding"] == [0.1] * 768
 
-    def test_limit_respected(
-        self, mock_list_indexes, mock_metadata, mock_embedding
-    ):
+    def test_limit_respected(self, mock_list_indexes, mock_metadata, mock_embedding):
         results_a = [_make_result(f"a{i}.py", 0.9 - i * 0.1) for i in range(5)]
         results_b = [_make_result(f"b{i}.py", 0.85 - i * 0.1) for i in range(5)]
 
@@ -154,13 +152,14 @@ class TestMultiSearch:
         results = multi_search("test query", [])
         assert results == []
 
-    def test_embedding_model_mismatch_warns(
-        self, mock_list_indexes, mock_embedding
-    ):
+    def test_embedding_model_mismatch_warns(self, mock_list_indexes, mock_embedding):
         with patch("cocosearch.search.multi.get_index_metadata") as mock_meta:
             mock_meta.side_effect = [
                 {"embedding_provider": "ollama", "embedding_model": "nomic-embed-text"},
-                {"embedding_provider": "openai", "embedding_model": "text-embedding-3-small"},
+                {
+                    "embedding_provider": "openai",
+                    "embedding_model": "text-embedding-3-small",
+                },
             ]
             with patch("cocosearch.search.multi.search") as mock_search:
                 mock_search.return_value = []

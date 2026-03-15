@@ -56,6 +56,13 @@ def test_config_template_is_valid_yaml():
     assert "embedding" in data
 
 
+def test_config_template_contains_linked_indexes_comment():
+    """Test that CONFIG_TEMPLATE includes the linkedIndexes commented example."""
+    assert "linkedIndexes" in CONFIG_TEMPLATE
+    assert "shared-lib" in CONFIG_TEMPLATE
+    assert "common-utils" in CONFIG_TEMPLATE
+
+
 class TestClaudeMdRouting:
     """Tests for generate_claude_md_routing."""
 

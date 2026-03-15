@@ -14,6 +14,12 @@ CONFIG_TEMPLATE = """\
 # Index name (optional - defaults to directory name)
 # indexName: my-project
 
+# Linked indexes for cross-project search (monorepo setups)
+# Automatically includes these indexes when searching this project
+# linkedIndexes:
+#   - shared-lib
+#   - common-utils
+
 # Indexing settings
 indexing: {}
   # File patterns to include (glob patterns)

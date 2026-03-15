@@ -412,6 +412,30 @@ def search_command(args: argparse.Namespace) -> int:
         # Resolve index name with CLI > env > config > git > cwd fallback
         index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
 
+        # Auto-expand linked indexes from config
+        if project_config.linkedIndexes:
+            try:
+                all_indexes = {idx["name"] for idx in list_indexes()}
+                existing_linked = [
+                    li
+                    for li in project_config.linkedIndexes
+                    if li != index_name and li in all_indexes
+                ]
+                if existing_linked:
+                    multi_index_names = [index_name, *existing_linked]
+                    use_multi_search = True
+                    skipped_linked = [
+                        li
+                        for li in project_config.linkedIndexes
+                        if li != index_name and li not in all_indexes
+                    ]
+                    if skipped_linked:
+                        console.print(
+                            f"[dim]Linked indexes not found (skipped): {', '.join(skipped_linked)}[/dim]"
+                        )
+            except Exception:
+                pass  # Best-effort — don't block search on linked index check
+
     # Resolve search settings with precedence
     limit, _ = resolver.resolve(
         "search.resultLimit",

@@ -1152,6 +1152,27 @@ async def api_search(request) -> JSONResponse:
             status_code=503,
         )
 
+    # Auto-expand linked indexes from config when in single-index mode
+    if not is_multi and index_name and not index_names_param:
+        try:
+            from cocosearch.config import find_config_file, load_config
+
+            config_path = find_config_file()
+            if config_path:
+                _api_cfg = load_config(config_path)
+                if _api_cfg.linkedIndexes:
+                    all_indexes = {idx["name"] for idx in mgmt_list_indexes()}
+                    existing_linked = [
+                        li
+                        for li in _api_cfg.linkedIndexes
+                        if li != index_name and li in all_indexes
+                    ]
+                    if existing_linked:
+                        is_multi = True
+                        index_names_param = [index_name, *existing_linked]
+        except Exception:
+            pass  # Best-effort
+
     start_time = time.monotonic()
 
     if is_multi:
@@ -1222,8 +1243,14 @@ async def api_search(request) -> JSONResponse:
             if is_multi:
                 # Per-result path resolution for cross-index
                 r_source_path = None
-                if r.index_name and metadata_by_index and r.index_name in metadata_by_index:
-                    r_source_path = metadata_by_index[r.index_name].get("canonical_path")
+                if (
+                    r.index_name
+                    and metadata_by_index
+                    and r.index_name in metadata_by_index
+                ):
+                    r_source_path = metadata_by_index[r.index_name].get(
+                        "canonical_path"
+                    )
                 filepath = (
                     os.path.join(r_source_path, r.filename)
                     if r_source_path
@@ -1231,9 +1258,7 @@ async def api_search(request) -> JSONResponse:
                 )
             else:
                 filepath = (
-                    os.path.join(source_path, r.filename)
-                    if source_path
-                    else r.filename
+                    os.path.join(source_path, r.filename) if source_path else r.filename
                 )
             start_line = byte_to_line(filepath, r.start_byte)
             end_line = byte_to_line(filepath, r.end_byte)
@@ -1982,6 +2007,50 @@ async def search_code(
                     }
                 ]
 
+    # Auto-expand linked indexes from config (only when index_names was not explicitly provided)
+    _linked_indexes: list[str] = []
+    _skipped_indexes: list[str] = []
+    if index_names is None or (isinstance(index_names, set)):
+        # index_names was not explicitly provided by the caller
+        try:
+            from cocosearch.config import find_config_file, load_config
+
+            config_path = find_config_file()
+            if config_path:
+                _linked_cfg = load_config(config_path)
+                if _linked_cfg.linkedIndexes:
+                    all_indexes = {idx["name"] for idx in mgmt_list_indexes()}
+                    for li in _linked_cfg.linkedIndexes:
+                        if li == index_name:
+                            continue  # skip self-reference
+                        if li in all_indexes:
+                            _linked_indexes.append(li)
+                        else:
+                            _skipped_indexes.append(li)
+                    if _linked_indexes:
+                        effective_names = [index_name, *_linked_indexes]
+                        if _skipped_indexes:
+                            logger.warning(
+                                f"Linked indexes not found (skipped): {_skipped_indexes}"
+                            )
+                        return await _multi_index_search(
+                            query=query,
+                            index_names=effective_names,
+                            limit=limit,
+                            language=language,
+                            use_hybrid_search=use_hybrid_search,
+                            symbol_type=symbol_type,
+                            symbol_name=symbol_name,
+                            context_before=context_before,
+                            context_after=context_after,
+                            smart_context=smart_context,
+                            include_deps=include_deps,
+                            linked_indexes=_linked_indexes,
+                            skipped_indexes=_skipped_indexes,
+                        )
+        except Exception:
+            pass  # Best-effort — don't block search on config loading
+
     # Initialize CocoIndex (required for embedding generation)
     if not _ensure_cocoindex_init():
         return [
@@ -2190,6 +2259,8 @@ async def _multi_index_search(
     context_after: int | None,
     smart_context: bool,
     include_deps: bool,
+    linked_indexes: list[str] | None = None,
+    skipped_indexes: list[str] | None = None,
 ) -> list[dict]:
     """Execute cross-index search and format results."""
     if not _ensure_cocoindex_init():
@@ -2224,13 +2295,16 @@ async def _multi_index_search(
 
     expander = ContextExpander()
 
-    output: list[dict] = [
-        {
-            "type": "search_context",
-            "searching": "cross-index",
-            "index_names": index_names,
-        }
-    ]
+    search_header: dict = {
+        "type": "search_context",
+        "searching": "cross-index",
+        "index_names": index_names,
+    }
+    if linked_indexes:
+        search_header["linked_indexes"] = linked_indexes
+    if skipped_indexes:
+        search_header["skipped_indexes"] = skipped_indexes
+    output: list[dict] = [search_header]
 
     try:
         for r in results:
