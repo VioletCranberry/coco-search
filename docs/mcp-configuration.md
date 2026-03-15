@@ -15,10 +15,15 @@ This gives you PostgreSQL (with pgvector) on port `5432` and Ollama (with `nomic
 ### Available MCP Tools
 
 - `index_codebase` -- index a directory for semantic search
-- `search_code` -- search indexed code with natural language queries
+- `search_code` -- search indexed code with natural language queries (supports cross-index search via `index_names` parameter; auto-expands to `linkedIndexes` from `cocosearch.yaml` when configured)
+- `analyze_query` -- pipeline diagnostics for search queries
 - `list_indexes` -- list all available indexes
 - `index_stats` -- get statistics and parse health for an index
 - `clear_index` -- remove an index from the database
+- `get_file_dependencies` -- forward dependency query (what does a file depend on?)
+- `get_file_impact` -- reverse impact query (what depends on this file?)
+- `get_batch_dependencies` -- batch forward dependency query for multiple files
+- `get_batch_impact` -- batch reverse impact query for multiple files
 
 ### Single Registration (Recommended)
 

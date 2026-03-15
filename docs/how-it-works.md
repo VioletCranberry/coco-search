@@ -136,6 +136,34 @@ The only external dependencies are Docker (to run Postgres and Ollama) and the e
 
 **Optional remote embeddings:** If you prefer managed infrastructure or don't want to run Ollama locally, CocoSearch supports OpenAI and OpenRouter as embedding providers. When using a remote provider, only chunk text is sent for embedding — all indexing logic, storage, and search remain fully local. Configure via `embedding.provider` in `cocosearch.yaml` or the `COCOSEARCH_EMBEDDING_PROVIDER` environment variable. You can also use `embedding.baseUrl` (or `COCOSEARCH_EMBEDDING_BASE_URL`) to point any provider at a local OpenAI-compatible server (Infinity, text-embeddings-inference, vLLM) — in that case, no API key is required and embeddings stay fully local.
 
+## Searching Across Projects: Cross-Index Search
+
+Sometimes the code you're looking for isn't in a single project. A shared library defines the auth middleware, the API server uses it, and the gateway proxies it. CocoSearch can search across multiple indexes in one call.
+
+**How to set it up:**
+
+Add `linkedIndexes` to your `cocosearch.yaml`:
+
+```yaml
+indexName: api-server
+linkedIndexes:
+  - shared-libs
+  - auth-service
+```
+
+Now every search against `api-server` automatically includes `shared-libs` and `auth-service`. You can also search explicitly across indexes with `--indexes api-server,shared-libs` (CLI) or `index_names` (MCP).
+
+**How it works under the hood:**
+
+1. Your query is embedded **once** — the same 768-number vector is reused for all indexes
+2. Each index is searched **in parallel** (not sequentially)
+3. Results from all indexes are **merged by score** — the best results float to the top regardless of which project they came from
+4. Each result is tagged with which index it came from
+
+This avoids the obvious waste of computing the same embedding multiple times. If one of the linked indexes doesn't exist (maybe it was cleared), it's silently skipped — the search still returns results from the other indexes.
+
+**Important:** All indexes should use the same embedding model. Mixing models (e.g., Ollama for one index, OpenAI for another) produces vectors in different spaces, making cross-index score comparisons meaningless.
+
 ## Beyond Search: Dependency Graph
 
 CocoSearch can also extract dependency relationships between files. After indexing, run `cocosearch deps extract .` to parse import statements and build a directed graph of which files depend on which.

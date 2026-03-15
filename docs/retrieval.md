@@ -378,6 +378,39 @@ The result in both lists scores nearly **2x higher**, naturally boosting double-
 
 **Implementation:** `src/cocosearch/search/context_expander.py` — `ContextExpander` class
 
+## Cross-Index Search (Multi-Index Merging)
+
+When searching across multiple indexes (via `index_names` parameter, `--indexes` CLI flag, or `linkedIndexes` config auto-expansion), CocoSearch uses a score-based merge strategy:
+
+### Embedding Computation
+
+The query embedding is computed **once** and passed to all per-index searches. This avoids redundant Ollama/API calls — the embedding is identical regardless of which index is being searched.
+
+### Parallel Execution
+
+Per-index searches run in parallel via `ThreadPoolExecutor`. Each index executes the full single-index pipeline (vector search, optional keyword search, RRF fusion, definition boost, filtering) independently.
+
+### Result Merging
+
+Results from all indexes are merged using a simple score-based strategy:
+
+1. Each result is tagged with its source `index_name`
+2. All results are collected into a single list
+3. The list is sorted by score (descending)
+4. The list is truncated to the requested `limit`
+
+No re-ranking or score normalization is applied across indexes — scores are directly comparable because all indexes use the same embedding model and the same RRF formula.
+
+### Partial Failure Handling
+
+If one or more indexes fail (e.g., index doesn't exist, connection error), the search continues with the remaining indexes and returns whatever results are available. Errors are logged but do not cause the entire search to fail.
+
+### Embedding Model Compatibility
+
+All indexes in a cross-index search must use the same embedding provider and model. CocoSearch does not validate this at query time — mismatched models will produce results with incomparable scores.
+
+**Implementation:** `src/cocosearch/search/multi.py` — `multi_search()`
+
 ## Summary
 
 CocoSearch's retrieval logic combines semantic understanding (vector search) with exact matching (keyword search) to deliver highly relevant code search results:

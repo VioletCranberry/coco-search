@@ -43,6 +43,7 @@ Search indexed code using natural language.
 | `--symbol-name`        | Filter by symbol name pattern      | None                 |
 | `--no-cache`           | Bypass query cache (for debugging) | Off                  |
 | `-i, --interactive`    | Enter REPL mode                    | Off                  |
+| `--indexes`            | Comma-separated index names for cross-index search | None |
 | `--pretty`             | Human-readable output              | JSON                 |
 
 **Examples:**
@@ -56,6 +57,9 @@ uv run cocosearch search "error handling" --lang python
 
 # Inline language filter
 uv run cocosearch search "database connection lang:go"
+
+# Cross-index search across multiple projects
+uv run cocosearch search "auth middleware" --indexes api-server,shared-libs --pretty
 
 # Interactive mode
 uv run cocosearch search --interactive
