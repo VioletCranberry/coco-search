@@ -909,6 +909,21 @@ select option:checked {
     gap: 4px;
 }
 
+.search-index-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.search-index-selector select {
+    padding: 2px 20px 2px 6px;
+    font-size: 13px;
+    background-position: right 6px center;
+    background-size: 10px 10px;
+}
+
 .search-index-group-header {
     font-size: 14px;
     font-weight: 600;

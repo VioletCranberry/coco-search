@@ -62,7 +62,9 @@ export async function executeSearch() {
                 return;
             }
         } else {
-            body.index_name = stats.name;
+            const searchIndexSelect = document.getElementById('searchIndexSelect');
+            const searchIndexName = searchIndexSelect && searchIndexSelect.value;
+            body.index_name = searchIndexName || stats.name;
         }
 
         if (language) body.language = language;

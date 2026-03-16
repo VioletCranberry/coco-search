@@ -47,6 +47,10 @@ document.getElementById('clearSearchBtn').addEventListener('click', clearSearch)
 document.getElementById('searchAllIndexes').addEventListener('change', (e) => {
     document.getElementById('groupByIndexLabel').style.display = e.target.checked ? '' : 'none';
     if (!e.target.checked) document.getElementById('groupByIndex').checked = false;
+    const searchIndexLabel = document.getElementById('searchIndexLabel');
+    if (searchIndexLabel && state.linkedIndexes.length > 0) {
+        searchIndexLabel.style.display = e.target.checked ? 'none' : '';
+    }
 });
 
 // Search min score slider

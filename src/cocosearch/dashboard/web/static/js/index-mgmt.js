@@ -218,6 +218,22 @@ export async function loadIndexList() {
             }
         }
 
+        // Populate search index dropdown
+        const searchIndexSelect = document.getElementById('searchIndexSelect');
+        if (searchIndexSelect) {
+            const mainName = (ctx && ctx.index_name) || '';
+            let opts = '';
+            if (mainName) opts += `<option value="${mainName}">${mainName}</option>`;
+            for (const li of state.linkedIndexes) {
+                if (li !== mainName) opts += `<option value="${li}">${li}</option>`;
+            }
+            searchIndexSelect.innerHTML = opts;
+            const label = document.getElementById('searchIndexLabel');
+            if (label) {
+                label.style.display = state.linkedIndexes.length > 0 ? '' : 'none';
+            }
+        }
+
         // Determine which index to select
         let selectedIndex = 0;
         let projectNotIndexed = false;
