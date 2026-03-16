@@ -7,7 +7,12 @@ Also provides hybrid search combining vector and keyword matching for
 improved results on code identifier queries.
 """
 
-from cocosearch.search.analyze import AnalysisResult, MultiAnalysisResult, analyze, multi_analyze
+from cocosearch.search.analyze import (
+    AnalysisResult,
+    MultiAnalysisResult,
+    analyze,
+    multi_analyze,
+)
 from cocosearch.search.multi import multi_search
 from cocosearch.search.query import SearchResult, search
 from cocosearch.search.utils import byte_to_line, read_chunk_content

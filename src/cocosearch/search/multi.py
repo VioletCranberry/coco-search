@@ -112,12 +112,14 @@ def multi_search(
         )
         logger.warning(warning_msg)
         if warnings is not None:
-            warnings.append({
-                "type": "embedding_model_mismatch",
-                "warning": "Mismatched embedding models across indexes",
-                "message": warning_msg,
-                "models": dict(models_seen),
-            })
+            warnings.append(
+                {
+                    "type": "embedding_model_mismatch",
+                    "warning": "Mismatched embedding models across indexes",
+                    "message": warning_msg,
+                    "models": dict(models_seen),
+                }
+            )
 
     # Pre-compute query embedding once
     query_embedding = code_to_embedding.eval(query)

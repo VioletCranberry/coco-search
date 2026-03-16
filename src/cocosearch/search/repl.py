@@ -220,9 +220,7 @@ class SearchREPL(cmd.Cmd):
                                 if li != self.index_name and li in all_indexes
                             ]
                             if not linked:
-                                self.console.print(
-                                    "[red]No linked indexes found[/red]"
-                                )
+                                self.console.print("[red]No linked indexes found[/red]")
                             else:
                                 self.index_names = [self.index_name, *linked]
                                 self.console.print(

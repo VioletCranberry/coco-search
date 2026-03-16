@@ -182,9 +182,7 @@ class TestMultiSearch:
             with patch("cocosearch.search.multi.search") as mock_search:
                 mock_search.return_value = []
                 warnings: list[dict] = []
-                multi_search(
-                    "test query", ["repo_a", "repo_b"], warnings=warnings
-                )
+                multi_search("test query", ["repo_a", "repo_b"], warnings=warnings)
                 assert len(warnings) == 1
                 assert warnings[0]["type"] == "embedding_model_mismatch"
 
