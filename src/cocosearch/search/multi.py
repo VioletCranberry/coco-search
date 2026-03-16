@@ -35,6 +35,7 @@ def multi_search(
     symbol_name: str | None = None,
     no_cache: bool = False,
     include_deps: bool = False,
+    warnings: list[dict] | None = None,
 ) -> list[SearchResult]:
     """Search across multiple indexes and return merged results.
 
@@ -53,6 +54,7 @@ def multi_search(
         symbol_name: Filter by symbol name pattern.
         no_cache: If True, bypass query cache.
         include_deps: If True, attach dependency info to results.
+        warnings: Optional list to populate with warning dicts (e.g., model mismatch).
 
     Returns:
         List of SearchResult ordered by score (highest first), each tagged
@@ -104,11 +106,18 @@ def multi_search(
     unique_models = set(models_seen.values())
     if len(unique_models) > 1:
         model_details = ", ".join(f"{k}={v}" for k, v in models_seen.items())
-        logger.warning(
+        warning_msg = (
             "Cross-index search with mismatched embedding models — "
-            "scores may not be directly comparable: %s",
-            model_details,
+            f"scores may not be directly comparable: {model_details}"
         )
+        logger.warning(warning_msg)
+        if warnings is not None:
+            warnings.append({
+                "type": "embedding_model_mismatch",
+                "warning": "Mismatched embedding models across indexes",
+                "message": warning_msg,
+                "models": dict(models_seen),
+            })
 
     # Pre-compute query embedding once
     query_embedding = code_to_embedding.eval(query)

@@ -2272,6 +2272,7 @@ async def _multi_index_search(
             }
         ]
 
+    search_warnings: list[dict] = []
     try:
         results = multi_search(
             query=query,
@@ -2282,6 +2283,7 @@ async def _multi_index_search(
             symbol_type=symbol_type,
             symbol_name=symbol_name,
             include_deps=include_deps,
+            warnings=search_warnings,
         )
     except ValueError as e:
         return [{"error": "Cross-index search error", "message": str(e), "results": []}]
@@ -2305,6 +2307,27 @@ async def _multi_index_search(
     if skipped_indexes:
         search_header["skipped_indexes"] = skipped_indexes
     output: list[dict] = [search_header]
+
+    # Check staleness for all indexes in cross-index search
+    all_staleness_warnings: list[dict] = []
+    for idx_name in index_names:
+        try:
+            from cocosearch.management.stats import check_deps_staleness
+
+            idx_warnings = check_deps_staleness(idx_name)
+            for w in idx_warnings:
+                w["index_name"] = idx_name
+                all_staleness_warnings.append(w)
+        except Exception:
+            pass
+    if all_staleness_warnings:
+        output.append(
+            {"type": "staleness_warnings", "warnings": all_staleness_warnings}
+        )
+
+    # Surface embedding model mismatch warnings
+    for w in search_warnings:
+        output.append(w)
 
     try:
         for r in results:
@@ -2420,6 +2443,14 @@ async def analyze_query(
             description="Filter by symbol name pattern (glob). Examples: 'get*', '*Handler'"
         ),
     ] = None,
+    index_names: Annotated[
+        list[str] | None,
+        Field(
+            description="List of index names to analyze across multiple projects. "
+            "Runs analysis per-index in parallel and returns per-index diagnostics. "
+            "Mutually exclusive with index_name (index_names takes precedence)."
+        ),
+    ] = None,
 ) -> dict:
     """Analyze the search pipeline for a query with stage-by-stage diagnostics.
 
@@ -2434,6 +2465,37 @@ async def analyze_query(
     were detected, whether hybrid mode kicked in, how RRF scored results, or
     where time was spent.
     """
+    # Handle cross-index analysis
+    if index_names is not None and len(index_names) >= 2:
+        if index_name is not None:
+            logger.warning(
+                "Both index_name and index_names provided to analyze_query — index_names takes precedence"
+            )
+        if not _ensure_cocoindex_init():
+            return {
+                "error": "Database not initialized",
+                "message": "Index a codebase first using index_codebase(path='.')",
+            }
+        try:
+            from cocosearch.search.analyze import multi_analyze as run_multi_analyze
+
+            result = run_multi_analyze(
+                query=query,
+                index_names=index_names,
+                limit=limit,
+                language_filter=language,
+                use_hybrid=use_hybrid_search,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=True,
+            )
+            return result.to_dict()
+        except Exception as e:
+            logger.error(f"Cross-index analysis failed: {e}")
+            return {"error": "Analysis failed", "message": str(e)}
+    elif index_names is not None and len(index_names) == 1:
+        index_name = index_names[0]
+
     # Auto-detect index if not provided (same logic as search_code)
     if index_name is None:
         detected_path, source = await _detect_project(ctx)
@@ -2543,21 +2605,64 @@ def index_stats(
 @mcp.tool()
 @log_mcp_tool
 def clear_index(
-    index_name: Annotated[str, Field(description="Name of the index to delete")],
+    index_name: Annotated[
+        str | None,
+        Field(
+            description="Name of a single index to delete. "
+            "Use index_names for bulk deletion."
+        ),
+    ] = None,
+    index_names: Annotated[
+        list[str] | None,
+        Field(
+            description="List of index names to delete in bulk. "
+            "Mutually exclusive with index_name."
+        ),
+    ] = None,
 ) -> dict:
-    """Clear (delete) a code index.
+    """Clear (delete) one or more code indexes.
 
-    WARNING: This permanently deletes all indexed data for this codebase.
+    WARNING: This permanently deletes all indexed data.
     The operation cannot be undone.
+
+    Use index_name for a single index, or index_names for bulk deletion.
     """
-    try:
-        # mgmt_clear_index also clears path metadata internally
-        result = mgmt_clear_index(index_name)
-        return result
-    except ValueError as e:
-        return {"success": False, "error": str(e)}
-    except Exception as e:
-        return {"success": False, "error": f"Failed to clear index: {e}"}
+    # Determine which indexes to delete
+    names_to_delete: list[str] = []
+    if index_names:
+        names_to_delete = index_names
+    elif index_name:
+        names_to_delete = [index_name]
+    else:
+        return {"success": False, "error": "Provide index_name or index_names"}
+
+    if len(names_to_delete) == 1:
+        try:
+            result = mgmt_clear_index(names_to_delete[0])
+            return result
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to clear index: {e}"}
+
+    # Bulk deletion
+    results: list[dict] = []
+    for name in names_to_delete:
+        try:
+            mgmt_clear_index(name)
+            results.append({"index_name": name, "success": True})
+        except ValueError as e:
+            results.append({"index_name": name, "success": False, "error": str(e)})
+        except Exception as e:
+            results.append({"index_name": name, "success": False, "error": str(e)})
+
+    succeeded = sum(1 for r in results if r["success"])
+    return {
+        "success": succeeded > 0,
+        "deleted": succeeded,
+        "total": len(names_to_delete),
+        "results": results,
+    }
 
 
 @mcp.tool()

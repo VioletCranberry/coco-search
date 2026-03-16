@@ -167,3 +167,32 @@ class TestMultiSearch:
                     multi_search("test query", ["repo_a", "repo_b"])
                     mock_logger.warning.assert_called_once()
                     assert "mismatched" in mock_logger.warning.call_args[0][0]
+
+    def test_model_mismatch_populates_warnings_list(
+        self, mock_list_indexes, mock_embedding
+    ):
+        with patch("cocosearch.search.multi.get_index_metadata") as mock_meta:
+            mock_meta.side_effect = [
+                {"embedding_provider": "ollama", "embedding_model": "nomic-embed-text"},
+                {
+                    "embedding_provider": "openai",
+                    "embedding_model": "text-embedding-3-small",
+                },
+            ]
+            with patch("cocosearch.search.multi.search") as mock_search:
+                mock_search.return_value = []
+                warnings: list[dict] = []
+                multi_search(
+                    "test query", ["repo_a", "repo_b"], warnings=warnings
+                )
+                assert len(warnings) == 1
+                assert warnings[0]["type"] == "embedding_model_mismatch"
+
+    def test_no_mismatch_no_warnings(
+        self, mock_list_indexes, mock_metadata, mock_embedding
+    ):
+        with patch("cocosearch.search.multi.search") as mock_search:
+            mock_search.return_value = []
+            warnings: list[dict] = []
+            multi_search("test query", ["repo_a", "repo_b"], warnings=warnings)
+            assert len(warnings) == 0

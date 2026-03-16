@@ -415,15 +415,48 @@ def _client_list(client: CocoSearchClient, args, console) -> int:
 
 def _client_clear(client: CocoSearchClient, args, console) -> int:
     """Handle clear command in client mode."""
-    index_name = args.index
+    index_names = args.index  # Now a list due to nargs="+"
+
+    if getattr(args, "all", False):
+        # --all not supported in client mode (would need list_indexes API)
+        console.print("[red]--all is not supported in client mode[/red]")
+        return 1
+
     if not getattr(args, "force", False):
-        response = input(f"Delete index '{index_name}' on remote server? [y/N] ")
+        if len(index_names) == 1:
+            response = input(
+                f"Delete index '{index_names[0]}' on remote server? [y/N] "
+            )
+        else:
+            response = input(
+                f"Delete {len(index_names)} indexes on remote server? [y/N] "
+            )
         if response.lower() != "y":
             console.print("Cancelled.")
             return 0
 
-    result = client.clear(index_name)
-    print(json.dumps(result, indent=2))
+    if len(index_names) == 1:
+        result = client.clear(index_names[0])
+        print(json.dumps(result, indent=2))
+    else:
+        results = []
+        for name in index_names:
+            try:
+                client.clear(name)
+                results.append({"index_name": name, "success": True})
+            except Exception as e:
+                results.append({"index_name": name, "success": False, "error": str(e)})
+        succeeded = sum(1 for r in results if r["success"])
+        print(
+            json.dumps(
+                {
+                    "deleted": succeeded,
+                    "total": len(index_names),
+                    "results": results,
+                },
+                indent=2,
+            )
+        )
     return 0
 
 

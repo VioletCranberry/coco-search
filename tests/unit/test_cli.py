@@ -336,7 +336,7 @@ class TestClearCommand:
             with patch("cocosearch.cli.get_stats", return_value=mock_stats):
                 with patch("cocosearch.cli.clear_index", return_value=mock_result):
                     args = argparse.Namespace(
-                        index="testindex", force=True, pretty=False
+                        index=["testindex"], force=True, pretty=False
                     )
                     result = clear_command(args)
 
@@ -351,7 +351,7 @@ class TestClearCommand:
             with patch(
                 "cocosearch.cli.get_stats", side_effect=ValueError("Index not found")
             ):
-                args = argparse.Namespace(index="missing", force=True, pretty=False)
+                args = argparse.Namespace(index=["missing"], force=True, pretty=False)
                 result = clear_command(args)
 
         assert result == 1

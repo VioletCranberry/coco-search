@@ -523,6 +523,7 @@ def search_command(args: argparse.Namespace) -> int:
             limit=limit,
             context_lines=interactive_context,
             min_score=min_score,
+            index_names=multi_index_names if use_multi_search else None,
         )
         return 0
 
@@ -557,6 +558,7 @@ def search_command(args: argparse.Namespace) -> int:
         if use_multi_search:
             from cocosearch.search.multi import multi_search
 
+            search_warnings: list[dict] = []
             results = multi_search(
                 query=query,
                 index_names=multi_index_names,
@@ -567,7 +569,13 @@ def search_command(args: argparse.Namespace) -> int:
                 symbol_type=symbol_type,
                 symbol_name=symbol_name,
                 no_cache=no_cache,
+                warnings=search_warnings,
             )
+            if search_warnings and args.pretty:
+                for w in search_warnings:
+                    console.print(
+                        f"[yellow]Warning: {w.get('message', w.get('warning', ''))}[/yellow]"
+                    )
         else:
             results = search(
                 query=query,
@@ -641,7 +649,28 @@ def analyze_command(args: argparse.Namespace) -> int:
         project_config = CocoSearchConfig()
 
     resolver = ConfigResolver(project_config, config_path)
-    index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
+
+    # Check for cross-index analysis mode
+    indexes_arg = getattr(args, "indexes", None)
+    if indexes_arg and args.index:
+        console.print(
+            "[bold red]Error:[/bold red] --index and --indexes are mutually exclusive"
+        )
+        return 1
+
+    use_multi_analyze = False
+    multi_index_names: list[str] = []
+    if indexes_arg:
+        multi_index_names = [n.strip() for n in indexes_arg.split(",") if n.strip()]
+        if len(multi_index_names) < 2:
+            console.print(
+                "[bold red]Error:[/bold red] --indexes requires at least 2 comma-separated index names"
+            )
+            return 1
+        use_multi_analyze = True
+        index_name = multi_index_names[0]
+    else:
+        index_name, _ = _resolve_index_name(resolver, cli_value=args.index)
 
     # Resolve search settings
     limit, _ = resolver.resolve(
@@ -675,29 +704,50 @@ def analyze_command(args: argparse.Namespace) -> int:
 
     # Execute analysis
     try:
-        result = analyze(
-            query=query,
-            index_name=index_name,
-            limit=limit,
-            min_score=min_score,
-            language_filter=lang_filter,
-            use_hybrid=use_hybrid,
-            symbol_type=symbol_type,
-            symbol_name=symbol_name,
-            no_cache=no_cache,
-        )
+        if use_multi_analyze:
+            from cocosearch.search.analyze import (
+                format_multi_analysis_json,
+                format_multi_analysis_pretty as fmt_multi_pretty,
+                multi_analyze,
+            )
+
+            result = multi_analyze(
+                query=query,
+                index_names=multi_index_names,
+                limit=limit,
+                min_score=min_score,
+                language_filter=lang_filter,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+            )
+            if args.json:
+                print(format_multi_analysis_json(result))
+            else:
+                fmt_multi_pretty(result)
+        else:
+            result = analyze(
+                query=query,
+                index_name=index_name,
+                limit=limit,
+                min_score=min_score,
+                language_filter=lang_filter,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+            )
+            if args.json:
+                print(format_analysis_json(result))
+            else:
+                format_analysis_pretty(result, index_name)
     except Exception as e:
         if args.json:
             print(json.dumps({"error": str(e)}))
         else:
             console.print(f"[bold red]Error:[/bold red] {e}")
         return 1
-
-    # Output
-    if args.json:
-        print(format_analysis_json(result))
-    else:
-        format_analysis_pretty(result, index_name)
 
     return 0
 
@@ -1300,46 +1350,103 @@ def clear_command(args: argparse.Namespace) -> int:
         console.print("[dim]No indexes found. Nothing to clear.[/dim]")
         return 0
 
-    index_name = args.index
-
-    # Get stats first to validate existence and show what will be deleted
-    try:
-        stats = get_stats(index_name)
-    except ValueError as e:
-        if args.pretty:
+    # Determine which indexes to delete
+    if getattr(args, "all", False):
+        try:
+            all_indexes = list_indexes()
+            if not all_indexes:
+                console.print("[dim]No indexes found.[/dim]")
+                return 0
+            index_names = [idx["name"] for idx in all_indexes]
+        except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {e}")
-        else:
-            print(json.dumps({"error": str(e)}))
-        return 1
+            return 1
+    else:
+        index_names = args.index  # Now a list due to nargs="+"
+
+    # Validate all indexes exist and gather stats
+    index_stats: dict[str, dict] = {}
+    for name in index_names:
+        try:
+            stats = get_stats(name)
+            index_stats[name] = stats
+        except ValueError as e:
+            if args.pretty:
+                console.print(f"[bold red]Error:[/bold red] {e}")
+            else:
+                print(json.dumps({"error": str(e)}))
+            return 1
 
     # Show confirmation prompt unless --force
     if not args.force:
-        console.print(f"\nIndex '[cyan]{index_name}[/cyan]' contains:")
-        console.print(f"  Files:  {stats['file_count']}")
-        console.print(f"  Chunks: {stats['chunk_count']}")
-        console.print(f"  Size:   {stats['storage_size_pretty']}")
-        console.print()
+        if len(index_names) == 1:
+            name = index_names[0]
+            stats = index_stats[name]
+            console.print(f"\nIndex '[cyan]{name}[/cyan]' contains:")
+            console.print(f"  Files:  {stats['file_count']}")
+            console.print(f"  Chunks: {stats['chunk_count']}")
+            console.print(f"  Size:   {stats['storage_size_pretty']}")
+            console.print()
+            response = input(f"Delete index '{name}'? [y/N] ")
+        else:
+            console.print(f"\n[bold]Deleting {len(index_names)} indexes:[/bold]")
+            for name in index_names:
+                stats = index_stats[name]
+                console.print(
+                    f"  [cyan]{name}[/cyan]: "
+                    f"{stats['file_count']} files, "
+                    f"{stats['chunk_count']} chunks, "
+                    f"{stats['storage_size_pretty']}"
+                )
+            console.print()
+            response = input(f"Delete {len(index_names)} indexes? [y/N] ")
 
-        response = input(f"Delete index '{index_name}'? [y/N] ")
         if response.lower() != "y":
             console.print("Cancelled.")
             return 0
 
     # Perform deletion
-    try:
-        result = clear_index(index_name)
-    except ValueError as e:
-        if args.pretty:
-            console.print(f"[bold red]Error:[/bold red] {e}")
-        else:
-            print(json.dumps({"error": str(e)}))
-        return 1
+    if len(index_names) == 1:
+        try:
+            result = clear_index(index_names[0])
+        except ValueError as e:
+            if args.pretty:
+                console.print(f"[bold red]Error:[/bold red] {e}")
+            else:
+                print(json.dumps({"error": str(e)}))
+            return 1
 
-    # Output result
-    if args.pretty:
-        console.print(f"[green]Index '{index_name}' deleted successfully[/green]")
+        if args.pretty:
+            console.print(
+                f"[green]Index '{index_names[0]}' deleted successfully[/green]"
+            )
+        else:
+            print(json.dumps(result, indent=2))
     else:
-        print(json.dumps(result, indent=2))
+        results = []
+        for name in index_names:
+            try:
+                result = clear_index(name)
+                results.append({"index_name": name, "success": True})
+                if args.pretty:
+                    console.print(f"[green]Index '{name}' deleted[/green]")
+            except ValueError as e:
+                results.append({"index_name": name, "success": False, "error": str(e)})
+                if args.pretty:
+                    console.print(f"[red]Failed to delete '{name}': {e}[/red]")
+
+        if not args.pretty:
+            succeeded = sum(1 for r in results if r["success"])
+            print(
+                json.dumps(
+                    {
+                        "deleted": succeeded,
+                        "total": len(index_names),
+                        "results": results,
+                    },
+                    indent=2,
+                )
+            )
 
     return 0
 
@@ -2597,6 +2704,11 @@ def main() -> None:
         help="Bypass query cache",
     )
     analyze_parser.add_argument(
+        "--indexes",
+        help="Comma-separated index names for cross-index analysis (e.g., 'repo_a,repo_b'). "
+        "Mutually exclusive with --index.",
+    )
+    analyze_parser.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON (default: Rich panels)",
@@ -2697,12 +2809,18 @@ def main() -> None:
     # Clear subcommand
     clear_parser = subparsers.add_parser(
         "clear",
-        help="Delete an index",
-        description="Delete an index and all its data. Prompts for confirmation by default.",
+        help="Delete one or more indexes",
+        description="Delete indexes and all their data. Prompts for confirmation by default.",
     )
     clear_parser.add_argument(
         "index",
-        help="Index name to delete",
+        nargs="+",
+        help="Index name(s) to delete (space-separated)",
+    )
+    clear_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Delete all indexes",
     )
     clear_parser.add_argument(
         "--force",

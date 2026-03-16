@@ -62,12 +62,16 @@ uv run ruff format src/ tests/          # Format code
 uv run cocosearch index .
 uv run cocosearch search "query"
 uv run cocosearch search -i          # Interactive REPL
+uv run cocosearch search -i --indexes "repo_a,repo_b"  # Cross-index interactive REPL
 uv run cocosearch search --indexes "repo_a,repo_b" "query"  # Cross-index search
 uv run cocosearch analyze "query"    # Pipeline analysis with diagnostics
 uv run cocosearch analyze "query" --json  # JSON pipeline analysis
+uv run cocosearch analyze --indexes "repo_a,repo_b" "query"  # Cross-index analysis
 uv run cocosearch stats
 uv run cocosearch list
 uv run cocosearch clear <index>
+uv run cocosearch clear idx1 idx2    # Delete multiple indexes
+uv run cocosearch clear --all        # Delete all indexes
 uv run cocosearch languages              # List supported languages
 uv run cocosearch grammars               # List supported grammars
 uv run cocosearch init                   # Initialize cocosearch.yaml + optional CLAUDE.md/AGENTS.md
@@ -110,8 +114,8 @@ uv run cocosearch mcp --project-from-cwd
 - **`mcp/project_detection.py`** — Auto-detect project from MCP Roots or CWD
 - **`indexer/`** — CocoIndex pipeline: file filtering (`file_filter.py`), Tree-sitter symbol extraction (16 languages via `.scm` queries in `indexer/queries/`), multi-provider embedding (`embedder.py` — Ollama/OpenAI/OpenRouter via `PROVIDER_MAP`), tsvector generation, parse health tracking, schema migration, preflight validation (`preflight.py` — conditional Ollama vs API key checks), progress reporting (`progress.py`)
 - **`indexer/flow.py`** — CocoIndex flow definition (the indexing pipeline)
-- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries for 10 languages (`context_expander.py`, exports `CONTEXT_EXPANSION_LANGUAGES`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), optional dependency enrichment (`include_deps` attaches direct dependencies/dependents to search results), interactive REPL (`repl.py`), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics (`analyze.py`), cross-index orchestrator (`multi.py`)
-- **`search/multi.py`** — Cross-index search orchestrator: `multi_search()` queries multiple indexes in parallel via `ThreadPoolExecutor`, pre-computes query embedding once, tags results with source `index_name`, merges by score. Handles partial failures gracefully.
+- **`search/`** — Hybrid search engine: RRF fusion of vector + keyword results, two-level LRU query cache (`cache.py` — exact + semantic similarity at cosine > 0.92), context expansion via Tree-sitter boundaries for 10 languages (`context_expander.py`, exports `CONTEXT_EXPANSION_LANGUAGES`), symbol/language filtering (`filters.py`), auto-detection of code identifiers for hybrid mode (`query_analyzer.py`), optional dependency enrichment (`include_deps` attaches direct dependencies/dependents to search results), interactive REPL with cross-index support (`repl.py` — `:indexes`, `:searchall` commands), result formatting (`formatter.py`), pipeline analysis with stage-by-stage diagnostics and cross-index `multi_analyze()` (`analyze.py`), cross-index orchestrator (`multi.py`)
+- **`search/multi.py`** — Cross-index search orchestrator: `multi_search()` queries multiple indexes in parallel via `ThreadPoolExecutor`, pre-computes query embedding once, tags results with source `index_name`, merges by score. Handles partial failures gracefully. Accepts optional `warnings` list to surface embedding model mismatch warnings to callers.
 - **`search/db.py`** — PostgreSQL connection pool (singleton) and query execution
 - **`config/`** — YAML config with 4-level precedence resolution (CLI > env > file > defaults), `${VAR}` substitution (`env_substitution.py`), Pydantic schema validation (`schema.py` with `extra="forbid"`, `strict=True`, `EmbeddingSection` with `provider` field, provider-aware model defaults, and optional `baseUrl` for custom endpoints, `LoggingSection` with `file` toggle, `linkedIndexes` list for cross-index search auto-expansion), user-friendly error formatting with fuzzy field suggestions (`errors.py`), env var validation (`env_validation.py`)
 - **`management/`** — Index lifecycle: discovery (`discovery.py`), stats (`stats.py` — includes `check_deps_staleness()` for dependency freshness checks), clearing (`clear.py`), git-based naming (`git.py`), metadata with collision detection, status tracking, embedding provider/model tracking, and `deps_extracted_at` timestamp (`metadata.py`), project root detection (`context.py`)
@@ -228,11 +232,11 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 ### MCP Tools
 
 - `search_code` — Semantic + keyword hybrid search. Always use `use_hybrid_search=True` and `smart_context=True`. Optional `include_deps=True` attaches dependency info to results. Optional `index_names` parameter for cross-index search across multiple projects. Auto-expands to include `linkedIndexes` from `cocosearch.yaml` when `index_names` is not explicitly provided.
-- `analyze_query` — Pipeline diagnostics: see why a query returns specific results (stage timings, mode selection, RRF fusion breakdown)
+- `analyze_query` — Pipeline diagnostics: see why a query returns specific results (stage timings, mode selection, RRF fusion breakdown). Optional `index_names` parameter for cross-index analysis with per-index breakdowns.
 - `index_codebase` — Index a directory for search
 - `list_indexes` — List all available indexes
 - `index_stats` — Statistics and health for an index
-- `clear_index` — Remove an index
+- `clear_index` — Remove one or more indexes (supports `index_name` for single, `index_names` for bulk deletion)
 - `get_file_dependencies` — Forward dependency query: what does a file depend on? `depth=1` returns flat edge list, `depth>1` returns transitive tree. Includes staleness warnings when deps are outdated.
 - `get_file_impact` — Reverse impact query: what would be affected if a file changes? Returns transitive impact tree. Includes staleness warnings when deps are outdated.
 - `get_batch_dependencies` — Batch forward dependency query for multiple files. Shared visited set eliminates redundant traversal of overlapping subgraphs. More efficient than per-file calls for git diff analysis. Includes staleness warnings.
