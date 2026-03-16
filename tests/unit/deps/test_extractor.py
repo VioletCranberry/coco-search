@@ -443,10 +443,10 @@ class TestIncrementalNoChanges:
                 "cocosearch.deps.extractor._compute_file_hashes",
                 return_value=current_hashes,
             ),
+            patch("cocosearch.deps.extractor.set_deps_extracted_at") as mock_stamp,
             patch(
-                "cocosearch.deps.extractor.set_deps_extracted_at"
-            ) as mock_stamp,
-            patch("cocosearch.deps.query.get_dep_stats", return_value={"total_edges": 5}),
+                "cocosearch.deps.query.get_dep_stats", return_value={"total_edges": 5}
+            ),
         ):
             from cocosearch.deps.extractor import extract_dependencies
 
