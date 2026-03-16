@@ -247,6 +247,7 @@ def index_command(args: argparse.Namespace) -> int:
 
     # Run indexing with progress display
     indexing_failed = False
+    deps_extracted = False
     try:
         with IndexingProgress(console) as progress:
             if args.fresh:
@@ -307,6 +308,7 @@ def index_command(args: argparse.Namespace) -> int:
                 dep_stats = extract_dependencies(
                     index_name, codebase_path, fresh=dep_fresh
                 )
+                deps_extracted = True
                 if dep_stats.get("incremental"):
                     console.print(
                         f"  [green]{dep_stats['edges_found']} edges[/green] "
@@ -330,7 +332,11 @@ def index_command(args: argparse.Namespace) -> int:
 
     finally:
         try:
-            set_index_status(index_name, "error" if indexing_failed else "indexed")
+            set_index_status(
+                index_name,
+                "error" if indexing_failed else "indexed",
+                update_timestamp=not deps_extracted,
+            )
         except Exception:
             pass
 

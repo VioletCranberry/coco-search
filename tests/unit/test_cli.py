@@ -154,6 +154,89 @@ class TestIndexCommand:
         assert "feature-branch" in captured.out
         assert "def5678" in captured.out
 
+    def test_deps_extraction_skips_timestamp_update(self, capsys, tmp_codebase):
+        """set_index_status called with update_timestamp=False after deps extraction."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+            patch("cocosearch.cli.set_index_status") as mock_status,
+            patch(
+                "cocosearch.cli.extract_dependencies",
+                return_value={"edges_found": 5, "files_processed": 2},
+            ),
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+                deps=True,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        # The finally block should call set_index_status with update_timestamp=False
+        final_call = mock_status.call_args_list[-1]
+        assert final_call.args == ("testindex", "indexed")
+        assert final_call.kwargs.get("update_timestamp") is False
+
+    def test_no_deps_updates_timestamp(self, capsys, tmp_codebase):
+        """set_index_status called with update_timestamp=True when no deps."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+            patch("cocosearch.cli.set_index_status") as mock_status,
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        final_call = mock_status.call_args_list[-1]
+        assert final_call.args == ("testindex", "indexed")
+        assert final_call.kwargs.get("update_timestamp") is True
+
+    def test_failed_deps_extraction_updates_timestamp(self, capsys, tmp_codebase):
+        """set_index_status updates timestamp when deps extraction fails."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+            patch("cocosearch.cli.set_index_status") as mock_status,
+            patch(
+                "cocosearch.cli.extract_dependencies",
+                side_effect=Exception("extraction failed"),
+            ),
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+                deps=True,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        final_call = mock_status.call_args_list[-1]
+        assert final_call.args == ("testindex", "indexed")
+        assert final_call.kwargs.get("update_timestamp") is True
+
 
 class TestSearchCommand:
     """Tests for search_command."""
