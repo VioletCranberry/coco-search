@@ -564,6 +564,7 @@ async def api_reindex(request) -> JSONResponse:
 
         def _run():
             failed = False
+            deps_extracted = False
             try:
                 if cancel_event.is_set():
                     return
@@ -581,6 +582,7 @@ async def api_reindex(request) -> JSONResponse:
                         from cocosearch.deps.extractor import extract_dependencies
 
                         extract_dependencies(index_name, source_path)
+                        deps_extracted = True
                     except Exception as e:
                         logger.warning(f"Dependency extraction failed: {e}")
             except Exception as exc:
@@ -592,7 +594,9 @@ async def api_reindex(request) -> JSONResponse:
                         current = get_index_metadata(index_name)
                         if current and current.get("status") == "indexing":
                             set_index_status(
-                                index_name, "error" if failed else "indexed"
+                                index_name,
+                                "error" if failed else "indexed",
+                                update_timestamp=not deps_extracted,
                             )
                     except Exception as e:
                         logger.warning(
