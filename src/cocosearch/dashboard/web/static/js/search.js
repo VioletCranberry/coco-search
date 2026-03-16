@@ -200,10 +200,25 @@ function displaySearchResults(data) {
         return;
     }
 
-    infoEl.textContent = `${data.total} result${data.total !== 1 ? 's' : ''} in ${data.query_time_ms}ms`;
+    // Per-index breakdown for cross-index results
+    const indexCounts = {};
+    results.forEach(r => {
+        if (r.index_name) {
+            indexCounts[r.index_name] = (indexCounts[r.index_name] || 0) + 1;
+        }
+    });
+    const indexNames = Object.keys(indexCounts);
+    if (indexNames.length > 1) {
+        const breakdown = indexNames.map(n => `${n}: ${indexCounts[n]}`).join(', ');
+        infoEl.textContent = `${data.total} results in ${data.query_time_ms}ms (${breakdown})`;
+    } else {
+        infoEl.textContent = `${data.total} result${data.total !== 1 ? 's' : ''} in ${data.query_time_ms}ms`;
+    }
     infoEl.style.display = 'block';
 
-    container.innerHTML = results.map((r, i) => {
+    const groupByIndex = document.getElementById('groupByIndex').checked && indexNames.length > 1;
+
+    const renderCard = (r, i) => {
         const scoreClass = r.score >= 0.7 ? 'badge-score-high' : r.score >= 0.4 ? 'badge-score-mid' : 'badge-score-low';
         const matchBadge = r.match_type ? `<span class="search-result-badge badge-match">${escapeHtml(r.match_type)}</span>` : '';
         const langBadge = r.language_id ? `<span class="search-result-badge badge-lang">${escapeHtml(r.language_id)}</span>` : '';
@@ -253,7 +268,23 @@ function displaySearchResults(data) {
                 <button onclick="viewFile('${escapedPath}', ${r.start_line || 1}, ${r.end_line || r.start_line || 1})">View File</button>
             </div>
         </div>`;
-    }).join('');
+    };
+
+    if (groupByIndex) {
+        // Group results by index_name, render with section headers
+        const groups = {};
+        results.forEach((r, i) => {
+            const name = r.index_name || 'unknown';
+            if (!groups[name]) groups[name] = [];
+            groups[name].push({ result: r, index: i });
+        });
+        container.innerHTML = Object.entries(groups).map(([name, items]) =>
+            `<div class="search-index-group-header">${escapeHtml(name)} (${items.length} result${items.length !== 1 ? 's' : ''})</div>` +
+            items.map(({ result, index }) => renderCard(result, index)).join('')
+        ).join('');
+    } else {
+        container.innerHTML = results.map((r, i) => renderCard(r, i)).join('');
+    }
 }
 
 export function toggleDepsPanel(index) {

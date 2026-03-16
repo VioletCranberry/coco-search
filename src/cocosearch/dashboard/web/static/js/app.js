@@ -43,6 +43,12 @@ document.getElementById('searchInput').addEventListener('keydown', (e) => {
 document.getElementById('searchBtn').addEventListener('click', executeSearch);
 document.getElementById('clearSearchBtn').addEventListener('click', clearSearch);
 
+// Toggle "Group by index" visibility based on "Search all indexes"
+document.getElementById('searchAllIndexes').addEventListener('change', (e) => {
+    document.getElementById('groupByIndexLabel').style.display = e.target.checked ? '' : 'none';
+    if (!e.target.checked) document.getElementById('groupByIndex').checked = false;
+});
+
 // Search min score slider
 document.getElementById('searchMinScore').addEventListener('input', (e) => {
     document.getElementById('minScoreValue').textContent = e.target.value;

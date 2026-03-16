@@ -269,6 +269,7 @@ class TestHybridSearchModes:
                     symbol_type=None,
                     symbol_name=None,
                     language_filter=None,
+                    query_embedding=None,
                 )
 
         # Results should have match_type from hybrid search

@@ -903,6 +903,15 @@ select option:checked {
     gap: 4px;
 }
 
+.search-index-group-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 10px 14px 4px;
+    margin-top: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
 .search-result-symbol {
     padding: 6px 14px;
     font-size: 15px;
