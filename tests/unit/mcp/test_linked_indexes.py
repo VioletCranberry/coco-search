@@ -181,3 +181,93 @@ class TestApiSearchLinkedIndexes:
 
         assert resp.status_code == 200
         mock_s.assert_called_once()
+
+
+class TestApiProjectLinkedIndexes:
+    """Tests for GET /api/project returning linked_indexes from config."""
+
+    @pytest.mark.asyncio
+    async def test_project_includes_linked_indexes(self, client):
+        """linked_indexes from config are included in /api/project response."""
+        config = _config_with_linked(["shared_lib", "utils"])
+
+        with (
+            patch.dict("os.environ", {"COCOSEARCH_PROJECT_PATH": "/tmp/test"}),
+            patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(None, None),
+            ),
+            patch(
+                "cocosearch.management.git.get_main_repo_root",
+                return_value=None,
+            ),
+            patch(
+                "cocosearch.mcp.server.resolve_index_name",
+                return_value="test_proj",
+            ),
+            patch(
+                "cocosearch.mcp.server._ensure_cocoindex_init",
+                return_value=True,
+            ),
+            patch(
+                "cocosearch.mcp.server.mgmt_list_indexes",
+                return_value=[{"name": "test_proj"}],
+            ),
+            patch(
+                "cocosearch.mcp.server.get_index_metadata",
+                return_value={"canonical_path": "/tmp/test"},
+            ),
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=config),
+        ):
+            resp = await client.get("/api/project")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["linked_indexes"] == ["shared_lib", "utils"]
+
+    @pytest.mark.asyncio
+    async def test_project_empty_linked_indexes(self, client):
+        """When no linkedIndexes configured, linked_indexes is empty list."""
+        config = _config_with_linked([])
+
+        with (
+            patch.dict("os.environ", {"COCOSEARCH_PROJECT_PATH": "/tmp/test"}),
+            patch(
+                "cocosearch.management.context.find_project_root",
+                return_value=(None, None),
+            ),
+            patch(
+                "cocosearch.management.git.get_main_repo_root",
+                return_value=None,
+            ),
+            patch(
+                "cocosearch.mcp.server.resolve_index_name",
+                return_value="test_proj",
+            ),
+            patch(
+                "cocosearch.mcp.server._ensure_cocoindex_init",
+                return_value=True,
+            ),
+            patch(
+                "cocosearch.mcp.server.mgmt_list_indexes",
+                return_value=[{"name": "test_proj"}],
+            ),
+            patch(
+                "cocosearch.mcp.server.get_index_metadata",
+                return_value={"canonical_path": "/tmp/test"},
+            ),
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=config),
+        ):
+            resp = await client.get("/api/project")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["linked_indexes"] == []

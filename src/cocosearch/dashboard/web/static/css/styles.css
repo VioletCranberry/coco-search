@@ -891,6 +891,12 @@ select option:checked {
 .badge-lang { background: var(--border-color); color: var(--text-primary); }
 .badge-index { background: #8b5cf6; color: white; }
 
+.linked-indexes-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
 .search-scope {
     margin: 6px 0 0 0;
     font-size: 13px;

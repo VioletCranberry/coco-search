@@ -88,9 +88,11 @@ export function startPolling(reloadListOnComplete = false) {
                 );
                 if (matchIdx >= 0) {
                     // Rebuild dropdown and select the new index
-                    select.innerHTML = state.allIndexes.map((idx, i) =>
-                        `<option value="${i}">${idx.name}</option>`
-                    ).join('');
+                    const linkedSet = new Set(state.linkedIndexes);
+                    select.innerHTML = state.allIndexes.map((idx, i) => {
+                        const prefix = linkedSet.has(idx.name) ? '[linked] ' : '';
+                        return `<option value="${i}">${prefix}${idx.name}</option>`;
+                    }).join('');
                     select.value = String(matchIdx);
                     // Ensure dashboard is visible (may already be from indexCurrentProject)
                     document.getElementById('loadingMessage').style.display = 'none';
@@ -163,6 +165,7 @@ export async function loadIndexList() {
             fetchInfra(),
         ]);
         state.projectContext = ctx;
+        state.linkedIndexes = (ctx && ctx.linked_indexes) || [];
         state.allIndexes = Array.isArray(data) ? data : [data];
         state.allProjects = projects;
 
@@ -176,13 +179,16 @@ export async function loadIndexList() {
         const unindexedProjects = state.allProjects.filter(p => !p.is_indexed && !indexedNames.has(p.index_name));
 
         const select = document.getElementById('indexSelect');
+        const linkedSet = new Set(state.linkedIndexes);
+        const indexOption = (idx, i) => {
+            const prefix = linkedSet.has(idx.name) ? '[linked] ' : '';
+            return `<option value="${i}">${prefix}${idx.name}</option>`;
+        };
         let html = '';
         if (state.allIndexes.length > 0 && unindexedProjects.length > 0) {
             // Use optgroups when both indexed and unindexed exist
             html += '<optgroup label="Indexed">';
-            html += state.allIndexes.map((idx, i) =>
-                `<option value="${i}">${idx.name}</option>`
-            ).join('');
+            html += state.allIndexes.map(indexOption).join('');
             html += '</optgroup>';
             html += '<optgroup label="Available (not indexed)">';
             html += unindexedProjects.map(p =>
@@ -190,9 +196,7 @@ export async function loadIndexList() {
             ).join('');
             html += '</optgroup>';
         } else {
-            html = state.allIndexes.map((idx, i) =>
-                `<option value="${i}">${idx.name}</option>`
-            ).join('');
+            html = state.allIndexes.map(indexOption).join('');
             if (unindexedProjects.length > 0) {
                 html += '<optgroup label="Available (not indexed)">';
                 html += unindexedProjects.map(p =>
@@ -202,6 +206,17 @@ export async function loadIndexList() {
             }
         }
         select.innerHTML = html;
+
+        // Show linked indexes hint next to "Search all indexes" checkbox
+        const hint = document.getElementById('linkedIndexesHint');
+        if (hint) {
+            const mainName = (ctx && ctx.index_name) || '';
+            if (mainName && state.linkedIndexes.length > 0) {
+                hint.textContent = `(${mainName}, ${state.linkedIndexes.join(', ')})`;
+            } else {
+                hint.textContent = '';
+            }
+        }
 
         // Determine which index to select
         let selectedIndex = 0;

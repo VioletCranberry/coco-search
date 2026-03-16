@@ -4,6 +4,7 @@ export const state = {
     grammarChart: null,
     allIndexes: [],
     allProjects: [],
+    linkedIndexes: [],
     projectContext: null,
     parseFailuresData: [],
     grammarFailuresData: [],

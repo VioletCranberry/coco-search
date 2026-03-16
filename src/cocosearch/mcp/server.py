@@ -699,6 +699,17 @@ def _build_project_response(env_path: str) -> JSONResponse:
     except Exception as e:
         logger.warning(f"Failed to check index existence: {e}")
 
+    linked_indexes = []
+    try:
+        from cocosearch.config import find_config_file, load_config
+
+        config_path = find_config_file()
+        if config_path:
+            _cfg = load_config(config_path)
+            linked_indexes = _cfg.linkedIndexes or []
+    except Exception:
+        pass
+
     return JSONResponse(
         {
             "has_project": True,
@@ -708,6 +719,7 @@ def _build_project_response(env_path: str) -> JSONResponse:
             "detection_method": detection_method,
             "path_collision": path_collision,
             "collision_message": collision_message,
+            "linked_indexes": linked_indexes,
         }
     )
 
