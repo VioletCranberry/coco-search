@@ -174,7 +174,7 @@ Three independent systems — a language can use any combination. See `docs/addi
 Workflow skills are SKILL.md files that guide AI coding assistants through structured workflows using CocoSearch MCP tools.
 
 1. Create `skills/cocosearch-<name>/SKILL.md` with YAML frontmatter (`name`, `description`) and the workflow steps
-2. Copy to `src/cocosearch/skills/cocosearch-<name>/SKILL.md` (bundled with the Python package for `cocosearch init`)
+2. Run `./scripts/sync_skills.sh` to sync skills into the Python package
 3. Add to the skills table in `skills/README.md`
 4. Add to all installation `for` loops in `skills/README.md` (Claude Code project-local, global, OpenCode project-local, global)
 5. Update skill count in `skills/README.md` ("all N skills")

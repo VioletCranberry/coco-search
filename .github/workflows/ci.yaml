@@ -33,6 +33,21 @@ jobs:
               - 'src/cocosearch/__init__.py'
               - '.claude-plugin/**'
 
+  skills-sync:
+    name: Skills Sync Check
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check skills are in sync
+        run: |
+          diff -r skills/ src/cocosearch/skills/ \
+            --exclude=README.md --exclude=__init__.py --exclude=__pycache__ \
+            && echo "Skills are in sync" \
+            || { echo "::error::Skills out of sync. Run ./scripts/sync_skills.sh"; exit 1; }
+
   lint:
     name: Lint
     needs: changes
