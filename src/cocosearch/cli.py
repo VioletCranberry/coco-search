@@ -2130,6 +2130,62 @@ def config_check_command(args: argparse.Namespace) -> int:
 
     console.print(conn_table)
 
+    # Linked Indexes health (informational, does not affect exit code)
+    if project_config.linkedIndexes and not has_failure:
+        try:
+            from cocosearch.management.discovery import list_indexes
+            from cocosearch.management.stats import (
+                check_staleness,
+                check_branch_staleness,
+                check_deps_staleness,
+            )
+
+            linked_table = Table(title="Linked Indexes")
+            linked_table.add_column("Index", style="cyan")
+            linked_table.add_column("Status", style="white")
+            linked_table.add_column("Details", style="dim")
+
+            all_indexes = {idx["name"] for idx in list_indexes()}
+            for li in project_config.linkedIndexes:
+                if li not in all_indexes:
+                    linked_table.add_row(
+                        li,
+                        "[yellow]⚠ not indexed[/yellow]",
+                        "Run 'cocosearch index' on that project",
+                    )
+                else:
+                    issues = []
+                    try:
+                        li_stale, li_days = check_staleness(li)
+                        if li_stale:
+                            issues.append(f"stale ({li_days}d)")
+                        li_branch = check_branch_staleness(li)
+                        if li_branch and li_branch.get("branch_changed"):
+                            issues.append("branch drift")
+                        elif li_branch and li_branch.get("commits_changed"):
+                            issues.append(
+                                f"{li_branch.get('commits_behind', '?')} commits behind"
+                            )
+                        li_deps = check_deps_staleness(li)
+                        if li_deps:
+                            issues.append(f"{len(li_deps)} deps warning(s)")
+                    except Exception:
+                        pass  # Best-effort per linked index
+
+                    if issues:
+                        linked_table.add_row(
+                            li,
+                            "[yellow]⚠ warnings[/yellow]",
+                            ", ".join(issues),
+                        )
+                    else:
+                        linked_table.add_row(li, "[green]✓ healthy[/green]", "")
+
+            console.print()
+            console.print(linked_table)
+        except Exception:
+            pass  # Best-effort — don't block config check
+
     if has_failure:
         return 1
 

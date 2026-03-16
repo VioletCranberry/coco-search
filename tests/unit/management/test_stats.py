@@ -433,6 +433,12 @@ class TestGetSymbolStats:
 class TestCollectWarnings:
     """Tests for collect_warnings function."""
 
+    @pytest.fixture(autouse=True)
+    def _no_real_config(self):
+        """Prevent real cocosearch.yaml from injecting linked index warnings."""
+        with patch("cocosearch.config.find_config_file", return_value=None):
+            yield
+
     def test_stale_index_warning(self, mock_db_pool):
         """Generates staleness warning for stale index."""
         pool, cursor, conn = mock_db_pool(results=[(100,), (100,)])  # file counts
@@ -500,6 +506,18 @@ class TestCollectWarnings:
                 "cocosearch.management.discovery.list_indexes",
                 return_value=[{"name": "repo_a"}],
             ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={},
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
         ):
             warnings = collect_warnings("test", is_stale=False, staleness_days=1)
 
@@ -508,7 +526,7 @@ class TestCollectWarnings:
         assert "not found" in warnings[0]
 
     def test_linked_index_all_exist_no_warning(self, mock_db_pool):
-        """No warning when all linkedIndexes exist."""
+        """No warning when all linkedIndexes exist and healthy."""
         from unittest.mock import MagicMock
 
         mock_config = MagicMock()
@@ -526,6 +544,18 @@ class TestCollectWarnings:
             patch(
                 "cocosearch.management.discovery.list_indexes",
                 return_value=[{"name": "repo_a"}, {"name": "repo_b"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={},
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
             ),
         ):
             warnings = collect_warnings("test", is_stale=False, staleness_days=1)
@@ -547,6 +577,245 @@ class TestCollectWarnings:
         with patch(
             "cocosearch.config.find_config_file",
             side_effect=Exception("config error"),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert warnings == []
+
+    def test_linked_index_stale_warning(self, mock_db_pool):
+        """Warns when a linked index is stale."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(True, 14),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={},
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert any("repo_a" in w and "stale" in w and "14" in w for w in warnings)
+
+    def test_linked_index_no_metadata_warning(self, mock_db_pool):
+        """Warns when a linked index has no metadata."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(True, -1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={},
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert any("repo_a" in w and "no metadata" in w for w in warnings)
+
+    def test_linked_index_branch_drift_warning(self, mock_db_pool):
+        """Warns when a linked index has branch drift."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={
+                    "branch_changed": True,
+                    "indexed_branch": "main",
+                    "current_branch": "develop",
+                },
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert any("repo_a" in w and "main" in w and "develop" in w for w in warnings)
+
+    def test_linked_index_commits_behind_warning(self, mock_db_pool):
+        """Warns when a linked index is commits behind."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={
+                    "commits_changed": True,
+                    "commits_behind": 5,
+                    "current_branch": "main",
+                },
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert any("repo_a" in w and "5 commits behind" in w for w in warnings)
+
+    def test_linked_index_deps_stale_warning(self, mock_db_pool):
+        """Warns when a linked index has stale dependencies."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={},
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[{"message": "deps are 3 days old"}],
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        assert any("repo_a" in w and "deps are 3 days old" in w for w in warnings)
+
+    def test_linked_index_staleness_error_silent(self, mock_db_pool):
+        """Errors during linked index staleness checks are silently ignored."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                side_effect=Exception("db error"),
+            ),
+        ):
+            warnings = collect_warnings("test", is_stale=False, staleness_days=1)
+
+        # No crash, no linked index warnings
+        assert not any("repo_a" in w for w in warnings)
+
+    def test_linked_index_healthy_no_extra_warnings(self, mock_db_pool):
+        """No extra warnings when all linked index checks pass."""
+        from unittest.mock import MagicMock
+
+        mock_config = MagicMock()
+        mock_config.linkedIndexes = ["repo_a", "repo_b"]
+
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_config),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "repo_a"}, {"name": "repo_b"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={},
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
         ):
             warnings = collect_warnings("test", is_stale=False, staleness_days=1)
 
@@ -746,6 +1015,12 @@ class TestCheckBranchStaleness:
 
 class TestCollectWarningsBranch:
     """Tests for collect_warnings with branch staleness."""
+
+    @pytest.fixture(autouse=True)
+    def _no_real_config(self):
+        """Prevent real cocosearch.yaml from injecting linked index warnings."""
+        with patch("cocosearch.config.find_config_file", return_value=None):
+            yield
 
     def test_branch_change_warning(self, mock_db_pool):
         """Generates warning when branch has changed."""

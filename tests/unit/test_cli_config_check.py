@@ -238,6 +238,160 @@ class TestConfigCheckProvider:
         assert "COCOSEARCH_EMBEDDING_PROVIDER" in output
 
 
+def _patch_all_services_ok():
+    """Context manager that patches all services as reachable."""
+    mock_conn = MagicMock()
+    return (
+        patch("cocosearch.indexer.preflight.psycopg.connect", return_value=mock_conn),
+        patch(
+            "cocosearch.indexer.preflight.urllib.request.urlopen",
+            return_value=_mock_tags_response(),
+        ),
+    )
+
+
+class TestConfigCheckLinkedIndexes:
+    """Tests for linked indexes section in config check command."""
+
+    def _make_config(self, linked=None):
+        """Create a mock CocoSearchConfig with linkedIndexes."""
+        config = MagicMock()
+        config.linkedIndexes = linked or []
+        config.embedding = MagicMock()
+        config.embedding.provider = None
+        config.embedding.model = None
+        config.embedding.baseUrl = None
+        config.logging = MagicMock()
+        config.logging.file = False
+        return config
+
+    def test_linked_indexes_shown_when_configured(self, capsys):
+        """Linked Indexes table appears when linkedIndexes is configured."""
+        pg_patch, ollama_patch = _patch_all_services_ok()
+        config = self._make_config(linked=["other_repo"])
+
+        with pg_patch, ollama_patch:
+            with patch(
+                "cocosearch.cli.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ):
+                with patch(
+                    "cocosearch.cli.load_project_config",
+                    return_value=config,
+                ):
+                    with patch(
+                        "cocosearch.management.discovery.list_indexes",
+                        return_value=[],
+                    ):
+                        result = config_check_command(_make_args())
+
+        assert result == 0
+        output = capsys.readouterr().out
+        assert "Linked Indexes" in output
+
+    def test_missing_linked_index_shows_not_indexed(self, capsys):
+        """Missing linked index shows 'not indexed' status."""
+        pg_patch, ollama_patch = _patch_all_services_ok()
+        config = self._make_config(linked=["missing_repo"])
+
+        with pg_patch, ollama_patch:
+            with patch(
+                "cocosearch.cli.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ):
+                with patch(
+                    "cocosearch.cli.load_project_config",
+                    return_value=config,
+                ):
+                    with patch(
+                        "cocosearch.management.discovery.list_indexes",
+                        return_value=[],
+                    ):
+                        result = config_check_command(_make_args())
+
+        assert result == 0
+        output = capsys.readouterr().out
+        assert "not indexed" in output
+
+    def test_healthy_linked_index_shows_healthy(self, capsys):
+        """Healthy linked index shows 'healthy' status."""
+        pg_patch, ollama_patch = _patch_all_services_ok()
+        config = self._make_config(linked=["healthy_repo"])
+
+        with pg_patch, ollama_patch:
+            with patch(
+                "cocosearch.cli.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ):
+                with patch(
+                    "cocosearch.cli.load_project_config",
+                    return_value=config,
+                ):
+                    with patch(
+                        "cocosearch.management.discovery.list_indexes",
+                        return_value=[{"name": "healthy_repo"}],
+                    ):
+                        with patch(
+                            "cocosearch.management.stats.check_staleness",
+                            return_value=(False, 1),
+                        ):
+                            with patch(
+                                "cocosearch.management.stats.check_branch_staleness",
+                                return_value={},
+                            ):
+                                with patch(
+                                    "cocosearch.management.stats.check_deps_staleness",
+                                    return_value=[],
+                                ):
+                                    result = config_check_command(_make_args())
+
+        assert result == 0
+        output = capsys.readouterr().out
+        assert "healthy" in output
+
+    def test_linked_indexes_do_not_affect_exit_code(self, capsys):
+        """Missing/stale linked indexes still return exit 0."""
+        pg_patch, ollama_patch = _patch_all_services_ok()
+        config = self._make_config(linked=["missing_repo"])
+
+        with pg_patch, ollama_patch:
+            with patch(
+                "cocosearch.cli.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ):
+                with patch(
+                    "cocosearch.cli.load_project_config",
+                    return_value=config,
+                ):
+                    with patch(
+                        "cocosearch.management.discovery.list_indexes",
+                        return_value=[],
+                    ):
+                        result = config_check_command(_make_args())
+
+        assert result == 0
+
+    def test_no_linked_indexes_no_table(self, capsys):
+        """No linkedIndexes config means no Linked Indexes table."""
+        pg_patch, ollama_patch = _patch_all_services_ok()
+        config = self._make_config(linked=[])
+
+        with pg_patch, ollama_patch:
+            with patch(
+                "cocosearch.cli.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ):
+                with patch(
+                    "cocosearch.cli.load_project_config",
+                    return_value=config,
+                ):
+                    result = config_check_command(_make_args())
+
+        assert result == 0
+        output = capsys.readouterr().out
+        assert "Linked Indexes" not in output
+
+
 class TestConfigSubcommandHelp:
     """Tests that 'cocosearch config' with no sub-subcommand shows config help."""
 
