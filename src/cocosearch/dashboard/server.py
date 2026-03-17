@@ -17,6 +17,14 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+_dashboard_server = None  # uvicorn.Server | None
+
+
+def stop_dashboard_server():
+    """Signal the dashboard uvicorn server to exit."""
+    if _dashboard_server is not None:
+        _dashboard_server.should_exit = True
+
 
 def start_dashboard_server(port: int | None = None) -> str | None:
     """Start the dashboard HTTP server in a daemon thread.
@@ -49,6 +57,9 @@ def start_dashboard_server(port: int | None = None) -> str | None:
         access_log=False,
     )
     server = uvicorn.Server(config)
+
+    global _dashboard_server
+    _dashboard_server = server
 
     # Track the actual bound port (resolved after startup when port=0)
     actual_port = port

@@ -67,6 +67,14 @@ document.querySelector('.log-panel .log-header-btns button:first-child').addEven
 document.querySelector('.log-panel .log-header-btns button:last-child').addEventListener('click', toggleLogPanel);
 document.getElementById('logScrollIndicator').addEventListener('click', scrollLogsToBottom);
 
+// Quit button
+document.querySelector('.quit-btn').addEventListener('click', async () => {
+    if (!confirm('Shut down the CocoSearch server?')) return;
+    try { await fetch('/api/shutdown', { method: 'POST' }); } catch {}
+    document.getElementById('disconnectOverlay').style.display = 'flex';
+    setTimeout(() => window.close(), 1000);
+});
+
 // Log auto-scroll detection
 document.getElementById('logPanelBody').addEventListener('scroll', function() {
     const body = this;

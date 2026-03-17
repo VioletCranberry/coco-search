@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 _active_indexing: dict[str, tuple[threading.Thread, threading.Event]] = {}
 _indexing_lock = threading.Lock()
+_last_activity: float = _time.monotonic()
+_IDLE_TIMEOUT_DEFAULT = 1800  # 30 minutes
 _cocoindex_initialized = False
 _cocoindex_init_lock = threading.Lock()
 _cocoindex_init_failed_at: float = 0.0  # monotonic timestamp of last failure
@@ -80,6 +82,44 @@ def _get_cs_log():
     from cocosearch.logging import cs_log
 
     return cs_log
+
+
+def _touch_activity():
+    """Record that the server handled a request (resets idle watchdog)."""
+    global _last_activity
+    _last_activity = _time.monotonic()
+
+
+def _graceful_shutdown():
+    """Cancel indexing, stop dashboard, close DB, exit."""
+    with _indexing_lock:
+        for name, (thread, stop_event) in list(_active_indexing.items()):
+            stop_event.set()
+    with _indexing_lock:
+        for name, (thread, stop_event) in list(_active_indexing.items()):
+            thread.join(timeout=2.0)
+    from cocosearch.dashboard.server import stop_dashboard_server
+
+    stop_dashboard_server()
+    from cocosearch.search.db import close_pool
+
+    close_pool()
+    os._exit(0)
+
+
+def _start_idle_watchdog(timeout_seconds: int):
+    """Start a daemon thread that exits the process after idle timeout."""
+
+    def _watchdog():
+        while True:
+            _time.sleep(60)
+            idle = _time.monotonic() - _last_activity
+            if idle >= timeout_seconds:
+                _get_cs_log().system("Idle watchdog — shutting down", idle_s=int(idle))
+                _graceful_shutdown()
+
+    t = threading.Thread(target=_watchdog, daemon=True)
+    t.start()
 
 
 def _ensure_cocoindex_init(timeout: float = 5.0) -> bool:
@@ -360,6 +400,14 @@ async def heartbeat(request) -> StreamingResponse:
     )
 
 
+@mcp.custom_route("/api/shutdown", methods=["POST"])
+async def api_shutdown(request) -> JSONResponse:
+    """Shut down the CocoSearch server gracefully."""
+    _get_cs_log().system("Shutdown requested via API")
+    asyncio.get_event_loop().call_later(0.5, _graceful_shutdown)
+    return JSONResponse({"status": "shutting_down"})
+
+
 # SSE log streaming endpoint for dashboard
 @mcp.custom_route("/api/logs", methods=["GET"])
 async def api_logs(request) -> StreamingResponse:
@@ -500,6 +548,7 @@ async def api_stats_single(request) -> JSONResponse:
 @mcp.custom_route("/api/reindex", methods=["POST"])
 async def api_reindex(request) -> JSONResponse:
     """Trigger reindexing of an existing index in a background thread."""
+    _touch_activity()
     try:
         body = await request.json()
     except Exception:
@@ -620,6 +669,7 @@ async def api_reindex(request) -> JSONResponse:
 @mcp.custom_route("/api/extract-deps", methods=["POST"])
 async def api_extract_deps(request) -> JSONResponse:
     """Extract dependency edges for an index."""
+    _touch_activity()
     try:
         body = await request.json()
     except Exception:
@@ -737,6 +787,7 @@ async def api_project(request) -> JSONResponse:
 @mcp.custom_route("/api/index", methods=["POST"])
 async def api_index(request) -> JSONResponse:
     """Trigger initial indexing of a project from the dashboard."""
+    _touch_activity()
     try:
         body = await request.json()
     except Exception:
@@ -1126,6 +1177,7 @@ async def api_grammars(request) -> JSONResponse:
 @mcp.custom_route("/api/search", methods=["POST"])
 async def api_search(request) -> JSONResponse:
     """Search indexed code via the dashboard API."""
+    _touch_activity()
     import time
 
     try:
@@ -1749,6 +1801,7 @@ def log_mcp_tool(func):
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            _touch_activity()
             from cocosearch.logging import cs_log
 
             tool_name = func.__name__
@@ -1792,6 +1845,7 @@ def log_mcp_tool(func):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            _touch_activity()
             from cocosearch.logging import cs_log
 
             tool_name = func.__name__
@@ -3162,6 +3216,13 @@ def run_server(
                 dashboard_url = start_dashboard_server()
                 if dashboard_url:
                     _open_browser(dashboard_url)
+
+            timeout = int(
+                os.environ.get("COCOSEARCH_IDLE_TIMEOUT", _IDLE_TIMEOUT_DEFAULT)
+            )
+            if timeout > 0:
+                _start_idle_watchdog(timeout)
+                _get_cs_log().system("Idle watchdog started", timeout_s=timeout)
 
             _get_cs_log().system("Server listening", transport="stdio")
             mcp.run(transport="stdio")

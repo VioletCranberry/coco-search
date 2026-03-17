@@ -1264,6 +1264,21 @@ select option:checked {
 }
 .log-badge.active { display: block; }
 
+/* QUIT button in status line */
+.quit-btn {
+    background: transparent;
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 1px 8px;
+    cursor: pointer;
+}
+.quit-btn:hover {
+    box-shadow: 0 0 8px rgba(208, 96, 64, 0.3);
+    color: var(--text-primary);
+}
+
 @media (max-width: 768px) {
     .log-panel {
         width: 100%;
