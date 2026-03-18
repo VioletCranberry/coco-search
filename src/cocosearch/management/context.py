@@ -143,7 +143,11 @@ def resolve_index_name(project_root: Path, detection_method: str | None) -> str:
             if config.indexName:
                 return config.indexName
         except ConfigError as e:
-            logger.debug("Config invalid at %s, falling back to directory name: %s", config_path, e)
+            logger.debug(
+                "Config invalid at %s, falling back to directory name: %s",
+                config_path,
+                e,
+            )
         except Exception as e:
             logger.warning(
                 "Unexpected error loading config at %s, falling back to directory name: %s",

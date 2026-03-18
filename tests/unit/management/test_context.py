@@ -210,10 +210,13 @@ class TestResolveIndexName:
         config_file = tmp_path / "cocosearch.yaml"
         config_file.write_text("indexName: myproject\n")
 
-        with patch(
-            "cocosearch.config.load_config",
-            side_effect=RuntimeError("unexpected import failure"),
-        ), caplog.at_level(logging.WARNING, logger="cocosearch.management.context"):
+        with (
+            patch(
+                "cocosearch.config.load_config",
+                side_effect=RuntimeError("unexpected import failure"),
+            ),
+            caplog.at_level(logging.WARNING, logger="cocosearch.management.context"),
+        ):
             result = resolve_index_name(tmp_path, "config")
 
         # Falls back to derived name
@@ -230,10 +233,13 @@ class TestResolveIndexName:
         config_file = tmp_path / "cocosearch.yaml"
         config_file.write_text("indexName: myproject\n")
 
-        with patch(
-            "cocosearch.config.load_config",
-            side_effect=ConfigError("bad config"),
-        ), caplog.at_level(logging.DEBUG, logger="cocosearch.management.context"):
+        with (
+            patch(
+                "cocosearch.config.load_config",
+                side_effect=ConfigError("bad config"),
+            ),
+            caplog.at_level(logging.DEBUG, logger="cocosearch.management.context"),
+        ):
             result = resolve_index_name(tmp_path, "config")
 
         from cocosearch.management.context import derive_index_name
