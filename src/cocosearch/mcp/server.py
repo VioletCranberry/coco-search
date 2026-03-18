@@ -263,6 +263,12 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
             if include_failures:
                 result["parse_failures"] = get_parse_failures(idx["name"])
                 result["grammar_failures"] = get_grammar_failures(idx["name"])
+            try:
+                from cocosearch.deps.query import get_dep_stats_detailed
+
+                result["dep_stats"] = get_dep_stats_detailed(idx["name"])
+            except Exception:
+                result["dep_stats"] = None
             all_stats.append(result)
         except ValueError as e:
             logger.warning("build_all_stats: skipped index %r: %s", idx["name"], e)
@@ -288,6 +294,12 @@ def build_single_stats(index_name: str, include_failures: bool = False) -> dict:
     if include_failures:
         result["parse_failures"] = get_parse_failures(index_name)
         result["grammar_failures"] = get_grammar_failures(index_name)
+    try:
+        from cocosearch.deps.query import get_dep_stats_detailed
+
+        result["dep_stats"] = get_dep_stats_detailed(index_name)
+    except Exception:
+        result["dep_stats"] = None
     return result
 
 
