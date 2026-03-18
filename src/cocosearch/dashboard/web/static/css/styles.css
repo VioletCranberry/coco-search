@@ -335,6 +335,11 @@ header {
     color: var(--text-muted);
 }
 
+.linked-indexes-card .value {
+    color: #8b5cf6;
+    text-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
 .chart-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));

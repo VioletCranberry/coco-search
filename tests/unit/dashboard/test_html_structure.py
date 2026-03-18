@@ -165,6 +165,24 @@ def test_deps_checkbox_exists(soup):
     assert checkbox.get("type") == "checkbox", "searchIncludeDeps should be a checkbox"
 
 
+def test_linked_indexes_card_exists(soup):
+    """The linked indexes summary card must exist with its child elements."""
+    card = soup.find(id="linkedIndexesCard")
+    assert card is not None, "Missing #linkedIndexesCard element"
+    assert "linked-indexes-card" in card.get("class", []), (
+        "linkedIndexesCard should have 'linked-indexes-card' class"
+    )
+    # Card should be hidden by default
+    assert card.get("style") and "display: none" in card["style"], (
+        "linkedIndexesCard should be hidden by default"
+    )
+    # Child elements
+    count_el = soup.find(id="linkedIndexesCount")
+    assert count_el is not None, "Missing #linkedIndexesCount element"
+    names_el = soup.find(id="linkedIndexesNames")
+    assert names_el is not None, "Missing #linkedIndexesNames element"
+
+
 def test_deps_graph_depth_selector_exists(soup):
     """The depth selector for the dependency graph modal must exist."""
     select = soup.find(id="depsGraphDepth")

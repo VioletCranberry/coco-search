@@ -218,6 +218,18 @@ export async function loadIndexList() {
             }
         }
 
+        // Populate linked indexes summary card
+        const linkedCard = document.getElementById('linkedIndexesCard');
+        if (linkedCard) {
+            if (state.linkedIndexes.length > 0) {
+                document.getElementById('linkedIndexesCount').textContent = state.linkedIndexes.length;
+                document.getElementById('linkedIndexesNames').textContent = state.linkedIndexes.join(', ');
+                linkedCard.style.display = '';
+            } else {
+                linkedCard.style.display = 'none';
+            }
+        }
+
         // Populate search index dropdown
         const searchIndexSelect = document.getElementById('searchIndexSelect');
         if (searchIndexSelect) {
