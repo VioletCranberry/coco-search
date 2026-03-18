@@ -554,6 +554,99 @@ def analyze(
     )
 
 
+@dataclass
+class MultiAnalysisResult:
+    """Cross-index analysis result with per-index breakdowns."""
+
+    per_index: dict[str, AnalysisResult]
+    errors: dict[str, str]
+    total_results: int
+    index_names: list[str]
+
+    def to_dict(self) -> dict:
+        """Convert to JSON-serializable dictionary."""
+        return {
+            "index_names": self.index_names,
+            "per_index": {k: v.to_dict() for k, v in self.per_index.items()},
+            "errors": self.errors,
+            "total_results": self.total_results,
+        }
+
+
+def multi_analyze(
+    query: str,
+    index_names: list[str],
+    limit: int = 10,
+    min_score: float = 0.0,
+    language_filter: str | None = None,
+    use_hybrid: bool | None = None,
+    symbol_type: str | list[str] | None = None,
+    symbol_name: str | None = None,
+    no_cache: bool = False,
+) -> MultiAnalysisResult:
+    """Analyze the search pipeline across multiple indexes.
+
+    Runs analyze() per-index in parallel using ThreadPoolExecutor,
+    following the same pattern as multi_search().
+
+    Args:
+        query: Natural language search query.
+        index_names: List of index names to analyze.
+        limit: Maximum results per index.
+        min_score: Minimum similarity score.
+        language_filter: Optional language filter.
+        use_hybrid: Hybrid search mode.
+        symbol_type: Filter by symbol type.
+        symbol_name: Filter by symbol name pattern.
+        no_cache: If True, bypass query cache.
+
+    Returns:
+        MultiAnalysisResult with per-index analysis and aggregate info.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    per_index: dict[str, AnalysisResult] = {}
+    errors: dict[str, str] = {}
+
+    def _analyze_index(idx_name: str) -> tuple[str, AnalysisResult]:
+        result = analyze(
+            query=query,
+            index_name=idx_name,
+            limit=limit,
+            min_score=min_score,
+            language_filter=language_filter,
+            use_hybrid=use_hybrid,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            no_cache=no_cache,
+        )
+        return idx_name, result
+
+    max_workers = min(len(index_names), 4)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_analyze_index, idx_name): idx_name
+            for idx_name in index_names
+        }
+        for future in as_completed(futures):
+            idx_name = futures[future]
+            try:
+                name, result = future.result()
+                per_index[name] = result
+            except Exception as e:
+                errors[idx_name] = str(e)
+                logger.warning("Analysis failed for index '%s': %s", idx_name, e)
+
+    total_results = sum(len(r.results) for r in per_index.values())
+
+    return MultiAnalysisResult(
+        per_index=per_index,
+        errors=errors,
+        total_results=total_results,
+        index_names=index_names,
+    )
+
+
 def format_analysis_pretty(analysis: AnalysisResult, index_name: str) -> None:
     """Print pipeline analysis using Rich panels and tables.
 
@@ -761,6 +854,59 @@ def format_analysis_json(analysis: AnalysisResult) -> str:
         JSON string of the analysis.
     """
     return json.dumps(analysis.to_dict(), indent=2)
+
+
+def format_multi_analysis_pretty(multi_result: MultiAnalysisResult) -> None:
+    """Print cross-index pipeline analysis using Rich panels.
+
+    Args:
+        multi_result: MultiAnalysisResult from multi_analyze().
+    """
+    from rich.console import Console
+
+    console = Console()
+
+    console.print(
+        f"\n[bold]Cross-Index Pipeline Analysis[/bold] ({len(multi_result.index_names)} indexes)"
+    )
+
+    if multi_result.errors:
+        for idx_name, error in multi_result.errors.items():
+            console.print(f"[red]  {idx_name}: {error}[/red]")
+
+    for idx_name in multi_result.index_names:
+        if idx_name in multi_result.per_index:
+            console.print(f"\n[bold cyan]{'=' * 60}[/bold cyan]")
+            format_analysis_pretty(multi_result.per_index[idx_name], idx_name)
+
+    # Summary
+    console.print("\n[bold]Summary[/bold]")
+    summary_lines = []
+    for idx_name in multi_result.index_names:
+        if idx_name in multi_result.per_index:
+            a = multi_result.per_index[idx_name]
+            summary_lines.append(
+                f"  {idx_name}: {len(a.results)} results, "
+                f"{a.timings.total_ms:.1f}ms total"
+            )
+        elif idx_name in multi_result.errors:
+            summary_lines.append(f"  {idx_name}: [red]FAILED[/red]")
+    console.print("\n".join(summary_lines))
+    console.print(
+        f"\n[dim]Total results across all indexes: {multi_result.total_results}[/dim]"
+    )
+
+
+def format_multi_analysis_json(multi_result: MultiAnalysisResult) -> str:
+    """Format cross-index analysis result as JSON.
+
+    Args:
+        multi_result: MultiAnalysisResult from multi_analyze().
+
+    Returns:
+        JSON string.
+    """
+    return json.dumps(multi_result.to_dict(), indent=2)
 
 
 def _truncate(s: str, max_len: int) -> str:

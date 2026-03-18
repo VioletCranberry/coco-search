@@ -409,3 +409,49 @@ class TestExtractDependenciesModuleResolution:
         ]
         target_files = {e.target_file for e in doc_edges}
         assert target_files == {"src/search/engine.py", "src/search/cache.py"}
+
+
+# ============================================================================
+# Tests: incremental extraction no-changes path
+# ============================================================================
+
+
+class TestIncrementalNoChanges:
+    """Tests for the incremental extraction early-return when nothing changed."""
+
+    def test_stamps_deps_extracted_at_when_no_changes(self, mock_db_pool, tmp_path):
+        """set_deps_extracted_at must be called even when no files changed."""
+        py_file = tmp_path / "app.py"
+        py_file.write_text("import os\n")
+
+        indexed_files = [("app.py", "py")]
+        stored_hashes = {"app.py": "abc123"}
+        current_hashes = {"app.py": ("abc123", "py")}
+
+        with (
+            patch(
+                "cocosearch.deps.extractor.get_indexed_files",
+                return_value=indexed_files,
+            ),
+            patch("cocosearch.deps.extractor.create_deps_table"),
+            patch("cocosearch.deps.extractor.create_tracking_table"),
+            patch(
+                "cocosearch.deps.extractor.get_stored_hashes",
+                return_value=stored_hashes,
+            ),
+            patch(
+                "cocosearch.deps.extractor._compute_file_hashes",
+                return_value=current_hashes,
+            ),
+            patch("cocosearch.deps.extractor.set_deps_extracted_at") as mock_stamp,
+            patch(
+                "cocosearch.deps.query.get_dep_stats", return_value={"total_edges": 5}
+            ),
+        ):
+            from cocosearch.deps.extractor import extract_dependencies
+
+            stats = extract_dependencies("test", str(tmp_path))
+
+        mock_stamp.assert_called_once_with("test")
+        assert stats["files_processed"] == 0
+        assert stats["files_unchanged"] == 1

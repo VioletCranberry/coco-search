@@ -69,6 +69,8 @@ search_code(
 )
 ```
 
+> **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For bugs spanning shared libraries, pass `index_names=["app", "shared-lib"]` to trace across boundaries.
+
 **Symbol search for each identifier:**
 For each identifier extracted from the symptom (function names, class names, error types):
 

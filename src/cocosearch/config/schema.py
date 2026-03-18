@@ -78,6 +78,7 @@ class CocoSearchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     indexName: str | None = Field(default=None)
+    linkedIndexes: list[str] = Field(default_factory=list)
     indexing: IndexingSection = Field(default_factory=IndexingSection)
     search: SearchSection = Field(default_factory=SearchSection)
     embedding: EmbeddingSection = Field(default_factory=EmbeddingSection)

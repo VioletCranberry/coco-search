@@ -67,6 +67,7 @@ class SearchResult:
     symbol_signature: str | None = None
     dependencies: list | None = None
     dependents: list | None = None
+    index_name: str | None = None  # Source index (set for cross-index searches)
 
 
 # Language to file extension mapping
@@ -257,6 +258,7 @@ def search(
     symbol_name: str | None = None,
     no_cache: bool = False,
     include_deps: bool = False,
+    query_embedding: list[float] | None = None,
 ) -> list[SearchResult]:
     """Search for code similar to query.
 
@@ -280,6 +282,9 @@ def search(
         symbol_name: Filter by symbol name using glob pattern (supports * and ?).
         no_cache: If True, bypass query cache (default False).
         include_deps: If True, attach dependency and dependent info to results.
+        query_embedding: Pre-computed query embedding. When provided, skips
+            embedding computation. Used by multi_search to avoid redundant
+            embedding calls when searching N indexes with the same query.
 
     Returns:
         List of SearchResult ordered by similarity (highest first).
@@ -386,6 +391,7 @@ def search(
                 if validated_languages
                 else language_filter
             ),
+            query_embedding=query_embedding,
         )
 
         # Convert HybridSearchResult to SearchResult, applying min_score filter
@@ -435,8 +441,9 @@ def search(
         return results
 
     # Vector-only search (existing behavior)
-    # Embed query using same model as indexing
-    query_embedding = code_to_embedding.eval(query)
+    # Embed query using same model as indexing (skip if pre-computed)
+    if query_embedding is None:
+        query_embedding = code_to_embedding.eval(query)
 
     # Build base SELECT columns (always include metadata)
     select_cols = (

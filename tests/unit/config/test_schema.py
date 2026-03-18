@@ -267,6 +267,26 @@ class TestCocoSearchConfig:
         config = CocoSearchConfig(logging={"file": True})
         assert config.logging.file is True
 
+    def test_linked_indexes_default_empty(self):
+        """Test that linkedIndexes defaults to empty list."""
+        config = CocoSearchConfig()
+        assert config.linkedIndexes == []
+
+    def test_linked_indexes_accepts_string_list(self):
+        """Test that linkedIndexes accepts a list of strings."""
+        config = CocoSearchConfig(linkedIndexes=["shared-lib", "common-utils"])
+        assert config.linkedIndexes == ["shared-lib", "common-utils"]
+
+    def test_linked_indexes_rejects_non_string_entries(self):
+        """Test that linkedIndexes rejects non-string entries in strict mode."""
+        with pytest.raises(ValidationError):
+            CocoSearchConfig(linkedIndexes=[123, "valid"])
+
+    def test_linked_indexes_rejects_non_list(self):
+        """Test that linkedIndexes rejects non-list values."""
+        with pytest.raises(ValidationError):
+            CocoSearchConfig(linkedIndexes="not-a-list")
+
     def test_model_dump_serialization(self):
         """Test that model_dump produces correct dictionary."""
         config = CocoSearchConfig()

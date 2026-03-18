@@ -146,3 +146,53 @@ uv run cocosearch analyze "getUserById" --json
 - **RRF Fusion** — match type breakdown (both/semantic-only/keyword-only), fused scores
 - **Definition Boost** — how many results were boosted and rank changes
 - **Timings** — per-stage timing with visual bar chart
+
+### Cross-Index Search
+
+**When to use:** Searching across multiple related projects — monorepos, shared libraries, microservice codebases, or any set of independently indexed repositories.
+
+**`linkedIndexes` config (automatic):**
+
+Configure related indexes in `cocosearch.yaml` to automatically expand searches:
+
+```yaml
+indexName: my-api
+linkedIndexes:
+  - shared-libs
+  - common-types
+```
+
+With this config, every search against `my-api` automatically includes `shared-libs` and `common-types`. Missing linked indexes are silently skipped.
+
+**CLI usage:**
+
+```bash
+# Explicit cross-index search
+uv run cocosearch search "auth middleware" --indexes api-server,shared-libs --pretty
+
+# With linkedIndexes configured, just search normally — expansion is automatic
+uv run cocosearch search "auth middleware" --pretty
+```
+
+**MCP usage:**
+
+```json
+{
+  "query": "auth middleware",
+  "index_names": ["api-server", "shared-libs", "auth-service"],
+  "use_hybrid_search": true,
+  "smart_context": true
+}
+```
+
+Explicitly providing `index_names` in MCP (or `--indexes` in CLI) overrides the `linkedIndexes` config.
+
+**How it works:**
+
+1. The query embedding is computed **once** and reused across all indexes
+2. Each index is searched **in parallel** (ThreadPoolExecutor)
+3. Results are **merged by score** across all indexes
+4. Each result is tagged with its source `index_name`
+5. Partial failures are handled gracefully — if one index is unavailable, results from the others are still returned
+
+**Note:** All indexes must use the same embedding provider and model for reliable cross-index relevance scoring.

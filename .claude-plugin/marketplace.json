@@ -5,13 +5,13 @@
     "email": "zh6an0w.fedor@gmail.com"
   },
   "metadata": {
-    "description": "Local-first hybrid semantic code search with MCP tools and workflow skills",
+    "description": "Local-first hybrid semantic code search with dependency graphs and cross-repo search. MCP tools and workflow skills.",
     "version": "0.1.39"
   },
   "plugins": [
     {
       "name": "cocosearch",
-      "description": "Local-first hybrid semantic code search with MCP tools and workflow skills",
+      "description": "Local-first hybrid semantic code search with dependency graphs and cross-repo search. MCP tools and workflow skills.",
       "version": "0.1.39",
       "source": "./"
     }

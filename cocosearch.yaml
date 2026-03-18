@@ -1,2 +1,4 @@
 # CocoSearch using CocoSearch - dogfooding configuration
 indexName: cocosearch
+linkedIndexes:
+  - cocoindex

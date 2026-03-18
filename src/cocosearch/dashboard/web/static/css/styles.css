@@ -335,6 +335,11 @@ header {
     color: var(--text-muted);
 }
 
+.linked-indexes-card .value {
+    color: #8b5cf6;
+    text-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
 .chart-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -889,6 +894,49 @@ select option:checked {
 .badge-score-low { background: var(--text-muted); color: white; }
 .badge-match { background: var(--accent-blue); color: white; }
 .badge-lang { background: var(--border-color); color: var(--text-primary); }
+.badge-index { background: #8b5cf6; color: white; }
+
+.linked-indexes-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.search-scope {
+    margin: 6px 0 0 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.search-scope label {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.search-index-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.search-index-selector select {
+    padding: 2px 20px 2px 6px;
+    font-size: 13px;
+    background-position: right 6px center;
+    background-size: 10px 10px;
+}
+
+.search-index-group-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 10px 14px 4px;
+    margin-top: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
 
 .search-result-symbol {
     padding: 6px 14px;
@@ -1220,6 +1268,21 @@ select option:checked {
     background: var(--accent-green);
 }
 .log-badge.active { display: block; }
+
+/* QUIT button in status line */
+.quit-btn {
+    background: transparent;
+    border: 1px solid var(--accent-red);
+    color: var(--accent-red);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 1px 8px;
+    cursor: pointer;
+}
+.quit-btn:hover {
+    box-shadow: 0 0 8px rgba(208, 96, 64, 0.3);
+    color: var(--text-primary);
+}
 
 @media (max-width: 768px) {
     .log-panel {

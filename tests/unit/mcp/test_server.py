@@ -1157,6 +1157,98 @@ class TestApiReindex:
         assert response.status_code == 400
         assert "index_name is required" in body["error"]
 
+    @pytest.mark.asyncio
+    async def test_reindex_skips_timestamp_update_after_deps_extraction(self):
+        """set_index_status uses update_timestamp=False after successful deps extraction."""
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request({"index_name": "myindex", "fresh": False})
+
+        mock_set_status = MagicMock()
+        captured_run = {}
+
+        def capture_thread(target, **kwargs):
+            """Run _run() synchronously to inspect its calls."""
+            captured_run["fn"] = target
+            thread = MagicMock()
+            thread.is_alive.return_value = False
+            return thread
+
+        with (
+            patch(
+                "cocosearch.mcp.server.get_index_metadata",
+                return_value={
+                    "canonical_path": "/projects/myrepo",
+                    "status": "indexing",
+                },
+            ),
+            patch("cocosearch.mcp.server.set_index_status", mock_set_status),
+            patch("cocosearch.mcp.server.run_index"),
+            patch("cocosearch.mcp.server._register_with_git"),
+            patch("cocosearch.mcp.server._ensure_cocoindex_init"),
+            patch(
+                "cocosearch.deps.extractor.extract_dependencies",
+            ),
+            patch("threading.Thread", side_effect=capture_thread),
+        ):
+            await api_reindex(request)
+
+            # Execute the captured _run() function synchronously
+            assert "fn" in captured_run
+            captured_run["fn"]()
+
+        # The final set_index_status call (from the finally block) should
+        # use update_timestamp=False because deps were extracted successfully
+        finally_call = mock_set_status.call_args_list[-1]
+        assert finally_call == (
+            ("myindex", "indexed"),
+            {"update_timestamp": False},
+        )
+
+    @pytest.mark.asyncio
+    async def test_reindex_updates_timestamp_when_deps_extraction_fails(self):
+        """set_index_status uses update_timestamp=True when deps extraction fails."""
+        from cocosearch.mcp.server import api_reindex
+
+        request = self._make_request({"index_name": "myindex", "fresh": False})
+
+        mock_set_status = MagicMock()
+        captured_run = {}
+
+        def capture_thread(target, **kwargs):
+            captured_run["fn"] = target
+            thread = MagicMock()
+            thread.is_alive.return_value = False
+            return thread
+
+        with (
+            patch(
+                "cocosearch.mcp.server.get_index_metadata",
+                return_value={
+                    "canonical_path": "/projects/myrepo",
+                    "status": "indexing",
+                },
+            ),
+            patch("cocosearch.mcp.server.set_index_status", mock_set_status),
+            patch("cocosearch.mcp.server.run_index"),
+            patch("cocosearch.mcp.server._register_with_git"),
+            patch("cocosearch.mcp.server._ensure_cocoindex_init"),
+            patch(
+                "cocosearch.deps.extractor.extract_dependencies",
+                side_effect=RuntimeError("extraction failed"),
+            ),
+            patch("threading.Thread", side_effect=capture_thread),
+        ):
+            await api_reindex(request)
+            captured_run["fn"]()
+
+        # When deps extraction fails, update_timestamp should default to True
+        finally_call = mock_set_status.call_args_list[-1]
+        assert finally_call == (
+            ("myindex", "indexed"),
+            {"update_timestamp": True},
+        )
+
 
 class TestServerLifespan:
     """Tests for the FastMCP lifespan context manager."""

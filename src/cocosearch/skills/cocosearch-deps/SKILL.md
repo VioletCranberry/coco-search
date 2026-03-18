@@ -171,6 +171,8 @@ search_code(
 )
 ```
 
+> **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For cross-project connections, pass `index_names=["project1", "project2"]`.
+
 ## Step 2d: Hub Identification
 
 **Goal:** Find the most connected files in the project.

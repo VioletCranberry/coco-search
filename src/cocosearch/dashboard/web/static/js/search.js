@@ -14,10 +14,11 @@ export async function executeSearch() {
     const query = document.getElementById('searchInput').value.trim();
     if (!query) return;
 
+    const searchAll = document.getElementById('searchAllIndexes').checked;
     const select = document.getElementById('indexSelect');
     const indexIndex = parseInt(select.value);
     const stats = state.allIndexes[indexIndex];
-    if (!stats) return;
+    if (!searchAll && !stats) return;
 
     const language = document.getElementById('searchLanguage').value || undefined;
     const symbolType = document.getElementById('searchSymbolType').value || undefined;
@@ -42,10 +43,30 @@ export async function executeSearch() {
     try {
         const body = {
             query: query,
-            index_name: stats.name,
             limit: limit,
             min_score: minScore,
         };
+
+        if (searchAll) {
+            // Cross-index search: send all indexed project names
+            const indexedNames = state.allIndexes
+                .filter(idx => idx.status === 'indexed' || idx.status === 'ready')
+                .map(idx => idx.name);
+            if (indexedNames.length >= 2) {
+                body.index_names = indexedNames;
+            } else if (indexedNames.length === 1) {
+                body.index_name = indexedNames[0];
+            } else {
+                document.getElementById('searchError').textContent = 'No indexed projects available';
+                document.getElementById('searchError').style.display = 'block';
+                return;
+            }
+        } else {
+            const searchIndexSelect = document.getElementById('searchIndexSelect');
+            const searchIndexName = searchIndexSelect && searchIndexSelect.value;
+            body.index_name = searchIndexName || stats.name;
+        }
+
         if (language) body.language = language;
         if (symbolType) body.symbol_type = symbolType;
         if (useHybrid !== undefined) body.use_hybrid = useHybrid;
@@ -181,13 +202,29 @@ function displaySearchResults(data) {
         return;
     }
 
-    infoEl.textContent = `${data.total} result${data.total !== 1 ? 's' : ''} in ${data.query_time_ms}ms`;
+    // Per-index breakdown for cross-index results
+    const indexCounts = {};
+    results.forEach(r => {
+        if (r.index_name) {
+            indexCounts[r.index_name] = (indexCounts[r.index_name] || 0) + 1;
+        }
+    });
+    const indexNames = Object.keys(indexCounts);
+    if (indexNames.length > 1) {
+        const breakdown = indexNames.map(n => `${n}: ${indexCounts[n]}`).join(', ');
+        infoEl.textContent = `${data.total} results in ${data.query_time_ms}ms (${breakdown})`;
+    } else {
+        infoEl.textContent = `${data.total} result${data.total !== 1 ? 's' : ''} in ${data.query_time_ms}ms`;
+    }
     infoEl.style.display = 'block';
 
-    container.innerHTML = results.map((r, i) => {
+    const groupByIndex = document.getElementById('groupByIndex').checked && indexNames.length > 1;
+
+    const renderCard = (r, i) => {
         const scoreClass = r.score >= 0.7 ? 'badge-score-high' : r.score >= 0.4 ? 'badge-score-mid' : 'badge-score-low';
         const matchBadge = r.match_type ? `<span class="search-result-badge badge-match">${escapeHtml(r.match_type)}</span>` : '';
         const langBadge = r.language_id ? `<span class="search-result-badge badge-lang">${escapeHtml(r.language_id)}</span>` : '';
+        const indexBadge = r.index_name ? `<span class="search-result-badge badge-index">${escapeHtml(r.index_name)}</span>` : '';
         const lineRange = r.start_line && r.end_line ? `Lines ${r.start_line}-${r.end_line}` : '';
         const escapedPath = escapeHtml(r.file_path).replace(/'/g, "\\'");
 
@@ -216,6 +253,7 @@ function displaySearchResults(data) {
                     <span class="search-result-badge ${scoreClass}">${r.score.toFixed(2)}</span>
                     ${matchBadge}
                     ${langBadge}
+                    ${indexBadge}
                     ${badgesHtml}
                 </div>
             </div>
@@ -232,7 +270,23 @@ function displaySearchResults(data) {
                 <button onclick="viewFile('${escapedPath}', ${r.start_line || 1}, ${r.end_line || r.start_line || 1})">View File</button>
             </div>
         </div>`;
-    }).join('');
+    };
+
+    if (groupByIndex) {
+        // Group results by index_name, render with section headers
+        const groups = {};
+        results.forEach((r, i) => {
+            const name = r.index_name || 'unknown';
+            if (!groups[name]) groups[name] = [];
+            groups[name].push({ result: r, index: i });
+        });
+        container.innerHTML = Object.entries(groups).map(([name, items]) =>
+            `<div class="search-index-group-header">${escapeHtml(name)} (${items.length} result${items.length !== 1 ? 's' : ''})</div>` +
+            items.map(({ result, index }) => renderCard(result, index)).join('')
+        ).join('');
+    } else {
+        container.innerHTML = results.map((r, i) => renderCard(r, i)).join('');
+    }
 }
 
 export function toggleDepsPanel(index) {

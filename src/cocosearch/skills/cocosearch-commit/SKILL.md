@@ -122,6 +122,8 @@ search_code(
 )
 ```
 
+> **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For commits affecting shared code, pass `index_names=["project1", "project2"]` to capture cross-project impact.
+
 Use the diff to identify the *key symbols* that changed (new functions, modified classes, renamed variables), then search for them:
 
 ```

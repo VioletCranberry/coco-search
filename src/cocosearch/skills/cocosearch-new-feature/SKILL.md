@@ -55,6 +55,8 @@ search_code(
 )
 ```
 
+> **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For ad-hoc multi-project pattern discovery, pass `index_names=["project1", "project2"]`.
+
 **Search for the subsystem's existing entry points:**
 
 ```

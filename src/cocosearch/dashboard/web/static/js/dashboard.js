@@ -108,6 +108,34 @@ export function updateSummaryCards(stats) {
         branchBadge.style.display = 'none';
     }
 
+    // Symbol Count card
+    const symbolCard = document.getElementById('symbolCountCard');
+    const symbols = stats.symbols || {};
+    const symbolEntries = Object.entries(symbols).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const totalSymbols = symbolEntries.reduce((sum, [, v]) => sum + v, 0);
+    if (totalSymbols > 0) {
+        document.getElementById('symbolCount').textContent = formatNumber(totalSymbols);
+        const topTypes = symbolEntries.slice(0, 3).map(([k, v]) => `${formatNumber(v)} ${k}`).join(', ');
+        document.getElementById('symbolCountLabel').textContent = topTypes;
+        symbolCard.style.display = '';
+    } else {
+        symbolCard.style.display = 'none';
+    }
+
+    // Dependency Graph card
+    const depCard = document.getElementById('depGraphCard');
+    const depStats = stats.dep_stats;
+    if (depStats && depStats.total_edges > 0) {
+        document.getElementById('depEdgeCount').textContent = formatNumber(depStats.total_edges);
+        const byType = depStats.by_type || {};
+        const typeBreakdown = Object.entries(byType).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => `${formatNumber(v)} ${k}`).join(', ');
+        document.getElementById('depGraphLabel').textContent = typeBreakdown || 'Dependency edges';
+        depCard.style.display = '';
+    } else {
+        depCard.style.display = 'none';
+    }
+
     // Status
     const statusEl = document.getElementById('indexStatus');
     const statusLabelEl = document.getElementById('statusLabel');

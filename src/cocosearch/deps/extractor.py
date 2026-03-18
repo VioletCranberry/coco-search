@@ -351,6 +351,12 @@ def extract_dependencies(
         except Exception:
             total_edges = 0
 
+        # Still stamp the timestamp so staleness checks pass
+        try:
+            set_deps_extracted_at(index_name)
+        except Exception:
+            pass
+
         _get_cs_log().deps(
             "Dependency extraction skipped (no changes)",
             files_unchanged=len(indexed_files),

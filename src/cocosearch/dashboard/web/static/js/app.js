@@ -43,6 +43,16 @@ document.getElementById('searchInput').addEventListener('keydown', (e) => {
 document.getElementById('searchBtn').addEventListener('click', executeSearch);
 document.getElementById('clearSearchBtn').addEventListener('click', clearSearch);
 
+// Toggle "Group by index" visibility based on "Search all indexes"
+document.getElementById('searchAllIndexes').addEventListener('change', (e) => {
+    document.getElementById('groupByIndexLabel').style.display = e.target.checked ? '' : 'none';
+    if (!e.target.checked) document.getElementById('groupByIndex').checked = false;
+    const searchIndexLabel = document.getElementById('searchIndexLabel');
+    if (searchIndexLabel && state.linkedIndexes.length > 0) {
+        searchIndexLabel.style.display = e.target.checked ? 'none' : '';
+    }
+});
+
 // Search min score slider
 document.getElementById('searchMinScore').addEventListener('input', (e) => {
     document.getElementById('minScoreValue').textContent = e.target.value;
@@ -56,6 +66,14 @@ document.querySelector('.logs-btn').addEventListener('click', toggleLogPanel);
 document.querySelector('.log-panel .log-header-btns button:first-child').addEventListener('click', clearLogPanel);
 document.querySelector('.log-panel .log-header-btns button:last-child').addEventListener('click', toggleLogPanel);
 document.getElementById('logScrollIndicator').addEventListener('click', scrollLogsToBottom);
+
+// Quit button
+document.querySelector('.quit-btn').addEventListener('click', async () => {
+    if (!confirm('Shut down the CocoSearch server?')) return;
+    try { await fetch('/api/shutdown', { method: 'POST' }); } catch {}
+    document.getElementById('disconnectOverlay').style.display = 'flex';
+    setTimeout(() => window.close(), 1000);
+});
 
 // Log auto-scroll detection
 document.getElementById('logPanelBody').addEventListener('scroll', function() {

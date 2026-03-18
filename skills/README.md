@@ -1,6 +1,6 @@
 # CocoSearch Skills
 
-Reusable AI coding assistant skills that leverage CocoSearch's semantic and symbol-aware search for structured codebase workflows.
+Reusable AI coding assistant skills for CocoSearch — semantic and symbol-aware search, dependency graphs, cross-repo search. Fewer tokens, less hallucination.
 
 ## Available Skills
 

@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 _active_indexing: dict[str, tuple[threading.Thread, threading.Event]] = {}
 _indexing_lock = threading.Lock()
+_last_activity: float = _time.monotonic()
+_IDLE_TIMEOUT_DEFAULT = 1800  # 30 minutes
 _cocoindex_initialized = False
 _cocoindex_init_lock = threading.Lock()
 _cocoindex_init_failed_at: float = 0.0  # monotonic timestamp of last failure
@@ -71,7 +73,7 @@ from cocosearch.management.stats import (  # noqa: E402
     get_grammar_failures,
     get_parse_failures,
 )
-from cocosearch.search import byte_to_line, read_chunk_content, search  # noqa: E402
+from cocosearch.search import byte_to_line, multi_search, read_chunk_content, search  # noqa: E402
 from cocosearch.search.analyze import analyze as run_analyze  # noqa: E402
 from cocosearch.search.context_expander import ContextExpander  # noqa: E402
 
@@ -80,6 +82,44 @@ def _get_cs_log():
     from cocosearch.logging import cs_log
 
     return cs_log
+
+
+def _touch_activity():
+    """Record that the server handled a request (resets idle watchdog)."""
+    global _last_activity
+    _last_activity = _time.monotonic()
+
+
+def _graceful_shutdown():
+    """Cancel indexing, stop dashboard, close DB, exit."""
+    with _indexing_lock:
+        for name, (thread, stop_event) in list(_active_indexing.items()):
+            stop_event.set()
+    with _indexing_lock:
+        for name, (thread, stop_event) in list(_active_indexing.items()):
+            thread.join(timeout=2.0)
+    from cocosearch.dashboard.server import stop_dashboard_server
+
+    stop_dashboard_server()
+    from cocosearch.search.db import close_pool
+
+    close_pool()
+    os._exit(0)
+
+
+def _start_idle_watchdog(timeout_seconds: int):
+    """Start a daemon thread that exits the process after idle timeout."""
+
+    def _watchdog():
+        while True:
+            _time.sleep(60)
+            idle = _time.monotonic() - _last_activity
+            if idle >= timeout_seconds:
+                _get_cs_log().system("Idle watchdog — shutting down", idle_s=int(idle))
+                _graceful_shutdown()
+
+    t = threading.Thread(target=_watchdog, daemon=True)
+    t.start()
 
 
 def _ensure_cocoindex_init(timeout: float = 5.0) -> bool:
@@ -223,6 +263,12 @@ def build_all_stats(include_failures: bool = False) -> list[dict]:
             if include_failures:
                 result["parse_failures"] = get_parse_failures(idx["name"])
                 result["grammar_failures"] = get_grammar_failures(idx["name"])
+            try:
+                from cocosearch.deps.query import get_dep_stats_detailed
+
+                result["dep_stats"] = get_dep_stats_detailed(idx["name"])
+            except Exception:
+                result["dep_stats"] = None
             all_stats.append(result)
         except ValueError as e:
             logger.warning("build_all_stats: skipped index %r: %s", idx["name"], e)
@@ -248,6 +294,12 @@ def build_single_stats(index_name: str, include_failures: bool = False) -> dict:
     if include_failures:
         result["parse_failures"] = get_parse_failures(index_name)
         result["grammar_failures"] = get_grammar_failures(index_name)
+    try:
+        from cocosearch.deps.query import get_dep_stats_detailed
+
+        result["dep_stats"] = get_dep_stats_detailed(index_name)
+    except Exception:
+        result["dep_stats"] = None
     return result
 
 
@@ -358,6 +410,14 @@ async def heartbeat(request) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@mcp.custom_route("/api/shutdown", methods=["POST"])
+async def api_shutdown(request) -> JSONResponse:
+    """Shut down the CocoSearch server gracefully."""
+    _get_cs_log().system("Shutdown requested via API")
+    asyncio.get_event_loop().call_later(0.5, _graceful_shutdown)
+    return JSONResponse({"status": "shutting_down"})
 
 
 # SSE log streaming endpoint for dashboard
@@ -500,6 +560,7 @@ async def api_stats_single(request) -> JSONResponse:
 @mcp.custom_route("/api/reindex", methods=["POST"])
 async def api_reindex(request) -> JSONResponse:
     """Trigger reindexing of an existing index in a background thread."""
+    _touch_activity()
     try:
         body = await request.json()
     except Exception:
@@ -564,6 +625,7 @@ async def api_reindex(request) -> JSONResponse:
 
         def _run():
             failed = False
+            deps_extracted = False
             try:
                 if cancel_event.is_set():
                     return
@@ -581,6 +643,7 @@ async def api_reindex(request) -> JSONResponse:
                         from cocosearch.deps.extractor import extract_dependencies
 
                         extract_dependencies(index_name, source_path)
+                        deps_extracted = True
                     except Exception as e:
                         logger.warning(f"Dependency extraction failed: {e}")
             except Exception as exc:
@@ -592,7 +655,9 @@ async def api_reindex(request) -> JSONResponse:
                         current = get_index_metadata(index_name)
                         if current and current.get("status") == "indexing":
                             set_index_status(
-                                index_name, "error" if failed else "indexed"
+                                index_name,
+                                "error" if failed else "indexed",
+                                update_timestamp=not deps_extracted,
                             )
                     except Exception as e:
                         logger.warning(
@@ -616,6 +681,7 @@ async def api_reindex(request) -> JSONResponse:
 @mcp.custom_route("/api/extract-deps", methods=["POST"])
 async def api_extract_deps(request) -> JSONResponse:
     """Extract dependency edges for an index."""
+    _touch_activity()
     try:
         body = await request.json()
     except Exception:
@@ -681,6 +747,29 @@ def _build_project_response(env_path: str) -> JSONResponse:
         index_names = {idx["name"] for idx in indexes}
         is_indexed = index_name in index_names
 
+        # Cross-check: if resolve_index_name fell back to derived name but
+        # the config's indexName exists in the DB, self-heal to avoid false
+        # "not indexed" banner (e.g. derived "coco_s" vs config "cocosearch")
+        if not is_indexed:
+            config_path = project_root / "cocosearch.yaml"
+            if config_path.exists():
+                try:
+                    from cocosearch.config import load_config as _load_cfg
+
+                    _cfg_check = _load_cfg(config_path)
+                    if _cfg_check.indexName and _cfg_check.indexName in index_names:
+                        logger.warning(
+                            "resolve_index_name returned '%s' but config indexName '%s' "
+                            "exists in DB — using config value (likely a config loading "
+                            "issue in resolve_index_name)",
+                            index_name,
+                            _cfg_check.indexName,
+                        )
+                        index_name = _cfg_check.indexName
+                        is_indexed = True
+                except Exception:
+                    pass
+
         if is_indexed:
             metadata = get_index_metadata(index_name)
             if metadata and metadata.get("canonical_path"):
@@ -695,6 +784,17 @@ def _build_project_response(env_path: str) -> JSONResponse:
     except Exception as e:
         logger.warning(f"Failed to check index existence: {e}")
 
+    linked_indexes = []
+    try:
+        from cocosearch.config import find_config_file, load_config
+
+        config_path = find_config_file()
+        if config_path:
+            _cfg = load_config(config_path)
+            linked_indexes = _cfg.linkedIndexes or []
+    except Exception:
+        pass
+
     return JSONResponse(
         {
             "has_project": True,
@@ -704,6 +804,7 @@ def _build_project_response(env_path: str) -> JSONResponse:
             "detection_method": detection_method,
             "path_collision": path_collision,
             "collision_message": collision_message,
+            "linked_indexes": linked_indexes,
         }
     )
 
@@ -721,6 +822,7 @@ async def api_project(request) -> JSONResponse:
 @mcp.custom_route("/api/index", methods=["POST"])
 async def api_index(request) -> JSONResponse:
     """Trigger initial indexing of a project from the dashboard."""
+    _touch_activity()
     try:
         body = await request.json()
     except Exception:
@@ -1110,6 +1212,7 @@ async def api_grammars(request) -> JSONResponse:
 @mcp.custom_route("/api/search", methods=["POST"])
 async def api_search(request) -> JSONResponse:
     """Search indexed code via the dashboard API."""
+    _touch_activity()
     import time
 
     try:
@@ -1119,11 +1222,20 @@ async def api_search(request) -> JSONResponse:
 
     query = body.get("query", "").strip()
     index_name = body.get("index_name")
+    index_names_param = body.get("index_names")  # list[str] for cross-index search
 
     if not query:
         return JSONResponse({"error": "query is required"}, status_code=400)
-    if not index_name:
-        return JSONResponse({"error": "index_name is required"}, status_code=400)
+
+    # Determine search mode: cross-index vs single-index
+    is_multi = isinstance(index_names_param, list) and len(index_names_param) >= 2
+
+    if not is_multi:
+        # Single-index: resolve from index_names (single entry) or index_name
+        if isinstance(index_names_param, list) and len(index_names_param) == 1:
+            index_name = index_names_param[0]
+        if not index_name:
+            return JSONResponse({"error": "index_name is required"}, status_code=400)
 
     limit = body.get("limit", 10)
     language = body.get("language") or None
@@ -1143,25 +1255,78 @@ async def api_search(request) -> JSONResponse:
             status_code=503,
         )
 
+    # Auto-expand linked indexes from config when in single-index mode
+    if not is_multi and index_name and not index_names_param:
+        try:
+            from cocosearch.config import find_config_file, load_config
+
+            config_path = find_config_file()
+            if config_path:
+                _api_cfg = load_config(config_path)
+                if _api_cfg.linkedIndexes:
+                    all_indexes = {idx["name"] for idx in mgmt_list_indexes()}
+                    existing_linked = [
+                        li
+                        for li in _api_cfg.linkedIndexes
+                        if li != index_name and li in all_indexes
+                    ]
+                    if existing_linked:
+                        is_multi = True
+                        index_names_param = [index_name, *existing_linked]
+        except Exception:
+            pass  # Best-effort
+
     start_time = time.monotonic()
-    try:
-        results = search(
-            query=query,
-            index_name=index_name,
-            limit=limit,
-            min_score=min_score,
-            language_filter=language,
-            use_hybrid=use_hybrid,
-            symbol_type=symbol_type,
-            symbol_name=symbol_name,
-            no_cache=no_cache,
-            include_deps=include_deps,
-        )
-    except ValueError as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+    if is_multi:
+        # Cross-index search
+        try:
+            results = multi_search(
+                query=query,
+                index_names=index_names_param,
+                limit=limit,
+                min_score=min_score,
+                language_filter=language,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+                include_deps=include_deps,
+            )
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        except Exception as e:
+            logger.error(f"Cross-index search failed: {e}")
+            return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+        # Build per-index metadata for path resolution
+        metadata_by_index: dict[str, dict] = {}
+        for idx_name in index_names_param:
+            meta = get_index_metadata(idx_name)
+            if meta:
+                metadata_by_index[idx_name] = meta
+    else:
+        # Single-index search (existing behavior)
+        try:
+            results = search(
+                query=query,
+                index_name=index_name,
+                limit=limit,
+                min_score=min_score,
+                language_filter=language,
+                use_hybrid=use_hybrid,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=no_cache,
+                include_deps=include_deps,
+            )
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return JSONResponse({"error": f"Search failed: {e}"}, status_code=500)
+
+        metadata_by_index = None
 
     query_time_ms = round((time.monotonic() - start_time) * 1000)
 
@@ -1171,15 +1336,33 @@ async def api_search(request) -> JSONResponse:
         expander = ContextExpander()
 
     # Resolve relative DB paths to absolute using the index's canonical_path
-    metadata = get_index_metadata(index_name)
-    source_path = metadata.get("canonical_path") if metadata else None
+    if not is_multi:
+        metadata = get_index_metadata(index_name)
+        source_path = metadata.get("canonical_path") if metadata else None
 
     output = []
     try:
         for r in results:
-            filepath = (
-                os.path.join(source_path, r.filename) if source_path else r.filename
-            )
+            if is_multi:
+                # Per-result path resolution for cross-index
+                r_source_path = None
+                if (
+                    r.index_name
+                    and metadata_by_index
+                    and r.index_name in metadata_by_index
+                ):
+                    r_source_path = metadata_by_index[r.index_name].get(
+                        "canonical_path"
+                    )
+                filepath = (
+                    os.path.join(r_source_path, r.filename)
+                    if r_source_path
+                    else r.filename
+                )
+            else:
+                filepath = (
+                    os.path.join(source_path, r.filename) if source_path else r.filename
+                )
             start_line = byte_to_line(filepath, r.start_byte)
             end_line = byte_to_line(filepath, r.end_byte)
             content = read_chunk_content(filepath, r.start_byte, r.end_byte)
@@ -1197,6 +1380,10 @@ async def api_search(request) -> JSONResponse:
                 "symbol_name": r.symbol_name,
                 "symbol_signature": r.symbol_signature,
             }
+
+            # Include index_name for cross-index results
+            if is_multi and r.index_name is not None:
+                result_dict["index_name"] = r.index_name
 
             # Apply context expansion if requested
             if expander is not None:
@@ -1649,6 +1836,7 @@ def log_mcp_tool(func):
 
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
+            _touch_activity()
             from cocosearch.logging import cs_log
 
             tool_name = func.__name__
@@ -1692,6 +1880,7 @@ def log_mcp_tool(func):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            _touch_activity()
             from cocosearch.logging import cs_log
 
             tool_name = func.__name__
@@ -1804,6 +1993,15 @@ async def search_code(
             "When True, each result includes 'dependencies' and 'dependents' lists."
         ),
     ] = True,
+    index_names: Annotated[
+        list[str] | None,
+        Field(
+            description="List of index names to search across multiple projects. "
+            "Searches all specified indexes and returns merged results ranked by relevance. "
+            "Use list_indexes to discover available indexes. "
+            "Mutually exclusive with index_name (index_names takes precedence)."
+        ),
+    ] = None,
 ) -> list[dict]:
     """Search indexed code using natural language.
 
@@ -1821,7 +2019,30 @@ async def search_code(
     for better results when searching for code identifiers.
     If index_name is not provided, auto-detects from current working directory.
     Set include_deps=True to attach dependency information to each result.
+    Use index_names to search across multiple projects in one call.
     """
+    # Handle cross-index search
+    if index_names is not None and len(index_names) >= 2:
+        if index_name is not None:
+            logger.warning(
+                "Both index_name and index_names provided — index_names takes precedence"
+            )
+        return await _multi_index_search(
+            query=query,
+            index_names=index_names,
+            limit=limit,
+            language=language,
+            use_hybrid_search=use_hybrid_search,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            context_before=context_before,
+            context_after=context_after,
+            smart_context=smart_context,
+            include_deps=include_deps,
+        )
+    elif index_names is not None and len(index_names) == 1:
+        index_name = index_names[0]
+
     # Track root_path for search header (set during auto-detection)
     root_path: Path | None = None
     auto_detected_source = None  # Track detection source for hint
@@ -1890,6 +2111,50 @@ async def search_code(
                         "results": [],
                     }
                 ]
+
+    # Auto-expand linked indexes from config (only when index_names was not explicitly provided)
+    _linked_indexes: list[str] = []
+    _skipped_indexes: list[str] = []
+    if index_names is None or (isinstance(index_names, set)):
+        # index_names was not explicitly provided by the caller
+        try:
+            from cocosearch.config import find_config_file, load_config
+
+            config_path = find_config_file()
+            if config_path:
+                _linked_cfg = load_config(config_path)
+                if _linked_cfg.linkedIndexes:
+                    all_indexes = {idx["name"] for idx in mgmt_list_indexes()}
+                    for li in _linked_cfg.linkedIndexes:
+                        if li == index_name:
+                            continue  # skip self-reference
+                        if li in all_indexes:
+                            _linked_indexes.append(li)
+                        else:
+                            _skipped_indexes.append(li)
+                    if _linked_indexes:
+                        effective_names = [index_name, *_linked_indexes]
+                        if _skipped_indexes:
+                            logger.warning(
+                                f"Linked indexes not found (skipped): {_skipped_indexes}"
+                            )
+                        return await _multi_index_search(
+                            query=query,
+                            index_names=effective_names,
+                            limit=limit,
+                            language=language,
+                            use_hybrid_search=use_hybrid_search,
+                            symbol_type=symbol_type,
+                            symbol_name=symbol_name,
+                            context_before=context_before,
+                            context_after=context_after,
+                            smart_context=smart_context,
+                            include_deps=include_deps,
+                            linked_indexes=_linked_indexes,
+                            skipped_indexes=_skipped_indexes,
+                        )
+        except Exception:
+            pass  # Best-effort — don't block search on config loading
 
     # Initialize CocoIndex (required for embedding generation)
     if not _ensure_cocoindex_init():
@@ -2087,6 +2352,164 @@ async def search_code(
     return output
 
 
+async def _multi_index_search(
+    query: str,
+    index_names: list[str],
+    limit: int,
+    language: str | None,
+    use_hybrid_search: bool | None,
+    symbol_type: str | list[str] | None,
+    symbol_name: str | None,
+    context_before: int | None,
+    context_after: int | None,
+    smart_context: bool,
+    include_deps: bool,
+    linked_indexes: list[str] | None = None,
+    skipped_indexes: list[str] | None = None,
+) -> list[dict]:
+    """Execute cross-index search and format results."""
+    if not _ensure_cocoindex_init():
+        return [
+            {
+                "error": "Database not initialized",
+                "message": "Index a codebase first using index_codebase(path='.')",
+                "results": [],
+            }
+        ]
+
+    search_warnings: list[dict] = []
+    try:
+        results = multi_search(
+            query=query,
+            index_names=index_names,
+            limit=limit,
+            language_filter=language,
+            use_hybrid=use_hybrid_search,
+            symbol_type=symbol_type,
+            symbol_name=symbol_name,
+            include_deps=include_deps,
+            warnings=search_warnings,
+        )
+    except ValueError as e:
+        return [{"error": "Cross-index search error", "message": str(e), "results": []}]
+
+    # Build per-index metadata lookup for path resolution
+    metadata_by_index: dict[str, dict] = {}
+    for idx_name in index_names:
+        meta = get_index_metadata(idx_name)
+        if meta:
+            metadata_by_index[idx_name] = meta
+
+    expander = ContextExpander()
+
+    search_header: dict = {
+        "type": "search_context",
+        "searching": "cross-index",
+        "index_names": index_names,
+    }
+    if linked_indexes:
+        search_header["linked_indexes"] = linked_indexes
+    if skipped_indexes:
+        search_header["skipped_indexes"] = skipped_indexes
+    output: list[dict] = [search_header]
+
+    # Check staleness for all indexes in cross-index search
+    all_staleness_warnings: list[dict] = []
+    for idx_name in index_names:
+        try:
+            from cocosearch.management.stats import check_deps_staleness
+
+            idx_warnings = check_deps_staleness(idx_name)
+            for w in idx_warnings:
+                w["index_name"] = idx_name
+                all_staleness_warnings.append(w)
+        except Exception:
+            pass
+    if all_staleness_warnings:
+        output.append(
+            {"type": "staleness_warnings", "warnings": all_staleness_warnings}
+        )
+
+    # Surface embedding model mismatch warnings
+    for w in search_warnings:
+        output.append(w)
+
+    try:
+        for r in results:
+            # Resolve source_path from per-index metadata
+            source_path = None
+            if r.index_name and r.index_name in metadata_by_index:
+                source_path = metadata_by_index[r.index_name].get("canonical_path")
+
+            filepath = (
+                os.path.join(source_path, r.filename) if source_path else r.filename
+            )
+            start_line = byte_to_line(filepath, r.start_byte)
+            end_line = byte_to_line(filepath, r.end_byte)
+            content = read_chunk_content(filepath, r.start_byte, r.end_byte)
+
+            context_before_text = ""
+            context_after_text = ""
+
+            if context_before is not None or context_after is not None or smart_context:
+                ext = os.path.splitext(r.filename)[1].lstrip(".")
+                language_name = _get_treesitter_language(ext)
+
+                before_lines, _match_lines, after_lines, _is_bof, _is_eof = (
+                    expander.get_context_lines(
+                        filepath,
+                        start_line,
+                        end_line,
+                        context_before=context_before or 0,
+                        context_after=context_after or 0,
+                        smart=smart_context
+                        and (context_before is None and context_after is None),
+                        language=language_name,
+                    )
+                )
+
+                context_before_text = "\n".join(line for _, line in before_lines)
+                context_after_text = "\n".join(line for _, line in after_lines)
+
+            result_dict = {
+                "file_path": r.filename,
+                "start_line": start_line,
+                "end_line": end_line,
+                "score": r.score,
+                "content": content,
+                "block_type": r.block_type,
+                "hierarchy": r.hierarchy,
+                "language_id": r.language_id,
+                "symbol_type": r.symbol_type,
+                "symbol_name": r.symbol_name,
+                "symbol_signature": r.symbol_signature,
+            }
+
+            if r.index_name is not None:
+                result_dict["index_name"] = r.index_name
+
+            if context_before_text or context_after_text:
+                result_dict["context_before"] = context_before_text
+                result_dict["context_after"] = context_after_text
+
+            if r.match_type:
+                result_dict["match_type"] = r.match_type
+            if r.vector_score is not None:
+                result_dict["vector_score"] = r.vector_score
+            if r.keyword_score is not None:
+                result_dict["keyword_score"] = r.keyword_score
+
+            if include_deps and r.dependencies is not None:
+                result_dict["dependencies"] = r.dependencies
+                result_dict["dependents"] = r.dependents
+
+            output.append(result_dict)
+    finally:
+        expander.clear_cache()
+
+    return output
+
+
 @mcp.tool()
 @log_mcp_tool
 async def analyze_query(
@@ -2125,6 +2548,14 @@ async def analyze_query(
             description="Filter by symbol name pattern (glob). Examples: 'get*', '*Handler'"
         ),
     ] = None,
+    index_names: Annotated[
+        list[str] | None,
+        Field(
+            description="List of index names to analyze across multiple projects. "
+            "Runs analysis per-index in parallel and returns per-index diagnostics. "
+            "Mutually exclusive with index_name (index_names takes precedence)."
+        ),
+    ] = None,
 ) -> dict:
     """Analyze the search pipeline for a query with stage-by-stage diagnostics.
 
@@ -2139,6 +2570,37 @@ async def analyze_query(
     were detected, whether hybrid mode kicked in, how RRF scored results, or
     where time was spent.
     """
+    # Handle cross-index analysis
+    if index_names is not None and len(index_names) >= 2:
+        if index_name is not None:
+            logger.warning(
+                "Both index_name and index_names provided to analyze_query — index_names takes precedence"
+            )
+        if not _ensure_cocoindex_init():
+            return {
+                "error": "Database not initialized",
+                "message": "Index a codebase first using index_codebase(path='.')",
+            }
+        try:
+            from cocosearch.search.analyze import multi_analyze as run_multi_analyze
+
+            result = run_multi_analyze(
+                query=query,
+                index_names=index_names,
+                limit=limit,
+                language_filter=language,
+                use_hybrid=use_hybrid_search,
+                symbol_type=symbol_type,
+                symbol_name=symbol_name,
+                no_cache=True,
+            )
+            return result.to_dict()
+        except Exception as e:
+            logger.error(f"Cross-index analysis failed: {e}")
+            return {"error": "Analysis failed", "message": str(e)}
+    elif index_names is not None and len(index_names) == 1:
+        index_name = index_names[0]
+
     # Auto-detect index if not provided (same logic as search_code)
     if index_name is None:
         detected_path, source = await _detect_project(ctx)
@@ -2248,21 +2710,64 @@ def index_stats(
 @mcp.tool()
 @log_mcp_tool
 def clear_index(
-    index_name: Annotated[str, Field(description="Name of the index to delete")],
+    index_name: Annotated[
+        str | None,
+        Field(
+            description="Name of a single index to delete. "
+            "Use index_names for bulk deletion."
+        ),
+    ] = None,
+    index_names: Annotated[
+        list[str] | None,
+        Field(
+            description="List of index names to delete in bulk. "
+            "Mutually exclusive with index_name."
+        ),
+    ] = None,
 ) -> dict:
-    """Clear (delete) a code index.
+    """Clear (delete) one or more code indexes.
 
-    WARNING: This permanently deletes all indexed data for this codebase.
+    WARNING: This permanently deletes all indexed data.
     The operation cannot be undone.
+
+    Use index_name for a single index, or index_names for bulk deletion.
     """
-    try:
-        # mgmt_clear_index also clears path metadata internally
-        result = mgmt_clear_index(index_name)
-        return result
-    except ValueError as e:
-        return {"success": False, "error": str(e)}
-    except Exception as e:
-        return {"success": False, "error": f"Failed to clear index: {e}"}
+    # Determine which indexes to delete
+    names_to_delete: list[str] = []
+    if index_names:
+        names_to_delete = index_names
+    elif index_name:
+        names_to_delete = [index_name]
+    else:
+        return {"success": False, "error": "Provide index_name or index_names"}
+
+    if len(names_to_delete) == 1:
+        try:
+            result = mgmt_clear_index(names_to_delete[0])
+            return result
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to clear index: {e}"}
+
+    # Bulk deletion
+    results: list[dict] = []
+    for name in names_to_delete:
+        try:
+            mgmt_clear_index(name)
+            results.append({"index_name": name, "success": True})
+        except ValueError as e:
+            results.append({"index_name": name, "success": False, "error": str(e)})
+        except Exception as e:
+            results.append({"index_name": name, "success": False, "error": str(e)})
+
+    succeeded = sum(1 for r in results if r["success"])
+    return {
+        "success": succeeded > 0,
+        "deleted": succeeded,
+        "total": len(names_to_delete),
+        "results": results,
+    }
 
 
 @mcp.tool()
@@ -2746,6 +3251,13 @@ def run_server(
                 dashboard_url = start_dashboard_server()
                 if dashboard_url:
                     _open_browser(dashboard_url)
+
+            timeout = int(
+                os.environ.get("COCOSEARCH_IDLE_TIMEOUT", _IDLE_TIMEOUT_DEFAULT)
+            )
+            if timeout > 0:
+                _start_idle_watchdog(timeout)
+                _get_cs_log().system("Idle watchdog started", timeout_s=timeout)
 
             _get_cs_log().system("Server listening", transport="stdio")
             mcp.run(transport="stdio")

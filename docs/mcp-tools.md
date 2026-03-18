@@ -24,6 +24,8 @@ Search indexed code using natural language queries. Returns code chunks ranked b
 | context_before | integer \| null | No | null | Number of lines to show before each match. Overrides smart context expansion when specified. |
 | context_after | integer \| null | No | null | Number of lines to show after each match. Overrides smart context expansion when specified. |
 | smart_context | boolean | No | true | Expand context to enclosing function/class boundaries. Enabled by default. Set to False for exact line counts only. |
+| include_deps | boolean | No | true | Include dependency info (imports/dependents) for each result file |
+| index_names | list\<string\> \| null | No | null | Search across multiple indexes. Results merged by relevance score. Mutually exclusive with `index_name`. |
 
 ### Natural Language Example
 
@@ -74,7 +76,46 @@ This will search the auto-detected index for code chunks related to JWT token va
 ]
 ```
 
-**Note:** Response may include a search_context header (when auto-detecting index) and a staleness_warning footer (when index is older than 7 days).
+**Note:** Response may include a search_context header (when auto-detecting index) and a staleness_warning footer (when index is older than 7 days). When using `index_names` for cross-index search, each result includes an `index_name` field identifying which index it came from.
+
+### Cross-Index Search
+
+Search across multiple indexes in a single call using the `index_names` parameter. This is useful for searching related projects together — monorepos, shared libraries, or microservice codebases.
+
+**How it works:**
+
+1. The query embedding is computed **once** and reused across all indexes
+2. Each index is searched **in parallel** via `ThreadPoolExecutor`
+3. Results from all indexes are **merged by score** and truncated to the requested `limit`
+4. Each result is tagged with its source `index_name`
+5. Partial failures are handled gracefully — if one index fails, results from other indexes are still returned
+
+**`linkedIndexes` auto-expansion:** When `cocosearch.yaml` includes a `linkedIndexes` list, single-index searches automatically expand to include the linked indexes — no explicit `index_names` parameter needed. Explicitly providing `index_names` overrides the config. Missing linked indexes are silently skipped.
+
+**Example config:**
+
+```yaml
+indexName: my-api
+linkedIndexes:
+  - shared-libs
+  - common-types
+```
+
+With this config, searching `my-api` automatically includes `shared-libs` and `common-types`.
+
+**JSON Request (explicit cross-index):**
+
+```json
+{
+  "query": "authentication middleware",
+  "index_names": ["api-server", "shared-libs", "auth-service"],
+  "limit": 10,
+  "use_hybrid_search": true,
+  "smart_context": true
+}
+```
+
+**Note:** All indexes must use the same embedding provider and model. Mismatched embedding models across indexes will produce unreliable relevance scores.
 
 ---
 

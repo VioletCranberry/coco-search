@@ -58,6 +58,8 @@
   <a href="#supported-grammars"><img src="https://img.shields.io/badge/Terraform-844FBA?logo=terraform&logoColor=white" alt="Terraform"></a>
 </p>
 
+<p align="center"><em>Give your AI assistant a search engine instead of a thousand grep calls — 32 languages, 9 grammars, dependency graphs, cross-repo search, fewer tokens, less hallucination.</em></p>
+
 > *Typical code RAG splits files into chunks that break across function and class boundaries, losing the structure that makes code meaningful. CocoSearch preserves it — [CocoIndex](https://github.com/cocoindex-io/cocoindex) and Tree-sitter provide syntax-aware chunking that keeps functions, classes, and config blocks intact; search results expand to enclosing scope boundaries via Tree-sitter AST; grammar handlers split infrastructure configs at domain-aware boundaries (Terraform resources, CI/CD jobs, Compose services); and a dependency graph maps how files connect across code, config, and documentation.*
 
 Coco[-S]earch is a local-first hybrid semantic code search tool. It combines vector similarity and keyword matching (via RRF fusion) to find code by meaning, not just text. Powered by [CocoIndex](https://github.com/cocoindex-io/cocoindex) for indexing, [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) for syntax-aware chunking and symbol extraction, [PostgreSQL](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector) for storage, and [Ollama](https://ollama.com/) for local embeddings by default. Optional remote embedding providers ([OpenAI](https://platform.openai.com/), [OpenRouter](https://openrouter.ai/)) available for teams that prefer managed infrastructure — your code still never leaves your machine, only chunk text is sent for embedding.
@@ -385,7 +387,7 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 ### Available MCP Tools
 
 - `index_codebase` -- index a directory for semantic search
-- `search_code` -- search indexed code with natural language queries (optional `include_deps` for dependency info)
+- `search_code` -- search indexed code with natural language queries (optional `include_deps` for dependency info, `index_names` for cross-index search)
 - `analyze_query` -- pipeline diagnostics: understand why a query returns specific results
 - `list_indexes` -- list all available indexes
 - `index_stats` -- get statistics and parse health for an index

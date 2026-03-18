@@ -40,6 +40,7 @@
                     <span id="uptime">UPTIME: --:--:--</span>
                     <span id="embeddingInfo" style="display: none;"></span>
                     <button class="logs-btn">LOGS <span id="logBadge" class="log-badge"></span></button>
+                    <button class="quit-btn" title="Shut down CocoSearch server">QUIT</button>
                 </div>
             </div>
         </header>
@@ -99,6 +100,14 @@
                     <input type="text" id="searchInput" placeholder="Search code with natural language..." autocomplete="off">
                     <button class="action-btn" id="searchBtn">Search</button>
                     <button class="action-btn" id="clearSearchBtn" style="display:none;">Clear</button>
+                </div>
+                <div class="search-scope">
+                    <label><input type="checkbox" id="searchAllIndexes"> Search all indexes</label>
+                    <span id="linkedIndexesHint" class="linked-indexes-hint"></span>
+                    <label id="searchIndexLabel" class="search-index-selector" style="display:none; margin-left: 12px;">Search in:
+                        <select id="searchIndexSelect"></select>
+                    </label>
+                    <label id="groupByIndexLabel" style="display:none; margin-left: 12px;"><input type="checkbox" id="groupByIndex"> Group by index</label>
                 </div>
                 <div class="search-filters">
                     <label>Language:
@@ -180,6 +189,21 @@
                     <h3>Parse Health</h3>
                     <div class="value" id="parseHealth">-</div>
                     <div class="label" id="parseHealthLabel">File parse quality</div>
+                </div>
+                <div class="summary-card linked-indexes-card" id="linkedIndexesCard" style="display: none;">
+                    <h3>Linked Indexes</h3>
+                    <div class="value" id="linkedIndexesCount">-</div>
+                    <div class="label" id="linkedIndexesNames"></div>
+                </div>
+                <div class="summary-card" id="symbolCountCard" style="display: none;">
+                    <h3>Symbols</h3>
+                    <div class="value" id="symbolCount">-</div>
+                    <div class="label" id="symbolCountLabel">Extracted symbols</div>
+                </div>
+                <div class="summary-card" id="depGraphCard" style="display: none;">
+                    <h3>Dependencies</h3>
+                    <div class="value" id="depEdgeCount">-</div>
+                    <div class="label" id="depGraphLabel">Dependency edges</div>
                 </div>
             </div>
 

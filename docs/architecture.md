@@ -47,10 +47,11 @@ The search pipeline combines semantic understanding with keyword precision:
 4. **Keyword Search (Optional):** Full-text search via PostgreSQL tsvector for exact identifier matches
 5. **RRF Fusion:** Merge vector and keyword result lists using Reciprocal Rank Fusion
 6. **Definition Boost:** Apply 2x score multiplier to definition chunks (functions, classes) post-fusion
-7. **Filtering:** Apply symbol type filters (function/class/method) and symbol name patterns (glob matching)
-8. **Language Filtering:** Restrict results to specified programming languages if requested
-9. **Context Expansion:** Expand matched chunks to enclosing function/class boundaries for better understanding
-10. **Query Caching:** Store results with exact hash match and semantic similarity fallback (0.95 threshold)
+7. **Cross-Index Orchestration (Optional):** When multiple indexes are specified (via `index_names` parameter, `--indexes` CLI flag, or `linkedIndexes` config), the embedding is computed once and search runs in parallel across all indexes via `ThreadPoolExecutor`. Results are tagged with their source `index_name` and merged by score. Implementation: `src/cocosearch/search/multi.py`
+8. **Filtering:** Apply symbol type filters (function/class/method) and symbol name patterns (glob matching)
+9. **Language Filtering:** Restrict results to specified programming languages if requested
+10. **Context Expansion:** Expand matched chunks to enclosing function/class boundaries for better understanding
+11. **Query Caching:** Store results with exact hash match and semantic similarity fallback (0.95 threshold)
 
 See [Retrieval Logic](retrieval.md) for scoring formulas, cache implementation, and performance characteristics.
 
