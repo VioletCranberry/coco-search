@@ -747,6 +747,29 @@ def _build_project_response(env_path: str) -> JSONResponse:
         index_names = {idx["name"] for idx in indexes}
         is_indexed = index_name in index_names
 
+        # Cross-check: if resolve_index_name fell back to derived name but
+        # the config's indexName exists in the DB, self-heal to avoid false
+        # "not indexed" banner (e.g. derived "coco_s" vs config "cocosearch")
+        if not is_indexed:
+            config_path = project_root / "cocosearch.yaml"
+            if config_path.exists():
+                try:
+                    from cocosearch.config import load_config as _load_cfg
+
+                    _cfg_check = _load_cfg(config_path)
+                    if _cfg_check.indexName and _cfg_check.indexName in index_names:
+                        logger.warning(
+                            "resolve_index_name returned '%s' but config indexName '%s' "
+                            "exists in DB — using config value (likely a config loading "
+                            "issue in resolve_index_name)",
+                            index_name,
+                            _cfg_check.indexName,
+                        )
+                        index_name = _cfg_check.indexName
+                        is_indexed = True
+                except Exception:
+                    pass
+
         if is_indexed:
             metadata = get_index_metadata(index_name)
             if metadata and metadata.get("canonical_path"):

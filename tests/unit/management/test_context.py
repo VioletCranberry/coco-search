@@ -4,7 +4,9 @@ Tests get_canonical_path, find_project_root, and resolve_index_name functions
 for the auto-detect feature.
 """
 
+import logging
 from pathlib import Path
+from unittest.mock import patch
 
 from cocosearch.management.context import (
     find_project_root,
@@ -202,3 +204,48 @@ class TestResolveIndexName:
 
         # derive_index_name converts hyphens to underscores
         assert "_" in result or "-" not in result
+
+    def test_logs_warning_on_unexpected_exception(self, tmp_path, caplog):
+        """resolve_index_name logs warning when load_config raises unexpected error."""
+        config_file = tmp_path / "cocosearch.yaml"
+        config_file.write_text("indexName: myproject\n")
+
+        with patch(
+            "cocosearch.config.load_config",
+            side_effect=RuntimeError("unexpected import failure"),
+        ), caplog.at_level(logging.WARNING, logger="cocosearch.management.context"):
+            result = resolve_index_name(tmp_path, "config")
+
+        # Falls back to derived name
+        from cocosearch.management.context import derive_index_name
+
+        assert result == derive_index_name(str(tmp_path))
+        assert "Unexpected error loading config" in caplog.text
+        assert "unexpected import failure" in caplog.text
+
+    def test_logs_debug_on_config_error(self, tmp_path, caplog):
+        """resolve_index_name logs debug (not warning) for ConfigError."""
+        from cocosearch.config.schema import ConfigError
+
+        config_file = tmp_path / "cocosearch.yaml"
+        config_file.write_text("indexName: myproject\n")
+
+        with patch(
+            "cocosearch.config.load_config",
+            side_effect=ConfigError("bad config"),
+        ), caplog.at_level(logging.DEBUG, logger="cocosearch.management.context"):
+            result = resolve_index_name(tmp_path, "config")
+
+        from cocosearch.management.context import derive_index_name
+
+        assert result == derive_index_name(str(tmp_path))
+        assert "Config invalid" in caplog.text
+
+    def test_valid_config_returns_indexname(self, tmp_path):
+        """resolve_index_name returns indexName from valid config."""
+        config_file = tmp_path / "cocosearch.yaml"
+        config_file.write_text("indexName: cocosearch\n")
+
+        result = resolve_index_name(tmp_path, "git")
+
+        assert result == "cocosearch"

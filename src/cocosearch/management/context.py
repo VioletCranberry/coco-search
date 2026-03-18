@@ -5,9 +5,12 @@ resolve symlinks to canonical paths, derive index names from paths,
 and determine the appropriate index name following the priority chain.
 """
 
+import logging
 import os
 import re
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def get_canonical_path(path: str | Path) -> Path:
@@ -139,9 +142,21 @@ def resolve_index_name(project_root: Path, detection_method: str | None) -> str:
             config = load_config(config_path)
             if config.indexName:
                 return config.indexName
-        except (ConfigError, Exception):
-            # Config invalid or unreadable, fall back to directory name
-            pass
+        except ConfigError as e:
+            logger.debug("Config invalid at %s, falling back to directory name: %s", config_path, e)
+        except Exception as e:
+            logger.warning(
+                "Unexpected error loading config at %s, falling back to directory name: %s",
+                config_path,
+                e,
+            )
 
     # Priority 2: Directory name (always available)
-    return derive_index_name(str(project_root))
+    derived = derive_index_name(str(project_root))
+    if config_path.exists():
+        logger.debug(
+            "Config exists at %s but could not read indexName, using derived name '%s'",
+            config_path,
+            derived,
+        )
+    return derived
