@@ -1,6 +1,6 @@
 [project]
 name = "cocosearch"
-version = "0.1.39"
+version = "0.1.40"
 description = "Local-first hybrid semantic code search with dependency graphs and cross-repo search"
 readme = "README.md"
 authors = [
