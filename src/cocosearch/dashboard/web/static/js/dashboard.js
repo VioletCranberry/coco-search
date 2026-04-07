@@ -3,13 +3,17 @@ import { formatNumber, formatDate, escapeHtml } from './utils.js';
 import { updateLanguageChart, updateSymbolChart, updateGrammarChart } from './charts.js';
 
 export function updateTabStatus(status, indexName) {
+    // Read tab status colors from CSS variables so the favicon picks up
+    // the active theme on the next status poll after a theme toggle.
+    const cs = getComputedStyle(document.documentElement);
+    const read = (n) => cs.getPropertyValue(n).trim();
     const colorMap = {
-        indexing: { primary: '#FF9800', secondary: '#e07840' },
-        indexed:  { primary: '#4CAF50', secondary: '#388E3C' },
-        stale:    { primary: '#FFC107', secondary: '#FFA000' },
-        error:    { primary: '#f44336', secondary: '#d32f2f' },
+        indexing: { primary: read('--log-tab-indexing-primary'), secondary: read('--log-tab-indexing-secondary') },
+        indexed:  { primary: read('--log-tab-indexed-primary'),  secondary: read('--log-tab-indexed-secondary')  },
+        stale:    { primary: read('--log-tab-stale-primary'),    secondary: read('--log-tab-stale-secondary')    },
+        error:    { primary: read('--log-tab-error-primary'),    secondary: read('--log-tab-error-secondary')    },
     };
-    const defaultColors = { primary: '#f0a060', secondary: '#e07840' };
+    const defaultColors = { primary: read('--accent-blue'), secondary: read('--accent-orange') };
     const colors = colorMap[status] || defaultColors;
 
     const suffix = indexName ? ` \u00b7 ${indexName}` : '';

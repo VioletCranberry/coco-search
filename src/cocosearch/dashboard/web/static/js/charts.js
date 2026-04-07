@@ -1,4 +1,22 @@
 import { state } from './state.js';
+import { THEME_CHANGE_EVENT } from './theme.js';
+
+// Read chart palette from CSS custom properties so charts always reflect
+// the current theme. Called on chart create AND on every theme change.
+function getChartColors() {
+    const cs = getComputedStyle(document.documentElement);
+    const read = (n) => cs.getPropertyValue(n).trim();
+    return {
+        textColor:  read('--text-secondary'),
+        gridColor:  read('--shadow'),
+        langBorder: read('--accent-blue'),
+        langFill:   read('--accent-blue') + '99',   // ~60% alpha via hex
+        symBorder:  read('--accent-green'),
+        symFill:    read('--accent-green') + '99',
+        gramBorder: read('--accent-orange'),
+        gramFill:   read('--accent-orange') + '99',
+    };
+}
 
 export function updateLanguageChart(languages) {
     const ctx = document.getElementById('languageChart');
@@ -16,9 +34,7 @@ export function updateLanguageChart(languages) {
         state.languageChart.destroy();
     }
 
-    // Terminal chart colors
-    const textColor = '#d0b090';
-    const gridColor = 'rgba(240, 160, 96, 0.15)';
+    const colors = getChartColors();
 
     state.languageChart = new Chart(ctx, {
         type: 'bar',
@@ -27,8 +43,8 @@ export function updateLanguageChart(languages) {
             datasets: [{
                 label: 'Chunks',
                 data: data,
-                backgroundColor: 'rgba(240, 160, 96, 0.6)',
-                borderColor: '#f0a060',
+                backgroundColor: colors.langFill,
+                borderColor: colors.langBorder,
                 borderWidth: 1
             }]
         },
@@ -44,21 +60,21 @@ export function updateLanguageChart(languages) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        color: textColor,
+                        color: colors.textColor,
                         font: { family: "'IBM Plex Mono', monospace", size: 10 }
                     },
                     grid: {
-                        color: gridColor,
+                        color: colors.gridColor,
                         borderDash: [4, 4]
                     }
                 },
                 x: {
                     ticks: {
-                        color: textColor,
+                        color: colors.textColor,
                         font: { family: "'IBM Plex Mono', monospace", size: 10 }
                     },
                     grid: {
-                        color: gridColor
+                        color: colors.gridColor
                     }
                 }
             }
@@ -88,9 +104,7 @@ export function updateSymbolChart(symbols) {
         state.symbolChart.destroy();
     }
 
-    // Terminal chart colors
-    const textColor = '#d0b090';
-    const gridColor = 'rgba(240, 160, 96, 0.15)';
+    const colors = getChartColors();
 
     state.symbolChart = new Chart(ctx, {
         type: 'bar',
@@ -99,8 +113,8 @@ export function updateSymbolChart(symbols) {
             datasets: [{
                 label: 'Count',
                 data: data,
-                backgroundColor: 'rgba(192, 160, 96, 0.6)',
-                borderColor: '#c0a060',
+                backgroundColor: colors.symFill,
+                borderColor: colors.symBorder,
                 borderWidth: 1
             }]
         },
@@ -116,21 +130,21 @@ export function updateSymbolChart(symbols) {
                 y: {
                     beginAtZero: true,
                     ticks: {
-                        color: textColor,
+                        color: colors.textColor,
                         font: { family: "'IBM Plex Mono', monospace", size: 10 }
                     },
                     grid: {
-                        color: gridColor,
+                        color: colors.gridColor,
                         borderDash: [4, 4]
                     }
                 },
                 x: {
                     ticks: {
-                        color: textColor,
+                        color: colors.textColor,
                         font: { family: "'IBM Plex Mono', monospace", size: 10 }
                     },
                     grid: {
-                        color: gridColor
+                        color: colors.gridColor
                     }
                 }
             }
@@ -158,9 +172,7 @@ export function updateGrammarChart(grammars) {
         state.grammarChart.destroy();
     }
 
-    // Terminal chart colors
-    const textColor = '#d0b090';
-    const gridColor = 'rgba(240, 160, 96, 0.15)';
+    const colors = getChartColors();
 
     state.grammarChart = new Chart(ctx, {
         type: 'bar',
@@ -169,8 +181,8 @@ export function updateGrammarChart(grammars) {
             datasets: [{
                 label: 'Chunks',
                 data: data,
-                backgroundColor: 'rgba(224, 120, 64, 0.6)',
-                borderColor: '#e07840',
+                backgroundColor: colors.gramFill,
+                borderColor: colors.gramBorder,
                 borderWidth: 1
             }]
         },
@@ -179,11 +191,34 @@ export function updateGrammarChart(grammars) {
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, ticks: { color: textColor, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: gridColor, borderDash: [4, 4] } },
-                x: { ticks: { color: textColor, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: gridColor } }
+                y: { beginAtZero: true, ticks: { color: colors.textColor, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: colors.gridColor, borderDash: [4, 4] } },
+                x: { ticks: { color: colors.textColor, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: colors.gridColor } }
             }
         }
     });
 
     section.style.display = 'block';
 }
+
+// Re-theme existing chart instances when the user toggles light/dark mode.
+// Mutates options + dataset colors and calls update() — no destroy/recreate,
+// so no data churn or animation artifacts.
+document.addEventListener(THEME_CHANGE_EVENT, () => {
+    const colors = getChartColors();
+    const map = {
+        languageChart: ['langBorder', 'langFill'],
+        symbolChart:   ['symBorder',  'symFill'],
+        grammarChart:  ['gramBorder', 'gramFill'],
+    };
+    for (const [key, [borderKey, fillKey]] of Object.entries(map)) {
+        const chart = state[key];
+        if (!chart) continue;
+        chart.options.scales.x.ticks.color = colors.textColor;
+        chart.options.scales.y.ticks.color = colors.textColor;
+        chart.options.scales.x.grid.color = colors.gridColor;
+        chart.options.scales.y.grid.color = colors.gridColor;
+        chart.data.datasets[0].borderColor = colors[borderKey];
+        chart.data.datasets[0].backgroundColor = colors[fillKey];
+        chart.update();
+    }
+});

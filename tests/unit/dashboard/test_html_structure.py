@@ -72,9 +72,16 @@ def test_html_is_well_formed(soup):
 
 
 def test_no_inline_script_blocks(soup):
-    """After the split, there should be no inline <script> blocks (only src-based)."""
+    """After the split, there should be no inline <script> blocks (only src-based).
+
+    Exception: the FOUC-prevention script that applies the theme attribute
+    synchronously before stylesheets paint. It is identified by the
+    'cocosearch-theme' localStorage key string.
+    """
     for script in soup.find_all("script"):
         if script.string and script.string.strip():
+            if "cocosearch-theme" in script.string:
+                continue  # FOUC prevention script is allowed
             # Allow CDN scripts that might have inline fallbacks
             assert False, (
                 f"Found inline <script> block with content: {script.string[:80]}..."
@@ -123,6 +130,7 @@ def test_all_expected_js_modules_exist():
         "index-mgmt.js",
         "search.js",
         "logs.js",
+        "theme.js",
     ]
     for module in expected_modules:
         path = JS_DIR / module
@@ -145,6 +153,7 @@ def test_app_js_imports_all_modules():
         "./index-mgmt.js",
         "./search.js",
         "./logs.js",
+        "./theme.js",
     ]
     for module in expected_imports:
         assert module in content, f"app.js missing import from '{module}'"
@@ -191,4 +200,95 @@ def test_deps_graph_depth_selector_exists(soup):
     values = [opt.get("value") for opt in options]
     assert "1" in values and "3" in values, (
         f"Expected depth options 1 and 3, got {values}"
+    )
+
+
+# --- Light mode (theme toggle) ---
+
+
+def test_theme_toggle_button_exists(soup):
+    """Header must contain the theme toggle button inside the status line."""
+    btn = soup.find(id="themeToggleBtn")
+    assert btn is not None, "Missing #themeToggleBtn"
+    assert "theme-btn" in btn.get("class", []), (
+        "themeToggleBtn must have class 'theme-btn'"
+    )
+    status_line = soup.find(class_="terminal-status-line")
+    assert status_line is not None, "Missing .terminal-status-line container"
+    assert btn in status_line.find_all(id="themeToggleBtn"), (
+        "themeToggleBtn must live inside .terminal-status-line"
+    )
+
+
+def test_both_prism_themes_linked(soup):
+    """Both Prism syntax themes must be linked, with the light one starting disabled."""
+    dark = soup.find(id="prismThemeDark")
+    light = soup.find(id="prismThemeLight")
+    assert dark is not None, "Missing #prismThemeDark <link>"
+    assert "prism-tomorrow" in dark.get("href", ""), (
+        "prismThemeDark should point at prism-tomorrow"
+    )
+    assert light is not None, "Missing #prismThemeLight <link>"
+    assert "prismjs@" in light.get("href", ""), (
+        "prismThemeLight should be a prismjs CDN stylesheet"
+    )
+    assert light.has_attr("disabled"), (
+        "prismThemeLight should start disabled so dark renders by default"
+    )
+
+
+def test_fouc_prevention_script_present(soup):
+    """The inline FOUC script must be in <head> and run before styles.css paints."""
+    scripts = [
+        s
+        for s in soup.find_all("script")
+        if s.string and "cocosearch-theme" in s.string
+    ]
+    assert len(scripts) == 1, (
+        f"Expected exactly one FOUC prevention inline script, got {len(scripts)}"
+    )
+    head = soup.find("head")
+    head_children = [c for c in head.children if getattr(c, "name", None)]
+    styles_link = next(
+        (
+            c
+            for c in head_children
+            if c.name == "link" and "styles.css" in (c.get("href") or "")
+        ),
+        None,
+    )
+    assert styles_link is not None, "Could not find styles.css <link> in <head>"
+    script_tag = scripts[0]
+    assert head_children.index(script_tag) < head_children.index(styles_link), (
+        "FOUC script must appear before styles.css to avoid a flash of dark content"
+    )
+
+
+def test_light_theme_css_vars_defined():
+    """styles.css must define a [data-theme=light] block with the expected overrides."""
+    content = (CSS_DIR / "styles.css").read_text()
+    assert ':root[data-theme="light"]' in content, (
+        "Missing :root[data-theme='light'] block in styles.css"
+    )
+    light_block = content.split(':root[data-theme="light"]', 1)[1].split("}", 1)[0]
+    required = [
+        "--bg-primary",
+        "--text-primary",
+        "--accent-orange",
+        "--border-color",
+        "--log-cat-search",
+        "--log-tab-indexed-primary",
+    ]
+    for var in required:
+        assert var in light_block, f"Light theme block missing override for {var}"
+
+
+def test_crt_effects_disabled_in_light_mode():
+    """Light mode must hide the CRT scanlines and vignette."""
+    content = (CSS_DIR / "styles.css").read_text()
+    assert ':root[data-theme="light"] body::before' in content, (
+        "Missing rule to hide body::before scanlines in light mode"
+    )
+    assert ':root[data-theme="light"] body::after' in content, (
+        "Missing rule to hide body::after vignette in light mode"
     )
