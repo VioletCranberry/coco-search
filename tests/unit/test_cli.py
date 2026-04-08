@@ -237,6 +237,105 @@ class TestIndexCommand:
         assert final_call.args == ("testindex", "indexed")
         assert final_call.kwargs.get("update_timestamp") is True
 
+    def test_if_exists_skips_missing_index(self, capsys, tmp_codebase):
+        """--if-exists exits 0 without indexing when the index is not listed."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "other_index", "table_name": "..."}],
+            ),
+        ):
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="missing_index",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+                if_exists=True,
+                quiet=False,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        mock_run.assert_not_called()
+
+    def test_if_exists_proceeds_when_index_exists(self, capsys, tmp_codebase):
+        """--if-exists proceeds normally when the index is listed."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "testindex", "table_name": "..."}],
+            ),
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+                if_exists=True,
+                quiet=False,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        mock_run.assert_called_once()
+
+    def test_if_exists_safe_on_list_failure(self, capsys, tmp_codebase):
+        """--if-exists treats list_indexes errors as 'index absent' (hook safety)."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                side_effect=RuntimeError("db unreachable"),
+            ),
+        ):
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+                if_exists=True,
+                quiet=False,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        mock_run.assert_not_called()
+
+    def test_quiet_suppresses_console_output(self, capsys, tmp_codebase):
+        """--quiet silences Rich console output but still returns correct exit code."""
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name="testindex",
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+                quiet=True,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        captured = capsys.readouterr()
+        # Rich Console(quiet=True) swallows all prints.
+        assert captured.out == ""
+
 
 class TestSearchCommand:
     """Tests for search_command."""

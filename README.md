@@ -144,6 +144,8 @@ This project was originally built for personal use — a solo experiment in loca
 
 - 🩺 **Parse health tracking** -- tracks per-file parse status across four categories: `ok`, `partial` (Tree-sitter produced a tree with ERROR nodes), `error` (parse failure), and `no_grammar`. Detects index staleness by comparing the indexed commit hash and branch against your current HEAD — the dashboard and CLI show warnings when the index drifts behind. View with `cocosearch stats --pretty`.
 
+- 🔄 **Auto-reindex on git events** -- three composable layers to keep your index in sync without manual reindex: (1) **MCP server watchdog** (on by default) polls git state and triggers an incremental reindex when the branch or commit changes; (2) **`cocosearch hooks install`** writes `post-checkout`, `post-merge`, `post-commit`, `post-rewrite` hooks that fire a background reindex on every branch switch, pull, commit, and rebase (append-safe with husky/pre-commit/lefthook); (3) **`cocosearch watch`** runs a foreground polling loop for continuous feedback. All layers reuse `flow.update()`'s content-hash incremental path, so they're cheap in steady state. Dependency graph auto-refreshes when the deps table exists.
+
 - 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool.
 
 - 🔒 **Privacy-first** -- runs entirely on your machine by default — Ollama generates embeddings locally, PostgreSQL stores vectors locally, no telemetry. Optional remote embedding providers (OpenAI, OpenRouter) send only chunk text for embedding; all indexing, storage, and search remain local. Your code never leaves your machine.
@@ -327,6 +329,31 @@ uvx cocosearch list --pretty
 ```
 
 For the full list of commands and flags, see [CLI Reference](./docs/cli-reference.md).
+
+### Keeping the index fresh
+
+CocoSearch automatically keeps your index in sync with git. Three composable layers — pick any combination:
+
+**1. MCP server watchdog (on by default).** When the MCP server is running (`uvx cocosearch mcp` or the Claude Code plugin), a daemon thread polls git state every 60 seconds. On branch switch or new commit it triggers an incremental reindex in the background — zero setup. Opt out via `autoReindex.enabled: false` in `cocosearch.yaml` or `COCOSEARCH_AUTO_REINDEX_ENABLED=false`.
+
+**2. Git hooks (opt-in per repo).** Install hooks that fire a background incremental reindex on every branch switch, pull, commit, or rebase:
+
+```bash
+uvx cocosearch hooks install       # post-checkout, post-merge, post-commit, post-rewrite
+uvx cocosearch hooks status        # show which hooks are active
+uvx cocosearch hooks uninstall     # clean removal
+```
+
+Hooks are append-safe — they coexist with husky, pre-commit, lefthook, and other hook managers. Each hook runs `cocosearch index . --deps --if-exists --quiet` in the background, so your git operations are never blocked and no new indexes are auto-created.
+
+**3. Foreground watcher.** For a persistent feedback loop during heavy editing sessions:
+
+```bash
+uvx cocosearch watch .                     # polls every 30s, refreshes deps
+uvx cocosearch watch . --interval 60 --no-deps
+```
+
+Because `flow.update()` is already content-hash incremental, all three layers are cheap in steady state and immediate after a real change. Dependency extraction auto-runs after each trigger when the deps table already exists.
 
 ### Web Dashboard
 

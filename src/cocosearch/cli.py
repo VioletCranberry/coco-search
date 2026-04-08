@@ -145,7 +145,8 @@ def index_command(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for error).
     """
-    console = Console()
+    quiet = getattr(args, "quiet", False)
+    console = Console(quiet=quiet)
 
     # Validate path exists
     codebase_path = os.path.abspath(args.path)
@@ -179,6 +180,26 @@ def index_command(args: argparse.Namespace) -> int:
         console.print(f"[dim]Using derived index name: {index_name}[/dim]")
     elif index_source not in ("default", "CLI flag"):
         console.print(f"[dim]Using index name: {index_name} ({index_source})[/dim]")
+
+    # --if-exists: skip silently (exit 0) if the target index doesn't exist.
+    # Used by git hooks to avoid auto-creating indexes on branch switch/commit.
+    if getattr(args, "if_exists", False):
+        try:
+            from cocosearch.management.discovery import list_indexes
+
+            existing_names = {idx["name"] for idx in list_indexes()}
+            if index_name not in existing_names:
+                console.print(
+                    f"[dim]Index '{index_name}' not found; skipping "
+                    f"(run `cocosearch index .` to create it).[/dim]"
+                )
+                return 0
+        except Exception as e:
+            # DB/infra unavailable — treat as "index doesn't exist" for hook safety.
+            console.print(
+                f"[dim]--if-exists: could not verify index ({e}); skipping.[/dim]"
+            )
+            return 0
 
     # Map project config to IndexingConfig
     # Only override defaults if patterns are explicitly set in config
@@ -2533,6 +2554,129 @@ def _build_rich_tree(rich_node, tree_node) -> None:
             _build_rich_tree(child_rich, child)
 
 
+def hooks_install_command(args: argparse.Namespace) -> int:
+    """Install CocoSearch git hooks for auto-reindex."""
+    from cocosearch.hooks import HooksError, install_hooks
+
+    console = Console()
+    try:
+        result = install_hooks(Path(args.path))
+    except HooksError as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    console.print(f"[green]Hooks installed in[/green] {result.hooks_dir}")
+    for hook in result.installed:
+        console.print(f"  [green]+[/green] {hook}")
+    for hook in result.updated:
+        console.print(f"  [yellow]~[/yellow] {hook} (refreshed)")
+    if result.coexisted_with:
+        console.print(
+            "\n[yellow]Note:[/yellow] appended to hooks managed by another tool:"
+        )
+        for entry in result.coexisted_with:
+            hook, mgr = entry.split(":", 1)
+            console.print(f"  • {hook} — {mgr}")
+        console.print("[dim]Verify your hook chain still works after install.[/dim]")
+    return 0
+
+
+def hooks_uninstall_command(args: argparse.Namespace) -> int:
+    """Remove CocoSearch git hooks from the current repo."""
+    from cocosearch.hooks import HooksError, uninstall_hooks
+
+    console = Console()
+    try:
+        result = uninstall_hooks(Path(args.path))
+    except HooksError as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    console.print(f"[green]Hooks uninstalled from[/green] {result.hooks_dir}")
+    for hook in result.deleted:
+        console.print(f"  [red]-[/red] {hook} (file deleted)")
+    for hook in result.removed:
+        console.print(f"  [yellow]~[/yellow] {hook} (block removed, file kept)")
+    if not result.deleted and not result.removed:
+        console.print("[dim]No CocoSearch hooks were installed.[/dim]")
+    return 0
+
+
+def hooks_status_command(args: argparse.Namespace) -> int:
+    """Report which CocoSearch git hooks are installed."""
+    from cocosearch.hooks import HooksError, hook_status
+
+    console = Console()
+    try:
+        statuses = hook_status(Path(args.path))
+    except HooksError as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        return 1
+
+    if not statuses:
+        console.print("[dim]No hooks found.[/dim]")
+        return 0
+
+    console.print(f"[bold]Hook directory:[/bold] {statuses[0].path.parent}\n")
+    for s in statuses:
+        if s.installed:
+            mark = "[green]✓ installed[/green]"
+        elif s.has_other_content:
+            mark = "[yellow]– not installed[/yellow] (other content present)"
+        else:
+            mark = "[dim]– not installed[/dim]"
+        line = f"  {s.name:<14} {mark}"
+        if s.foreign_manager:
+            line += f"  [dim](coexists with {s.foreign_manager})[/dim]"
+        console.print(line)
+    return 0
+
+
+def watch_command(args: argparse.Namespace) -> int:
+    """Execute the watch command — foreground incremental-reindex loop."""
+    from cocosearch.watch import run_watch
+
+    console = Console()
+
+    codebase_path = os.path.abspath(args.path)
+    if not os.path.isdir(codebase_path):
+        console.print(
+            f"[bold red]Error:[/bold red] Path does not exist or is not a directory: {args.path}"
+        )
+        return 1
+
+    # Resolve index name the same way `cocosearch index` does.
+    config_path = find_config_file()
+    if config_path:
+        try:
+            project_config = load_project_config(config_path)
+        except ConfigLoadError as e:
+            console.print(f"[bold red]Configuration error:[/bold red]\n{e}")
+            return 1
+    else:
+        project_config = CocoSearchConfig()
+
+    resolver = ConfigResolver(project_config, config_path)
+    index_name, _ = _resolve_index_name(
+        resolver, cli_value=args.name, fallback_path=codebase_path
+    )
+
+    interval = max(1, int(getattr(args, "interval", 30)))
+    include_deps = not getattr(args, "no_deps", False)
+
+    try:
+        return run_watch(
+            Path(codebase_path),
+            index_name,
+            interval_seconds=interval,
+            include_deps=include_deps,
+            console=console,
+        )
+    except Exception as e:
+        console.print(f"[bold red]Watch failed:[/bold red] {e}")
+        return 1
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
@@ -2593,6 +2737,19 @@ def main() -> None:
         "--deps",
         action="store_true",
         help="Extract dependency graph after indexing",
+    )
+    index_parser.add_argument(
+        "--if-exists",
+        action="store_true",
+        help=(
+            "Skip with exit 0 if the target index does not already exist. "
+            "Useful for git hooks to avoid auto-creating indexes."
+        ),
+    )
+    index_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress Rich console output (errors still go to stderr).",
     )
 
     # Search subcommand (also works as default action)
@@ -3110,6 +3267,85 @@ def main() -> None:
         help_text="Index name",
     )
 
+    # Hooks subcommand — install/uninstall/status git hooks for auto-reindex
+    hooks_parser = subparsers.add_parser(
+        "hooks",
+        help="Manage git hooks for auto-reindex",
+        description=(
+            "Install, uninstall, or inspect git hooks that trigger an "
+            "incremental reindex after branch switch, pull, commit, or rebase."
+        ),
+    )
+    hooks_subparsers = hooks_parser.add_subparsers(dest="hooks_command")
+
+    hooks_install_parser = hooks_subparsers.add_parser(
+        "install",
+        help="Install CocoSearch git hooks into the current repo",
+    )
+    hooks_install_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Path inside the target git repo (default: current directory)",
+    )
+
+    hooks_uninstall_parser = hooks_subparsers.add_parser(
+        "uninstall",
+        help="Remove CocoSearch git hooks from the current repo",
+    )
+    hooks_uninstall_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Path inside the target git repo (default: current directory)",
+    )
+
+    hooks_status_parser = hooks_subparsers.add_parser(
+        "status",
+        help="Show which CocoSearch hooks are installed",
+    )
+    hooks_status_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Path inside the target git repo (default: current directory)",
+    )
+
+    # Watch subcommand — foreground incremental-reindex loop
+    watch_parser = subparsers.add_parser(
+        "watch",
+        help="Continuously keep the index up-to-date",
+        description=(
+            "Foreground command that periodically runs an incremental "
+            "reindex. Leaves the index in sync after every file change. "
+            "Ctrl+C to stop."
+        ),
+    )
+    watch_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Path to the codebase directory (default: current directory)",
+    )
+    add_config_arg(
+        watch_parser,
+        "-n",
+        "--name",
+        config_key="indexName",
+        help_text="Index name (default: derived from directory name)",
+    )
+    watch_parser.add_argument(
+        "--interval",
+        type=int,
+        default=30,
+        help="Seconds between incremental updates (default: 30)",
+    )
+    watch_parser.add_argument(
+        "--no-deps",
+        action="store_true",
+        help="Skip dependency graph refresh even when the deps table exists",
+    )
+
     # Known subcommands for routing
     known_subcommands = (
         "index",
@@ -3125,6 +3361,8 @@ def main() -> None:
         "config",
         "dashboard",
         "deps",
+        "hooks",
+        "watch",
         "-h",
         "--help",
         "--version",
@@ -3184,6 +3422,7 @@ def main() -> None:
         "init": init_command,
         "mcp": mcp_command,
         "dashboard": dashboard_command,
+        "watch": watch_command,
     }
 
     _config_command_registry: dict[str, Any] = {
@@ -3200,6 +3439,12 @@ def main() -> None:
         "impact": deps_impact_command,
     }
 
+    _hooks_command_registry: dict[str, Any] = {
+        "install": hooks_install_command,
+        "uninstall": hooks_uninstall_command,
+        "status": hooks_status_command,
+    }
+
     if args.command == "config":
         handler = _config_command_registry.get(args.config_command)
         if handler:
@@ -3213,6 +3458,13 @@ def main() -> None:
             sys.exit(handler(args))
         else:
             deps_parser.print_help()
+            sys.exit(1)
+    elif args.command == "hooks":
+        handler = _hooks_command_registry.get(args.hooks_command)
+        if handler:
+            sys.exit(handler(args))
+        else:
+            hooks_parser.print_help()
             sys.exit(1)
     else:
         handler = _command_registry.get(args.command)
