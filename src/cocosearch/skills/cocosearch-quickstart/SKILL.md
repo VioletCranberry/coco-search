@@ -54,7 +54,10 @@ This starts both PostgreSQL and Ollama in one command.
 
 ## Step 2: Index the Project
 
-**First, check for project config:** Look for `cocosearch.yaml` in the project root. If it exists and has an `indexName` field, use that as the index name for all subsequent operations. **This is critical** — the MCP `index_codebase` tool auto-derives names from the directory path if `index_name` is not specified, which may not match the configured name. A mismatch causes "Index not found" errors from the CLI.
+**Resolve index name** (use the resolved name for all operations):
+- **Try** `cocosearch.yaml` for `indexName` field -- if found, use it
+- **If no config file**, call `list_indexes()` and match the current project's directory name against available indexes. The MCP tools auto-derive index names from directory paths (e.g., `my-project/` -> `my_project`), so a match is likely if the repo was indexed without a config file.
+- **If no match found**, the project is genuinely not indexed -- proceed to create one below. Do NOT abandon CocoSearch tools just because `cocosearch.yaml` is missing.
 
 **Check if an index already exists for this project:**
 
@@ -63,17 +66,17 @@ list_indexes()
 ```
 
 **If index exists:**
-- Run `index_stats(index_name="<configured-name>")` to check freshness
+- Run `index_stats(index_name="<resolved-name>")` to check freshness
 - If stale (>7 days): ask "Index is X days old. Reindex to pick up recent changes?"
 - If fresh: skip to Step 3
 
 **If no index exists, create one:**
 
 ```
-index_codebase(path="<current-project-root>", index_name="<configured-name>")
+index_codebase(path="<current-project-root>", index_name="<resolved-name>")
 ```
 
-**Always pass `index_name` explicitly** to match the project config. If no `cocosearch.yaml` exists, the auto-derived name is fine. Indexing will:
+Indexing will:
 - Discover all supported files (Python, TypeScript, Go, Rust, Java, C/C++, HCL, Dockerfile, Bash, Markdown, YAML)
 - Parse symbols via Tree-sitter (functions, classes, methods)
 - Generate embeddings via the configured provider (ollama/nomic-embed-text by default)

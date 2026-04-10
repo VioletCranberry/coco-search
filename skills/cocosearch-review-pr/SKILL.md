@@ -17,7 +17,10 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
 
 ## Pre-flight Check
 
-1. Read `cocosearch.yaml` for `indexName` (critical -- use this for all operations)
+1. **Resolve index name** (use the resolved name for all operations):
+   - **Try** `cocosearch.yaml` for `indexName` field -- if found, use it
+   - **If no config file**, call `list_indexes()` and match the current project's directory name against available indexes. The MCP tools auto-derive index names from directory paths (e.g., `my-project/` -> `my_project`), so a match is likely if the repo was indexed without a config file.
+   - **If no match found**, the project is genuinely not indexed -- offer to index it. Do NOT abandon CocoSearch tools just because `cocosearch.yaml` is missing.
 2. **Inventory API tokens.** Check which tokens are available before anything else:
 
    ```bash
@@ -60,6 +63,8 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
 8. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
 
 ## Step 1: Fetch PR/MR Data
+
+> **Important:** Use the Python `urllib` / `curl` snippets provided below for all API calls. Do NOT use `gh`, `glab`, or other CLI wrappers -- they may not be installed and add an unnecessary dependency.
 
 ### GitHub
 

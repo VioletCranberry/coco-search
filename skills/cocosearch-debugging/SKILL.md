@@ -7,9 +7,12 @@ description: Use when debugging an error, unexpected behavior, or tracing how co
 
 ## Pre-flight Check
 
-1. Read `cocosearch.yaml` for `indexName` (critical -- use this for all operations)
+1. **Resolve index name** (use the resolved name for all operations):
+   - **Try** `cocosearch.yaml` for `indexName` field -- if found, use it
+   - **If no config file**, call `list_indexes()` and match the current project's directory name against available indexes. The MCP tools auto-derive index names from directory paths (e.g., `my-project/` -> `my_project`), so a match is likely if the repo was indexed without a config file.
+   - **If no match found**, the project is genuinely not indexed -- offer to index it. Do NOT abandon CocoSearch tools just because `cocosearch.yaml` is missing.
 2. `list_indexes()` to confirm project is indexed
-3. `index_stats(index_name="<configured-name>")` to check freshness
+3. `index_stats(index_name="<resolved-name>")` to check freshness
 - No index → offer to index before debugging
 - Stale (>7 days) → warn: "Index is X days old -- results may not reflect recent changes. Want me to reindex first?"
 4. Check dependency freshness — call `get_file_dependencies` on any known file from the error context:
