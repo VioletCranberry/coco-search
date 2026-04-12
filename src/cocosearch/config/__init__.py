@@ -22,6 +22,7 @@ from .generator import (
 from .loader import find_config_file, load_config
 from .resolver import ConfigResolver, config_key_to_env_var, parse_env_value
 from .schema import (
+    AutoReindexSection,
     CocoSearchConfig,
     ConfigError,
     EmbeddingSection,
@@ -33,6 +34,7 @@ from .schema import (
 )
 
 __all__ = [
+    "AutoReindexSection",
     "CocoSearchConfig",
     "ConfigError",
     "EmbeddingSection",

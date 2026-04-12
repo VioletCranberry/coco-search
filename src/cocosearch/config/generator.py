@@ -49,6 +49,14 @@ search: {}
 embedding: {}
   # Ollama model for embeddings
   # model: nomic-embed-text
+
+# Auto-reindex settings (MCP server watchdog)
+# When the MCP server is running, a daemon thread polls git state and
+# automatically triggers an incremental reindex when the branch or commit
+# changes. This is the invisible safety net — set enabled=false to opt out.
+# autoReindex:
+#   enabled: true
+#   intervalSeconds: 60
 """
 
 

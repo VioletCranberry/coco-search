@@ -72,6 +72,15 @@ class LoggingSection(BaseModel):
     file: bool = Field(default=False)
 
 
+class AutoReindexSection(BaseModel):
+    """Configuration for automatic reindex on git drift."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = Field(default=True)
+    intervalSeconds: int = Field(default=60, gt=0)
+
+
 class CocoSearchConfig(BaseModel):
     """Root configuration model for CocoSearch."""
 
@@ -83,3 +92,4 @@ class CocoSearchConfig(BaseModel):
     search: SearchSection = Field(default_factory=SearchSection)
     embedding: EmbeddingSection = Field(default_factory=EmbeddingSection)
     logging: LoggingSection = Field(default_factory=LoggingSection)
+    autoReindex: AutoReindexSection = Field(default_factory=AutoReindexSection)

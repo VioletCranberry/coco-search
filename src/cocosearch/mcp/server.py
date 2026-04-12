@@ -122,6 +122,149 @@ def _start_idle_watchdog(timeout_seconds: int):
     t.start()
 
 
+def _resolve_watchdog_project() -> Path | None:
+    """Resolve the project path the auto-reindex watchdog should monitor.
+
+    The watchdog runs on a daemon thread and therefore has no MCP Context,
+    so the async/session-dependent parts of ``_detect_project`` are not
+    available. We use the subset that works off-thread: env var, then cwd.
+    """
+    env_path = os.environ.get("COCOSEARCH_PROJECT_PATH") or os.environ.get(
+        "COCOSEARCH_PROJECT"
+    )
+    if env_path:
+        p = Path(env_path)
+        if p.exists():
+            return p
+    return Path.cwd()
+
+
+def _watchdog_tick_once() -> None:
+    """Poll drift for the current project + linkedIndexes and trigger reindex.
+
+    Extracted from the watchdog loop so tests can invoke it directly without
+    spinning up a thread.
+    """
+    from cocosearch.auto_reindex import detect_drift, trigger_reindex
+    from cocosearch.config import load_config
+    from cocosearch.management.context import find_project_root, resolve_index_name
+
+    project_path = _resolve_watchdog_project()
+    if project_path is None:
+        return
+
+    root, _ = find_project_root(project_path)
+    if root is None:
+        root = project_path
+    try:
+        index_name = resolve_index_name(root, None)
+    except Exception as e:
+        _get_cs_log().index(
+            "auto-reindex: could not resolve index name",
+            level="DEBUG",
+            error=str(e),
+        )
+        return
+
+    # Read linkedIndexes from cocosearch.yaml (if the project root has one).
+    linked: list[str] = []
+    try:
+        cfg_path = root / "cocosearch.yaml"
+        if cfg_path.exists():
+            cfg = load_config(cfg_path)
+            linked = list(cfg.linkedIndexes or [])
+    except Exception:
+        pass
+
+    # Poll the main index and every linked index. Each poll is cheap
+    # (one metadata lookup + one git rev-parse).
+    targets = [(index_name, str(root))]
+    for linked_name in linked:
+        # Linked indexes share the main project's git state for drift purposes,
+        # but their metadata points to their own canonical_path. detect_drift
+        # resolves the path internally from metadata when project_path is None.
+        targets.append((linked_name, None))
+
+    for name, path in targets:
+        try:
+            report = detect_drift(name, path)
+        except Exception as e:
+            _get_cs_log().index(
+                "auto-reindex: drift detection failed",
+                level="DEBUG",
+                index=name,
+                error=str(e),
+            )
+            continue
+
+        if not report.should_reindex:
+            continue
+
+        # Skip if an indexing thread is already active for this index.
+        with _indexing_lock:
+            prev = _active_indexing.get(name)
+            if prev is not None and prev[0].is_alive():
+                continue
+
+        # Resolve a concrete project path for run_index. For the main index
+        # we already have one; for linked indexes we need metadata.
+        target_path = path
+        if target_path is None:
+            try:
+                meta = get_index_metadata(name)
+                target_path = meta.get("canonical_path") if meta else None
+            except Exception:
+                target_path = None
+        if not target_path:
+            continue
+
+        _get_cs_log().index(
+            "auto-reindex: drift detected",
+            index=name,
+            reason=report.reason,
+            indexed_commit=report.indexed_commit,
+            current_commit=report.current_commit,
+        )
+        trigger_reindex(
+            name,
+            target_path,
+            fresh=False,
+            include_deps=True,
+            lock=_indexing_lock,
+            active_registry=_active_indexing,
+        )
+
+
+def _start_auto_reindex_watchdog(interval_seconds: int):
+    """Start a daemon thread that polls git state and auto-triggers reindex.
+
+    Uses the shared ``cocosearch.auto_reindex`` core. Reuses the existing
+    ``_indexing_lock``/``_active_indexing`` pair so one reindex runs at a time
+    per index, coordinated with ``/api/reindex``.
+
+    Args:
+        interval_seconds: How often to poll git state (seconds). Must be > 0.
+    """
+
+    def _watchdog():
+        # Small initial delay so we don't race with server startup.
+        _time.sleep(min(5, interval_seconds))
+        while True:
+            try:
+                _watchdog_tick_once()
+            except Exception as e:
+                _get_cs_log().index(
+                    "auto-reindex watchdog tick failed",
+                    level="WARNING",
+                    error=str(e),
+                )
+            _time.sleep(interval_seconds)
+
+    t = threading.Thread(target=_watchdog, daemon=True, name="auto-reindex-watchdog")
+    t.start()
+    return t
+
+
 def _ensure_cocoindex_init(timeout: float = 5.0) -> bool:
     """Initialize CocoIndex exactly once, thread-safely.
 
@@ -3198,6 +3341,10 @@ def run_server(
         "1",
         "true",
     )
+    # Auto-reindex config (stdio only — polling makes sense when the plugin
+    # is bound to a user's working tree). Defaults match AutoReindexSection.
+    auto_reindex_enabled = True
+    auto_reindex_interval = 60
     try:
         from cocosearch.config import find_config_file, load_config
 
@@ -3206,8 +3353,22 @@ def run_server(
             cfg = load_config(cfg_path)
             if cfg.logging.file:
                 log_file_enabled = True
+            auto_reindex_enabled = cfg.autoReindex.enabled
+            auto_reindex_interval = cfg.autoReindex.intervalSeconds
     except Exception:
         pass
+
+    # Env var overrides (CLI > env > config > default order; no CLI flag yet)
+    env_enabled = os.environ.get("COCOSEARCH_AUTO_REINDEX_ENABLED", "").strip().lower()
+    if env_enabled in ("1", "true", "yes"):
+        auto_reindex_enabled = True
+    elif env_enabled in ("0", "false", "no"):
+        auto_reindex_enabled = False
+    env_interval = os.environ.get("COCOSEARCH_AUTO_REINDEX_INTERVAL_SECONDS", "")
+    if env_interval.isdigit():
+        parsed = int(env_interval)
+        if parsed > 0:
+            auto_reindex_interval = parsed
 
     setup_log_capture(log_file=log_file_enabled)
 
@@ -3258,6 +3419,13 @@ def run_server(
             if timeout > 0:
                 _start_idle_watchdog(timeout)
                 _get_cs_log().system("Idle watchdog started", timeout_s=timeout)
+
+            if auto_reindex_enabled and auto_reindex_interval > 0:
+                _start_auto_reindex_watchdog(auto_reindex_interval)
+                _get_cs_log().system(
+                    "Auto-reindex watchdog started",
+                    interval_s=auto_reindex_interval,
+                )
 
             _get_cs_log().system("Server listening", transport="stdio")
             mcp.run(transport="stdio")

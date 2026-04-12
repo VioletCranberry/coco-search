@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from cocosearch.config import (
+    AutoReindexSection,
     CocoSearchConfig,
     EmbeddingSection,
     IndexingSection,
@@ -205,6 +206,47 @@ class TestLoggingSection:
         assert "Input should be a valid boolean" in str(exc_info.value)
 
 
+class TestAutoReindexSection:
+    """Test AutoReindexSection model."""
+
+    def test_default_values(self):
+        """Test that default values are set correctly."""
+        section = AutoReindexSection()
+        assert section.enabled is True
+        assert section.intervalSeconds == 60
+
+    def test_disabled(self):
+        """Test explicitly disabling auto-reindex."""
+        section = AutoReindexSection(enabled=False)
+        assert section.enabled is False
+
+    def test_custom_interval(self):
+        """Test setting a custom polling interval."""
+        section = AutoReindexSection(intervalSeconds=30)
+        assert section.intervalSeconds == 30
+
+    def test_interval_must_be_positive(self):
+        """Test that intervalSeconds must be greater than 0."""
+        with pytest.raises(ValidationError) as exc_info:
+            AutoReindexSection(intervalSeconds=0)
+        assert "Input should be greater than 0" in str(exc_info.value)
+
+        with pytest.raises(ValidationError):
+            AutoReindexSection(intervalSeconds=-10)
+
+    def test_unknown_field_rejected(self):
+        """Test that unknown fields are rejected (extra='forbid')."""
+        with pytest.raises(ValidationError) as exc_info:
+            AutoReindexSection(unknownField="value")
+        assert "Extra inputs are not permitted" in str(exc_info.value)
+
+    def test_type_validation_strict(self):
+        """Test strict type validation on boolean field."""
+        with pytest.raises(ValidationError) as exc_info:
+            AutoReindexSection(enabled="true")
+        assert "Input should be a valid boolean" in str(exc_info.value)
+
+
 class TestCocoSearchConfig:
     """Test root CocoSearchConfig model."""
 
@@ -216,6 +258,7 @@ class TestCocoSearchConfig:
         assert isinstance(config.search, SearchSection)
         assert isinstance(config.embedding, EmbeddingSection)
         assert isinstance(config.logging, LoggingSection)
+        assert isinstance(config.autoReindex, AutoReindexSection)
 
     def test_valid_config_all_fields(self):
         """Test valid configuration with all fields specified."""
@@ -267,6 +310,22 @@ class TestCocoSearchConfig:
         config = CocoSearchConfig(logging={"file": True})
         assert config.logging.file is True
 
+    def test_auto_reindex_section_defaults(self):
+        """Test that autoReindex section defaults are correct."""
+        config = CocoSearchConfig()
+        assert config.autoReindex.enabled is True
+        assert config.autoReindex.intervalSeconds == 60
+
+    def test_auto_reindex_section_disabled(self):
+        """Test disabling autoReindex via dict."""
+        config = CocoSearchConfig(autoReindex={"enabled": False})
+        assert config.autoReindex.enabled is False
+
+    def test_auto_reindex_section_custom_interval(self):
+        """Test custom intervalSeconds via dict."""
+        config = CocoSearchConfig(autoReindex={"intervalSeconds": 120})
+        assert config.autoReindex.intervalSeconds == 120
+
     def test_linked_indexes_default_empty(self):
         """Test that linkedIndexes defaults to empty list."""
         config = CocoSearchConfig()
@@ -297,5 +356,7 @@ class TestCocoSearchConfig:
         assert "search" in data
         assert "embedding" in data
         assert "logging" in data
+        assert "autoReindex" in data
         assert isinstance(data["indexing"], dict)
         assert isinstance(data["logging"], dict)
+        assert isinstance(data["autoReindex"], dict)
