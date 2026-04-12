@@ -11,10 +11,12 @@ A systematic workflow for adding new code to an existing codebase. This skill us
 
 ## Pre-flight Check
 
-1. Read `cocosearch.yaml` for `indexName` (critical -- use this for all operations)
+1. **Resolve index name** (use the resolved name for all operations):
+   - **Try** `cocosearch.yaml` for `indexName` field -- if found, use it
+   - **If no config file**, call `list_indexes()` and match the current project's directory name against available indexes. The MCP tools auto-derive index names from directory paths (e.g., `my-project/` -> `my_project`), so a match is likely if the repo was indexed without a config file.
+   - **If no match found**, the project is genuinely not indexed -- offer to index it. Do NOT abandon CocoSearch tools just because `cocosearch.yaml` is missing.
 2. `list_indexes()` to confirm project is indexed
-3. `index_stats(index_name="<configured-name>")` to check freshness
-- No index → offer to index before proceeding
+3. `index_stats(index_name="<resolved-name>")` to check freshness
 - Stale (>7 days) → warn: "Index is X days old -- I may miss recent patterns. Want me to reindex first?"
 
 ## Step 1: Understand the Feature

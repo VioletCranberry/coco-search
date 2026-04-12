@@ -13,14 +13,17 @@ Before we start exploring, let me check if we have a CocoSearch index for this c
 
 **I'll run:**
 
-1. **Check for project config first:** Look for `cocosearch.yaml` in the project root. If it exists and has an `indexName` field, use that as the index name for all subsequent operations. **This is critical** — the MCP `index_codebase` tool auto-derives names from the directory path if `index_name` is not specified, which may not match the configured name. A mismatch causes "Index not found" errors from the CLI.
+1. **Resolve index name** (use the resolved name for all operations):
+   - **Try** `cocosearch.yaml` for `indexName` field -- if found, use it
+   - **If no config file**, call `list_indexes()` and match the current project's directory name against available indexes. The MCP tools auto-derive index names from directory paths (e.g., `my-project/` -> `my_project`), so a match is likely if the repo was indexed without a config file.
+   - **If no match found**, the project is genuinely not indexed -- offer to index it. Do NOT abandon CocoSearch tools just because `cocosearch.yaml` is missing.
 2. `list_indexes()` - Check what indexes exist
-3. `index_stats(index_name="<configured-name>")` - Check index health and freshness
+3. `index_stats(index_name="<resolved-name>")` - Check index health and freshness
 
 **What to look for:**
 
-- **No index found:** I'll offer to run `index_codebase(path, index_name="<configured-name>")` to create one before we start. **Always pass `index_name` explicitly** to match the project config.
-- **Index exists but stale (>7 days):** I'll mention the index might be outdated and ask if you want to reindex for the freshest results
+- **No index found:** Offer to run `index_codebase(path, index_name="<resolved-name>")` to create one before we start.
+- **Index exists but stale (>7 days):** Mention the index might be outdated and ask if you want to reindex for the freshest results
 - **Index fresh:** Great! We can start exploring immediately
 
 **Why this matters:** Stale indexes might miss recent refactorings or new modules. A fresh index gives you the most accurate picture of the codebase.
