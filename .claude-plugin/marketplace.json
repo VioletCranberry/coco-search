@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Local-first hybrid semantic code search with dependency graphs and cross-repo search. MCP tools and workflow skills.",
-    "version": "0.1.40"
+    "version": "0.1.41"
   },
   "plugins": [
     {
       "name": "cocosearch",
       "description": "Local-first hybrid semantic code search with dependency graphs and cross-repo search. MCP tools and workflow skills.",
-      "version": "0.1.40",
+      "version": "0.1.41",
       "source": "./"
     }
   ]
