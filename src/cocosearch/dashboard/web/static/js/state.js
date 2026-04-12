@@ -18,4 +18,5 @@ export const state = {
     isUnloading: false,
     toastTimer: null,
     depsGraphSimulation: null,
+    currentTheme: 'dark',  // synced by theme.js on init and every toggle
 };

@@ -15,6 +15,21 @@
     --shadow: rgba(240, 160, 96, 0.15);
     --font-mono: 'IBM Plex Mono', monospace;
     --font-display: 'VT323', monospace;
+    /* Log category + tab status colors (themeable) */
+    --log-cat-search: #5bc0de;
+    --log-cat-mcp:    #c678dd;
+    --log-cat-cache:  #e0a040;
+    --log-cat-infra:  #5b9bd5;
+    --log-cat-deps:   #56b6c2;
+    --log-level-warning: #e0a040;
+    --log-tab-indexing-primary:   #FF9800;
+    --log-tab-indexing-secondary: #e07840;
+    --log-tab-indexed-primary:    #4CAF50;
+    --log-tab-indexed-secondary:  #388E3C;
+    --log-tab-stale-primary:      #FFC107;
+    --log-tab-stale-secondary:    #FFA000;
+    --log-tab-error-primary:      #f44336;
+    --log-tab-error-secondary:    #d32f2f;
 }
 
 /* Dark mode same as terminal theme */
@@ -31,6 +46,37 @@
     --accent-orange: #e07840;
     --accent-red: #d06040;
     --shadow: rgba(240, 160, 96, 0.15);
+}
+
+/* Light mode — sepia parchment */
+:root[data-theme="light"] {
+    --bg-primary: #f8f1e4;
+    --bg-secondary: #f0e6d2;
+    --bg-card: #ebe0c8;
+    --border-color: rgba(196, 74, 16, 0.3);
+    --text-primary: #3a2a1a;
+    --text-secondary: #5a4028;
+    --text-muted: #8a6a4a;
+    --accent-blue: #c44a10;
+    --accent-green: #4a6a20;
+    --accent-orange: #c44a10;
+    --accent-red: #9a2010;
+    --shadow: rgba(196, 74, 16, 0.15);
+    /* log + tab overrides for cream legibility */
+    --log-cat-search: #0b6e8a;
+    --log-cat-mcp:    #6a2d8a;
+    --log-cat-cache:  #8a5a00;
+    --log-cat-infra:  #1a4f7a;
+    --log-cat-deps:   #0b6464;
+    --log-level-warning: #8a5a00;
+    --log-tab-indexing-primary:   #c44a10;
+    --log-tab-indexing-secondary: #8a3408;
+    --log-tab-indexed-primary:    #4a6a20;
+    --log-tab-indexed-secondary:  #3a5018;
+    --log-tab-stale-primary:      #8a5a00;
+    --log-tab-stale-secondary:    #6a4400;
+    --log-tab-error-primary:      #9a2010;
+    --log-tab-error-secondary:    #70180a;
 }
 
 * {
@@ -75,6 +121,15 @@ body::after {
     pointer-events: none;
     z-index: 9998;
     background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+/* Disable CRT effects + phosphor glow in light mode (cream backgrounds) */
+:root[data-theme="light"] body::before,
+:root[data-theme="light"] body::after {
+    display: none;
+}
+:root[data-theme="light"] .phosphor-glow {
+    text-shadow: none;
 }
 
 .container {
@@ -1207,20 +1262,20 @@ select option:checked {
 .log-name { color: var(--text-muted); }
 .log-level-DEBUG { color: var(--text-muted); }
 .log-level-INFO { color: var(--accent-green); }
-.log-level-WARNING { color: #e0a040; }
+.log-level-WARNING { color: var(--log-level-warning); }
 .log-level-ERROR { color: var(--accent-red); }
 .log-level-CRITICAL { color: var(--accent-red); font-weight: 700; }
 .log-level-STDERR { color: var(--text-secondary); font-style: italic; }
 
 /* Category badge colors */
 .log-cat { font-weight: 600; margin-right: 4px; }
-.log-cat-search { color: #5bc0de; }
+.log-cat-search { color: var(--log-cat-search); }
 .log-cat-index { color: var(--accent-green); }
-.log-cat-mcp { color: #c678dd; }
-.log-cat-cache { color: #e0a040; }
-.log-cat-infra { color: #5b9bd5; }
+.log-cat-mcp { color: var(--log-cat-mcp); }
+.log-cat-cache { color: var(--log-cat-cache); }
+.log-cat-infra { color: var(--log-cat-infra); }
 .log-cat-system { color: var(--text-secondary); }
-.log-cat-deps { color: #56b6c2; }
+.log-cat-deps { color: var(--log-cat-deps); }
 
 /* Structured fields */
 .log-fields { color: var(--text-muted); font-style: italic; }
@@ -1270,6 +1325,20 @@ select option:checked {
 .log-badge.active { display: block; }
 
 /* QUIT button in status line */
+.theme-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 1px 8px;
+    cursor: pointer;
+}
+.theme-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--accent-orange);
+}
+
 .quit-btn {
     background: transparent;
     border: 1px solid var(--accent-red);

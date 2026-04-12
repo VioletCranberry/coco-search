@@ -28,7 +28,8 @@ export function escapeHtml(str) {
 }
 
 export function isDarkMode() {
-    return true; // Always dark for terminal theme
+    // Defaults to dark when attribute is missing (safe during boot race).
+    return document.documentElement.getAttribute('data-theme') !== 'light';
 }
 
 export function copyToClipboard(text) {

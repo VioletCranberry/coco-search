@@ -11,6 +11,7 @@ import {
     toggleDepsPanel, toggleDepsOverflow, openDepsGraph, closeDepsGraph, onDepsDepthChange,
 } from './search.js';
 import { startLogStream, toggleLogPanel, clearLogPanel, scrollLogsToBottom } from './logs.js';
+import { initTheme } from './theme.js';
 
 // --- Expose functions needed by dynamically generated onclick handlers ---
 window.toggleLanguageDetails = toggleLanguageDetails;
@@ -146,6 +147,7 @@ function updateUptime() {
 }
 
 // --- Initialize ---
+initTheme();
 startHeartbeat();
 loadIndexList();
 setInterval(updateUptime, 1000);
