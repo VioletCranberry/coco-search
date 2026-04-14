@@ -18,12 +18,25 @@ import threading
 logger = logging.getLogger(__name__)
 
 _dashboard_server = None  # uvicorn.Server | None
+_dashboard_url: str | None = None
+
+
+def get_dashboard_url() -> str | None:
+    """Return the URL of the running dashboard, or None if not started."""
+    return _dashboard_url
+
+
+def set_dashboard_url(url: str | None) -> None:
+    """Record the dashboard URL so other modules can retrieve it."""
+    global _dashboard_url
+    _dashboard_url = url
 
 
 def stop_dashboard_server():
     """Signal the dashboard uvicorn server to exit."""
     if _dashboard_server is not None:
         _dashboard_server.should_exit = True
+    set_dashboard_url(None)
 
 
 def start_dashboard_server(port: int | None = None) -> str | None:
@@ -97,5 +110,6 @@ def start_dashboard_server(port: int | None = None) -> str | None:
         break
 
     url = f"http://127.0.0.1:{actual_port}/dashboard"
+    set_dashboard_url(url)
     print(f"Dashboard available at {url}", file=sys.stderr)
     return url

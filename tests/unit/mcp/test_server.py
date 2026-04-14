@@ -15,6 +15,7 @@ from cocosearch.mcp.server import (
     index_stats,
     clear_index,
     index_codebase,
+    open_dashboard,
 )
 
 
@@ -232,6 +233,28 @@ class TestListIndexes:
             result = list_indexes()
 
         assert result == []
+
+
+class TestOpenDashboard:
+    """Tests for open_dashboard MCP tool."""
+
+    def test_returns_url_and_opens_browser_when_dashboard_running(self):
+        url = "http://127.0.0.1:54321/dashboard"
+        with patch("cocosearch.dashboard.server.get_dashboard_url", return_value=url):
+            with patch("cocosearch.mcp.server._open_browser") as mock_open:
+                result = open_dashboard()
+
+        assert result == {"success": True, "url": url, "opened": True}
+        mock_open.assert_called_once_with(url, delay=0.0)
+
+    def test_returns_error_when_dashboard_not_running(self):
+        with patch("cocosearch.dashboard.server.get_dashboard_url", return_value=None):
+            with patch("cocosearch.mcp.server._open_browser") as mock_open:
+                result = open_dashboard()
+
+        assert result["success"] is False
+        assert "error" in result
+        mock_open.assert_not_called()
 
 
 class TestIndexStats:
