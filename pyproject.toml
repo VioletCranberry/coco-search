@@ -35,7 +35,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "cocoindex[embeddings]>=0.3.31,<1.0",
+    "cocoindex[embeddings]>=1,<1.1",
     "mcp[cli]>=1.26.0",
     "pathspec>=1.0.3",
     "pgvector>=0.4.2",
