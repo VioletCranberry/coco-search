@@ -1,6 +1,6 @@
 {
   "name": "cocosearch",
-  "version": "0.1.41",
+  "version": "0.1.42",
   "description": "Local-first hybrid semantic code search with dependency graphs and cross-repo search. Powered by CocoIndex, Tree-sitter, pgvector, and Ollama.",
   "author": {
     "name": "VioletCranberry",
