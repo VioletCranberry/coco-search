@@ -2672,6 +2672,35 @@ def list_indexes() -> list[dict]:
 
 @mcp.tool()
 @log_mcp_tool
+def open_dashboard() -> dict:
+    """Reopen the CocoSearch dashboard in the user's default browser.
+
+    Use this when the dashboard tab was closed and the user wants it back.
+    The dashboard runs in the background as long as the MCP server is alive,
+    so this just navigates the browser back to its URL.
+
+    Returns success status and the dashboard URL. If the dashboard is
+    disabled (COCOSEARCH_NO_DASHBOARD=1) or the server is not yet ready,
+    returns success=False with an explanatory error.
+    """
+    from cocosearch.dashboard.server import get_dashboard_url
+
+    url = get_dashboard_url()
+    if not url:
+        return {
+            "success": False,
+            "error": (
+                "Dashboard is not running. It may be disabled "
+                "(COCOSEARCH_NO_DASHBOARD=1) or the server has not finished "
+                "starting up yet."
+            ),
+        }
+    _open_browser(url, delay=0.0)
+    return {"success": True, "url": url, "opened": True}
+
+
+@mcp.tool()
+@log_mcp_tool
 def index_stats(
     index_name: Annotated[
         str | None,
@@ -3271,7 +3300,10 @@ def run_server(
             logger.info(f"Health check at http://{host}:{port}/health")
 
             if not no_dashboard:
+                from cocosearch.dashboard.server import set_dashboard_url
+
                 dashboard_url = f"http://127.0.0.1:{port}/dashboard"
+                set_dashboard_url(dashboard_url)
                 _open_browser(dashboard_url)
 
             _get_cs_log().system(
@@ -3288,7 +3320,10 @@ def run_server(
             logger.info(f"Health check at http://{host}:{port}/health")
 
             if not no_dashboard:
+                from cocosearch.dashboard.server import set_dashboard_url
+
                 dashboard_url = f"http://127.0.0.1:{port}/dashboard"
+                set_dashboard_url(dashboard_url)
                 _open_browser(dashboard_url)
 
             _get_cs_log().system(
