@@ -1,15 +1,14 @@
 """Embedding module for cocosearch indexer.
 
 Provides shared embedding functions used by both indexing and search
-to ensure consistent embeddings.
+to ensure consistent embeddings. Uses LiteLLM for provider abstraction.
 """
 
 import os
 
-import cocoindex
+import litellm
 
 
-@cocoindex.op.function(behavior_version=1)
 def extract_extension(filename: str) -> str:
     """Extract file extension for language detection.
 
@@ -21,13 +20,11 @@ def extract_extension(filename: str) -> str:
         Returns empty string if no extension.
     """
     _, ext = os.path.splitext(filename)
-    # Remove leading dot if present
     return ext[1:] if ext else ""
 
 
-@cocoindex.op.function(behavior_version=1)
 def extract_language(filename: str, content: str) -> str:
-    """Extract language identifier for SplitRecursively routing.
+    """Extract language identifier for RecursiveSplitter routing.
 
     Checks grammar handlers first (path + content matching), then filename
     patterns (for extensionless files like Dockerfile), then falls back to
@@ -45,23 +42,19 @@ def extract_language(filename: str, content: str) -> str:
     """
     from cocosearch.handlers import detect_grammar
 
-    # Grammar-based routing (path + content matching)
     grammar = detect_grammar(filename, content)
     if grammar is not None:
         return grammar
 
     basename = os.path.basename(filename)
 
-    # Filename-based routing (extensionless files)
     if basename == "Containerfile" or basename.startswith("Dockerfile"):
         return "dockerfile"
 
-    # Extension-based routing (standard behavior, same as extract_extension)
     _, ext = os.path.splitext(filename)
     return ext[1:] if ext else ""
 
 
-@cocoindex.op.function(behavior_version=1)
 def add_filename_context(text: str, filename: str) -> str:
     """Prepend filename context to text for embedding generation.
 
@@ -103,13 +96,6 @@ def _resolve_output_dimension(model: str) -> int | None:
     return _KNOWN_DIMENSIONS.get(model)
 
 
-PROVIDER_MAP: dict[str, "cocoindex.LlmApiType"] = {
-    "ollama": cocoindex.LlmApiType.OLLAMA,
-    "openai": cocoindex.LlmApiType.OPENAI,
-    "openrouter": cocoindex.LlmApiType.OPEN_ROUTER,
-}
-
-
 def _default_model(provider: str) -> str:
     """Return the default embedding model for a provider."""
     from cocosearch.config.schema import default_model_for_provider
@@ -117,47 +103,61 @@ def _default_model(provider: str) -> str:
     return default_model_for_provider(provider)
 
 
-@cocoindex.transform_flow()
-def code_to_embedding(
-    text: cocoindex.DataSlice[str],
-) -> cocoindex.DataSlice[list[float]]:
-    """Shared embedding function for indexing and querying.
+def _get_litellm_model() -> str:
+    """Build the LiteLLM model string from COCOSEARCH env vars.
 
-    Supports multiple embedding providers (Ollama, OpenAI, OpenRouter).
-    Provider selection is controlled via environment variables.
+    Maps COCOSEARCH_EMBEDDING_PROVIDER + COCOSEARCH_EMBEDDING_MODEL
+    to a LiteLLM-compatible model identifier.
 
-    Environment variables:
-        COCOSEARCH_EMBEDDING_PROVIDER: Provider name (default: ollama).
-        COCOSEARCH_OLLAMA_URL: Ollama server address (default: http://localhost:11434).
-        COCOSEARCH_EMBEDDING_MODEL: Embedding model name (default depends on provider).
-        COCOSEARCH_EMBEDDING_API_KEY: API key for remote providers (OpenAI, OpenRouter).
+    Returns:
+        LiteLLM model string (e.g., "ollama/nomic-embed-text").
+    """
+    provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    model = os.environ.get("COCOSEARCH_EMBEDDING_MODEL", _default_model(provider))
+
+    if provider == "ollama":
+        return f"ollama/{model}"
+    elif provider == "openrouter":
+        return f"openrouter/{model}"
+    return model
+
+
+def _get_litellm_kwargs() -> dict:
+    """Build kwargs dict for litellm.embedding() calls.
+
+    Reads api_base and api_key from COCOSEARCH env vars.
+    """
+    provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    kwargs: dict = {}
+
+    api_base = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
+    if api_base is None and provider == "ollama":
+        api_base = os.environ.get("COCOSEARCH_OLLAMA_URL")
+    if api_base:
+        kwargs["api_base"] = api_base
+
+    api_key = os.environ.get("COCOSEARCH_EMBEDDING_API_KEY")
+    if api_key:
+        kwargs["api_key"] = api_key
+
+    return kwargs
+
+
+def embed_query(text: str) -> list[float]:
+    """Embed a single text for search queries.
+
+    Uses LiteLLM to call the configured embedding provider synchronously.
+    This function is used by the search side (query.py, hybrid.py, multi.py)
+    to embed search queries without needing a CocoIndex runtime.
 
     Args:
         text: Text to embed.
 
     Returns:
-        Embedding vector.
+        Embedding vector as list of floats.
     """
-    provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
-    model = os.environ.get("COCOSEARCH_EMBEDDING_MODEL", _default_model(provider))
-    api_type = PROVIDER_MAP.get(provider, cocoindex.LlmApiType.OLLAMA)
+    model = _get_litellm_model()
+    kwargs = _get_litellm_kwargs()
 
-    kwargs: dict = {"api_type": api_type, "model": model}
-
-    # Resolve address: COCOSEARCH_EMBEDDING_BASE_URL (universal) > COCOSEARCH_OLLAMA_URL (ollama fallback)
-    address = os.environ.get("COCOSEARCH_EMBEDDING_BASE_URL")
-    if address is None and provider == "ollama":
-        address = os.environ.get("COCOSEARCH_OLLAMA_URL")
-    if address:
-        kwargs["address"] = address
-
-    # API key (any provider — local servers just won't set it)
-    api_key = os.environ.get("COCOSEARCH_EMBEDDING_API_KEY")
-    if api_key:
-        kwargs["api_key"] = cocoindex.auth_registry.add_transient_auth_entry(api_key)
-
-    output_dim = _resolve_output_dimension(model)
-    if output_dim is not None:
-        kwargs["output_dimension"] = output_dim
-
-    return text.transform(cocoindex.functions.EmbedText(**kwargs))
+    response = litellm.embedding(model=model, input=[text], **kwargs)
+    return response.data[0]["embedding"]
