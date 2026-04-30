@@ -160,4 +160,4 @@ def embed_query(text: str) -> list[float]:
     kwargs = _get_litellm_kwargs()
 
     response = litellm.embedding(model=model, input=[text], **kwargs)
-    return response.data[0]["embedding"]
+    return [float(x) for x in response.data[0]["embedding"]]
