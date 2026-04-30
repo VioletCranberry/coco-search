@@ -105,7 +105,7 @@ Copy from the template and implement:
 
 1. **Create** `src/cocosearch/handlers/<language>.py` (copy `_template.py`)
 2. **Set** `EXTENSIONS` to all file extensions (with leading dot)
-3. **Define** `SEPARATOR_SPEC` with `CustomLanguageSpec` -- hierarchical regex separators from coarsest to finest
+3. **Define** `SEPARATOR_SPEC` with `CustomLanguageConfig` -- hierarchical regex separators from coarsest to finest
 4. **Implement** `extract_metadata()` returning `block_type`, `hierarchy`, and `language_id`
 5. **Constraint:** Separators must use standard regex only -- no lookaheads/lookbehinds (CocoIndex uses Rust regex)
 
@@ -375,7 +375,7 @@ search_code(
 
 Update in `tests/unit/handlers/test_registry.py`:
 - `len(_HANDLER_REGISTRY) >= N` -- increment by number of new extensions
-- `len(specs) == N` -- increment by 1 (one `CustomLanguageSpec` per handler)
+- `len(specs) == N` -- increment by 1 (one `CustomLanguageConfig` per handler)
 
 ### 7b. Grammar Count (If Path D was done)
 

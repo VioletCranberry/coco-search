@@ -151,7 +151,7 @@ Review all existing grammar `PATH_PATTERNS` and `matches()` logic to ensure your
 4. **Set** `GRAMMAR_NAME` -- unique lowercase hyphenated identifier (e.g., `ansible-playbook`)
 5. **Set** `PATH_PATTERNS` -- glob patterns matching file paths
 6. **Override** `matches()` only for broad patterns (rare — see Step 3 decision tree)
-7. **Define** `SEPARATOR_SPEC` with `CustomLanguageSpec` -- hierarchical regex separators from coarsest to finest
+7. **Define** `SEPARATOR_SPEC` with `CustomLanguageConfig` -- hierarchical regex separators from coarsest to finest
 8. **Implement** `_has_content_markers(content)` -- return True if content has grammar-specific markers
 9. **Implement** `_extract_grammar_metadata(stripped, text)` -- return metadata dict or `None` for fallback chain
 

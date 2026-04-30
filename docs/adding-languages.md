@@ -11,7 +11,7 @@ Every indexed file is chunked by CocoIndex's `SplitRecursively`. The chunking st
 | Tier | How it works | Languages |
 |------|-------------|-----------|
 | **Tree-sitter (CocoIndex built-in)** | `SplitRecursively` uses Tree-sitter internally to split at syntax boundaries (function/class edges) | Python, JS, TS, Go, Rust, Java, C, C++, C#, Ruby, PHP, and ~10 more in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages) |
-| **Custom handler regex** | `SplitRecursively` receives a `CustomLanguageSpec` with hierarchical regex separators | HCL, Go Template, Dockerfile, Bash (language handlers) + GitHub Actions, GitLab CI, Docker Compose, Helm Template, Helm Values (grammar handlers) |
+| **Custom handler regex** | `SplitRecursively` receives a `CustomLanguageConfig` with hierarchical regex separators | HCL, Go Template, Dockerfile, Bash (language handlers) + GitHub Actions, GitLab CI, Docker Compose, Helm Template, Helm Values (grammar handlers) |
 | **Plain-text fallback** | Splits on blank lines, newlines, whitespace | Everything not matched by either tier above |
 
 ## Systems Overview
@@ -72,7 +72,7 @@ Use this when the language is not in CocoIndex's built-in list and needs custom 
 
 2. **Implement the handler class:**
    - Set `EXTENSIONS` to the file extensions (with leading dot)
-   - Define `SEPARATOR_SPEC` with `CustomLanguageSpec` — hierarchical regex separators from coarsest to finest
+   - Define `SEPARATOR_SPEC` with `CustomLanguageConfig` — hierarchical regex separators from coarsest to finest
    - Implement `extract_metadata()` returning `block_type`, `hierarchy`, and `language_id`
 
 3. **Include patterns are auto-derived** — `IndexingConfig` automatically collects file extensions from handler `EXTENSIONS` and grammar `PATH_PATTERNS`. No manual `config.py` edit needed. For non-extension patterns (like `Dockerfile`), add an `INCLUDE_PATTERNS` class var to the handler.
@@ -195,7 +195,7 @@ Priority: Grammar match > Language match > TextHandler fallback.
 ### How it works
 
 `extract_language()` in `indexer/embedder.py` checks grammar handlers first. If a grammar matches, it returns the grammar name (e.g., `"github-actions"`) instead of the file extension. This grammar name flows through the pipeline:
-- `SplitRecursively` uses the grammar's `CustomLanguageSpec` for chunking
+- `SplitRecursively` uses the grammar's `CustomLanguageConfig` for chunking
 - `extract_chunk_metadata` dispatches to the grammar handler for metadata
 
 ### Steps
@@ -210,7 +210,7 @@ Priority: Grammar match > Language match > TextHandler fallback.
    For YAML-based grammars, inherit from `YamlGrammarBase` (in `handlers/grammars/_base.py`), which provides shared comment stripping, path matching, and fallback metadata chain. You only need to implement:
    - `GRAMMAR_NAME` — unique identifier (lowercase, hyphenated, e.g., `"github-actions"`)
    - `PATH_PATTERNS` — glob patterns matching the file paths
-   - `SEPARATOR_SPEC` — `CustomLanguageSpec` with hierarchical separators (or `None` for default)
+   - `SEPARATOR_SPEC` — `CustomLanguageConfig` with hierarchical separators (or `None` for default)
    - `_has_content_markers(content)` — content validation for `matches()`
    - `_extract_grammar_metadata(stripped, text)` — grammar-specific metadata extraction (return dict or `None` for fallback)
 

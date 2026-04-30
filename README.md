@@ -508,7 +508,7 @@ CocoSearch indexes 32 programming languages. Symbol-aware languages support `--s
 Chunking strategy depends on the language:
 
 - **Tree-sitter chunking (~20 languages)**: CocoIndex's `SplitRecursively` uses Tree-sitter internally to split at syntax-aware boundaries (function/class edges). Covers Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, C#, Ruby, PHP, and others in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages).
-- **Custom handler chunking (6 languages)**: HCL, Dockerfile, Bash, Go Template, Scala, and Groovy use regex-based `CustomLanguageSpec` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
+- **Custom handler chunking (6 languages)**: HCL, Dockerfile, Bash, Go Template, Scala, and Groovy use regex-based `CustomLanguageConfig` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
 - **Text fallback**: Languages not recognized by either tier (Markdown, JSON, YAML, TOML, etc.) are split on blank lines and whitespace boundaries.
 
 In short: CocoIndex's Tree-sitter tells you _where to cut_; the `.scm` files tell you _what's inside each piece_.
