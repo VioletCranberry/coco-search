@@ -11,7 +11,7 @@ For language handlers (matched by extension), see handlers/_template.py instead.
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 
@@ -31,8 +31,8 @@ class TemplateGrammarHandler(YamlGrammarBase):
     # TODO: File path patterns that suggest this grammar (glob syntax)
     PATH_PATTERNS = ["**/example/*.yml"]
 
-    # TODO: Define CustomLanguageSpec with hierarchical separators, or None for default
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    # TODO: Define CustomLanguageConfig with hierarchical separators, or None for default
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="template-grammar",
         separators_regex=[
             # Level 1: Top-level structural boundaries

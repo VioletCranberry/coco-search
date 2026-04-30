@@ -9,7 +9,7 @@ handled by the Terraform grammar handler in handlers/grammars/terraform.py.
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class HclHandler:
@@ -17,7 +17,7 @@ class HclHandler:
 
     EXTENSIONS = [".hcl"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="hcl",
         separators_regex=[
             # Level 1: Top-level block boundaries (any identifier at line start)

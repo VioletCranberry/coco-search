@@ -10,7 +10,7 @@ Content markers: 'apiVersion:' and 'kind:'
 import fnmatch
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 from cocosearch.handlers.grammars.argocd import _ARGOCD_MARKER
@@ -23,7 +23,7 @@ class KubernetesHandler(YamlGrammarBase):
     GRAMMAR_NAME = "kubernetes"
     PATH_PATTERNS = ["*.yaml", "*.yml"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="kubernetes",
         separators_regex=[
             # Level 1: YAML document separator (multi-resource files)

@@ -10,7 +10,7 @@ Content markers: 'apiVersion:' with 'argoproj.io/' and 'kind:'
 import fnmatch
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 from cocosearch.handlers.grammars.helm_template import _HELM_MARKERS
@@ -24,7 +24,7 @@ class ArgoCDHandler(YamlGrammarBase):
     GRAMMAR_NAME = "argocd"
     PATH_PATTERNS = ["*.yaml", "*.yml"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="argocd",
         separators_regex=[
             # Level 1: YAML document separator (multi-resource files)

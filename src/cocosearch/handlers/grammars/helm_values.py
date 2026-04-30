@@ -8,7 +8,7 @@ Matches: values.yaml, values-*.yaml (with 3+ common Helm keys)
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 
@@ -37,7 +37,7 @@ class HelmValuesHandler(YamlGrammarBase):
     GRAMMAR_NAME = "helm-values"
     PATH_PATTERNS = ["**/values.yaml", "**/values-*.yaml"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="helm-values",
         separators_regex=[
             # Level 1: annotated section boundaries

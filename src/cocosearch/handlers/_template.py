@@ -16,7 +16,7 @@ For full documentation, see handlers/README.md
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class TemplateHandler:
@@ -28,11 +28,11 @@ class TemplateHandler:
     # TODO: List file extensions this handler manages (with leading dot)
     EXTENSIONS = [".example"]
 
-    # TODO: Define CustomLanguageSpec with hierarchical separators
+    # TODO: Define CustomLanguageConfig with hierarchical separators
     # Separators are tried in order - earlier separators have higher priority
     # Use standard Rust regex syntax (no lookaheads, lookbehinds, backreferences)
     # See: https://docs.rs/regex/latest/regex/#syntax
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="example",
         separators_regex=[
             # Level 1: Top-level structural boundaries (functions, classes, blocks)

@@ -9,7 +9,7 @@ Handles .scala file extensions.
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class ScalaHandler:
@@ -17,7 +17,7 @@ class ScalaHandler:
 
     EXTENSIONS = [".scala"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="scala",
         separators_regex=[
             # Level 1: Top-level type boundaries (class, trait, object with optional modifiers)

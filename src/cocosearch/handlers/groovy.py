@@ -8,7 +8,7 @@ Handles .groovy and .gradle file extensions.
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class GroovyHandler:
@@ -16,7 +16,7 @@ class GroovyHandler:
 
     EXTENSIONS = [".groovy", ".gradle"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="groovy",
         separators_regex=[
             # Level 1: Top-level type boundaries (class, interface, trait, enum with optional modifiers)

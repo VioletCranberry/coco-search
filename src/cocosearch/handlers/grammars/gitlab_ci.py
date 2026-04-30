@@ -9,7 +9,7 @@ Content markers: 'stages:' or ('script:' and ('image:' or 'stage:'))
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 
@@ -20,7 +20,7 @@ class GitLabCIHandler(YamlGrammarBase):
     GRAMMAR_NAME = "gitlab-ci"
     PATH_PATTERNS = [".gitlab-ci.yml"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="gitlab-ci",
         separators_regex=[
             # Level 1: YAML document separator
