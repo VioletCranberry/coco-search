@@ -32,7 +32,6 @@ import importlib.resources
 from pathlib import Path
 from tree_sitter import Parser, Query, QueryCursor
 from tree_sitter_language_pack import get_parser as pack_get_parser, get_language
-import cocoindex
 
 logger = logging.getLogger(__name__)
 
@@ -446,7 +445,6 @@ def _extract_symbols_with_query(
 # ============================================================================
 
 
-@cocoindex.op.function(behavior_version=1)
 def extract_symbol_metadata(text: str, language: str) -> SymbolMetadata:
     """Extract symbol metadata from code chunk.
 
