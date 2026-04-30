@@ -9,7 +9,7 @@ index, and then merged into a single ranked list by score.
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from cocosearch.indexer.embedder import code_to_embedding
+from cocosearch.indexer.embedder import embed_query
 from cocosearch.management.discovery import list_indexes
 from cocosearch.management.metadata import get_index_metadata
 from cocosearch.search.query import SearchResult, search
@@ -122,7 +122,7 @@ def multi_search(
             )
 
     # Pre-compute query embedding once
-    query_embedding = code_to_embedding.eval(query)
+    query_embedding = embed_query(query)
 
     # Request more results per index for better candidate pool
     per_index_limit = limit * 2

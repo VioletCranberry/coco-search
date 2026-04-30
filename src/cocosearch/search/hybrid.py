@@ -12,7 +12,7 @@ RRF is chosen over score normalization because:
 import logging
 from dataclasses import dataclass
 
-from cocosearch.indexer.embedder import code_to_embedding
+from cocosearch.indexer.embedder import embed_query
 from cocosearch.search.db import (
     check_column_exists,
     check_symbol_columns_exist,
@@ -236,7 +236,7 @@ def execute_vector_search(
 
     # Embed query (skip if pre-computed)
     if query_embedding is None:
-        query_embedding = code_to_embedding.eval(query)
+        query_embedding = embed_query(query)
 
     # Build WHERE clause if provided
     where_sql = f"WHERE {where_clause}" if where_clause else ""

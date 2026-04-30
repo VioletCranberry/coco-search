@@ -325,7 +325,7 @@ def analyze(
     # --- Stage 4: Embedding ---
     t0 = time.perf_counter()
     # Embedding is always needed for vector search (even in hybrid mode,
-    # execute_vector_search calls code_to_embedding internally).
+    # execute_vector_search calls embed_query internally).
     # We time it here but the actual embedding happens inside execute_vector_search.
     embedding_ms = 0.0  # Will be measured around vector search
 
