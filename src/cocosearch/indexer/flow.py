@@ -142,12 +142,12 @@ def _walk_files(
     root = pathlib.Path(codebase_path).resolve()
 
     include_spec = (
-        pathspec.PathSpec.from_lines("gitwildmatch", include_patterns)
+        pathspec.PathSpec.from_lines("gitignore", include_patterns)
         if include_patterns
         else None
     )
     exclude_spec = (
-        pathspec.PathSpec.from_lines("gitwildmatch", exclude_patterns)
+        pathspec.PathSpec.from_lines("gitignore", exclude_patterns)
         if exclude_patterns
         else None
     )
