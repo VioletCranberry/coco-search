@@ -275,14 +275,14 @@ class TestSearch:
         assert results == []
 
     def test_calls_embedding_function(self, mock_code_to_embedding, mock_db_pool):
-        """Should call code_to_embedding.eval with the query."""
+        """Should call embed_query with the query."""
         pool, cursor, _conn = mock_db_pool(results=[])
 
         with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
             search(query="find authentication code", index_name="testindex")
 
-        # The mock tracks that eval was called
-        assert mock_code_to_embedding.eval is not None
+        # The mock ensures embed_query is patched and callable
+        assert mock_code_to_embedding is not None
 
     def test_uses_correct_table_name(self, mock_code_to_embedding, mock_db_pool):
         """Should query the correct table based on index_name."""

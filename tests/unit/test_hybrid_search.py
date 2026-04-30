@@ -265,9 +265,9 @@ class TestHybridSearch:
                             return_value=False,
                         ):
                             with patch(
-                                "cocosearch.search.hybrid.code_to_embedding"
-                            ) as mock_embed:
-                                mock_embed.eval.return_value = [0.1] * 1024
+                                "cocosearch.search.hybrid.embed_query",
+                                return_value=[0.1] * 1024,
+                            ):
                                 results = hybrid_search("test query", "test_index")
 
         assert len(results) == 1
@@ -309,9 +309,9 @@ class TestHybridSearch:
                             return_value=False,
                         ):
                             with patch(
-                                "cocosearch.search.hybrid.code_to_embedding"
-                            ) as mock_embed:
-                                mock_embed.eval.return_value = [0.1] * 1024
+                                "cocosearch.search.hybrid.embed_query",
+                                return_value=[0.1] * 1024,
+                            ):
                                 results = hybrid_search("getUserById", "test_index")
 
         # Should have results from both sources
@@ -340,9 +340,9 @@ class TestHybridSearch:
                             return_value=False,
                         ):
                             with patch(
-                                "cocosearch.search.hybrid.code_to_embedding"
-                            ) as mock_embed:
-                                mock_embed.eval.return_value = [0.1] * 1024
+                                "cocosearch.search.hybrid.embed_query",
+                                return_value=[0.1] * 1024,
+                            ):
                                 results = hybrid_search("test", "test_index", limit=5)
 
         assert len(results) <= 5

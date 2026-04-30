@@ -91,42 +91,42 @@ class TestGitHubActionsSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'github-actions'."""
         handler = GitHubActionsHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "github-actions"
+        assert handler.SEPARATOR_SPEC._config.language_name == "github-actions"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 8 separator levels."""
         handler = GitHubActionsHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 8
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 8
 
     def test_has_yaml_document_separator(self):
         """First separator should be YAML document separator (---)."""
         handler = GitHubActionsHandler()
-        assert r"\n---" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert r"\n---" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_has_top_level_key_separator(self):
         """Second separator should split on top-level keys."""
         handler = GitHubActionsHandler()
-        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC.separators_regex[1]
+        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC._config.separators_regex[1]
 
     def test_has_job_boundary_separator(self):
         """Third separator should split on 2-space indented job keys."""
         handler = GitHubActionsHandler()
-        assert r"\n  " in handler.SEPARATOR_SPEC.separators_regex[2]
+        assert r"\n  " in handler.SEPARATOR_SPEC._config.separators_regex[2]
 
     def test_has_nested_key_separator(self):
         """Fourth separator should split on 4-space indented keys."""
         handler = GitHubActionsHandler()
-        assert r"\n    " in handler.SEPARATOR_SPEC.separators_regex[3]
+        assert r"\n    " in handler.SEPARATOR_SPEC._config.separators_regex[3]
 
     def test_has_step_boundary_separator(self):
         """Fifth separator should split on step boundaries (6-space dash)."""
         handler = GitHubActionsHandler()
-        assert r"\n      - " in handler.SEPARATOR_SPEC.separators_regex[4]
+        assert r"\n      - " in handler.SEPARATOR_SPEC._config.separators_regex[4]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = GitHubActionsHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

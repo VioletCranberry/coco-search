@@ -22,22 +22,22 @@ class TestScalaHandlerSeparatorSpec:
     def test_language_name_is_scala(self):
         """SEPARATOR_SPEC.language_name should be 'scala'."""
         handler = ScalaHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "scala"
+        assert handler.SEPARATOR_SPEC._config.language_name == "scala"
 
     def test_aliases_contains_sc(self):
         """SEPARATOR_SPEC.aliases should contain 'sc'."""
         handler = ScalaHandler()
-        assert handler.SEPARATOR_SPEC.aliases == ["sc"]
+        assert handler.SEPARATOR_SPEC._config.aliases == ["sc"]
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = ScalaHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) > 0
 
     def test_no_lookaheads_in_separators(self):
         """Scala separators must not contain lookahead or lookbehind patterns."""
         handler = ScalaHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Scala separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Scala separator: {sep}"
             assert "(?!" not in sep, (

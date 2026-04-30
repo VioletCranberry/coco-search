@@ -24,28 +24,28 @@ class TestGoTmplHandlerSeparatorSpec:
     def test_language_name_is_gotmpl(self):
         """SEPARATOR_SPEC.language_name should be 'gotmpl'."""
         handler = GoTmplHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "gotmpl"
+        assert handler.SEPARATOR_SPEC._config.language_name == "gotmpl"
 
     def test_aliases_contains_tpl(self):
         """SEPARATOR_SPEC.aliases should contain tpl."""
         handler = GoTmplHandler()
-        assert handler.SEPARATOR_SPEC.aliases == ["tpl"]
+        assert handler.SEPARATOR_SPEC._config.aliases == ["tpl"]
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = GoTmplHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) > 0
 
     def test_level1_splits_on_define(self):
         """Level 1 separator should split on template define blocks."""
         handler = GoTmplHandler()
-        level1 = handler.SEPARATOR_SPEC.separators_regex[0]
+        level1 = handler.SEPARATOR_SPEC._config.separators_regex[0]
         assert "define" in level1
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead or lookbehind patterns."""
         handler = GoTmplHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found in separator: {sep}"

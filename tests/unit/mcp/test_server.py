@@ -40,21 +40,18 @@ class TestSearchCode:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="def test(): pass",
-                    ):
-                        result = await search_code(
-                            query="test query",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=5,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="def test(): pass",
+                ):
+                    result = await search_code(
+                        query="test query",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=5,
+                    )
 
         assert isinstance(result, list)
         assert len(result) == 1
@@ -72,20 +69,17 @@ class TestSearchCode:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content", return_value="code"
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=1,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content", return_value="code"
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=1,
+                    )
 
         # Note: limit is applied in the search query, cursor returns all
         # This test verifies the limit parameter is passed correctly
@@ -100,21 +94,18 @@ class TestSearchCode:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content", return_value="code"
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=10,
-                            language="python",
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content", return_value="code"
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=10,
+                        language="python",
+                    )
 
         assert isinstance(result, list)
         # Verify query contains language filter
@@ -146,21 +137,18 @@ class TestSearchCodeMetadata:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="resource {}",
-                    ):
-                        result = await search_code(
-                            query="s3 bucket",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=5,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="resource {}",
+                ):
+                    result = await search_code(
+                        query="s3 bucket",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=5,
+                    )
 
         assert len(result) == 1
         item = result[0]
@@ -179,21 +167,18 @@ class TestSearchCodeMetadata:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="def test(): pass",
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=5,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="def test(): pass",
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=5,
+                    )
 
         assert len(result) == 1
         item = result[0]
@@ -291,11 +276,10 @@ class TestIndexStats:
             repo_url=None,
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.mcp.server.get_comprehensive_stats", return_value=mock_stats
-            ):
-                result = index_stats(index_name="testindex")
+        with patch(
+            "cocosearch.mcp.server.get_comprehensive_stats", return_value=mock_stats
+        ):
+            result = index_stats(index_name="testindex")
 
         assert isinstance(result, dict)
         assert result["file_count"] == 10
@@ -342,15 +326,14 @@ class TestIndexStats:
             ]
         )
 
-        with patch("cocoindex.init"):
+        with patch(
+            "cocosearch.management.discovery.get_connection_pool", return_value=pool
+        ):
             with patch(
-                "cocosearch.management.discovery.get_connection_pool", return_value=pool
+                "cocosearch.mcp.server.get_comprehensive_stats",
+                return_value=mock_stats,
             ):
-                with patch(
-                    "cocosearch.mcp.server.get_comprehensive_stats",
-                    return_value=mock_stats,
-                ):
-                    result = index_stats(index_name=None)
+                result = index_stats(index_name=None)
 
         assert isinstance(result, list)
 
@@ -384,13 +367,12 @@ class TestIndexStats:
         try:
             srv._active_indexing["myindex"] = (thread, threading.Event())
 
-            with patch("cocoindex.init"):
-                with patch(
-                    "cocosearch.mcp.server.get_comprehensive_stats",
-                    return_value=mock_stats,
-                ):
-                    with patch("cocosearch.mcp.server.set_index_status"):
-                        result = index_stats(index_name="myindex")
+            with patch(
+                "cocosearch.mcp.server.get_comprehensive_stats",
+                return_value=mock_stats,
+            ):
+                with patch("cocosearch.mcp.server.set_index_status"):
+                    result = index_stats(index_name="myindex")
 
             assert result["status"] == "indexing"
         finally:
@@ -433,17 +415,16 @@ class TestIndexStats:
         try:
             srv._active_indexing["proj1"] = (thread, threading.Event())
 
-            with patch("cocoindex.init"):
+            with patch(
+                "cocosearch.management.discovery.get_connection_pool",
+                return_value=pool,
+            ):
                 with patch(
-                    "cocosearch.management.discovery.get_connection_pool",
-                    return_value=pool,
+                    "cocosearch.mcp.server.get_comprehensive_stats",
+                    return_value=mock_stats,
                 ):
-                    with patch(
-                        "cocosearch.mcp.server.get_comprehensive_stats",
-                        return_value=mock_stats,
-                    ):
-                        with patch("cocosearch.mcp.server.set_index_status"):
-                            result = index_stats(index_name=None)
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        result = index_stats(index_name=None)
 
             assert isinstance(result, list)
             assert len(result) == 1
@@ -474,12 +455,11 @@ class TestIndexStats:
             repo_url=None,
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.mcp.server.get_comprehensive_stats",
-                return_value=mock_stats,
-            ):
-                result = index_stats(index_name="myindex")
+        with patch(
+            "cocosearch.mcp.server.get_comprehensive_stats",
+            return_value=mock_stats,
+        ):
+            result = index_stats(index_name="myindex")
 
         assert result["status"] == "indexed"
 
@@ -551,12 +531,11 @@ class TestInjectConfiguredEmbedding:
             repo_url=None,
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.mcp.server.get_comprehensive_stats",
-                return_value=mock_stats,
-            ):
-                result = index_stats(index_name="testindex")
+        with patch(
+            "cocosearch.mcp.server.get_comprehensive_stats",
+            return_value=mock_stats,
+        ):
+            result = index_stats(index_name="testindex")
 
         assert result["configured_embedding_provider"] == "openrouter"
         assert result["configured_embedding_model"] == "openai/text-embedding-3-small"
@@ -615,24 +594,23 @@ class TestIndexCodebase:
 
     def test_returns_success_dict(self, tmp_codebase):
         """Returns success dict with stats."""
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(
-                    stats={
-                        "files": {
-                            "num_insertions": 5,
-                            "num_deletions": 0,
-                            "num_updates": 2,
-                        }
+        with patch("cocosearch.mcp.server.run_index") as mock_run:
+            mock_run.return_value = MagicMock(
+                stats={
+                    "files": {
+                        "num_insertions": 5,
+                        "num_deletions": 0,
+                        "num_updates": 2,
                     }
-                )
-                with patch("cocosearch.mcp.server._register_with_git"):
-                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                        with patch("cocosearch.mcp.server.set_index_status"):
-                            result = index_codebase(
-                                path=str(tmp_codebase),
-                                index_name="testindex",
-                            )
+                }
+            )
+            with patch("cocosearch.mcp.server._register_with_git"):
+                with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        result = index_codebase(
+                            path=str(tmp_codebase),
+                            index_name="testindex",
+                        )
 
         assert result["success"] is True
         assert result["index_name"] == "testindex"
@@ -640,33 +618,31 @@ class TestIndexCodebase:
 
     def test_derives_index_name(self, tmp_codebase):
         """Auto-derives index name from path."""
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server._register_with_git"):
-                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                        with patch("cocosearch.mcp.server.set_index_status"):
-                            result = index_codebase(
-                                path=str(tmp_codebase),
-                                index_name=None,  # Should be derived
-                            )
+        with patch("cocosearch.mcp.server.run_index") as mock_run:
+            mock_run.return_value = MagicMock(stats={})
+            with patch("cocosearch.mcp.server._register_with_git"):
+                with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        result = index_codebase(
+                            path=str(tmp_codebase),
+                            index_name=None,  # Should be derived
+                        )
 
         assert result["success"] is True
         assert result["index_name"] == "codebase"  # tmp_codebase creates "codebase" dir
 
     def test_returns_error_on_failure(self, tmp_codebase):
         """Returns error dict on indexing failure."""
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                with patch("cocosearch.mcp.server.set_index_status"):
-                    with patch(
-                        "cocosearch.mcp.server.run_index",
-                        side_effect=ValueError("Flow error"),
-                    ):
-                        result = index_codebase(
-                            path=str(tmp_codebase),
-                            index_name="testindex",
-                        )
+        with patch("cocosearch.mcp.server.ensure_metadata_table"):
+            with patch("cocosearch.mcp.server.set_index_status"):
+                with patch(
+                    "cocosearch.mcp.server.run_index",
+                    side_effect=ValueError("Flow error"),
+                ):
+                    result = index_codebase(
+                        path=str(tmp_codebase),
+                        index_name="testindex",
+                    )
 
         assert result["success"] is False
         assert "error" in result
@@ -684,59 +660,6 @@ class TestEmptyDatabase:
             result = list_indexes()
 
         assert result == []
-
-    def test_index_stats_returns_empty_on_init_failure(self):
-        """index_stats returns empty list when cocoindex.init() fails gracefully."""
-        with (
-            patch("cocosearch.mcp.server._cocoindex_initialized", False),
-            patch(
-                "cocoindex.init",
-                side_effect=Exception(
-                    'relation "cocoindex_setup_metadata" does not exist'
-                ),
-            ),
-        ):
-            result = index_stats()
-
-        # _ensure_cocoindex_init now catches the exception and returns False,
-        # so build_all_stats proceeds and returns an empty list
-        assert isinstance(result, list)
-        assert result == []
-
-    @pytest.mark.asyncio
-    async def test_search_code_returns_empty_on_init_failure(self, mock_db_pool):
-        """search_code returns empty results when cocoindex.init() fails on empty DB."""
-        pool, cursor, _conn = mock_db_pool(
-            results=[
-                ("codeindex_test__test_chunks",),  # list_indexes finds an index
-            ]
-        )
-
-        with (
-            patch("cocosearch.mcp.server._cocoindex_initialized", False),
-            patch(
-                "cocosearch.management.discovery.get_connection_pool", return_value=pool
-            ),
-            patch(
-                "cocosearch.management.metadata.get_connection_pool", return_value=pool
-            ),
-            patch(
-                "cocoindex.init",
-                side_effect=Exception("cocoindex_setup_metadata does not exist"),
-            ),
-        ):
-            result = await search_code(
-                query="test",
-                ctx=_make_mock_ctx(),
-                index_name="test",
-                limit=5,
-            )
-
-        # _ensure_cocoindex_init returns False, so search_code returns early
-        # with a "Database not initialized" error dict
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert result[0]["error"] == "Database not initialized"
 
 
 class TestMCPToolRegistration:
@@ -942,16 +865,15 @@ class TestRegisterWithGit:
 
     def test_index_codebase_registers_with_git(self, tmp_codebase):
         """index_codebase passes git metadata via _register_with_git."""
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server._register_with_git") as mock_rwg:
-                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                        with patch("cocosearch.mcp.server.set_index_status"):
-                            result = index_codebase(
-                                path=str(tmp_codebase),
-                                index_name="testindex",
-                            )
+        with patch("cocosearch.mcp.server.run_index") as mock_run:
+            mock_run.return_value = MagicMock(stats={})
+            with patch("cocosearch.mcp.server._register_with_git") as mock_rwg:
+                with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        result = index_codebase(
+                            path=str(tmp_codebase),
+                            index_name="testindex",
+                        )
 
         assert result["success"] is True
         # _register_with_git called twice: pre-start and post-index

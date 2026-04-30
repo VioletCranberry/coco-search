@@ -94,27 +94,27 @@ class TestGitLabCISeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'gitlab-ci'."""
         handler = GitLabCIHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "gitlab-ci"
+        assert handler.SEPARATOR_SPEC._config.language_name == "gitlab-ci"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have exactly 7 separator levels."""
         handler = GitLabCIHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 7
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 7
 
     def test_has_yaml_document_separator(self):
         """First separator should be YAML document separator (---)."""
         handler = GitLabCIHandler()
-        assert r"\n---" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert r"\n---" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_has_top_level_key_separator(self):
         """Second separator should split on top-level keys."""
         handler = GitLabCIHandler()
-        assert r"[a-zA-Z_.]" in handler.SEPARATOR_SPEC.separators_regex[1]
+        assert r"[a-zA-Z_.]" in handler.SEPARATOR_SPEC._config.separators_regex[1]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = GitLabCIHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

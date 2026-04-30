@@ -110,42 +110,42 @@ class TestArgoCDSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'argocd'."""
         handler = ArgoCDHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "argocd"
+        assert handler.SEPARATOR_SPEC._config.language_name == "argocd"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 7 separator levels."""
         handler = ArgoCDHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 7
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 7
 
     def test_has_yaml_document_separator(self):
         """First separator should be YAML document separator (---)."""
         handler = ArgoCDHandler()
-        assert r"\n---" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert r"\n---" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_has_apiversion_separator(self):
         """Second separator should split on apiVersion boundaries."""
         handler = ArgoCDHandler()
-        assert "apiVersion" in handler.SEPARATOR_SPEC.separators_regex[1]
+        assert "apiVersion" in handler.SEPARATOR_SPEC._config.separators_regex[1]
 
     def test_has_top_level_key_separator(self):
         """Third separator should split on top-level keys."""
         handler = ArgoCDHandler()
-        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC.separators_regex[2]
+        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC._config.separators_regex[2]
 
     def test_has_second_level_key_separator(self):
         """Fourth separator should split on 2-space indented keys."""
         handler = ArgoCDHandler()
-        assert r"\n  " in handler.SEPARATOR_SPEC.separators_regex[3]
+        assert r"\n  " in handler.SEPARATOR_SPEC._config.separators_regex[3]
 
     def test_has_blank_line_separator(self):
         """Fifth separator should split on blank lines."""
         handler = ArgoCDHandler()
-        assert r"\n\n" in handler.SEPARATOR_SPEC.separators_regex[4]
+        assert r"\n\n" in handler.SEPARATOR_SPEC._config.separators_regex[4]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = ArgoCDHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

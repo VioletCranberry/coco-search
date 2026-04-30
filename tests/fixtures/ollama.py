@@ -1,33 +1,46 @@
 """Ollama fixtures for testing.
 
-Provides fixtures that mock CocoIndex embedding functions to enable
+Provides fixtures that mock LiteLLM embedding functions to enable
 testing without running Ollama or making API calls.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from tests.mocks.ollama import deterministic_embedding
 
 
 @pytest.fixture
-def mock_code_to_embedding():
-    """Mock the code_to_embedding.eval() function.
+def mock_embed_query():
+    """Mock the embed_query() function.
 
-    Patches cocosearch.indexer.embedder.code_to_embedding with a mock
-    that returns deterministic embeddings. The mock tracks calls for
-    assertion.
+    Patches cocosearch.indexer.embedder.embed_query with a function
+    that returns deterministic embeddings. Also patches the imported
+    references in search modules.
 
     Usage:
-        def test_search(mock_code_to_embedding, patched_db_pool):
-            # code_to_embedding.eval() now returns deterministic embeddings
+        def test_search(mock_embed_query, patched_db_pool):
+            # embed_query() now returns deterministic embeddings
             result = search("find auth code", "myindex")
-            mock_code_to_embedding.eval.assert_called_once()
     """
-    mock = MagicMock()
-    mock.eval = lambda text: deterministic_embedding(text)
+    with patch(
+        "cocosearch.indexer.embedder.embed_query", side_effect=deterministic_embedding
+    ):
+        with patch(
+            "cocosearch.search.query.embed_query", side_effect=deterministic_embedding
+        ):
+            with patch(
+                "cocosearch.search.hybrid.embed_query",
+                side_effect=deterministic_embedding,
+            ):
+                with patch(
+                    "cocosearch.search.multi.embed_query",
+                    side_effect=deterministic_embedding,
+                ):
+                    yield deterministic_embedding
 
-    with patch("cocosearch.indexer.embedder.code_to_embedding", mock):
-        # Also patch in search.query where it's imported
-        with patch("cocosearch.search.query.code_to_embedding", mock):
-            yield mock
+
+@pytest.fixture
+def mock_code_to_embedding(mock_embed_query):
+    """Backward-compatible alias for mock_embed_query."""
+    return mock_embed_query

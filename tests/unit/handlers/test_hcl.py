@@ -33,22 +33,22 @@ class TestHclHandlerSeparatorSpec:
     def test_language_name_is_hcl(self):
         """SEPARATOR_SPEC.language_name should be 'hcl'."""
         handler = HclHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "hcl"
+        assert handler.SEPARATOR_SPEC._config.language_name == "hcl"
 
     def test_aliases_is_empty(self):
         """SEPARATOR_SPEC.aliases should be empty (no tf/tfvars aliases)."""
         handler = HclHandler()
-        assert handler.SEPARATOR_SPEC.aliases == []
+        assert handler.SEPARATOR_SPEC._config.aliases == []
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = HclHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) > 0
 
     def test_level1_is_generic_block_pattern(self):
         """Level 1 separator should be a generic identifier pattern, not Terraform keywords."""
         handler = HclHandler()
-        level1 = handler.SEPARATOR_SPEC.separators_regex[0]
+        level1 = handler.SEPARATOR_SPEC._config.separators_regex[0]
         # Should be a generic pattern matching any identifier
         assert "[a-z_]" in level1
         # Should NOT contain specific Terraform keywords
@@ -58,7 +58,7 @@ class TestHclHandlerSeparatorSpec:
     def test_no_lookaheads_in_separators(self):
         """HCL separators must not contain lookahead or lookbehind patterns."""
         handler = HclHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in HCL separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in HCL separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found in HCL separator: {sep}"

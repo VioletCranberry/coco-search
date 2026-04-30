@@ -32,14 +32,13 @@ def test_deterministic_embedding_dimensions():
     assert all(-1 <= v <= 1 for v in embedding)
 
 
-def test_mock_code_to_embedding_fixture(mock_code_to_embedding):
-    """Verify mock_code_to_embedding patches correctly."""
-    from cocosearch.search.query import code_to_embedding
+def test_mock_embed_query_fixture(mock_embed_query):
+    """Verify mock_embed_query patches correctly."""
+    from cocosearch.search.query import embed_query
 
-    result = code_to_embedding.eval("test query")
+    result = embed_query("test query")
 
     assert len(result) == 768
-    # Should be deterministic
     assert result == deterministic_embedding("test query")
 
 

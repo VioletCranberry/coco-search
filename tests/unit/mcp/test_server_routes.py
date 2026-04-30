@@ -331,7 +331,7 @@ class TestApiLanguages:
 
         # Mock the handler imports within the route
         mock_handler = MagicMock()
-        mock_handler.SEPARATOR_SPEC.language_name = "hcl"
+        mock_handler.SEPARATOR_SPEC._config.language_name = "hcl"
         mock_handler.EXTENSIONS = {".tf", ".hcl"}
 
         with patch(
@@ -404,7 +404,7 @@ class TestApiLanguages:
         request = _make_mock_request()
 
         mock_handler = MagicMock()
-        mock_handler.SEPARATOR_SPEC.language_name = "dockerfile"
+        mock_handler.SEPARATOR_SPEC._config.language_name = "dockerfile"
         mock_handler.EXTENSIONS = {".dockerfile", "Dockerfile"}
 
         with patch(

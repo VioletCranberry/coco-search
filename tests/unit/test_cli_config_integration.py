@@ -255,11 +255,8 @@ class TestPrecedenceIntegration:
         mock_run_index.assert_called_once()
         assert mock_run_index.call_args[1]["index_name"] == "from-config"
 
-    @patch("cocoindex.init")
     @patch("cocosearch.cli.search")
-    def test_search_limit_precedence(
-        self, mock_search, mock_cocoindex_init, tmp_path, monkeypatch
-    ):
+    def test_search_limit_precedence(self, mock_search, tmp_path, monkeypatch):
         """Test search limit precedence chain."""
         # Set env var
         monkeypatch.setenv("COCOSEARCH_SEARCH_RESULT_LIMIT", "30")
@@ -303,11 +300,8 @@ search:
         mock_search.assert_called_once()
         assert mock_search.call_args[1]["limit"] == 30
 
-    @patch("cocoindex.init")
     @patch("cocosearch.cli.search")
-    def test_search_min_score_precedence(
-        self, mock_search, mock_cocoindex_init, tmp_path, monkeypatch
-    ):
+    def test_search_min_score_precedence(self, mock_search, tmp_path, monkeypatch):
         """Test search min_score precedence chain."""
         # Set env var
         monkeypatch.setenv("COCOSEARCH_SEARCH_MIN_SCORE", "0.6")

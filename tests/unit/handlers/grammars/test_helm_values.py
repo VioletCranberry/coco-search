@@ -117,42 +117,42 @@ class TestHelmValuesSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'helm-values'."""
         handler = HelmValuesHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "helm-values"
+        assert handler.SEPARATOR_SPEC._config.language_name == "helm-values"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 8 separator levels."""
         handler = HelmValuesHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 8
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 8
 
     def test_has_section_annotation_separator(self):
         """First separator should split on ## @section annotations."""
         handler = HelmValuesHandler()
-        assert "@section" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert "@section" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_has_comment_section_separator(self):
         """Second separator should split on ## comment headers."""
         handler = HelmValuesHandler()
-        assert r"\n## " in handler.SEPARATOR_SPEC.separators_regex[1]
+        assert r"\n## " in handler.SEPARATOR_SPEC._config.separators_regex[1]
 
     def test_has_top_level_key_separator(self):
         """Third separator should split on top-level YAML keys."""
         handler = HelmValuesHandler()
-        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC.separators_regex[2]
+        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC._config.separators_regex[2]
 
     def test_has_second_level_key_separator(self):
         """Fourth separator should split on 2-space indented keys."""
         handler = HelmValuesHandler()
-        assert r"\n  " in handler.SEPARATOR_SPEC.separators_regex[3]
+        assert r"\n  " in handler.SEPARATOR_SPEC._config.separators_regex[3]
 
     def test_has_third_level_key_separator(self):
         """Fifth separator should split on 4-space indented keys."""
         handler = HelmValuesHandler()
-        assert r"\n    " in handler.SEPARATOR_SPEC.separators_regex[4]
+        assert r"\n    " in handler.SEPARATOR_SPEC._config.separators_regex[4]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = HelmValuesHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

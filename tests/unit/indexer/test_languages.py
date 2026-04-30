@@ -17,52 +17,52 @@ HANDLER_CUSTOM_LANGUAGES = get_custom_languages()
 
 
 class TestHclLanguage:
-    """Tests for HCL CustomLanguageSpec."""
+    """Tests for HCL CustomLanguageConfig."""
 
     def test_language_name(self):
         """HCL spec should have language_name 'hcl'."""
-        assert HCL_LANGUAGE.language_name == "hcl"
+        assert HCL_LANGUAGE._config.language_name == "hcl"
 
     def test_aliases(self):
         """HCL spec should have empty aliases (tf/tfvars handled by Terraform grammar)."""
-        assert HCL_LANGUAGE.aliases == []
+        assert HCL_LANGUAGE._config.aliases == []
 
     def test_has_separators(self):
         """HCL spec should have a non-empty separators_regex list."""
-        assert len(HCL_LANGUAGE.separators_regex) > 0
+        assert len(HCL_LANGUAGE._config.separators_regex) > 0
 
     def test_level1_is_generic_block_pattern(self):
         """Level 1 separator should be a generic identifier pattern."""
-        level1 = HCL_LANGUAGE.separators_regex[0]
+        level1 = HCL_LANGUAGE._config.separators_regex[0]
         # Should be a generic pattern matching any identifier, not Terraform keywords
         assert "[a-z_]" in level1
         assert "resource" not in level1
 
     def test_no_lookaheads_in_separators(self):
         """HCL separators must not contain lookahead or lookbehind patterns."""
-        for sep in HCL_LANGUAGE.separators_regex:
+        for sep in HCL_LANGUAGE._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in HCL separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in HCL separator: {sep}"
 
 
 class TestDockerfileLanguage:
-    """Tests for Dockerfile CustomLanguageSpec."""
+    """Tests for Dockerfile CustomLanguageConfig."""
 
     def test_language_name(self):
         """Dockerfile spec should have language_name 'dockerfile'."""
-        assert DOCKERFILE_LANGUAGE.language_name == "dockerfile"
+        assert DOCKERFILE_LANGUAGE._config.language_name == "dockerfile"
 
     def test_aliases_empty(self):
         """Dockerfile spec should have no aliases (routing via extract_language)."""
-        assert DOCKERFILE_LANGUAGE.aliases == []
+        assert DOCKERFILE_LANGUAGE._config.aliases == []
 
     def test_has_separators(self):
         """Dockerfile spec should have a non-empty separators_regex list."""
-        assert len(DOCKERFILE_LANGUAGE.separators_regex) > 0
+        assert len(DOCKERFILE_LANGUAGE._config.separators_regex) > 0
 
     def test_from_is_separate_higher_priority(self):
         """FROM should be a separate separator at higher priority than other instructions."""
-        separators = DOCKERFILE_LANGUAGE.separators_regex
+        separators = DOCKERFILE_LANGUAGE._config.separators_regex
         from_index = None
         instructions_index = None
         for i, sep in enumerate(separators):
@@ -78,33 +78,33 @@ class TestDockerfileLanguage:
 
     def test_no_lookaheads_in_separators(self):
         """Dockerfile separators must not contain lookahead or lookbehind patterns."""
-        for sep in DOCKERFILE_LANGUAGE.separators_regex:
+        for sep in DOCKERFILE_LANGUAGE._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Dockerfile separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Dockerfile separator: {sep}"
 
 
 class TestBashLanguage:
-    """Tests for Bash CustomLanguageSpec."""
+    """Tests for Bash CustomLanguageConfig."""
 
     def test_language_name(self):
         """Bash spec should have language_name 'bash'."""
-        assert BASH_LANGUAGE.language_name == "bash"
+        assert BASH_LANGUAGE._config.language_name == "bash"
 
     def test_aliases(self):
         """Bash spec should have sh, zsh, and shell as aliases."""
-        assert BASH_LANGUAGE.aliases == ["sh", "zsh", "shell"]
+        assert BASH_LANGUAGE._config.aliases == ["sh", "zsh", "shell"]
 
     def test_has_separators(self):
         """Bash spec should have a non-empty separators_regex list."""
-        assert len(BASH_LANGUAGE.separators_regex) > 0
+        assert len(BASH_LANGUAGE._config.separators_regex) > 0
 
     def test_function_keyword_is_highest_priority(self):
         """Function keyword should be Level 1 (first separator)."""
-        assert "function" in BASH_LANGUAGE.separators_regex[0]
+        assert "function" in BASH_LANGUAGE._config.separators_regex[0]
 
     def test_no_lookaheads_in_separators(self):
         """Bash separators must not contain lookahead or lookbehind patterns."""
-        for sep in BASH_LANGUAGE.separators_regex:
+        for sep in BASH_LANGUAGE._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Bash separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Bash separator: {sep}"
 
@@ -135,25 +135,27 @@ class TestAllSeparatorsNoLookaheads:
     def test_no_lookaheads_or_lookbehinds(self):
         """All separators across all languages must use standard Rust regex only."""
         for lang in HANDLER_CUSTOM_LANGUAGES:
-            for sep in lang.separators_regex:
+            for sep in lang._config.separators_regex:
                 assert "(?=" not in sep, (
-                    f"Lookahead (?=) found in {lang.language_name} separator: {sep}"
+                    f"Lookahead (?=) found in {lang._config.language_name} separator: {sep}"
                 )
                 assert "(?<=" not in sep, (
-                    f"Lookbehind (?<=) found in {lang.language_name} separator: {sep}"
+                    f"Lookbehind (?<=) found in {lang._config.language_name} separator: {sep}"
                 )
                 assert "(?!" not in sep, (
-                    f"Negative lookahead (?!) found in {lang.language_name} separator: {sep}"
+                    f"Negative lookahead (?!) found in {lang._config.language_name} separator: {sep}"
                 )
                 assert "(?<!" not in sep, (
-                    f"Negative lookbehind (?<!) found in {lang.language_name} separator: {sep}"
+                    f"Negative lookbehind (?<!) found in {lang._config.language_name} separator: {sep}"
                 )
 
     def test_all_separators_are_valid_python_regex(self):
         """All separators should compile as valid Python regex (subset of Rust regex)."""
         for lang in HANDLER_CUSTOM_LANGUAGES:
-            for sep in lang.separators_regex:
+            for sep in lang._config.separators_regex:
                 try:
                     re.compile(sep)
                 except re.error as e:
-                    pytest.fail(f"Invalid regex in {lang.language_name}: {sep!r} - {e}")
+                    pytest.fail(
+                        f"Invalid regex in {lang._config.language_name}: {sep!r} - {e}"
+                    )

@@ -24,27 +24,27 @@ class TestBashHandlerSeparatorSpec:
     def test_language_name_is_bash(self):
         """SEPARATOR_SPEC.language_name should be 'bash'."""
         handler = BashHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "bash"
+        assert handler.SEPARATOR_SPEC._config.language_name == "bash"
 
     def test_aliases_contains_sh_zsh_shell(self):
         """SEPARATOR_SPEC.aliases should contain sh, zsh, and shell."""
         handler = BashHandler()
-        assert handler.SEPARATOR_SPEC.aliases == ["sh", "zsh", "shell"]
+        assert handler.SEPARATOR_SPEC._config.aliases == ["sh", "zsh", "shell"]
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = BashHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) > 0
 
     def test_function_keyword_is_level_1(self):
         """Function keyword should be Level 1 (first separator)."""
         handler = BashHandler()
-        assert "function" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert "function" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_no_lookaheads_in_separators(self):
         """Bash separators must not contain lookahead or lookbehind patterns."""
         handler = BashHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Bash separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Bash separator: {sep}"
             assert "(?!" not in sep, (

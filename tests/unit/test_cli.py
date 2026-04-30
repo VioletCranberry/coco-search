@@ -243,9 +243,40 @@ class TestSearchCommand:
 
     def test_requires_query_without_interactive(self, capsys):
         """Returns 1 when no query and not interactive."""
-        with patch("cocoindex.init"):
+        args = argparse.Namespace(
+            query=None,
+            index="testindex",
+            limit=10,
+            lang=None,
+            min_score=0.3,
+            context=5,
+            before_context=None,
+            after_context=None,
+            no_smart=False,
+            pretty=False,
+            interactive=False,
+            hybrid=None,
+            symbol_type=None,
+            symbol_name=None,
+            no_cache=False,
+        )
+        result = search_command(args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Query required" in captured.out
+
+    def test_json_output_is_valid(self, capsys, make_search_result):
+        """Search returns parseable JSON."""
+        # Create mock search results
+        mock_results = [
+            make_search_result(
+                filename="/test/file.py", start_byte=0, end_byte=100, score=0.9
+            ),
+        ]
+
+        with patch("cocosearch.cli.search", return_value=mock_results):
             args = argparse.Namespace(
-                query=None,
+                query="test query",
                 index="testindex",
                 limit=10,
                 lang=None,
@@ -262,39 +293,6 @@ class TestSearchCommand:
                 no_cache=False,
             )
             result = search_command(args)
-        assert result == 1
-        captured = capsys.readouterr()
-        assert "Query required" in captured.out
-
-    def test_json_output_is_valid(self, capsys, make_search_result):
-        """Search returns parseable JSON."""
-        # Create mock search results
-        mock_results = [
-            make_search_result(
-                filename="/test/file.py", start_byte=0, end_byte=100, score=0.9
-            ),
-        ]
-
-        with patch("cocoindex.init"):
-            with patch("cocosearch.cli.search", return_value=mock_results):
-                args = argparse.Namespace(
-                    query="test query",
-                    index="testindex",
-                    limit=10,
-                    lang=None,
-                    min_score=0.3,
-                    context=5,
-                    before_context=None,
-                    after_context=None,
-                    no_smart=False,
-                    pretty=False,
-                    interactive=False,
-                    hybrid=None,
-                    symbol_type=None,
-                    symbol_name=None,
-                    no_cache=False,
-                )
-                result = search_command(args)
 
         assert result == 0
         captured = capsys.readouterr()
@@ -314,10 +312,9 @@ class TestListCommand:
             },
         ]
 
-        with patch("cocoindex.init"):
-            with patch("cocosearch.cli.list_indexes", return_value=mock_indexes):
-                args = argparse.Namespace(pretty=False)
-                result = list_command(args)
+        with patch("cocosearch.cli.list_indexes", return_value=mock_indexes):
+            args = argparse.Namespace(pretty=False)
+            result = list_command(args)
 
         assert result == 0
         captured = capsys.readouterr()
@@ -354,22 +351,19 @@ class TestStatsCommand:
             repo_url=None,
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.cli.get_comprehensive_stats", return_value=mock_stats
-            ):
-                args = argparse.Namespace(
-                    index="testindex",
-                    pretty=False,
-                    json=True,
-                    all=False,
-                    staleness_threshold=7,
-                    live=False,
-                    watch=False,
-                    refresh_interval=1.0,
-                    show_failures=False,
-                )
-                result = stats_command(args)
+        with patch("cocosearch.cli.get_comprehensive_stats", return_value=mock_stats):
+            args = argparse.Namespace(
+                index="testindex",
+                pretty=False,
+                json=True,
+                all=False,
+                staleness_threshold=7,
+                live=False,
+                watch=False,
+                refresh_interval=1.0,
+                show_failures=False,
+            )
+            result = stats_command(args)
 
         assert result == 0
         captured = capsys.readouterr()
@@ -379,22 +373,21 @@ class TestStatsCommand:
 
     def test_nonexistent_index_error(self, capsys):
         """Returns error for nonexistent index."""
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.cli.get_comprehensive_stats",
-                side_effect=ValueError("Index not found"),
-            ):
-                args = argparse.Namespace(
-                    index="missing",
-                    pretty=False,
-                    json=True,
-                    all=False,
-                    staleness_threshold=7,
-                    live=False,
-                    watch=False,
-                    refresh_interval=1.0,
-                )
-                result = stats_command(args)
+        with patch(
+            "cocosearch.cli.get_comprehensive_stats",
+            side_effect=ValueError("Index not found"),
+        ):
+            args = argparse.Namespace(
+                index="missing",
+                pretty=False,
+                json=True,
+                all=False,
+                staleness_threshold=7,
+                live=False,
+                watch=False,
+                refresh_interval=1.0,
+            )
+            result = stats_command(args)
 
         assert result == 1
         captured = capsys.readouterr()
@@ -415,13 +408,10 @@ class TestClearCommand:
         }
         mock_result = {"success": True, "index": "testindex"}
 
-        with patch("cocoindex.init"):
-            with patch("cocosearch.cli.get_stats", return_value=mock_stats):
-                with patch("cocosearch.cli.clear_index", return_value=mock_result):
-                    args = argparse.Namespace(
-                        index=["testindex"], force=True, pretty=False
-                    )
-                    result = clear_command(args)
+        with patch("cocosearch.cli.get_stats", return_value=mock_stats):
+            with patch("cocosearch.cli.clear_index", return_value=mock_result):
+                args = argparse.Namespace(index=["testindex"], force=True, pretty=False)
+                result = clear_command(args)
 
         assert result == 0
         captured = capsys.readouterr()
@@ -430,12 +420,11 @@ class TestClearCommand:
 
     def test_nonexistent_index_error(self, capsys):
         """Returns error for nonexistent index."""
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.cli.get_stats", side_effect=ValueError("Index not found")
-            ):
-                args = argparse.Namespace(index=["missing"], force=True, pretty=False)
-                result = clear_command(args)
+        with patch(
+            "cocosearch.cli.get_stats", side_effect=ValueError("Index not found")
+        ):
+            args = argparse.Namespace(index=["missing"], force=True, pretty=False)
+            result = clear_command(args)
 
         assert result == 1
         captured = capsys.readouterr()
@@ -448,26 +437,25 @@ class TestErrorHandling:
 
     def test_search_error_returns_json_error(self, capsys):
         """Search errors return JSON error object."""
-        with patch("cocoindex.init"):
-            with patch("cocosearch.cli.search", side_effect=ValueError("DB error")):
-                args = argparse.Namespace(
-                    query="test",
-                    index="testindex",
-                    limit=10,
-                    lang=None,
-                    min_score=0.3,
-                    context=5,
-                    before_context=None,
-                    after_context=None,
-                    no_smart=False,
-                    pretty=False,
-                    interactive=False,
-                    hybrid=None,
-                    symbol_type=None,
-                    symbol_name=None,
-                    no_cache=False,
-                )
-                result = search_command(args)
+        with patch("cocosearch.cli.search", side_effect=ValueError("DB error")):
+            args = argparse.Namespace(
+                query="test",
+                index="testindex",
+                limit=10,
+                lang=None,
+                min_score=0.3,
+                context=5,
+                before_context=None,
+                after_context=None,
+                no_smart=False,
+                pretty=False,
+                interactive=False,
+                hybrid=None,
+                symbol_type=None,
+                symbol_name=None,
+                no_cache=False,
+            )
+            result = search_command(args)
 
         assert result == 1
         captured = capsys.readouterr()

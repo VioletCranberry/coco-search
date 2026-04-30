@@ -1,69 +1,73 @@
 """Unit tests for cocosearch indexer flow.
 
-Tests the CocoIndex flow definition for code indexing,
-focusing on the content_text field for hybrid search (v1.7).
+Tests the indexing pipeline structure, verifying that all required
+fields are stored and the key functions are correctly wired.
 """
 
 import inspect
 
-from cocosearch.indexer.flow import create_code_index_flow
+from cocosearch.indexer.flow import _index_file, run_index
 
 
-class TestFlowContentText:
-    """Tests for content_text field in indexing flow."""
+class TestIndexFileStructure:
+    """Tests for _index_file function structure."""
 
-    def test_flow_source_code_contains_content_text_collection(self):
-        """Verify flow definition collects content_text for hybrid search.
+    def test_index_file_stores_all_required_fields(self):
+        """Verify _index_file inserts all fields needed for search."""
+        source = inspect.getsource(_index_file)
 
-        This inspects the source code of create_code_index_flow to confirm
-        the content_text field is passed to code_embeddings.collect().
-
-        Note: We inspect source rather than run the flow because:
-        - Flow execution requires CocoIndex runtime + database
-        - The field existence in collect() determines schema creation
-        - This is a static analysis test for the flow definition
-        """
-        source = inspect.getsource(create_code_index_flow)
-
-        # Verify content_text is collected
-        assert "content_text=" in source, (
-            "Flow should collect content_text field for keyword search"
-        )
-
-        # Verify it receives chunk text (not transformed)
-        assert 'content_text=chunk["text"]' in source, (
-            "content_text should receive raw chunk text"
-        )
-
-    def test_flow_has_hybrid_search_documentation(self):
-        """Verify flow documents content_text purpose for maintainability."""
-        source = inspect.getsource(create_code_index_flow)
-
-        # Check for hybrid search comment (any case)
-        has_hybrid_comment = (
-            "hybrid search" in source.lower()
-            or "keyword search" in source.lower()
-            or "bm25" in source.lower()
-        )
-
-        assert has_hybrid_comment, (
-            "Flow should document content_text purpose for hybrid/keyword search"
-        )
-
-    def test_flow_collects_all_required_fields(self):
-        """Verify flow collects all fields needed for search functionality."""
-        source = inspect.getsource(create_code_index_flow)
-
-        # Required fields for semantic + keyword hybrid search
         required_fields = [
-            "filename=",  # File identification
-            "location=",  # Chunk location within file
-            "embedding=",  # Vector for semantic search
-            "content_text=",  # Text for keyword search (v1.7)
-            "block_type=",  # Handler metadata
-            "hierarchy=",  # Handler metadata
-            "language_id=",  # Language classification
+            "filename",
+            "embedding",
+            "content_text",
+            "content_tsv_input",
+            "block_type",
+            "hierarchy",
+            "language_id",
+            "symbol_type",
+            "symbol_name",
+            "symbol_signature",
         ]
 
         for field in required_fields:
-            assert field in source, f"Flow should collect {field.rstrip('=')} field"
+            assert field in source, f"_index_file should store {field} field"
+
+    def test_index_file_uses_add_filename_context(self):
+        """Verify _index_file enriches embedding text with filename context."""
+        source = inspect.getsource(_index_file)
+        assert "add_filename_context" in source
+
+    def test_index_file_uses_extract_chunk_metadata(self):
+        """Verify _index_file extracts chunk metadata."""
+        source = inspect.getsource(_index_file)
+        assert "extract_chunk_metadata" in source
+
+    def test_index_file_uses_extract_symbol_metadata(self):
+        """Verify _index_file extracts symbol metadata."""
+        source = inspect.getsource(_index_file)
+        assert "extract_symbol_metadata" in source
+
+    def test_index_file_uses_tsvector(self):
+        """Verify _index_file generates tsvector input."""
+        source = inspect.getsource(_index_file)
+        assert "text_to_tsvector_sql" in source
+
+
+class TestRunIndexStructure:
+    """Tests for run_index function structure."""
+
+    def test_run_index_has_incremental_tracking(self):
+        """Verify run_index uses SHA-256 content hashes for incremental indexing."""
+        source = inspect.getsource(run_index)
+        assert "sha256" in source
+        assert "content_hash" in source
+
+    def test_run_index_handles_deleted_files(self):
+        """Verify run_index detects and removes deleted files."""
+        source = inspect.getsource(run_index)
+        assert "deleted_files" in source
+
+    def test_run_index_invalidates_cache(self):
+        """Verify run_index invalidates query cache after changes."""
+        source = inspect.getsource(run_index)
+        assert "invalidate_index_cache" in source
