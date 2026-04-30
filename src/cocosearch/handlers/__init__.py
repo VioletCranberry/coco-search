@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 def get_language_name(spec: CustomLanguageConfig) -> str:
     return spec._config.language_name
 
+
 # ============================================================================
 # Shared Types (defined BEFORE discovery to avoid circular imports)
 # ============================================================================
