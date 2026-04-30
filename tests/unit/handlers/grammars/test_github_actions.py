@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.github_actions import GitHubActionsHandler
 
 
@@ -91,7 +92,7 @@ class TestGitHubActionsSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'github-actions'."""
         handler = GitHubActionsHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "github-actions"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "github-actions"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 8 separator levels."""

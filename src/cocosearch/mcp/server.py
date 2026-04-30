@@ -1099,7 +1099,7 @@ async def api_analyze(request) -> JSONResponse:
 async def api_languages(request) -> JSONResponse:
     """List supported languages with extensions and capabilities."""
     from cocosearch.deps.registry import get_all_extractor_language_ids
-    from cocosearch.handlers import get_registered_handlers
+    from cocosearch.handlers import get_language_name, get_registered_handlers
     from cocosearch.search.context_expander import CONTEXT_EXPANSION_LANGUAGES
     from cocosearch.search.query import LANGUAGE_EXTENSIONS, SYMBOL_AWARE_LANGUAGES
 
@@ -1119,9 +1119,10 @@ async def api_languages(request) -> JSONResponse:
         )
 
     for handler in sorted(
-        get_registered_handlers(), key=lambda h: h.SEPARATOR_SPEC._config.language_name
+        get_registered_handlers(),
+        key=lambda h: get_language_name(h.SEPARATOR_SPEC),
     ):
-        lang = handler.SEPARATOR_SPEC._config.language_name
+        lang = get_language_name(handler.SEPARATOR_SPEC)
         if lang in LANGUAGE_EXTENSIONS:
             continue
         languages.append(

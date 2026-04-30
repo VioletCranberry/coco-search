@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.dockerfile import DockerfileHandler
 
 
@@ -22,7 +23,7 @@ class TestDockerfileHandlerSeparatorSpec:
     def test_language_name_is_dockerfile(self):
         """SEPARATOR_SPEC.language_name should be 'dockerfile'."""
         handler = DockerfileHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "dockerfile"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "dockerfile"
 
     def test_aliases_empty(self):
         """SEPARATOR_SPEC.aliases should be empty (routing via extract_language)."""

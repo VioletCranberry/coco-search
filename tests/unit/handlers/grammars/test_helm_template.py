@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.helm_template import HelmTemplateHandler
 
 
@@ -129,7 +130,7 @@ class TestHelmTemplateSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'helm-template'."""
         handler = HelmTemplateHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "helm-template"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "helm-template"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 9 separator levels."""

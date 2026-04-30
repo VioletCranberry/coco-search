@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.hcl import HclHandler
 
 
@@ -33,7 +34,7 @@ class TestHclHandlerSeparatorSpec:
     def test_language_name_is_hcl(self):
         """SEPARATOR_SPEC.language_name should be 'hcl'."""
         handler = HclHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "hcl"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "hcl"
 
     def test_aliases_is_empty(self):
         """SEPARATOR_SPEC.aliases should be empty (no tf/tfvars aliases)."""

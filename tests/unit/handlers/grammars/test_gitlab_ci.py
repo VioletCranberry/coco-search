@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.gitlab_ci import GitLabCIHandler
 
 
@@ -94,7 +95,7 @@ class TestGitLabCISeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'gitlab-ci'."""
         handler = GitLabCIHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "gitlab-ci"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "gitlab-ci"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have exactly 7 separator levels."""

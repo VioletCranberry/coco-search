@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.terraform import TerraformHandler
 
 
@@ -60,7 +61,7 @@ class TestTerraformSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'terraform'."""
         handler = TerraformHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "terraform"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "terraform"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 6 separator levels."""

@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.docker_compose import DockerComposeHandler
 
 
@@ -86,7 +87,7 @@ class TestDockerComposeSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'docker-compose'."""
         handler = DockerComposeHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "docker-compose"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "docker-compose"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 7 separator levels."""

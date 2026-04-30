@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.scala import ScalaHandler
 
 
@@ -22,7 +23,7 @@ class TestScalaHandlerSeparatorSpec:
     def test_language_name_is_scala(self):
         """SEPARATOR_SPEC.language_name should be 'scala'."""
         handler = ScalaHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "scala"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "scala"
 
     def test_aliases_contains_sc(self):
         """SEPARATOR_SPEC.aliases should contain 'sc'."""

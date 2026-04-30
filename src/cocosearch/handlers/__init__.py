@@ -23,6 +23,10 @@ from cocoindex.ops.text import CustomLanguageConfig
 
 logger = logging.getLogger(__name__)
 
+
+def get_language_name(spec: CustomLanguageConfig) -> str:
+    return spec._config.language_name
+
 # ============================================================================
 # Shared Types (defined BEFORE discovery to avoid circular imports)
 # ============================================================================
@@ -359,6 +363,7 @@ __all__ = [
     "ChunkMetadata",
     "get_handler",
     "get_grammar_handler",
+    "get_language_name",
     "get_registered_handlers",
     "get_registered_grammars",
     "get_custom_languages",

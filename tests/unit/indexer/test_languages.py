@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from cocosearch.handlers import get_custom_languages
+from cocosearch.handlers import get_custom_languages, get_language_name
 from cocosearch.handlers.hcl import HclHandler
 from cocosearch.handlers.dockerfile import DockerfileHandler
 from cocosearch.handlers.bash import BashHandler
@@ -21,7 +21,7 @@ class TestHclLanguage:
 
     def test_language_name(self):
         """HCL spec should have language_name 'hcl'."""
-        assert HCL_LANGUAGE._config.language_name == "hcl"
+        assert get_language_name(HCL_LANGUAGE) == "hcl"
 
     def test_aliases(self):
         """HCL spec should have empty aliases (tf/tfvars handled by Terraform grammar)."""
@@ -50,7 +50,7 @@ class TestDockerfileLanguage:
 
     def test_language_name(self):
         """Dockerfile spec should have language_name 'dockerfile'."""
-        assert DOCKERFILE_LANGUAGE._config.language_name == "dockerfile"
+        assert get_language_name(DOCKERFILE_LANGUAGE) == "dockerfile"
 
     def test_aliases_empty(self):
         """Dockerfile spec should have no aliases (routing via extract_language)."""
@@ -88,7 +88,7 @@ class TestBashLanguage:
 
     def test_language_name(self):
         """Bash spec should have language_name 'bash'."""
-        assert BASH_LANGUAGE._config.language_name == "bash"
+        assert get_language_name(BASH_LANGUAGE) == "bash"
 
     def test_aliases(self):
         """Bash spec should have sh, zsh, and shell as aliases."""
@@ -137,16 +137,16 @@ class TestAllSeparatorsNoLookaheads:
         for lang in HANDLER_CUSTOM_LANGUAGES:
             for sep in lang._config.separators_regex:
                 assert "(?=" not in sep, (
-                    f"Lookahead (?=) found in {lang._config.language_name} separator: {sep}"
+                    f"Lookahead (?=) found in {get_language_name(lang)} separator: {sep}"
                 )
                 assert "(?<=" not in sep, (
-                    f"Lookbehind (?<=) found in {lang._config.language_name} separator: {sep}"
+                    f"Lookbehind (?<=) found in {get_language_name(lang)} separator: {sep}"
                 )
                 assert "(?!" not in sep, (
-                    f"Negative lookahead (?!) found in {lang._config.language_name} separator: {sep}"
+                    f"Negative lookahead (?!) found in {get_language_name(lang)} separator: {sep}"
                 )
                 assert "(?<!" not in sep, (
-                    f"Negative lookbehind (?<!) found in {lang._config.language_name} separator: {sep}"
+                    f"Negative lookbehind (?<!) found in {get_language_name(lang)} separator: {sep}"
                 )
 
     def test_all_separators_are_valid_python_regex(self):
@@ -157,5 +157,5 @@ class TestAllSeparatorsNoLookaheads:
                     re.compile(sep)
                 except re.error as e:
                     pytest.fail(
-                        f"Invalid regex in {lang._config.language_name}: {sep!r} - {e}"
+                        f"Invalid regex in {get_language_name(lang)}: {sep!r} - {e}"
                     )

@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.gotmpl import GoTmplHandler
 
 
@@ -24,7 +25,7 @@ class TestGoTmplHandlerSeparatorSpec:
     def test_language_name_is_gotmpl(self):
         """SEPARATOR_SPEC.language_name should be 'gotmpl'."""
         handler = GoTmplHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "gotmpl"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "gotmpl"
 
     def test_aliases_contains_tpl(self):
         """SEPARATOR_SPEC.aliases should contain tpl."""

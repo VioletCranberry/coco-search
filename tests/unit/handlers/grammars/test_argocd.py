@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.argocd import ArgoCDHandler
 
 
@@ -110,7 +111,7 @@ class TestArgoCDSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'argocd'."""
         handler = ArgoCDHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "argocd"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "argocd"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 7 separator levels."""

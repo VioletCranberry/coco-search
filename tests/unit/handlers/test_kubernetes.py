@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.kubernetes import KubernetesHandler
 
 
@@ -34,7 +35,7 @@ class TestKubernetesHandlerSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'kubernetes'."""
         handler = KubernetesHandler()
-        assert handler.SEPARATOR_SPEC._config.language_name == "kubernetes"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "kubernetes"
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have 7 separator levels."""
