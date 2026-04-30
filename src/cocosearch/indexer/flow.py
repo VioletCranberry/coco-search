@@ -235,6 +235,7 @@ def run_index(
     config: IndexingConfig | None = None,
     respect_gitignore: bool = True,
     fresh: bool = False,
+    stop_event=None,
 ):
     """Run indexing for a codebase.
 
@@ -251,6 +252,8 @@ def run_index(
         config: Optional indexing configuration (uses defaults if not provided).
         respect_gitignore: Whether to respect .gitignore patterns (default True).
         fresh: If True, drop and recreate all tables.
+        stop_event: Optional threading.Event checked between files to allow
+            cancellation from the dashboard or MCP server.
 
     Returns:
         Dict with indexing statistics.
@@ -358,11 +361,18 @@ def run_index(
     splitter = RecursiveSplitter(custom_languages=get_custom_languages())
 
     chunks_total = 0
+    files_indexed = 0
+    cancelled = False
     with psycopg.connect(db_url) as conn:
         register_vector(conn)
         tracking_table = f"cocosearch_index_tracking_{index_name}"
 
         for filename in files_to_index:
+            if stop_event is not None and stop_event.is_set():
+                logger.info("Indexing cancelled after %d files", files_indexed)
+                cancelled = True
+                break
+
             try:
                 n = _index_file(
                     conn,
@@ -374,6 +384,7 @@ def run_index(
                     config.chunk_overlap,
                 )
                 chunks_total += n
+                files_indexed += 1
 
                 with conn.cursor() as cur:
                     cur.execute(
@@ -389,7 +400,7 @@ def run_index(
                 logger.warning("Failed to index %s: %s", filename, e)
                 conn.rollback()
 
-        if deleted_files:
+        if deleted_files and not cancelled:
             with conn.cursor() as cur:
                 for filename in deleted_files:
                     cur.execute(
@@ -402,9 +413,12 @@ def run_index(
                     )
             conn.commit()
 
-    _get_cs_log().index("Indexing completed", index=index_name)
+    if cancelled:
+        _get_cs_log().index("Indexing cancelled", index=index_name)
+    else:
+        _get_cs_log().index("Indexing completed", index=index_name)
 
-    if total_changes > 0:
+    if files_indexed > 0 or deleted_files:
         try:
             removed = invalidate_index_cache(index_name)
             if removed > 0:
@@ -421,18 +435,19 @@ def run_index(
         except Exception as e:
             logger.warning("Cache invalidation failed (non-fatal): %s", e)
 
-        try:
-            with psycopg.connect(db_url) as conn:
-                parse_summary = track_parse_results(
-                    conn, index_name, codebase_path, table_name
-                )
-                logger.info("Parse tracking complete: %s", parse_summary)
-        except Exception as e:
-            logger.warning("Parse tracking failed (non-fatal): %s", e)
+        if not cancelled:
+            try:
+                with psycopg.connect(db_url) as conn:
+                    parse_summary = track_parse_results(
+                        conn, index_name, codebase_path, table_name
+                    )
+                    logger.info("Parse tracking complete: %s", parse_summary)
+            except Exception as e:
+                logger.warning("Parse tracking failed (non-fatal): %s", e)
 
     update_info = {
-        "files_indexed": len(files_to_index),
-        "files_deleted": len(deleted_files),
+        "files_indexed": files_indexed,
+        "files_deleted": len(deleted_files) if not cancelled else 0,
         "chunks_total": chunks_total,
     }
     return update_info

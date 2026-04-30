@@ -587,6 +587,7 @@ async def api_reindex(request) -> JSONResponse:
                     codebase_path=source_path,
                     config=IndexingConfig(),
                     fresh=fresh,
+                    stop_event=cancel_event,
                 )
                 _register_with_git(index_name, source_path)
                 # Always extract dependencies after indexing
@@ -836,6 +837,7 @@ async def api_index(request) -> JSONResponse:
                     config=indexing_config,
                     respect_gitignore=not no_gitignore,
                     fresh=fresh,
+                    stop_event=cancel_event,
                 )
                 _register_with_git(index_name, project_path)
                 # Always extract dependencies after indexing

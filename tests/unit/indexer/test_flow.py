@@ -114,6 +114,41 @@ class TestRunIndex:
         mock_track.assert_not_called()
         mock_invalidate.assert_not_called()
 
+    def test_stop_event_cancels_indexing(self, tmp_path, _mock_db):
+        """run_index stops processing files when stop_event is set."""
+        import threading
+
+        from cocosearch.indexer.flow import run_index
+
+        for i in range(10):
+            (tmp_path / f"file{i}.py").write_text(f"x = {i}")
+
+        stop_event = threading.Event()
+
+        call_count = 0
+        original_embed = None
+
+        def counting_embed(text):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 3:
+                stop_event.set()
+            return [0.1] * 768
+
+        with patch("cocosearch.indexer.flow.embed_query", side_effect=counting_embed):
+            with patch(
+                "cocosearch.management.metadata.get_index_metadata", return_value=None
+            ):
+                with patch("cocosearch.indexer.flow.invalidate_index_cache"):
+                    with patch("cocosearch.indexer.flow.track_parse_results"):
+                        result = run_index(
+                            index_name="testindex",
+                            codebase_path=str(tmp_path),
+                            stop_event=stop_event,
+                        )
+
+        assert result["files_indexed"] < 10
+
 
 class TestCustomLanguageIntegration:
     """Tests for custom language integration in flow module."""
