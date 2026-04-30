@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from rich.table import Table
 
-import cocoindex
 from rich.console import Console
 
 from cocosearch import __version__
@@ -374,14 +373,6 @@ def search_command(args: argparse.Namespace) -> int:
     """
     console = Console()
 
-    # Initialize CocoIndex (required for embedding generation)
-    try:
-        cocoindex.init()
-    except Exception:
-        console.print("[dim]No indexes found. Index a codebase first:[/dim]")
-        console.print("  cocosearch index <path>")
-        return 1
-
     # Load config for search settings
     config_path = find_config_file()
     if config_path:
@@ -635,14 +626,6 @@ def analyze_command(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for error).
     """
     console = Console()
-
-    # Initialize CocoIndex (required for embedding generation)
-    try:
-        cocoindex.init()
-    except Exception:
-        console.print("[dim]No indexes found. Index a codebase first:[/dim]")
-        console.print("  cocosearch index <path>")
-        return 1
 
     # Load config
     config_path = find_config_file()
@@ -1101,14 +1084,6 @@ def stats_command(args: argparse.Namespace) -> int:
 
     # Handle --live mode (terminal dashboard)
     if args.live:
-        # Initialize CocoIndex
-        try:
-            cocoindex.init()
-        except Exception:
-            console.print("[dim]No indexes found. Index a codebase first:[/dim]")
-            console.print("  cocosearch index <path>")
-            return 1
-
         # Resolve index name with config precedence (positional > env > config > auto)
         config_path = find_config_file()
         if config_path:
@@ -1135,12 +1110,6 @@ def stats_command(args: argparse.Namespace) -> int:
             refresh_interval=args.refresh_interval,
         )
         return 0
-
-    # Initialize CocoIndex (optional for stats — own pool used for queries)
-    try:
-        cocoindex.init()
-    except Exception:
-        pass  # Fresh database — stats queries use CocoSearch's own pool
 
     # Determine output mode: visual is default, --json enables JSON output
     json_output = args.json
@@ -1349,13 +1318,6 @@ def clear_command(args: argparse.Namespace) -> int:
     """
     console = Console()
 
-    # Initialize CocoIndex
-    try:
-        cocoindex.init()
-    except Exception:
-        console.print("[dim]No indexes found. Nothing to clear.[/dim]")
-        return 0
-
     # Determine which indexes to delete
     if getattr(args, "all", False):
         try:
@@ -1503,9 +1465,9 @@ def languages_command(args: argparse.Namespace) -> int:
     display_names = {"hcl": "HCL", "dockerfile": "Dockerfile", "bash": "Bash"}
     display_exts = {"dockerfile": "Dockerfile"}
     for handler in sorted(
-        get_registered_handlers(), key=lambda h: h.SEPARATOR_SPEC.language_name
+        get_registered_handlers(), key=lambda h: h.SEPARATOR_SPEC._config.language_name
     ):
-        lang = handler.SEPARATOR_SPEC.language_name
+        lang = handler.SEPARATOR_SPEC._config.language_name
         if lang in LANGUAGE_EXTENSIONS:
             continue
         languages.append(
