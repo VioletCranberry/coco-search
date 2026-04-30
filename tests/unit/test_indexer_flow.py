@@ -52,6 +52,11 @@ class TestIndexFileStructure:
         source = inspect.getsource(_index_file)
         assert "text_to_tsvector_sql" in source
 
+    def test_index_file_uses_embed_batch(self):
+        """Verify _index_file uses batched embedding."""
+        source = inspect.getsource(_index_file)
+        assert "embed_batch" in source
+
 
 class TestRunIndexStructure:
     """Tests for run_index function structure."""

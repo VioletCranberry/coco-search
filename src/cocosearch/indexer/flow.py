@@ -28,7 +28,7 @@ from cocosearch.indexer.preflight import check_infrastructure
 from cocosearch.indexer.embedder import (
     extract_language,
     add_filename_context,
-    embed_query,
+    embed_batch,
     _resolve_output_dimension,
 )
 from cocosearch.indexer.tsvector import text_to_tsvector_sql
@@ -198,9 +198,12 @@ def _index_file(
     with conn.cursor() as cur:
         cur.execute(f"DELETE FROM {table_name} WHERE filename = %s", (filename,))
 
-        for chunk in chunks:
-            embedding_text = add_filename_context(chunk.text, filename)
-            embedding = embed_query(embedding_text)
+        embedding_texts = [
+            add_filename_context(chunk.text, filename) for chunk in chunks
+        ]
+        embeddings = embed_batch(embedding_texts)
+
+        for chunk, embedding in zip(chunks, embeddings):
             metadata = extract_chunk_metadata(chunk.text, language)
             symbol_meta = extract_symbol_metadata(chunk.text, language)
             tsv_input = text_to_tsvector_sql(chunk.text, filename)

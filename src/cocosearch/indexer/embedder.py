@@ -161,3 +161,35 @@ def embed_query(text: str) -> list[float]:
 
     response = litellm.embedding(model=model, input=[text], **kwargs)
     return [float(x) for x in response.data[0]["embedding"]]
+
+
+_EMBEDDING_BATCH_SIZE = 128
+
+
+def embed_batch(texts: list[str]) -> list[list[float]]:
+    """Embed multiple texts in a single API call for indexing.
+
+    Calls litellm.embedding() with batched input to reduce HTTP
+    round-trips during indexing. Automatically splits into sub-batches
+    of _EMBEDDING_BATCH_SIZE to avoid API limits.
+
+    Args:
+        texts: List of texts to embed.
+
+    Returns:
+        List of embedding vectors, one per input text, in the same order.
+    """
+    if not texts:
+        return []
+
+    model = _get_litellm_model()
+    kwargs = _get_litellm_kwargs()
+
+    all_embeddings: list[list[float]] = []
+    for i in range(0, len(texts), _EMBEDDING_BATCH_SIZE):
+        batch = texts[i : i + _EMBEDDING_BATCH_SIZE]
+        response = litellm.embedding(model=model, input=batch, **kwargs)
+        for item in response.data:
+            all_embeddings.append([float(x) for x in item["embedding"]])
+
+    return all_embeddings

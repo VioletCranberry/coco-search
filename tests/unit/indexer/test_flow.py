@@ -50,7 +50,10 @@ class TestRunIndex:
 
         (tmp_path / "test.py").write_text("def hello(): pass")
 
-        with patch("cocosearch.indexer.flow.embed_query", return_value=[0.1] * 768):
+        with patch(
+            "cocosearch.indexer.flow.embed_batch",
+            side_effect=lambda texts: [[0.1] * 768] * len(texts),
+        ):
             with patch(
                 "cocosearch.management.metadata.get_index_metadata", return_value=None
             ):
@@ -71,7 +74,10 @@ class TestRunIndex:
 
         (tmp_path / "test.py").write_text("def hello(): pass")
 
-        with patch("cocosearch.indexer.flow.embed_query", return_value=[0.1] * 768):
+        with patch(
+            "cocosearch.indexer.flow.embed_batch",
+            side_effect=lambda texts: [[0.1] * 768] * len(texts),
+        ):
             with patch(
                 "cocosearch.management.metadata.get_index_metadata", return_value=None
             ):
@@ -127,14 +133,16 @@ class TestRunIndex:
 
         call_count = 0
 
-        def counting_embed(text):
+        def counting_embed_batch(texts):
             nonlocal call_count
             call_count += 1
             if call_count >= 3:
                 stop_event.set()
-            return [0.1] * 768
+            return [[0.1] * 768] * len(texts)
 
-        with patch("cocosearch.indexer.flow.embed_query", side_effect=counting_embed):
+        with patch(
+            "cocosearch.indexer.flow.embed_batch", side_effect=counting_embed_batch
+        ):
             with patch(
                 "cocosearch.management.metadata.get_index_metadata", return_value=None
             ):

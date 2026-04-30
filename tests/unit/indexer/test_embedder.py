@@ -428,3 +428,61 @@ class TestExtractLanguage:
         content = "name: Deploy\non: push\njobs:\n  deploy:"
         result = extract_language(".github/workflows/deploy.yaml", content)
         assert result == "github-actions"
+
+
+class TestEmbedBatch:
+    """Tests for embed_batch function."""
+
+    def test_empty_input_returns_empty(self):
+        from cocosearch.indexer.embedder import embed_batch
+
+        assert embed_batch([]) == []
+
+    def test_single_text(self):
+        from cocosearch.indexer.embedder import embed_batch
+
+        mock_response = MagicMock()
+        mock_response.data = [{"embedding": [0.1, 0.2]}]
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.return_value = mock_response
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_batch(["hello"])
+
+        assert result == [[0.1, 0.2]]
+        mock_litellm.embedding.assert_called_once()
+
+    def test_multiple_texts(self):
+        from cocosearch.indexer.embedder import embed_batch
+
+        mock_response = MagicMock()
+        mock_response.data = [
+            {"embedding": [0.1, 0.2]},
+            {"embedding": [0.3, 0.4]},
+        ]
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.return_value = mock_response
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_batch(["hello", "world"])
+
+        assert result == [[0.1, 0.2], [0.3, 0.4]]
+        mock_litellm.embedding.assert_called_once()
+
+    def test_batches_large_inputs(self):
+        from cocosearch.indexer.embedder import embed_batch, _EMBEDDING_BATCH_SIZE
+
+        texts = [f"text_{i}" for i in range(_EMBEDDING_BATCH_SIZE + 5)]
+
+        def mock_embedding(**kwargs):
+            resp = MagicMock()
+            resp.data = [{"embedding": [0.1]} for _ in kwargs["input"]]
+            return resp
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.side_effect = mock_embedding
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_batch(texts)
+
+        assert len(result) == _EMBEDDING_BATCH_SIZE + 5
+        assert mock_litellm.embedding.call_count == 2
