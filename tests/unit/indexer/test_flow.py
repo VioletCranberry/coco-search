@@ -126,7 +126,6 @@ class TestRunIndex:
         stop_event = threading.Event()
 
         call_count = 0
-        original_embed = None
 
         def counting_embed(text):
             nonlocal call_count
