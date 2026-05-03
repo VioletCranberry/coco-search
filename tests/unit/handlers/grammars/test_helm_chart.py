@@ -1,5 +1,6 @@
 """Tests for cocosearch.handlers.grammars.helm_chart module."""
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.helm_chart import HelmChartHandler
 
 # ============================================================================
@@ -74,17 +75,17 @@ class TestHelmChartSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'helm-chart'."""
         handler = HelmChartHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "helm-chart"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "helm-chart"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 7 separator levels."""
         handler = HelmChartHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 7
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 7
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = HelmChartHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

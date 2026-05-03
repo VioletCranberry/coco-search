@@ -13,8 +13,6 @@ Uses PostgreSQL 'simple' text search config (no stemming) because:
 
 import re
 
-import cocoindex
-
 
 def split_code_identifier(identifier: str) -> list[str]:
     """Split a code identifier into searchable tokens.
@@ -122,7 +120,6 @@ def preprocess_code_for_tsvector(content: str) -> str:
     return " ".join(all_tokens)
 
 
-@cocoindex.op.function(behavior_version=2)
 def text_to_tsvector_sql(content: str, filename: str = "") -> str:
     """Generate SQL expression for creating tsvector from content.
 

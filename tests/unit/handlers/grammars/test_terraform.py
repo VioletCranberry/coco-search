@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.terraform import TerraformHandler
 
 
@@ -60,17 +61,17 @@ class TestTerraformSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'terraform'."""
         handler = TerraformHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "terraform"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "terraform"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 6 separator levels."""
         handler = TerraformHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 6
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 6
 
     def test_has_all_12_keywords(self):
         """Level 1 separator should include all 12 Terraform block keywords."""
         handler = TerraformHandler()
-        level1 = handler.SEPARATOR_SPEC.separators_regex[0]
+        level1 = handler.SEPARATOR_SPEC._config.separators_regex[0]
         expected_keywords = [
             "resource",
             "data",
@@ -93,18 +94,18 @@ class TestTerraformSeparatorSpec:
     def test_has_nested_block_separator(self):
         """Level 2 separator should match nested block openings."""
         handler = TerraformHandler()
-        level2 = handler.SEPARATOR_SPEC.separators_regex[1]
+        level2 = handler.SEPARATOR_SPEC._config.separators_regex[1]
         assert r"\n  " in level2
 
     def test_aliases(self):
         """SEPARATOR_SPEC.aliases should contain tf and tfvars."""
         handler = TerraformHandler()
-        assert handler.SEPARATOR_SPEC.aliases == ["tf", "tfvars"]
+        assert handler.SEPARATOR_SPEC._config.aliases == ["tf", "tfvars"]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = TerraformHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found in separator: {sep}"

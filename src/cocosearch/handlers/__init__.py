@@ -19,9 +19,14 @@ import inspect
 import logging
 import dataclasses
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 logger = logging.getLogger(__name__)
+
+
+def get_language_name(spec: CustomLanguageConfig) -> str:
+    return spec._config.language_name
+
 
 # ============================================================================
 # Shared Types (defined BEFORE discovery to avoid circular imports)
@@ -44,15 +49,15 @@ class LanguageHandler(Protocol):
     No explicit inheritance required.
 
     This protocol defines handlers that work with CocoIndex's Rust-based
-    chunking. Handlers provide the CustomLanguageSpec for chunking and
+    chunking. Handlers provide the CustomLanguageConfig for chunking and
     extract_metadata() for Python-based metadata extraction.
     """
 
     EXTENSIONS: ClassVar[list[str]]
     """File extensions this handler claims (e.g., ['.tf', '.hcl'])."""
 
-    SEPARATOR_SPEC: ClassVar[cocoindex.functions.CustomLanguageSpec | None]
-    """CocoIndex CustomLanguageSpec for chunking, or None for default."""
+    SEPARATOR_SPEC: ClassVar[CustomLanguageConfig | None]
+    """CustomLanguageConfig for chunking, or None for default."""
 
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from chunk text.
@@ -85,8 +90,8 @@ class GrammarHandler(Protocol):
     PATH_PATTERNS: ClassVar[list[str]]
     """File path glob patterns that suggest this grammar."""
 
-    SEPARATOR_SPEC: ClassVar[cocoindex.functions.CustomLanguageSpec | None]
-    """CocoIndex CustomLanguageSpec for chunking, or None for default."""
+    SEPARATOR_SPEC: ClassVar[CustomLanguageConfig | None]
+    """CustomLanguageConfig for chunking, or None for default."""
 
     def matches(self, filepath: str, content: str | None = None) -> bool:
         """Check if this grammar applies to the given file."""
@@ -297,11 +302,11 @@ def get_registered_grammars() -> list:
     return list(_GRAMMAR_REGISTRY)
 
 
-def get_custom_languages() -> list[cocoindex.functions.CustomLanguageSpec]:
-    """Get all CustomLanguageSpec from registered handlers and grammars.
+def get_custom_languages() -> list[CustomLanguageConfig]:
+    """Get all CustomLanguageConfig from registered handlers and grammars.
 
     Returns:
-        List of CustomLanguageSpec for all handlers/grammars that define one
+        List of CustomLanguageConfig for all handlers/grammars that define one
     """
     seen = set()
     specs = []
@@ -323,14 +328,12 @@ def get_custom_languages() -> list[cocoindex.functions.CustomLanguageSpec]:
     return specs
 
 
-@cocoindex.op.function(behavior_version=1)
 def extract_chunk_metadata(text: str, language_id: str) -> ChunkMetadata:
     """Extract metadata from code chunk using appropriate handler.
 
-    This is a CocoIndex transform function that dispatches to the
-    appropriate handler based on language_id. Checks grammar handlers
-    first (by GRAMMAR_NAME match), then falls back to extension-based
-    language handler lookup.
+    Dispatches to the appropriate handler based on language_id. Checks
+    grammar handlers first (by GRAMMAR_NAME match), then falls back to
+    extension-based language handler lookup.
 
     Args:
         text: The chunk text content.
@@ -361,6 +364,7 @@ __all__ = [
     "ChunkMetadata",
     "get_handler",
     "get_grammar_handler",
+    "get_language_name",
     "get_registered_handlers",
     "get_registered_grammars",
     "get_custom_languages",

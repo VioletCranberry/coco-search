@@ -5,6 +5,7 @@ import pytest
 from cocosearch.handlers import (
     get_handler,
     get_custom_languages,
+    get_language_name,
     _HANDLER_REGISTRY,
 )
 from cocosearch.handlers.hcl import HclHandler
@@ -121,7 +122,7 @@ class TestGetCustomLanguages:
     def test_returns_expected_specs(self):
         """get_custom_languages() should include all expected language names."""
         specs = get_custom_languages()
-        language_names = {spec.language_name for spec in specs}
+        language_names = {get_language_name(spec) for spec in specs}
         for expected in ["hcl", "dockerfile", "bash", "gotmpl"]:
             assert expected in language_names, f"Missing spec: {expected}"
 
@@ -129,13 +130,13 @@ class TestGetCustomLanguages:
         """All specs should have language_name attribute."""
         specs = get_custom_languages()
         for spec in specs:
-            assert hasattr(spec, "language_name")
-            assert spec.language_name != ""
+            assert hasattr(spec, "_config")
+            assert get_language_name(spec) != ""
 
     def test_spec_language_names(self):
         """Specs should include hcl, dockerfile, and bash language names."""
         specs = get_custom_languages()
-        language_names = {spec.language_name for spec in specs}
+        language_names = {get_language_name(spec) for spec in specs}
         assert "hcl" in language_names
         assert "dockerfile" in language_names
         assert "bash" in language_names

@@ -8,7 +8,7 @@ Handles .tpl and .gotmpl file extensions.
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class GoTmplHandler:
@@ -16,7 +16,7 @@ class GoTmplHandler:
 
     EXTENSIONS = [".tpl", ".gotmpl"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="gotmpl",
         separators_regex=[
             # Level 1: template define blocks (each is a "function")

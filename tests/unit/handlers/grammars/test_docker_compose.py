@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.docker_compose import DockerComposeHandler
 
 
@@ -86,22 +87,22 @@ class TestDockerComposeSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'docker-compose'."""
         handler = DockerComposeHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "docker-compose"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "docker-compose"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 7 separator levels."""
         handler = DockerComposeHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 7
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 7
 
     def test_has_yaml_document_separator(self):
         """First separator should be YAML document separator (---)."""
         handler = DockerComposeHandler()
-        assert r"\n---" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert r"\n---" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = DockerComposeHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

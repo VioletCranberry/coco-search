@@ -62,22 +62,21 @@ class TestSearchCodeAutoDetect:
                             "cocosearch.mcp.server.get_index_metadata",
                             return_value=None,
                         ):
-                            with patch("cocoindex.init"):
+                            with patch(
+                                "cocosearch.search.query.get_connection_pool",
+                                return_value=pool,
+                            ):
                                 with patch(
-                                    "cocosearch.search.query.get_connection_pool",
-                                    return_value=pool,
+                                    "cocosearch.mcp.server.byte_to_line",
+                                    return_value=1,
                                 ):
                                     with patch(
-                                        "cocosearch.mcp.server.byte_to_line",
-                                        return_value=1,
+                                        "cocosearch.mcp.server.read_chunk_content",
+                                        return_value="def test(): pass",
                                     ):
-                                        with patch(
-                                            "cocosearch.mcp.server.read_chunk_content",
-                                            return_value="def test(): pass",
-                                        ):
-                                            result = await search_code(
-                                                query="test query", ctx=_make_mock_ctx()
-                                            )
+                                        result = await search_code(
+                                            query="test query", ctx=_make_mock_ctx()
+                                        )
 
         # Should return search results (header + result)
         assert isinstance(result, list)
@@ -208,20 +207,19 @@ class TestSearchCodeAutoDetect:
         with patch(
             "cocosearch.mcp.project_detection._detect_project", new_callable=AsyncMock
         ) as mock_detect:
-            with patch("cocoindex.init"):
-                with patch(
-                    "cocosearch.search.query.get_connection_pool", return_value=pool
-                ):
-                    with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                        with patch(
-                            "cocosearch.mcp.server.read_chunk_content",
-                            return_value="code",
-                        ):
-                            await search_code(
-                                query="test query",
-                                ctx=_make_mock_ctx(),
-                                index_name="explicit_index",
-                            )
+            with patch(
+                "cocosearch.search.query.get_connection_pool", return_value=pool
+            ):
+                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                    with patch(
+                        "cocosearch.mcp.server.read_chunk_content",
+                        return_value="code",
+                    ):
+                        await search_code(
+                            query="test query",
+                            ctx=_make_mock_ctx(),
+                            index_name="explicit_index",
+                        )
 
         # Should NOT call _detect_project when index_name is explicit
         mock_detect.assert_not_awaited()
@@ -268,22 +266,21 @@ class TestSearchCodeAutoDetect:
                             "cocosearch.mcp.server.get_index_metadata",
                             return_value=mock_metadata,
                         ):
-                            with patch("cocoindex.init"):
+                            with patch(
+                                "cocosearch.search.query.get_connection_pool",
+                                return_value=pool,
+                            ):
                                 with patch(
-                                    "cocosearch.search.query.get_connection_pool",
-                                    return_value=pool,
+                                    "cocosearch.mcp.server.byte_to_line",
+                                    return_value=1,
                                 ):
                                     with patch(
-                                        "cocosearch.mcp.server.byte_to_line",
-                                        return_value=1,
+                                        "cocosearch.mcp.server.read_chunk_content",
+                                        return_value="code",
                                     ):
-                                        with patch(
-                                            "cocosearch.mcp.server.read_chunk_content",
-                                            return_value="code",
-                                        ):
-                                            result = await search_code(
-                                                query="test query", ctx=_make_mock_ctx()
-                                            )
+                                        result = await search_code(
+                                            query="test query", ctx=_make_mock_ctx()
+                                        )
 
         # Should proceed to search, not return collision error
         assert isinstance(result, list)
@@ -324,13 +321,12 @@ class TestSearchCodeAutoDetect:
                             return_value=None,
                         ):
                             with patch("cocosearch.mcp.server.logger") as mock_logger:
-                                with patch("cocoindex.init"):
-                                    with patch(
-                                        "cocosearch.mcp.server.search", return_value=[]
-                                    ):
-                                        await search_code(
-                                            query="test query", ctx=_make_mock_ctx()
-                                        )
+                                with patch(
+                                    "cocosearch.mcp.server.search", return_value=[]
+                                ):
+                                    await search_code(
+                                        query="test query", ctx=_make_mock_ctx()
+                                    )
 
         # Should log auto-detection
         mock_logger.info.assert_called()
@@ -345,15 +341,14 @@ class TestIndexCodebasePathRegistration:
         """index_codebase registers path-to-index mapping."""
         from cocosearch.mcp.server import index_codebase
 
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server._register_with_git") as mock_register:
-                    with patch("cocosearch.mcp.server.set_index_status"):
-                        with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                            result = index_codebase(
-                                path=str(tmp_codebase), index_name="myindex"
-                            )
+        with patch("cocosearch.mcp.server.run_index") as mock_run:
+            mock_run.return_value = MagicMock(stats={})
+            with patch("cocosearch.mcp.server._register_with_git") as mock_register:
+                with patch("cocosearch.mcp.server.set_index_status"):
+                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                        result = index_codebase(
+                            path=str(tmp_codebase), index_name="myindex"
+                        )
 
         assert result["success"] is True
         # Called twice: once before indexing (status tracking) and once after
@@ -364,17 +359,16 @@ class TestIndexCodebasePathRegistration:
         """index_codebase logs warning on collision but doesn't fail."""
         from cocosearch.mcp.server import index_codebase
 
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server._register_with_git") as mock_register:
-                    mock_register.side_effect = ValueError("Collision!")
-                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                        with patch("cocosearch.mcp.server.set_index_status"):
-                            with patch("cocosearch.mcp.server.logger") as mock_logger:
-                                result = index_codebase(
-                                    path=str(tmp_codebase), index_name="myindex"
-                                )
+        with patch("cocosearch.mcp.server.run_index") as mock_run:
+            mock_run.return_value = MagicMock(stats={})
+            with patch("cocosearch.mcp.server._register_with_git") as mock_register:
+                mock_register.side_effect = ValueError("Collision!")
+                with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                    with patch("cocosearch.mcp.server.set_index_status"):
+                        with patch("cocosearch.mcp.server.logger") as mock_logger:
+                            result = index_codebase(
+                                path=str(tmp_codebase), index_name="myindex"
+                            )
 
         # Should succeed (indexing worked)
         assert result["success"] is True
@@ -385,15 +379,12 @@ class TestIndexCodebasePathRegistration:
         """index_codebase derives name and registers path."""
         from cocosearch.mcp.server import index_codebase
 
-        with patch("cocoindex.init"):
-            with patch("cocosearch.mcp.server.run_index") as mock_run:
-                mock_run.return_value = MagicMock(stats={})
-                with patch("cocosearch.mcp.server._register_with_git") as mock_register:
-                    with patch("cocosearch.mcp.server.set_index_status"):
-                        with patch("cocosearch.mcp.server.ensure_metadata_table"):
-                            result = index_codebase(
-                                path=str(tmp_codebase), index_name=None
-                            )
+        with patch("cocosearch.mcp.server.run_index") as mock_run:
+            mock_run.return_value = MagicMock(stats={})
+            with patch("cocosearch.mcp.server._register_with_git") as mock_register:
+                with patch("cocosearch.mcp.server.set_index_status"):
+                    with patch("cocosearch.mcp.server.ensure_metadata_table"):
+                        result = index_codebase(path=str(tmp_codebase), index_name=None)
 
         assert result["success"] is True
         # Called twice: once before indexing (status tracking) and once after

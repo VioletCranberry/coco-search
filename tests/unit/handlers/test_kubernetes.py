@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.kubernetes import KubernetesHandler
 
 
@@ -34,23 +35,23 @@ class TestKubernetesHandlerSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'kubernetes'."""
         handler = KubernetesHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "kubernetes"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "kubernetes"
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have 7 separator levels."""
         handler = KubernetesHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 7
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 7
 
     def test_level1_splits_on_yaml_doc_separator(self):
         """Level 1 separator should split on YAML document separators."""
         handler = KubernetesHandler()
-        level1 = handler.SEPARATOR_SPEC.separators_regex[0]
+        level1 = handler.SEPARATOR_SPEC._config.separators_regex[0]
         assert "---" in level1
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead or lookbehind patterns."""
         handler = KubernetesHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in separator: {sep}"
             assert "(?!" not in sep, f"Negative lookahead found: {sep}"

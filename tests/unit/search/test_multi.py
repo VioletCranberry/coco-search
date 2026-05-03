@@ -40,8 +40,7 @@ def mock_metadata():
 
 @pytest.fixture
 def mock_embedding():
-    with patch("cocosearch.search.multi.code_to_embedding") as m:
-        m.eval.return_value = [0.1] * 768
+    with patch("cocosearch.search.multi.embed_query", return_value=[0.1] * 768) as m:
         yield m
 
 
@@ -88,7 +87,7 @@ class TestMultiSearch:
             mock_search.return_value = []
             multi_search("test query", ["repo_a", "repo_b"])
 
-        mock_embedding.eval.assert_called_once_with("test query")
+        mock_embedding.assert_called_once_with("test query")
 
     def test_query_embedding_passed_to_search(
         self, mock_list_indexes, mock_metadata, mock_embedding

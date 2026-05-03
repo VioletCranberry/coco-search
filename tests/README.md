@@ -38,7 +38,8 @@ tests/
 - `patched_db_pool` - Auto-patched database pool
 
 ### Ollama (tests.fixtures.ollama)
-- `mock_code_to_embedding` - Mock embedding function with deterministic output
+- `mock_embed_query` - Mock embedding function with deterministic output
+- `mock_code_to_embedding` - Backward-compatible alias for `mock_embed_query`
 
 ## Mocking Philosophy
 

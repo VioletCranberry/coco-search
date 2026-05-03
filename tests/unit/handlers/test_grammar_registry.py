@@ -7,6 +7,7 @@ from cocosearch.handlers import (
     detect_grammar,
     get_grammar_handler,
     get_custom_languages,
+    get_language_name,
     get_registered_grammars,
     extract_chunk_metadata,
 )
@@ -195,7 +196,7 @@ class TestGetCustomLanguagesWithGrammars:
     def test_includes_expected_specs(self):
         """get_custom_languages() should include all expected grammar specs."""
         specs = get_custom_languages()
-        language_names = {spec.language_name for spec in specs}
+        language_names = {get_language_name(spec) for spec in specs}
         expected = {
             "argocd",
             "github-actions",
@@ -212,7 +213,7 @@ class TestGetCustomLanguagesWithGrammars:
     def test_includes_grammar_specs(self):
         """get_custom_languages() should include grammar language names."""
         specs = get_custom_languages()
-        language_names = {spec.language_name for spec in specs}
+        language_names = {get_language_name(spec) for spec in specs}
         assert "argocd" in language_names
         assert "github-actions" in language_names
         assert "gitlab-ci" in language_names
@@ -225,7 +226,7 @@ class TestGetCustomLanguagesWithGrammars:
     def test_still_includes_language_specs(self):
         """get_custom_languages() should still include language handler specs."""
         specs = get_custom_languages()
-        language_names = {spec.language_name for spec in specs}
+        language_names = {get_language_name(spec) for spec in specs}
         assert "hcl" in language_names
         assert "dockerfile" in language_names
         assert "bash" in language_names

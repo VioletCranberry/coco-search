@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.dockerfile import DockerfileHandler
 
 
@@ -22,22 +23,22 @@ class TestDockerfileHandlerSeparatorSpec:
     def test_language_name_is_dockerfile(self):
         """SEPARATOR_SPEC.language_name should be 'dockerfile'."""
         handler = DockerfileHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "dockerfile"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "dockerfile"
 
     def test_aliases_empty(self):
         """SEPARATOR_SPEC.aliases should be empty (routing via extract_language)."""
         handler = DockerfileHandler()
-        assert handler.SEPARATOR_SPEC.aliases == []
+        assert handler.SEPARATOR_SPEC._config.aliases == []
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = DockerfileHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) > 0
 
     def test_from_is_higher_priority_than_other_instructions(self):
         """FROM should be a separate separator at higher priority than other instructions."""
         handler = DockerfileHandler()
-        separators = handler.SEPARATOR_SPEC.separators_regex
+        separators = handler.SEPARATOR_SPEC._config.separators_regex
         from_index = None
         instructions_index = None
         for i, sep in enumerate(separators):
@@ -54,7 +55,7 @@ class TestDockerfileHandlerSeparatorSpec:
     def test_no_lookaheads_in_separators(self):
         """Dockerfile separators must not contain lookahead or lookbehind patterns."""
         handler = DockerfileHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Dockerfile separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Dockerfile separator: {sep}"
             assert "(?!" not in sep, (

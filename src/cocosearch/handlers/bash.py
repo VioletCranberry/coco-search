@@ -8,7 +8,7 @@ Handles .sh, .bash, and .zsh file extensions.
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class BashHandler:
@@ -16,7 +16,7 @@ class BashHandler:
 
     EXTENSIONS = [".sh", ".bash", ".zsh"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="bash",
         separators_regex=[
             # Level 1: Function keyword definitions

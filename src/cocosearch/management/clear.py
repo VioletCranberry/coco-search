@@ -76,32 +76,31 @@ def clear_index(index_name: str) -> dict:
             except Exception:
                 pass  # Table may not exist for indexes without deps extraction
 
-            # Drop CocoIndex tracking table if it exists (non-critical)
+            # Drop legacy CocoIndex tracking table (non-critical)
             tracking_table = f"codeindex_{index_name}__cocoindex_tracking"
             try:
                 cur.execute(f"DROP TABLE IF EXISTS {tracking_table}")
                 conn.commit()
             except Exception:
-                pass  # Table may not exist
+                pass
 
-            # Clean CocoIndex metadata so re-index creates tables fresh
+            # Drop index tracking table (non-critical)
+            index_tracking = f"cocosearch_index_tracking_{index_name}"
             try:
-                flow_name = f"CodeIndex_{index_name}"
+                cur.execute(f"DROP TABLE IF EXISTS {index_tracking}")
+                conn.commit()
+            except Exception:
+                pass
+
+            # Clean legacy CocoIndex metadata (non-critical)
+            try:
                 cur.execute(
                     "DELETE FROM cocoindex_setup_metadata WHERE flow_name = %s",
-                    (flow_name,),
+                    (f"CodeIndex_{index_name}",),
                 )
                 conn.commit()
-
-                # Close in-memory flow to prevent stale state on re-index
-                # (critical for long-running processes like MCP server)
-                from cocoindex.flow import _flows
-
-                old = _flows.get(flow_name)
-                if old is not None:
-                    old.close()
             except Exception:
-                pass  # Table may not exist or cocoindex not available
+                pass
 
     # Clear path-to-index metadata (non-critical, log but don't fail)
     try:

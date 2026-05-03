@@ -72,7 +72,9 @@ Available as a WEB dashboard, CLI, MCP server, or interactive REPL. Incremental 
 
 **AI-native context** — complete code units with dependency context in fewer retrieval calls. Less guessing about boundaries, less noise in the context window, more accurate answers about how the code actually works.
 
-**Dependency-aware analysis** — RAG-based code search that replaces iterative grep/glob cycles with a few semantic queries, and dependency-aware PR reviews that surface blast radius, missing test coverage, and pattern inconsistencies across the changeset.
+**Dependency-aware analysis** — file-level dependency graph with forward trees and reverse impact analysis across 11 extractors (Python, JS/TS, Go, Terraform, Helm, GitHub Actions, GitLab CI, Docker Compose, ArgoCD, Markdown). Dependency-enriched search results, blast radius estimation, and hub file detection — built in, not bolted on.
+
+**Cross-repo search** — link related indexes via `linkedIndexes` config and search across multiple codebases in a single query. Shared embedding, parallel per-index search, unified ranking. No manual orchestration needed.
 
 <details>
 <summary>Screenshots</summary>
@@ -140,11 +142,21 @@ This project was originally built for personal use — a solo experiment in loca
 
 - 📐 **Context expansion** -- results automatically expand to enclosing function/class boundaries using Tree-sitter AST traversal, so you see complete units of code instead of arbitrary line ranges. Supports Python, JavaScript, TypeScript, Go, Rust, Scala, HCL/Terraform, and Dockerfile. Hard-capped at 50 lines per result, centered on the match. Disable with `--no-smart` or set explicit line counts with `-B`/`-A`/`-C`.
 
+- 🔗 **Dependency graphs** -- file-level dependency extraction with 11 pluggable extractors (Python, JS/TS, Go, Terraform, Helm, GitHub Actions, GitLab CI, Docker Compose, ArgoCD, Markdown) and 5 module resolvers. Forward trees (`deps tree`), reverse impact analysis (`deps impact`), batch queries, and dependency-enriched search results (`include_deps`). Incremental extraction with SHA-256 tracking. Add extractors for new languages by copying a [template](./src/cocosearch/deps/extractors/_template.py).
+
+- 🌐 **Cross-index search** -- search across multiple codebases in a single query via `--indexes` or `linkedIndexes` config. Query embedding computed once, parallel per-index search, results merged by score. Linked indexes auto-expand single-index searches — missing indexes are skipped gracefully.
+
+- 📝 **Grammar handlers** -- 9 domain-specific handlers (ArgoCD, GitHub Actions, GitLab CI, Docker Compose, Helm Chart/Template/Values, Kubernetes, Terraform) that chunk infrastructure configs at meaningful boundaries — jobs/steps, resources, services — instead of splitting YAML on whitespace. Autodiscovered, extensible via [template](./src/cocosearch/handlers/grammars/_template.py).
+
+- 🔄 **Incremental indexing** -- SHA-256 content hashing tracks file changes so only new or modified files are re-embedded on subsequent runs. Each file commits atomically. `.gitignore`-aware by default.
+
+- 🖥️ **Web dashboard** -- browser UI with multi-project management, code search with filters, index lifecycle (create/reindex/delete), dependency graph visualization, syntax-highlighted file viewer, open-in-editor, real-time log streaming, and observability charts. Light and dark themes.
+
 - ⚡ **Query caching** -- two-level LRU cache (500 entries, 24h TTL): exact-match via SHA-256 hash of all search parameters, plus semantic fallback that finds paraphrased queries by cosine similarity (threshold 0.92, scanning last 50 entries). Cache auto-invalidates on reindex. Bypass with `--no-cache`.
 
 - 🩺 **Parse health tracking** -- tracks per-file parse status across four categories: `ok`, `partial` (Tree-sitter produced a tree with ERROR nodes), `error` (parse failure), and `no_grammar`. Detects index staleness by comparing the indexed commit hash and branch against your current HEAD — the dashboard and CLI show warnings when the index drifts behind. View with `cocosearch stats --pretty`.
 
-- 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool.
+- 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool. Cross-index analysis with per-index breakdowns.
 
 - 🔒 **Privacy-first** -- runs entirely on your machine by default — Ollama generates embeddings locally, PostgreSQL stores vectors locally, no telemetry. Optional remote embedding providers (OpenAI, OpenRouter) send only chunk text for embedding; all indexing, storage, and search remain local. Your code never leaves your machine.
 
@@ -508,7 +520,7 @@ CocoSearch indexes 32 programming languages. Symbol-aware languages support `--s
 Chunking strategy depends on the language:
 
 - **Tree-sitter chunking (~20 languages)**: CocoIndex's `SplitRecursively` uses Tree-sitter internally to split at syntax-aware boundaries (function/class edges). Covers Python, JavaScript, TypeScript, Go, Rust, Java, C, C++, C#, Ruby, PHP, and others in CocoIndex's [built-in list](https://cocoindex.io/docs/ops/functions#supported-languages).
-- **Custom handler chunking (6 languages)**: HCL, Dockerfile, Bash, Go Template, Scala, and Groovy use regex-based `CustomLanguageSpec` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
+- **Custom handler chunking (6 languages)**: HCL, Dockerfile, Bash, Go Template, Scala, and Groovy use regex-based `CustomLanguageConfig` separators tuned for their syntax — no Tree-sitter grammar available for these in CocoIndex.
 - **Text fallback**: Languages not recognized by either tier (Markdown, JSON, YAML, TOML, etc.) are split on blank lines and whitespace boundaries.
 
 In short: CocoIndex's Tree-sitter tells you _where to cut_; the `.scm` files tell you _what's inside each piece_.

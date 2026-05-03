@@ -23,15 +23,8 @@ def get_database_url() -> str:
 
     Returns COCOSEARCH_DATABASE_URL if set, otherwise the default
     (postgresql://cocosearch:cocosearch@localhost:5432/cocosearch).
-
-    Side effect: Sets COCOINDEX_DATABASE_URL in os.environ if not already
-    set, bridging to the CocoIndex SDK which reads that variable.
     """
-    url = os.getenv("COCOSEARCH_DATABASE_URL", DEFAULT_DATABASE_URL)
-    # Bridge: CocoIndex SDK reads COCOINDEX_DATABASE_URL, not COCOSEARCH_*
-    if not os.getenv("COCOINDEX_DATABASE_URL"):
-        os.environ["COCOINDEX_DATABASE_URL"] = url
-    return url
+    return os.getenv("COCOSEARCH_DATABASE_URL", DEFAULT_DATABASE_URL)
 
 
 def validate_required_env_vars() -> list[EnvVarError]:

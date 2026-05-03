@@ -29,19 +29,6 @@ class TestGetDatabaseUrl:
             result = get_database_url()
         assert result == custom_url
 
-    def test_bridges_to_cocoindex_env_var(self):
-        """Should set COCOINDEX_DATABASE_URL when not already set."""
-        with patch.dict(os.environ, {}, clear=True):
-            url = get_database_url()
-            assert os.environ.get("COCOINDEX_DATABASE_URL") == url
-
-    def test_does_not_override_existing_cocoindex_var(self):
-        """Should not override COCOINDEX_DATABASE_URL if already set."""
-        existing = "postgresql://other:pass@host:5432/other"
-        with patch.dict(os.environ, {"COCOINDEX_DATABASE_URL": existing}, clear=True):
-            get_database_url()
-            assert os.environ["COCOINDEX_DATABASE_URL"] == existing
-
 
 class TestValidateRequiredEnvVars:
     """Tests for validate_required_env_vars after default addition."""

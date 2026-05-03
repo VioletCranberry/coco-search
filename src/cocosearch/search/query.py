@@ -7,7 +7,7 @@ performs vector similarity searches against the PostgreSQL database.
 import logging
 from dataclasses import dataclass
 
-from cocosearch.indexer.embedder import code_to_embedding
+from cocosearch.indexer.embedder import embed_query
 from cocosearch.search.cache import get_query_cache
 from cocosearch.search.db import (
     check_column_exists,
@@ -443,7 +443,7 @@ def search(
     # Vector-only search (existing behavior)
     # Embed query using same model as indexing (skip if pre-computed)
     if query_embedding is None:
-        query_embedding = code_to_embedding.eval(query)
+        query_embedding = embed_query(query)
 
     # Build base SELECT columns (always include metadata)
     select_cols = (

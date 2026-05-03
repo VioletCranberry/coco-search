@@ -32,15 +32,11 @@ _active_indexing: dict[str, tuple[threading.Thread, threading.Event]] = {}
 _indexing_lock = threading.Lock()
 _last_activity: float = _time.monotonic()
 _IDLE_TIMEOUT_DEFAULT = 1800  # 30 minutes
-_cocoindex_initialized = False
-_cocoindex_init_lock = threading.Lock()
-_cocoindex_init_failed_at: float = 0.0  # monotonic timestamp of last failure
 _COCOINDEX_RETRY_COOLDOWN = 30.0  # seconds before retrying after failure
 
 from pathlib import Path  # noqa: E402
 from typing import Annotated  # noqa: E402
 
-import cocoindex  # noqa: E402
 from mcp.server.fastmcp import Context, FastMCP  # noqa: E402
 from pydantic import Field  # noqa: E402
 from starlette.responses import (  # noqa: E402
@@ -123,57 +119,13 @@ def _start_idle_watchdog(timeout_seconds: int):
 
 
 def _ensure_cocoindex_init(timeout: float = 5.0) -> bool:
-    """Initialize CocoIndex exactly once, thread-safely.
+    """No-op — CocoIndex runtime is no longer required.
 
-    Returns True if init succeeded, False if it timed out or failed.
-    After a failure, returns False immediately for ``_COCOINDEX_RETRY_COOLDOWN``
-    seconds to avoid repeated timeout waits and downstream pool spam.
-
-    cocoindex.init() is synchronous and triggers a RuntimeWarning when called
-    inside an async event loop. By calling it once (guarded by a lock) we
-    avoid the repeated sync-inside-async warnings from every HTTP/MCP handler.
+    CocoSearch v1 uses LiteLLM directly for embeddings and psycopg for
+    database operations. The CocoIndex runtime (LMDB state) is not needed.
+    This function is kept as a no-op to avoid changing all call sites.
     """
-    global _cocoindex_initialized, _cocoindex_init_failed_at
-    if _cocoindex_initialized:
-        return True
-    # Cooldown: don't retry if we recently failed
-    if _cocoindex_init_failed_at and (
-        _time.monotonic() - _cocoindex_init_failed_at < _COCOINDEX_RETRY_COOLDOWN
-    ):
-        return False
-    with _cocoindex_init_lock:
-        if _cocoindex_initialized:
-            return True
-        # Re-check cooldown inside the lock (another thread may have just failed)
-        if _cocoindex_init_failed_at and (
-            _time.monotonic() - _cocoindex_init_failed_at < _COCOINDEX_RETRY_COOLDOWN
-        ):
-            return False
-
-        import concurrent.futures
-
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(cocoindex.init)
-        try:
-            future.result(timeout=timeout)
-            _cocoindex_initialized = True
-            executor.shutdown(wait=False)
-            return True
-        except concurrent.futures.TimeoutError:
-            # Don't wait for the stuck thread — let the server proceed
-            executor.shutdown(wait=False, cancel_futures=True)
-            _cocoindex_init_failed_at = _time.monotonic()
-            logger.warning(
-                "CocoIndex init timed out after %.1fs — "
-                "infrastructure may be unavailable",
-                timeout,
-            )
-            return False
-        except Exception as e:
-            executor.shutdown(wait=False)
-            _cocoindex_init_failed_at = _time.monotonic()
-            logger.warning("CocoIndex init failed: %s", e)
-            return False
+    return True
 
 
 def _apply_thread_liveness_status(
@@ -635,6 +587,7 @@ async def api_reindex(request) -> JSONResponse:
                     codebase_path=source_path,
                     config=IndexingConfig(),
                     fresh=fresh,
+                    stop_event=cancel_event,
                 )
                 _register_with_git(index_name, source_path)
                 # Always extract dependencies after indexing
@@ -884,6 +837,7 @@ async def api_index(request) -> JSONResponse:
                     config=indexing_config,
                     respect_gitignore=not no_gitignore,
                     fresh=fresh,
+                    stop_event=cancel_event,
                 )
                 _register_with_git(index_name, project_path)
                 # Always extract dependencies after indexing
@@ -1145,7 +1099,7 @@ async def api_analyze(request) -> JSONResponse:
 async def api_languages(request) -> JSONResponse:
     """List supported languages with extensions and capabilities."""
     from cocosearch.deps.registry import get_all_extractor_language_ids
-    from cocosearch.handlers import get_registered_handlers
+    from cocosearch.handlers import get_language_name, get_registered_handlers
     from cocosearch.search.context_expander import CONTEXT_EXPANSION_LANGUAGES
     from cocosearch.search.query import LANGUAGE_EXTENSIONS, SYMBOL_AWARE_LANGUAGES
 
@@ -1165,9 +1119,10 @@ async def api_languages(request) -> JSONResponse:
         )
 
     for handler in sorted(
-        get_registered_handlers(), key=lambda h: h.SEPARATOR_SPEC.language_name
+        get_registered_handlers(),
+        key=lambda h: get_language_name(h.SEPARATOR_SPEC),
     ):
-        lang = handler.SEPARATOR_SPEC.language_name
+        lang = get_language_name(handler.SEPARATOR_SPEC)
         if lang in LANGUAGE_EXTENSIONS:
             continue
         languages.append(

@@ -9,7 +9,7 @@ Matches: *.tf, *.tfvars (path-based — these extensions are always Terraform)
 import fnmatch
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class TerraformHandler:
@@ -19,7 +19,7 @@ class TerraformHandler:
     BASE_LANGUAGE = "hcl"
     PATH_PATTERNS = ["**/*.tf", "**/*.tfvars"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="terraform",
         separators_regex=[
             # Level 1: Top-level Terraform block boundaries (12 keywords)

@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.groovy import GroovyHandler
 
 
@@ -27,22 +28,22 @@ class TestGroovyHandlerSeparatorSpec:
     def test_language_name_is_groovy(self):
         """SEPARATOR_SPEC.language_name should be 'groovy'."""
         handler = GroovyHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "groovy"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "groovy"
 
     def test_aliases_contains_gradle(self):
         """SEPARATOR_SPEC.aliases should contain 'gradle'."""
         handler = GroovyHandler()
-        assert handler.SEPARATOR_SPEC.aliases == ["gradle"]
+        assert handler.SEPARATOR_SPEC._config.aliases == ["gradle"]
 
     def test_has_separators(self):
         """SEPARATOR_SPEC should have a non-empty separators_regex list."""
         handler = GroovyHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) > 0
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) > 0
 
     def test_no_lookaheads_in_separators(self):
         """Groovy separators must not contain lookahead or lookbehind patterns."""
         handler = GroovyHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep, f"Lookahead found in Groovy separator: {sep}"
             assert "(?<=" not in sep, f"Lookbehind found in Groovy separator: {sep}"
             assert "(?!" not in sep, (

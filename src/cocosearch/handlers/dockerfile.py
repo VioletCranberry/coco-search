@@ -9,7 +9,7 @@ Handles .dockerfile extension and extensionless Dockerfile/Containerfile files
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 
 class DockerfileHandler:
@@ -20,7 +20,7 @@ class DockerfileHandler:
     # Additional include patterns for extensionless Dockerfiles/Containerfiles
     INCLUDE_PATTERNS = ["Dockerfile", "Dockerfile.*", "Containerfile"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="dockerfile",
         separators_regex=[
             # Level 1: FROM (build stage boundaries -- highest priority)

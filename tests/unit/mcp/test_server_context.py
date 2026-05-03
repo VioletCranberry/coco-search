@@ -81,22 +81,19 @@ class TestContextInResponse:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=5):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="def target():",
-                    ):
-                        result = await search_code(
-                            query="target function",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=5,
-                            smart_context=True,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=5):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="def target():",
+                ):
+                    result = await search_code(
+                        query="target function",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=5,
+                        smart_context=True,
+                    )
 
         assert len(result) == 1
         # Context fields should be present (may be empty strings if no context found)
@@ -118,24 +115,21 @@ class TestContextInResponse:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=3):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="def target():",
-                    ):
-                        result = await search_code(
-                            query="target",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            limit=5,
-                            context_before=2,
-                            context_after=1,
-                            smart_context=False,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=3):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="def target():",
+                ):
+                    result = await search_code(
+                        query="target",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        limit=5,
+                        context_before=2,
+                        context_after=1,
+                        smart_context=False,
+                    )
 
         assert len(result) == 1
         # With explicit context, context fields should be in response
@@ -161,21 +155,18 @@ class TestContextParameterCombinations:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=3):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content", return_value="line3"
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            context_before=2,
-                            smart_context=False,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=3):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content", return_value="line3"
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        context_before=2,
+                        smart_context=False,
+                    )
 
         assert len(result) == 1
         # Should have before context but no after
@@ -196,21 +187,18 @@ class TestContextParameterCombinations:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content", return_value="line1"
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            context_after=2,
-                            smart_context=False,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content", return_value="line1"
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        context_after=2,
+                        smart_context=False,
+                    )
 
         assert len(result) == 1
 
@@ -228,22 +216,19 @@ class TestContextParameterCombinations:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=3):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content", return_value="c"
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            context_before=2,
-                            context_after=2,
-                            smart_context=False,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=3):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content", return_value="c"
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        context_before=2,
+                        context_after=2,
+                        smart_context=False,
+                    )
 
         assert len(result) == 1
 
@@ -261,21 +246,18 @@ class TestContextParameterCombinations:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="def func():",
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            smart_context=False,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="def func():",
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        smart_context=False,
+                    )
 
         assert len(result) == 1
         # With smart_context=False and no explicit counts, no context expansion
@@ -296,21 +278,18 @@ class TestContextEdgeCases:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content", return_value="code"
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            context_before=5,
-                            context_after=5,
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content", return_value="code"
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        context_before=5,
+                        context_after=5,
+                    )
 
         assert len(result) == 1
         # Should not crash, should return result without context or with empty context
@@ -323,17 +302,14 @@ class TestContextEdgeCases:
         """No search results returns empty list."""
         pool, cursor, _conn = mock_db_pool(results=[])
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                result = await search_code(
-                    query="nonexistent",
-                    ctx=_make_mock_ctx(),
-                    index_name="testindex",
-                    context_before=5,
-                    context_after=5,
-                )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            result = await search_code(
+                query="nonexistent",
+                ctx=_make_mock_ctx(),
+                index_name="testindex",
+                context_before=5,
+                context_after=5,
+            )
 
         assert result == []
 
@@ -351,21 +327,18 @@ class TestContextEdgeCases:
             ]
         )
 
-        with patch("cocoindex.init"):
-            with patch(
-                "cocosearch.search.query.get_connection_pool", return_value=pool
-            ):
-                with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
-                    with patch(
-                        "cocosearch.mcp.server.read_chunk_content",
-                        return_value="some content",
-                    ):
-                        result = await search_code(
-                            query="test",
-                            ctx=_make_mock_ctx(),
-                            index_name="testindex",
-                            smart_context=True,  # Smart won't work for .xyz
-                        )
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.mcp.server.byte_to_line", return_value=1):
+                with patch(
+                    "cocosearch.mcp.server.read_chunk_content",
+                    return_value="some content",
+                ):
+                    result = await search_code(
+                        query="test",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        smart_context=True,  # Smart won't work for .xyz
+                    )
 
         assert len(result) == 1
         # Should not crash even with unsupported extension

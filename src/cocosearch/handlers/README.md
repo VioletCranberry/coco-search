@@ -13,7 +13,7 @@ This package provides language-aware chunking for code indexing.
 
 1. Copy `_template.py` to `<language>.py`
 2. Update EXTENSIONS list with file extensions (with dots, e.g., `['.ext']`)
-3. Define SEPARATOR_SPEC with CustomLanguageSpec:
+3. Define SEPARATOR_SPEC with CustomLanguageConfig:
    - `language_name`: Canonical language identifier
    - `separators_regex`: List of regex patterns (highest to lowest priority)
    - `aliases`: List of alternative language names
@@ -37,8 +37,8 @@ class LanguageHandler(Protocol):
     EXTENSIONS: ClassVar[list[str]]
     """File extensions this handler claims (e.g., ['.tf', '.hcl'])."""
 
-    SEPARATOR_SPEC: ClassVar[CustomLanguageSpec | None]
-    """CocoIndex CustomLanguageSpec for chunking, or None for default."""
+    SEPARATOR_SPEC: ClassVar[CustomLanguageConfig | None]
+    """CocoIndex CustomLanguageConfig for chunking, or None for default."""
 
     def extract_metadata(self, text: str) -> dict:
         """Extract metadata from chunk text.
@@ -105,7 +105,7 @@ from cocosearch.handlers import get_handler, get_custom_languages, extract_chunk
 handler = get_handler('.tf')  # Returns HclHandler
 handler = get_handler('.unknown')  # Returns TextHandler (fallback)
 
-# Get all CustomLanguageSpec for CocoIndex
+# Get all CustomLanguageConfig for CocoIndex
 specs = get_custom_languages()  # Returns [HCL_SPEC, DOCKERFILE_SPEC, BASH_SPEC]
 
 # Extract metadata from chunk (CocoIndex transform)

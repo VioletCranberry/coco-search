@@ -9,7 +9,7 @@ Content markers: 'on:' and 'jobs:'
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 
@@ -20,7 +20,7 @@ class GitHubActionsHandler(YamlGrammarBase):
     GRAMMAR_NAME = "github-actions"
     PATH_PATTERNS = [".github/workflows/*.yml", ".github/workflows/*.yaml"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="github-actions",
         separators_regex=[
             # Level 1: YAML document separator

@@ -8,7 +8,7 @@ Matches: Chart.yaml, Chart.yml (with apiVersion: and name: markers)
 
 import re
 
-import cocoindex
+from cocoindex.ops.text import CustomLanguageConfig
 
 from cocosearch.handlers.grammars._base import YamlGrammarBase
 
@@ -19,7 +19,7 @@ class HelmChartHandler(YamlGrammarBase):
     GRAMMAR_NAME = "helm-chart"
     PATH_PATTERNS = ["**/Chart.yaml", "**/Chart.yml"]
 
-    SEPARATOR_SPEC = cocoindex.functions.CustomLanguageSpec(
+    SEPARATOR_SPEC = CustomLanguageConfig(
         language_name="helm-chart",
         separators_regex=[
             # Level 1: YAML document separator

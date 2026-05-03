@@ -75,7 +75,7 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 - Same embedding function used during search queries to ensure consistency (search queries are NOT prefixed with filenames — intentional asymmetry: document embeddings are enriched, queries stay natural)
 - Server address configured via `COCOSEARCH_EMBEDDING_BASE_URL` (or `embedding.baseUrl` in config) for any provider, overriding the default endpoint. For the `ollama` provider specifically, `COCOSEARCH_OLLAMA_URL` is the fallback (defaults to http://localhost:11434)
 
-**Implementation:** `src/cocosearch/indexer/embedder.py` — `add_filename_context`, `code_to_embedding`
+**Implementation:** `src/cocosearch/indexer/embedder.py` — `add_filename_context`, `embed_query`
 
 ### 5. Metadata Extraction
 

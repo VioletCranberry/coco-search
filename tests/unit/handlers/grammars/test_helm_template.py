@@ -2,6 +2,7 @@
 
 import pytest
 
+from cocosearch.handlers import get_language_name
 from cocosearch.handlers.grammars.helm_template import HelmTemplateHandler
 
 
@@ -129,37 +130,37 @@ class TestHelmTemplateSeparatorSpec:
     def test_language_name(self):
         """SEPARATOR_SPEC.language_name should be 'helm-template'."""
         handler = HelmTemplateHandler()
-        assert handler.SEPARATOR_SPEC.language_name == "helm-template"
+        assert get_language_name(handler.SEPARATOR_SPEC) == "helm-template"
 
     def test_separator_count(self):
         """SEPARATOR_SPEC should have 9 separator levels."""
         handler = HelmTemplateHandler()
-        assert len(handler.SEPARATOR_SPEC.separators_regex) == 9
+        assert len(handler.SEPARATOR_SPEC._config.separators_regex) == 9
 
     def test_has_yaml_document_separator(self):
         """First separator should be YAML document separator (---)."""
         handler = HelmTemplateHandler()
-        assert r"\n---" in handler.SEPARATOR_SPEC.separators_regex[0]
+        assert r"\n---" in handler.SEPARATOR_SPEC._config.separators_regex[0]
 
     def test_has_api_version_separator(self):
         """Second separator should split on apiVersion: boundaries."""
         handler = HelmTemplateHandler()
-        assert "apiVersion" in handler.SEPARATOR_SPEC.separators_regex[1]
+        assert "apiVersion" in handler.SEPARATOR_SPEC._config.separators_regex[1]
 
     def test_has_define_separator(self):
         """Third separator should split on Go template define blocks."""
         handler = HelmTemplateHandler()
-        assert "define" in handler.SEPARATOR_SPEC.separators_regex[2]
+        assert "define" in handler.SEPARATOR_SPEC._config.separators_regex[2]
 
     def test_has_top_level_key_separator(self):
         """Fourth separator should split on top-level YAML keys."""
         handler = HelmTemplateHandler()
-        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC.separators_regex[3]
+        assert r"[a-zA-Z_]" in handler.SEPARATOR_SPEC._config.separators_regex[3]
 
     def test_has_control_flow_separator(self):
         """Fifth separator should split on Go template control flow."""
         handler = HelmTemplateHandler()
-        sep = handler.SEPARATOR_SPEC.separators_regex[4]
+        sep = handler.SEPARATOR_SPEC._config.separators_regex[4]
         assert "if" in sep
         assert "range" in sep
         assert "with" in sep
@@ -167,12 +168,12 @@ class TestHelmTemplateSeparatorSpec:
     def test_has_indented_key_separator(self):
         """Sixth separator should split on 2-space indented keys."""
         handler = HelmTemplateHandler()
-        assert r"\n  " in handler.SEPARATOR_SPEC.separators_regex[5]
+        assert r"\n  " in handler.SEPARATOR_SPEC._config.separators_regex[5]
 
     def test_no_lookaheads_in_separators(self):
         """Separators must not contain lookahead/lookbehind patterns."""
         handler = HelmTemplateHandler()
-        for sep in handler.SEPARATOR_SPEC.separators_regex:
+        for sep in handler.SEPARATOR_SPEC._config.separators_regex:
             assert "(?=" not in sep
             assert "(?<=" not in sep
             assert "(?!" not in sep

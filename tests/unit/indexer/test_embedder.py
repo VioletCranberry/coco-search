@@ -1,8 +1,6 @@
 """Tests for cocosearch.indexer.embedder module."""
 
-from unittest.mock import patch
-
-import cocoindex
+from unittest.mock import patch, MagicMock
 
 
 class TestKnownDimensions:
@@ -75,98 +73,93 @@ class TestOutputDimensionResolution:
             assert _resolve_output_dimension("some-custom-model") == 256
 
 
-class TestProviderMap:
-    """Tests for PROVIDER_MAP and _default_model."""
+class TestGetLitellmModel:
+    """Tests for _get_litellm_model helper."""
 
-    def test_provider_map_contains_ollama(self):
-        """PROVIDER_MAP maps 'ollama' to OLLAMA api type."""
-        from cocosearch.indexer.embedder import PROVIDER_MAP
+    def test_ollama_default(self):
+        """Ollama provider prefixes model with 'ollama/'."""
+        from cocosearch.indexer.embedder import _get_litellm_model
 
-        assert PROVIDER_MAP["ollama"] == cocoindex.LlmApiType.OLLAMA
+        with patch.dict("os.environ", {}, clear=True):
+            result = _get_litellm_model()
+        assert result == "ollama/nomic-embed-text"
 
-    def test_provider_map_contains_openai(self):
-        """PROVIDER_MAP maps 'openai' to OPENAI api type."""
-        from cocosearch.indexer.embedder import PROVIDER_MAP
+    def test_ollama_custom_model(self):
+        """Ollama with custom model prefixes correctly."""
+        from cocosearch.indexer.embedder import _get_litellm_model
 
-        assert PROVIDER_MAP["openai"] == cocoindex.LlmApiType.OPENAI
+        env = {
+            "COCOSEARCH_EMBEDDING_PROVIDER": "ollama",
+            "COCOSEARCH_EMBEDDING_MODEL": "mxbai-embed-large",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            result = _get_litellm_model()
+        assert result == "ollama/mxbai-embed-large"
 
-    def test_provider_map_contains_openrouter(self):
-        """PROVIDER_MAP maps 'openrouter' to OPEN_ROUTER api type."""
-        from cocosearch.indexer.embedder import PROVIDER_MAP
+    def test_openai_default(self):
+        """OpenAI provider uses model name directly."""
+        from cocosearch.indexer.embedder import _get_litellm_model
 
-        assert PROVIDER_MAP["openrouter"] == cocoindex.LlmApiType.OPEN_ROUTER
+        env = {"COCOSEARCH_EMBEDDING_PROVIDER": "openai"}
+        with patch.dict("os.environ", env, clear=True):
+            result = _get_litellm_model()
+        assert result == "text-embedding-3-small"
 
-    def test_default_model_ollama(self):
-        """Default model for ollama is nomic-embed-text."""
-        from cocosearch.indexer.embedder import _default_model
+    def test_openrouter_default(self):
+        """OpenRouter provider prefixes with 'openrouter/'."""
+        from cocosearch.indexer.embedder import _get_litellm_model
 
-        assert _default_model("ollama") == "nomic-embed-text"
+        env = {"COCOSEARCH_EMBEDDING_PROVIDER": "openrouter"}
+        with patch.dict("os.environ", env, clear=True):
+            result = _get_litellm_model()
+        assert result == "openrouter/openai/text-embedding-3-small"
 
-    def test_default_model_openai(self):
-        """Default model for openai is text-embedding-3-small."""
-        from cocosearch.indexer.embedder import _default_model
+    def test_unknown_provider_falls_back(self):
+        """Unknown provider uses default model without prefix."""
+        from cocosearch.indexer.embedder import _get_litellm_model
 
-        assert _default_model("openai") == "text-embedding-3-small"
-
-    def test_default_model_openrouter(self):
-        """Default model for openrouter is openai/text-embedding-3-small."""
-        from cocosearch.indexer.embedder import _default_model
-
-        assert _default_model("openrouter") == "openai/text-embedding-3-small"
-
-    def test_default_model_unknown_falls_back(self):
-        """Unknown provider falls back to nomic-embed-text."""
-        from cocosearch.indexer.embedder import _default_model
-
-        assert _default_model("unknown") == "nomic-embed-text"
-
-
-class TestCodeToEmbedding:
-    """Tests for code_to_embedding function.
-
-    These tests use the mock_code_to_embedding fixture which patches the
-    embedding function to return deterministic vectors without calling Ollama.
-    """
-
-    def test_generates_embedding_vector(self, mock_code_to_embedding):
-        """Returns a list of floats."""
-        result = mock_code_to_embedding.eval("def hello(): pass")
-
-        assert isinstance(result, list)
-        assert all(isinstance(x, float) for x in result)
-
-    def test_embedding_has_correct_dimensions(self, mock_code_to_embedding):
-        """Returns 768-dimensional vector (nomic-embed-text default)."""
-        result = mock_code_to_embedding.eval("def hello(): pass")
-
-        assert len(result) == 768
-
-    def test_different_inputs_different_embeddings(self, mock_code_to_embedding):
-        """Different code produces different vectors."""
-        embedding1 = mock_code_to_embedding.eval("def hello(): pass")
-        embedding2 = mock_code_to_embedding.eval("def world(): return 42")
-
-        # Embeddings should be different for different inputs
-        assert embedding1 != embedding2
-
-    def test_same_input_same_embedding(self, mock_code_to_embedding):
-        """Same input produces same embedding (deterministic)."""
-        code = "def example(): return True"
-        embedding1 = mock_code_to_embedding.eval(code)
-        embedding2 = mock_code_to_embedding.eval(code)
-
-        assert embedding1 == embedding2
-
-    def test_embedding_values_in_valid_range(self, mock_code_to_embedding):
-        """Embedding values are in [-1, 1] range."""
-        result = mock_code_to_embedding.eval("some code content")
-
-        for value in result:
-            assert -1 <= value <= 1
+        env = {"COCOSEARCH_EMBEDDING_PROVIDER": "custom"}
+        with patch.dict("os.environ", env, clear=True):
+            result = _get_litellm_model()
+        assert result == "nomic-embed-text"
 
 
-class TestCodeToEmbeddingAddress:
-    """Tests for address resolution in code_to_embedding."""
+class TestEmbedQuery:
+    """Tests for embed_query function."""
+
+    def test_calls_litellm_embedding(self):
+        """embed_query calls litellm.embedding with correct arguments."""
+        from cocosearch.indexer.embedder import embed_query
+
+        mock_response = MagicMock()
+        mock_response.data = [{"embedding": [0.1, 0.2, 0.3]}]
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.return_value = mock_response
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_query("test text")
+
+        assert result == [0.1, 0.2, 0.3]
+        mock_litellm.embedding.assert_called_once()
+
+    def test_returns_embedding_vector(self):
+        """embed_query returns the embedding list from the response."""
+        from cocosearch.indexer.embedder import embed_query
+
+        expected = [0.5] * 768
+        mock_response = MagicMock()
+        mock_response.data = [{"embedding": expected}]
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.return_value = mock_response
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_query("hello world")
+
+        assert result == expected
+
+
+class TestEmbedQueryAddress:
+    """Tests for address resolution in embed_query."""
 
     def test_ollama_falls_back_to_ollama_url(self):
         """Ollama provider uses COCOSEARCH_OLLAMA_URL when no base URL set."""
@@ -277,11 +270,7 @@ class TestAddFilenameContext:
 
 
 class TestExtractExtension:
-    """Tests for extract_extension function.
-
-    The extract_extension function is decorated with @cocoindex.op.function()
-    but can still be called directly for testing.
-    """
+    """Tests for extract_extension function."""
 
     def test_extracts_python_extension(self):
         """Extracts .py extension correctly."""
@@ -313,12 +302,7 @@ class TestExtractExtension:
 
 
 class TestExtractLanguage:
-    """Tests for extract_language function.
-
-    The extract_language function checks grammar handlers first (path + content),
-    then filename patterns (for extensionless files like Dockerfile),
-    then falls back to extension-based detection.
-    """
+    """Tests for extract_language function."""
 
     def test_hcl_tf_extension(self):
         """Routes .tf files via Terraform grammar handler."""
@@ -410,8 +394,6 @@ class TestExtractLanguage:
 
         assert extract_language("/infra/main.tf", "resource {}") == "terraform"
 
-    # Grammar-aware routing tests
-
     def test_github_actions_grammar(self):
         """Routes GitHub Actions workflow via grammar detection."""
         from cocosearch.indexer.embedder import extract_language
@@ -444,6 +426,63 @@ class TestExtractLanguage:
         from cocosearch.indexer.embedder import extract_language
 
         content = "name: Deploy\non: push\njobs:\n  deploy:"
-        # Even though .yaml extension would return "yaml", grammar wins
         result = extract_language(".github/workflows/deploy.yaml", content)
         assert result == "github-actions"
+
+
+class TestEmbedBatch:
+    """Tests for embed_batch function."""
+
+    def test_empty_input_returns_empty(self):
+        from cocosearch.indexer.embedder import embed_batch
+
+        assert embed_batch([]) == []
+
+    def test_single_text(self):
+        from cocosearch.indexer.embedder import embed_batch
+
+        mock_response = MagicMock()
+        mock_response.data = [{"embedding": [0.1, 0.2]}]
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.return_value = mock_response
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_batch(["hello"])
+
+        assert result == [[0.1, 0.2]]
+        mock_litellm.embedding.assert_called_once()
+
+    def test_multiple_texts(self):
+        from cocosearch.indexer.embedder import embed_batch
+
+        mock_response = MagicMock()
+        mock_response.data = [
+            {"embedding": [0.1, 0.2]},
+            {"embedding": [0.3, 0.4]},
+        ]
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.return_value = mock_response
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_batch(["hello", "world"])
+
+        assert result == [[0.1, 0.2], [0.3, 0.4]]
+        mock_litellm.embedding.assert_called_once()
+
+    def test_batches_large_inputs(self):
+        from cocosearch.indexer.embedder import embed_batch, _EMBEDDING_BATCH_SIZE
+
+        texts = [f"text_{i}" for i in range(_EMBEDDING_BATCH_SIZE + 5)]
+
+        def mock_embedding(**kwargs):
+            resp = MagicMock()
+            resp.data = [{"embedding": [0.1]} for _ in kwargs["input"]]
+            return resp
+
+        with patch("cocosearch.indexer.embedder.litellm") as mock_litellm:
+            mock_litellm.embedding.side_effect = mock_embedding
+            with patch.dict("os.environ", {}, clear=True):
+                result = embed_batch(texts)
+
+        assert len(result) == _EMBEDDING_BATCH_SIZE + 5
+        assert mock_litellm.embedding.call_count == 2
