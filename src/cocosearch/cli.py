@@ -28,6 +28,7 @@ from cocosearch.config import (
     find_config_file,
     generate_agents_md_routing,
     generate_claude_md_routing,
+    generate_claude_settings,
     generate_config,
     generate_opencode_mcp_config,
     generate_opencode_skills,
@@ -1816,6 +1817,50 @@ def init_command(args: argparse.Namespace) -> int:
                         "[yellow]Warning:[/yellow] Claude CLI command timed out."
                     )
 
+    # Offer to configure Claude Code tool permissions
+    no_claude_settings = getattr(args, "no_claude_settings", False)
+    if not no_claude_settings:
+        console.print()
+        response = input(
+            "Configure Claude Code tool permissions for CocoSearch? [y/N] "
+        )
+        if response.lower() == "y":
+            console.print()
+            console.print(
+                "  [cyan]1[/cyan]  Project .claude/settings.local.json (default)"
+            )
+            console.print("  [cyan]2[/cyan]  Project .claude/settings.json")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
+
+            if choice == "1":
+                target = Path.cwd() / ".claude" / "settings.local.json"
+            elif choice == "2":
+                target = Path.cwd() / ".claude" / "settings.json"
+            else:
+                console.print(
+                    "[dim]Invalid choice, skipping Claude Code settings.[/dim]"
+                )
+                target = None
+
+            if target:
+                try:
+                    result = generate_claude_settings(target)
+                    if result == "created":
+                        console.print(f"[green]Created {target}[/green]")
+                    elif result == "added":
+                        console.print(
+                            f"[green]Added CocoSearch tool permissions to {target}[/green]"
+                        )
+                    else:
+                        console.print(
+                            f"[dim]All CocoSearch tool permissions already present in {target}[/dim]"
+                        )
+                except (OSError, ConfigLoadError) as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not update {target}: {e}"
+                    )
+
     return 0
 
 
@@ -2922,6 +2967,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Skip the Claude Code plugin installation prompt",
+    )
+    init_parser.add_argument(
+        "--no-claude-settings",
+        action="store_true",
+        default=False,
+        help="Skip the Claude Code tool permissions prompt",
     )
 
     # MCP subcommand

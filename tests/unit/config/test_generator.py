@@ -10,11 +10,13 @@ import yaml
 from cocosearch.config import (
     CLAUDE_MD_DUPLICATE_MARKER,
     CLAUDE_MD_ROUTING_SECTION,
+    COCOSEARCH_MCP_TOOL_PERMISSIONS,
     CONFIG_TEMPLATE,
     ConfigError,
     check_claude_plugin_installed,
     generate_agents_md_routing,
     generate_claude_md_routing,
+    generate_claude_settings,
     generate_config,
     generate_opencode_mcp_config,
     generate_opencode_skills,
@@ -108,7 +110,7 @@ class TestClaudeMdRouting:
 
         content = target.read_text()
         # Existing ends with \n, so separator is \n (one blank line between)
-        assert "\n\n" + CLAUDE_MD_DUPLICATE_MARKER in content
+        assert "\n\n## CocoSearch Tool Routing" in content
 
     def test_skips_when_marker_present(self, tmp_path):
         """Test that it skips if routing section already exists."""
@@ -125,8 +127,11 @@ class TestClaudeMdRouting:
         assert "analyze_query" in CLAUDE_MD_ROUTING_SECTION
         assert "get_file_dependencies" in CLAUDE_MD_ROUTING_SECTION
         assert "get_file_impact" in CLAUDE_MD_ROUTING_SECTION
+        assert "get_batch_dependencies" in CLAUDE_MD_ROUTING_SECTION
+        assert "get_batch_impact" in CLAUDE_MD_ROUTING_SECTION
         assert "Grep" in CLAUDE_MD_ROUTING_SECTION
         assert "Glob" in CLAUDE_MD_ROUTING_SECTION
+        assert "mandatory" in CLAUDE_MD_ROUTING_SECTION.lower()
 
 
 class TestAgentsMdRouting:
@@ -621,3 +626,134 @@ class TestClaudePluginInstall:
 
         for call in mock_run.call_args_list:
             assert call[1]["timeout"] == 60
+
+
+class TestClaudeSettings:
+    """Tests for generate_claude_settings."""
+
+    def test_creates_new_file(self, tmp_path):
+        """Test that it creates a new settings file with all permissions."""
+        target = tmp_path / ".claude" / "settings.local.json"
+
+        result = generate_claude_settings(target)
+
+        assert result == "created"
+        assert target.exists()
+        config = json.loads(target.read_text())
+        assert set(config["permissions"]["allow"]) == set(
+            COCOSEARCH_MCP_TOOL_PERMISSIONS
+        )
+
+    def test_creates_parent_directories(self, tmp_path):
+        """Test that it creates parent dirs (e.g. .claude/)."""
+        target = tmp_path / "nested" / "dir" / "settings.local.json"
+
+        result = generate_claude_settings(target)
+
+        assert result == "created"
+        assert target.exists()
+
+    def test_adds_to_existing_settings_without_permissions(self, tmp_path):
+        """Test that it adds permissions to existing settings without them."""
+        target = tmp_path / "settings.local.json"
+        existing = {"env": {"DEBUG": "true"}}
+        target.write_text(json.dumps(existing, indent=2))
+
+        result = generate_claude_settings(target)
+
+        assert result == "added"
+        config = json.loads(target.read_text())
+        assert config["env"]["DEBUG"] == "true"
+        assert set(config["permissions"]["allow"]) == set(
+            COCOSEARCH_MCP_TOOL_PERMISSIONS
+        )
+
+    def test_adds_to_existing_permissions_list(self, tmp_path):
+        """Test that it appends to existing allow list with other entries."""
+        target = tmp_path / "settings.local.json"
+        existing = {"permissions": {"allow": ["Bash(git *)", "Read(**)"]}}
+        target.write_text(json.dumps(existing, indent=2))
+
+        result = generate_claude_settings(target)
+
+        assert result == "added"
+        config = json.loads(target.read_text())
+        allow = config["permissions"]["allow"]
+        assert "Bash(git *)" in allow
+        assert "Read(**)" in allow
+        for perm in COCOSEARCH_MCP_TOOL_PERMISSIONS:
+            assert perm in allow
+
+    def test_skips_when_all_permissions_present(self, tmp_path):
+        """Test that it returns 'skipped' when all permissions already exist."""
+        target = tmp_path / "settings.local.json"
+        existing = {"permissions": {"allow": list(COCOSEARCH_MCP_TOOL_PERMISSIONS)}}
+        target.write_text(json.dumps(existing, indent=2))
+
+        result = generate_claude_settings(target)
+
+        assert result == "skipped"
+
+    def test_adds_only_missing_permissions(self, tmp_path):
+        """Test that only missing permissions are added when some exist."""
+        target = tmp_path / "settings.local.json"
+        partial = COCOSEARCH_MCP_TOOL_PERMISSIONS[:3]
+        existing = {"permissions": {"allow": list(partial)}}
+        target.write_text(json.dumps(existing, indent=2))
+
+        result = generate_claude_settings(target)
+
+        assert result == "added"
+        config = json.loads(target.read_text())
+        allow = config["permissions"]["allow"]
+        assert len(allow) == len(COCOSEARCH_MCP_TOOL_PERMISSIONS)
+        for perm in COCOSEARCH_MCP_TOOL_PERMISSIONS:
+            assert perm in allow
+
+    def test_raises_on_invalid_json(self, tmp_path):
+        """Test that it raises ConfigError on malformed JSON."""
+        target = tmp_path / "settings.local.json"
+        target.write_text("{ invalid json // with comments }")
+
+        with pytest.raises(ConfigError, match="Cannot parse"):
+            generate_claude_settings(target)
+
+    def test_raises_on_non_object_json(self, tmp_path):
+        """Test that it raises ConfigError if JSON root is not an object."""
+        target = tmp_path / "settings.local.json"
+        target.write_text('"just a string"')
+
+        with pytest.raises(ConfigError, match="Expected a JSON object"):
+            generate_claude_settings(target)
+
+    def test_output_is_valid_json(self, tmp_path):
+        """Test that created file is valid, pretty-printed JSON."""
+        target = tmp_path / "settings.local.json"
+
+        generate_claude_settings(target)
+
+        raw = target.read_text()
+        assert raw.endswith("\n")
+        config = json.loads(raw)
+        assert raw == json.dumps(config, indent=2) + "\n"
+
+    def test_preserves_existing_config(self, tmp_path):
+        """Test that hooks and other settings are preserved."""
+        target = tmp_path / "settings.local.json"
+        existing = {
+            "permissions": {"allow": ["Bash(git *)"]},
+            "hooks": {"pre-commit": "lint"},
+        }
+        target.write_text(json.dumps(existing, indent=2))
+
+        generate_claude_settings(target)
+
+        config = json.loads(target.read_text())
+        assert config["hooks"]["pre-commit"] == "lint"
+        assert "Bash(git *)" in config["permissions"]["allow"]
+
+    def test_permissions_constant_has_all_tools(self):
+        """Test that COCOSEARCH_MCP_TOOL_PERMISSIONS has exactly 11 entries."""
+        assert len(COCOSEARCH_MCP_TOOL_PERMISSIONS) == 11
+        for perm in COCOSEARCH_MCP_TOOL_PERMISSIONS:
+            assert perm.startswith("mcp__plugin_cocosearch_cocosearch__")

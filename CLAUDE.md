@@ -6,9 +6,9 @@ This file provides guidance to AI coding agents (Claude Code, OpenCode, and othe
 
 CocoSearch is a local-first hybrid semantic code search tool powered by CocoIndex and Tree-sitter. It indexes codebases into PostgreSQL with pgvector embeddings and provides search through CLI, MCP server, or interactive REPL. Local by default with Ollama; optional remote embedding providers (OpenAI, OpenRouter) available for teams that prefer managed infrastructure. Requires Python >=3.11.
 
-## Tool Routing (IMPORTANT)
+## Tool Routing (MANDATORY)
 
-When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration:
+When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration. These rules are mandatory, not advisory. Violations degrade search quality and create unnecessary permission prompts.
 
 | Task | Use this | NOT this |
 |------|----------|----------|
@@ -80,6 +80,7 @@ uv run cocosearch init --no-agents-md    # Initialize without AGENTS.md prompt
 uv run cocosearch init --no-opencode-mcp # Initialize without OpenCode MCP registration prompt
 uv run cocosearch init --no-opencode-skills # Initialize without OpenCode skills installation prompt
 uv run cocosearch init --no-claude-mcp   # Initialize without Claude Code plugin prompt
+uv run cocosearch init --no-claude-settings # Initialize without Claude Code permissions prompt
 uv run cocosearch config show
 uv run cocosearch config path
 uv run cocosearch config check
@@ -271,20 +272,3 @@ When this plugin is active, you have access to MCP tools and workflow skills for
 ### Prerequisites
 
 Docker running PostgreSQL 17 (pgvector) on port 5432 and Ollama on port 11434. Use `/cocosearch:cocosearch-quickstart` to verify.
-
-## CocoSearch Tool Routing
-
-When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration:
-
-| Task | Use this | NOT this |
-|------|----------|----------|
-| Code search / "how does X work?" | `search_code` | Grep, Glob, Task (Explore) |
-| Symbol lookup / "find function Y" | `search_code` with `symbol_name`/`symbol_type` | Grep for def/class patterns |
-| Dependency tracing / "what imports X?" | `get_file_dependencies` / `get_file_impact` | Grep for import statements |
-| Batch dependency analysis (multiple files) | `get_batch_dependencies` / `get_batch_impact` | Per-file `get_file_dependencies` calls |
-| Search debugging / "why no results?" | `analyze_query` | Manual pipeline investigation |
-
-Fall back to Grep/Glob ONLY for:
-- Exact literal string matches (e.g., a specific error message or config value)
-- File path pattern matching (e.g., "find all `*.test.ts` files")
-- Editing operations that need line numbers from a known file

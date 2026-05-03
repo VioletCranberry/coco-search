@@ -5,7 +5,11 @@ import json
 from unittest.mock import patch
 
 from cocosearch.cli import init_command
-from cocosearch.config import CLAUDE_MD_DUPLICATE_MARKER, ConfigError as ConfigLoadError
+from cocosearch.config import (
+    CLAUDE_MD_DUPLICATE_MARKER,
+    COCOSEARCH_MCP_TOOL_PERMISSIONS,
+    ConfigError as ConfigLoadError,
+)
 
 
 def _make_args(**kwargs):
@@ -16,6 +20,7 @@ def _make_args(**kwargs):
         "no_opencode_mcp": True,
         "no_opencode_skills": True,
         "no_claude_mcp": True,
+        "no_claude_settings": True,
     }
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
@@ -828,8 +833,8 @@ def test_opencode_skills_write_error_does_not_fail_command(
     assert "Permission denied" in captured.out
 
 
-def test_all_five_prompts_together(tmp_path, monkeypatch, capsys):
-    """Test that all five prompts (CLAUDE.md, AGENTS.md, OpenCode MCP, OpenCode skills, Claude plugin) work together."""
+def test_all_six_prompts_together(tmp_path, monkeypatch, capsys):
+    """Test that all six prompts (CLAUDE.md, AGENTS.md, OpenCode MCP, OpenCode skills, Claude plugin, Claude settings) work together."""
     monkeypatch.chdir(tmp_path)
     args = _make_args(
         no_claude_md=False,
@@ -837,14 +842,15 @@ def test_all_five_prompts_together(tmp_path, monkeypatch, capsys):
         no_opencode_mcp=False,
         no_opencode_skills=False,
         no_claude_mcp=False,
+        no_claude_settings=False,
     )
 
     with patch("sys.stdin") as mock_stdin:
         mock_stdin.isatty.return_value = True
-        # CLAUDE.md (y, 1), AGENTS.md (y, 1), OpenCode MCP (y, 1), OpenCode skills (y, 1), Claude plugin (y)
+        # CLAUDE.md (y, 1), AGENTS.md (y, 1), OpenCode MCP (y, 1), OpenCode skills (y, 1), Claude plugin (y), Claude settings (y, 1)
         with patch(
             "builtins.input",
-            side_effect=["y", "1", "y", "1", "y", "1", "y", "1", "y"],
+            side_effect=["y", "1", "y", "1", "y", "1", "y", "1", "y", "y", "1"],
         ):
             with patch(
                 "cocosearch.cli.check_claude_plugin_installed", return_value=False
@@ -859,6 +865,185 @@ def test_all_five_prompts_together(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "AGENTS.md").exists()
     assert (tmp_path / "opencode.json").exists()
     assert (tmp_path / ".opencode" / "skills").exists()
+    assert (tmp_path / ".claude" / "settings.local.json").exists()
     captured = capsys.readouterr()
     assert "Installed CocoSearch plugin" in captured.out
     assert "skill(s)" in captured.out
+    assert "settings.local.json" in captured.out
+
+
+# --- Claude Code settings tests ---
+
+
+def test_skips_claude_settings_prompt_with_flag(tmp_path, monkeypatch):
+    """Test that --no-claude-settings skips the Claude settings prompt."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=True)
+
+    with patch("builtins.input") as mock_input:
+        result = init_command(args)
+
+    assert result == 0
+    mock_input.assert_not_called()
+
+
+def test_user_accepts_local_claude_settings(tmp_path, monkeypatch, capsys):
+    """Test that user choosing local creates .claude/settings.local.json."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    target = tmp_path / ".claude" / "settings.local.json"
+    assert target.exists()
+    config = json.loads(target.read_text())
+    assert "permissions" in config
+    assert len(config["permissions"]["allow"]) == 11
+    captured = capsys.readouterr()
+    assert "Created" in captured.out
+
+
+def test_user_accepts_shared_claude_settings(tmp_path, monkeypatch, capsys):
+    """Test that user choosing shared creates .claude/settings.json."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "2"]):
+            result = init_command(args)
+
+    assert result == 0
+    target = tmp_path / ".claude" / "settings.json"
+    assert target.exists()
+    config = json.loads(target.read_text())
+    assert "permissions" in config
+    assert len(config["permissions"]["allow"]) == 11
+
+
+def test_user_declines_claude_settings(tmp_path, monkeypatch):
+    """Test that user declining 'n' skips Claude settings creation."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", return_value="n"):
+            result = init_command(args)
+
+    assert result == 0
+    assert not (tmp_path / ".claude" / "settings.local.json").exists()
+    assert not (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_invalid_claude_settings_choice_skips_gracefully(tmp_path, monkeypatch, capsys):
+    """Test that invalid Claude settings location choice skips without error."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "3"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Invalid choice" in captured.out
+
+
+def test_claude_settings_skips_when_all_permissions_present(
+    tmp_path, monkeypatch, capsys
+):
+    """Test that existing settings with all permissions are detected."""
+    monkeypatch.chdir(tmp_path)
+
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    target = claude_dir / "settings.local.json"
+    target.write_text(
+        json.dumps({"permissions": {"allow": list(COCOSEARCH_MCP_TOOL_PERMISSIONS)}})
+    )
+
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "already present" in captured.out
+
+
+def test_claude_settings_merges_with_existing_config(tmp_path, monkeypatch):
+    """Test that existing settings are preserved when adding permissions."""
+    monkeypatch.chdir(tmp_path)
+
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    target = claude_dir / "settings.local.json"
+    target.write_text(json.dumps({"permissions": {"allow": ["Bash(git *)"]}}))
+
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    config = json.loads(target.read_text())
+    assert "Bash(git *)" in config["permissions"]["allow"]
+    assert len(config["permissions"]["allow"]) == 12  # 1 existing + 11 new
+
+
+def test_claude_settings_write_error_does_not_fail_command(
+    tmp_path, monkeypatch, capsys
+):
+    """Test that OSError on settings write still returns 0."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            with patch(
+                "cocosearch.cli.generate_claude_settings",
+                side_effect=OSError("Permission denied"),
+            ):
+                result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Warning" in captured.out
+    # Rich may wrap long paths across lines, splitting "Permission denied"
+    normalized = " ".join(captured.out.split())
+    assert "Permission denied" in normalized
+
+
+def test_claude_settings_json_parse_error_does_not_fail_command(
+    tmp_path, monkeypatch, capsys
+):
+    """Test that invalid JSON in existing settings is handled gracefully."""
+    monkeypatch.chdir(tmp_path)
+
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    target = claude_dir / "settings.local.json"
+    target.write_text("{ // this is JSONC, not valid JSON }")
+
+    args = _make_args(no_claude_settings=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Warning" in captured.out
