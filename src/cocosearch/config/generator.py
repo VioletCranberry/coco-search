@@ -72,13 +72,14 @@ CLAUDE_MD_DUPLICATE_MARKER = "## CocoSearch Tool Routing"
 CLAUDE_MD_ROUTING_SECTION = f"""\
 {CLAUDE_MD_DUPLICATE_MARKER}
 
-When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration:
+When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration. These rules are mandatory, not advisory.
 
 | Task | Use this | NOT this |
 |------|----------|----------|
 | Code search / "how does X work?" | `search_code` | Grep, Glob, Task (Explore) |
 | Symbol lookup / "find function Y" | `search_code` with `symbol_name`/`symbol_type` | Grep for def/class patterns |
 | Dependency tracing / "what imports X?" | `get_file_dependencies` / `get_file_impact` | Grep for import statements |
+| Batch dependency analysis (multiple files) | `get_batch_dependencies` / `get_batch_impact` | Per-file `get_file_dependencies` calls |
 | Search debugging / "why no results?" | `analyze_query` | Manual pipeline investigation |
 
 Fall back to Grep/Glob ONLY for:
@@ -288,6 +289,77 @@ def install_claude_plugin() -> str:
         )
 
     return "installed"
+
+
+COCOSEARCH_MCP_TOOL_PERMISSIONS = [
+    "mcp__plugin_cocosearch_cocosearch__search_code",
+    "mcp__plugin_cocosearch_cocosearch__analyze_query",
+    "mcp__plugin_cocosearch_cocosearch__index_codebase",
+    "mcp__plugin_cocosearch_cocosearch__list_indexes",
+    "mcp__plugin_cocosearch_cocosearch__index_stats",
+    "mcp__plugin_cocosearch_cocosearch__clear_index",
+    "mcp__plugin_cocosearch_cocosearch__open_dashboard",
+    "mcp__plugin_cocosearch_cocosearch__get_file_dependencies",
+    "mcp__plugin_cocosearch_cocosearch__get_file_impact",
+    "mcp__plugin_cocosearch_cocosearch__get_batch_dependencies",
+    "mcp__plugin_cocosearch_cocosearch__get_batch_impact",
+]
+
+
+def generate_claude_settings(path: Path) -> str:
+    """Add CocoSearch tool permissions to a Claude Code settings file.
+
+    Merges CocoSearch MCP tool permissions into an existing settings file,
+    or creates a new one. Preserves all existing configuration.
+
+    Args:
+        path: Path to the settings file (e.g., .claude/settings.local.json).
+
+    Returns:
+        "created" if a new file was created,
+        "added" if permissions were added to an existing file,
+        "skipped" if all permissions already exist.
+    """
+    if path.exists():
+        raw = path.read_text()
+        try:
+            config = json.loads(raw)
+        except json.JSONDecodeError:
+            raise ConfigError(
+                f"Cannot parse {path} as JSON. "
+                "If it uses JSONC (comments), please add the permissions manually."
+            )
+
+        if not isinstance(config, dict):
+            raise ConfigError(
+                f"Expected a JSON object in {path}, got {type(config).__name__}"
+            )
+
+        permissions = config.get("permissions")
+        if not isinstance(permissions, dict):
+            config["permissions"] = {"allow": []}
+        allow = config["permissions"].get("allow")
+        if not isinstance(allow, list):
+            config["permissions"]["allow"] = []
+
+        existing = set(config["permissions"]["allow"])
+        missing = [p for p in COCOSEARCH_MCP_TOOL_PERMISSIONS if p not in existing]
+
+        if not missing:
+            return "skipped"
+
+        config["permissions"]["allow"].extend(missing)
+        path.write_text(json.dumps(config, indent=2) + "\n")
+        return "added"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    config = {
+        "permissions": {
+            "allow": list(COCOSEARCH_MCP_TOOL_PERMISSIONS),
+        },
+    }
+    path.write_text(json.dumps(config, indent=2) + "\n")
+    return "created"
 
 
 def _get_bundled_skills() -> dict[str, str]:
