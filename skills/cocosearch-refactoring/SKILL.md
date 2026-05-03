@@ -30,6 +30,9 @@ A systematic workflow for safe code refactoring. This skill guides you through c
    - **If response contains `warnings`** with type `deps_not_extracted`:
      "No dependency data found. I'll fall back to search-based impact analysis, but dependency data provides more reliable coverage. Want me to extract dependencies first?"
    - **If no warnings:** Proceed with dependency-based impact analysis.
+5. **Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+   - Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+   - If stale/missing: warn user — "Linked index 'X' is stale/missing. Cross-project impact analysis may miss affected files. Want me to reindex?"
 
 ## Step 1: Understand the Refactoring Goal
 

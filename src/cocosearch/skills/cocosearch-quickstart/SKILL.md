@@ -103,6 +103,10 @@ index_stats(index_name="<name>")
 - Run `index_stats(index_name="<name>", include_failures=True)` to see which files failed
 - Common causes: unsupported file types (expected), syntax errors in source files
 
+**Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+- Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+- If any linked indexes are missing or stale, inform the user: "Linked index 'X' is not indexed/stale. Cross-project search won't include it until indexed."
+
 ## Step 4: Test a Search
 
 Run a quick semantic search to confirm results are meaningful:

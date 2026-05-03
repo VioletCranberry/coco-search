@@ -35,6 +35,9 @@ A structured workflow for generating comprehensive commit messages. Uses CocoSea
    - **If response contains `warnings`** with type `deps_not_extracted`:
      Note: "No dependency data found. Blast radius analysis will be skipped."
    - **If no warnings:** Proceed with full analysis.
+5. **Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+   - Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+   - If stale/missing: note — "Linked index 'X' is stale/missing. Cross-project context may be limited."
 
 ## Step 1: Collect Changes
 

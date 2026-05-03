@@ -53,14 +53,17 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
    - **If response contains `warnings`** with type `deps_not_extracted`:
      Warn: "No dependency data found. Blast radius and impact analysis will be limited to search-only. Want me to extract dependencies first?"
    - **If no warnings:** Proceed normally.
-6. Parse the PR/MR URL to detect platform:
+6. **Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+   - Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+   - If stale/missing: warn user — "Linked index 'X' is stale/missing. Cross-project blast radius analysis may be incomplete. Want me to reindex?"
+7. Parse the PR/MR URL to detect platform:
    - `github.com/{owner}/{repo}/pull/{number}` -> GitHub
    - `{host}/{group}/{project}/-/merge_requests/{iid}` -> GitLab (self-hosted or gitlab.com)
    - If no URL provided, ask: "Which PR/MR should I review? Paste the URL."
-7. **Match platform to tokens:**
+8. **Match platform to tokens:**
    - **GitHub:** prefer `GITHUB_TOKEN` over `GH_TOKEN`. If neither set: "Set `GITHUB_TOKEN` (or `GH_TOKEN`) to access the GitHub API. Create one at https://github.com/settings/tokens (needs `repo` scope for private repos, no scope needed for public repos)." Stop.
    - **GitLab:** prefer `GITLAB_TOKEN` over `GITLAB_PAT`. If neither set: "Set `GITLAB_TOKEN` (or `GITLAB_PAT`) to access the GitLab API. Create one at `https://{host}/-/user_settings/personal_access_tokens` (needs `read_api` scope)." Stop.
-8. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
+9. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
 
 ## Step 1: Fetch PR/MR Data
 
