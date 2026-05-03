@@ -134,6 +134,8 @@ def check_linked_index_references(index_names: list[str]) -> list[str]:
         if not config_path:
             return []
         cfg = load_config(config_path)
+        if not cfg.linkedIndexes:
+            return []
         for name in index_names:
             if name in cfg.linkedIndexes:
                 warnings.append(
