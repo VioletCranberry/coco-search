@@ -162,7 +162,7 @@ This project was originally built for personal use — a solo experiment in loca
 
 ## Quick Start
 
-- **Services**:
+- **Services (local embeddings with Ollama — default)**:
 
 ```bash
 # 1. Clone this repository and start infrastructure:
@@ -173,6 +173,21 @@ docker compose --profile ollama up -d
 # 2. Verify services are ready.
 uvx cocosearch config check
 ```
+
+- **Services (remote embeddings without Ollama)**:
+
+```bash
+# 1. Clone this repository and start only PostgreSQL:
+git clone https://github.com/VioletCranberry/coco-search.git && cd coco-search
+docker compose up -d
+# 2. Configure your embedding provider and API key:
+export COCOSEARCH_EMBEDDING_PROVIDER=openai   # or openrouter
+export COCOSEARCH_EMBEDDING_API_KEY=sk-...
+# 3. Verify services are ready.
+uvx cocosearch config check
+```
+
+> **Tip:** Add the `export` lines to your shell profile (`~/.zshrc`, `~/.bashrc`) so they persist across sessions. See [Remote Embedding Providers](#remote-embedding-providers) for all provider options, custom endpoints, and model overrides.
 
 - **Indexing your projects**:
 
