@@ -190,12 +190,27 @@ export function updateSummaryCards(stats) {
 export function updateWarnings(warnings) {
     const banner = document.getElementById('warningBanner');
     const list = document.getElementById('warningList');
+    const linkedWarningsEl = document.getElementById('linkedIndexWarnings');
 
-    if (warnings && warnings.length > 0) {
-        list.innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+    const linkedPrefix = "Linked index '";
+    const linkedWarnings = (warnings || []).filter(w => w.startsWith(linkedPrefix));
+    const otherWarnings = (warnings || []).filter(w => !w.startsWith(linkedPrefix));
+
+    if (otherWarnings.length > 0) {
+        list.innerHTML = otherWarnings.map(w => `<li>${escapeHtml(w)}</li>`).join('');
         banner.classList.add('visible');
     } else {
         banner.classList.remove('visible');
+    }
+
+    if (linkedWarningsEl) {
+        if (linkedWarnings.length > 0) {
+            linkedWarningsEl.innerHTML = linkedWarnings
+                .map(w => `<div class="linked-warning-item">${escapeHtml(w)}</div>`)
+                .join('');
+        } else {
+            linkedWarningsEl.innerHTML = '';
+        }
     }
 }
 

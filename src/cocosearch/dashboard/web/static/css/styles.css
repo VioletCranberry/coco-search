@@ -395,6 +395,21 @@ header {
     text-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
 }
 
+.linked-warnings {
+    margin-top: 8px;
+}
+
+.linked-warning-item {
+    font-size: 0.75rem;
+    color: var(--accent-orange);
+    padding: 2px 0;
+    line-height: 1.3;
+}
+
+.linked-warning-item::before {
+    content: "\26A0 ";
+}
+
 .chart-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));

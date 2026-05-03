@@ -190,6 +190,11 @@ def test_linked_indexes_card_exists(soup):
     assert count_el is not None, "Missing #linkedIndexesCount element"
     names_el = soup.find(id="linkedIndexesNames")
     assert names_el is not None, "Missing #linkedIndexesNames element"
+    warnings_el = soup.find(id="linkedIndexWarnings")
+    assert warnings_el is not None, "Missing #linkedIndexWarnings element"
+    assert "linked-warnings" in warnings_el.get("class", []), (
+        "linkedIndexWarnings should have 'linked-warnings' class"
+    )
 
 
 def test_deps_graph_depth_selector_exists(soup):
