@@ -807,6 +807,76 @@ def get_symbol_stats(index_name: str) -> dict[str, int]:
             return {row[0]: row[1] for row in rows}
 
 
+def check_linked_index_health() -> list[str]:
+    """Check health of linked indexes from the current project config.
+
+    Returns list of warning strings (empty if all healthy or no config).
+    Safe to call from any context — never raises.
+    """
+    warnings: list[str] = []
+    try:
+        from cocosearch.config import find_config_file, load_config
+        from cocosearch.management.discovery import list_indexes
+
+        config_path = find_config_file()
+        if not config_path:
+            return []
+        cfg = load_config(config_path)
+        if not cfg.linkedIndexes:
+            return []
+
+        all_indexes = {idx["name"] for idx in list_indexes()}
+        for li in cfg.linkedIndexes:
+            if li not in all_indexes:
+                warnings.append(
+                    f"Linked index '{li}' not found — "
+                    f"run 'cocosearch index' on that project "
+                    f"or remove from cocosearch.yaml"
+                )
+            else:
+                try:
+                    li_stale, li_days = check_staleness(li)
+                    if li_stale:
+                        if li_days == -1:
+                            warnings.append(
+                                f"Linked index '{li}': no metadata found"
+                            )
+                        else:
+                            warnings.append(
+                                f"Linked index '{li}' is stale "
+                                f"({li_days} days since last update)"
+                            )
+
+                    li_branch = check_branch_staleness(li)
+                    if li_branch and li_branch.get("branch_changed"):
+                        warnings.append(
+                            f"Linked index '{li}' was indexed on branch "
+                            f"'{li_branch['indexed_branch']}', "
+                            f"but that repo is now on "
+                            f"'{li_branch['current_branch']}'"
+                        )
+                    elif li_branch and li_branch.get("commits_changed"):
+                        behind = li_branch.get("commits_behind")
+                        behind_str = (
+                            f"{behind} commits behind"
+                            if behind is not None
+                            else "behind"
+                        )
+                        warnings.append(
+                            f"Linked index '{li}' is {behind_str} "
+                            f"on branch '{li_branch.get('current_branch', 'unknown')}'"
+                        )
+
+                    li_deps = check_deps_staleness(li)
+                    for dw in li_deps:
+                        warnings.append(f"Linked index '{li}': {dw['message']}")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return warnings
+
+
 def collect_warnings(
     index_name: str,
     is_stale: bool,
@@ -873,64 +943,7 @@ def collect_warnings(
     # identical and the results were never used.
 
     # Linked indexes validation
-    try:
-        from cocosearch.config import find_config_file, load_config
-        from cocosearch.management.discovery import list_indexes
-
-        config_path = find_config_file()
-        if config_path:
-            cfg = load_config(config_path)
-            if cfg.linkedIndexes:
-                all_indexes = {idx["name"] for idx in list_indexes()}
-                for li in cfg.linkedIndexes:
-                    if li not in all_indexes:
-                        warnings.append(
-                            f"Linked index '{li}' not found — "
-                            f"run 'cocosearch index' on that project "
-                            f"or remove from cocosearch.yaml"
-                        )
-                    else:
-                        # Staleness checks for existing linked indexes
-                        try:
-                            li_stale, li_days = check_staleness(li)
-                            if li_stale:
-                                if li_days == -1:
-                                    warnings.append(
-                                        f"Linked index '{li}': no metadata found"
-                                    )
-                                else:
-                                    warnings.append(
-                                        f"Linked index '{li}' is stale "
-                                        f"({li_days} days since last update)"
-                                    )
-
-                            li_branch = check_branch_staleness(li)
-                            if li_branch and li_branch.get("branch_changed"):
-                                warnings.append(
-                                    f"Linked index '{li}' was indexed on branch "
-                                    f"'{li_branch['indexed_branch']}', "
-                                    f"but that repo is now on "
-                                    f"'{li_branch['current_branch']}'"
-                                )
-                            elif li_branch and li_branch.get("commits_changed"):
-                                behind = li_branch.get("commits_behind")
-                                behind_str = (
-                                    f"{behind} commits behind"
-                                    if behind is not None
-                                    else "behind"
-                                )
-                                warnings.append(
-                                    f"Linked index '{li}' is {behind_str} "
-                                    f"on branch '{li_branch.get('current_branch', 'unknown')}'"
-                                )
-
-                            li_deps = check_deps_staleness(li)
-                            for dw in li_deps:
-                                warnings.append(f"Linked index '{li}': {dw['message']}")
-                        except Exception:
-                            pass  # Best-effort per linked index
-    except Exception:
-        pass  # Best-effort — don't block stats on config check
+    warnings.extend(check_linked_index_health())
 
     return warnings
 

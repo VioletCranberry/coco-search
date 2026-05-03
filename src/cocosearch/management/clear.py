@@ -118,3 +118,28 @@ def clear_index(index_name: str) -> dict:
         "success": True,
         "message": f"Index '{index_name}' deleted successfully",
     }
+
+
+def check_linked_index_references(index_names: list[str]) -> list[str]:
+    """Check if any of the given indexes are in the current project's linkedIndexes.
+
+    Returns list of warning strings (empty if none referenced or no config).
+    Safe to call from any context — never raises.
+    """
+    warnings: list[str] = []
+    try:
+        from cocosearch.config import find_config_file, load_config
+
+        config_path = find_config_file()
+        if not config_path:
+            return []
+        cfg = load_config(config_path)
+        for name in index_names:
+            if name in cfg.linkedIndexes:
+                warnings.append(
+                    f"Index '{name}' is listed in this project's linkedIndexes. "
+                    f"Deleting it will break cross-project search."
+                )
+    except Exception:
+        pass
+    return warnings

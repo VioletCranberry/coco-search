@@ -6,7 +6,7 @@ Tests clear_index function using mock database pool.
 import pytest
 from unittest.mock import patch
 
-from cocosearch.management.clear import clear_index
+from cocosearch.management.clear import check_linked_index_references, clear_index
 
 
 class TestClearIndex:
@@ -89,3 +89,72 @@ class TestClearIndex:
         ]
         assert len(delete_queries) == 1
         assert delete_queries[0][1] == ("CodeIndex_myproject",)
+
+
+class TestCheckLinkedIndexReferences:
+    """Tests for check_linked_index_references function."""
+
+    def test_index_in_linked_returns_warning(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["shared_lib"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+        ):
+            warnings = check_linked_index_references(["shared_lib"])
+            assert len(warnings) == 1
+            assert "shared_lib" in warnings[0]
+            assert "linkedIndexes" in warnings[0]
+
+    def test_index_not_in_linked_returns_empty(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["shared_lib"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+        ):
+            assert check_linked_index_references(["other_index"]) == []
+
+    def test_no_config_returns_empty(self):
+        with patch(
+            "cocosearch.config.find_config_file", return_value=None
+        ):
+            assert check_linked_index_references(["anything"]) == []
+
+    def test_empty_linked_indexes_returns_empty(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": []})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+        ):
+            assert check_linked_index_references(["shared_lib"]) == []
+
+    def test_multiple_indexes_some_referenced(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["lib_a", "lib_b"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/cocosearch.yaml",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+        ):
+            warnings = check_linked_index_references(
+                ["lib_a", "unrelated", "lib_b"]
+            )
+            assert len(warnings) == 2
+            assert "lib_a" in warnings[0]
+            assert "lib_b" in warnings[1]
+
+    def test_exception_returns_empty(self):
+        with patch(
+            "cocosearch.config.find_config_file",
+            side_effect=RuntimeError("boom"),
+        ):
+            assert check_linked_index_references(["anything"]) == []
