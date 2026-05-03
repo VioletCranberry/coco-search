@@ -26,6 +26,9 @@ description: Use when debugging an error, unexpected behavior, or tracing how co
    - **If response contains `warnings`** with type `deps_not_extracted`:
      Note: "No dependency data found. I'll use search-based call tracing instead. Dependency data can improve tracing accuracy — want me to extract dependencies?"
    - **If no warnings:** Proceed normally (use dependency Fast Path when applicable).
+5. **Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+   - Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+   - If stale/missing: warn user — "Linked index 'X' is stale/missing. Cross-project results may be incomplete. Want me to reindex?"
 
 ## Step 1: Understand the Symptom
 

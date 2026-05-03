@@ -2725,9 +2725,20 @@ def clear_index(
     else:
         return {"success": False, "error": "Provide index_name or index_names"}
 
+    # Check if any indexes are referenced in linkedIndexes
+    ref_warnings: list[str] = []
+    try:
+        from cocosearch.management.clear import check_linked_index_references
+
+        ref_warnings = check_linked_index_references(names_to_delete)
+    except Exception:
+        pass
+
     if len(names_to_delete) == 1:
         try:
             result = mgmt_clear_index(names_to_delete[0])
+            if ref_warnings:
+                result["linked_index_warnings"] = ref_warnings
             return result
         except ValueError as e:
             return {"success": False, "error": str(e)}
@@ -2746,12 +2757,15 @@ def clear_index(
             results.append({"index_name": name, "success": False, "error": str(e)})
 
     succeeded = sum(1 for r in results if r["success"])
-    return {
+    result = {
         "success": succeeded > 0,
         "deleted": succeeded,
         "total": len(names_to_delete),
         "results": results,
     }
+    if ref_warnings:
+        result["linked_index_warnings"] = ref_warnings
+    return result
 
 
 @mcp.tool()
@@ -2839,6 +2853,16 @@ def index_codebase(
         }
         if dep_stats:
             result["dep_stats"] = dep_stats
+
+        try:
+            from cocosearch.management.stats import check_linked_index_health
+
+            linked_warnings = check_linked_index_health()
+            if linked_warnings:
+                result["linked_index_warnings"] = linked_warnings
+        except Exception:
+            pass
+
         return result
     except Exception as e:
         return {"success": False, "error": f"Failed to index codebase: {e}"}

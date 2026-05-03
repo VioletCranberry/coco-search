@@ -38,6 +38,9 @@ get_file_dependencies(file="<any-known-file>", depth=1)
   Warn: "Dependency data is outdated and may not reflect recent changes. Want me to re-extract dependencies first? (`index_codebase` with `extract_deps=True`)"
   Do NOT proceed without user acknowledgment -- stale deps can lead to incorrect analysis.
 - **If results returned with no warnings:** Dependency index is ready, proceed.
+4. **Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+   - Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+   - If stale/missing: warn user — "Linked index 'X' is stale/missing. Cross-project dependency tracing may be incomplete. Want me to reindex?"
 
 ## Step 1: Classify Intent
 

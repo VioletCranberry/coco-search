@@ -322,6 +322,22 @@ def index_command(args: argparse.Namespace) -> int:
             except Exception as e:
                 console.print(f"  [yellow]Dependency extraction failed: {e}[/yellow]")
 
+        # Post-indexing: check linked index health
+        try:
+            from cocosearch.management.stats import check_linked_index_health
+
+            linked_warnings = check_linked_index_health()
+            if linked_warnings:
+                console.print("\n[yellow bold]Linked index health:[/yellow bold]")
+                for w in linked_warnings:
+                    console.print(f"  [yellow]![/yellow] {w}")
+                console.print(
+                    "[dim]Run 'cocosearch index' on stale linked projects "
+                    "to keep cross-project search current.[/dim]"
+                )
+        except Exception:
+            pass
+
         return 0
 
     except Exception as e:
@@ -1344,6 +1360,19 @@ def clear_command(args: argparse.Namespace) -> int:
             else:
                 print(json.dumps({"error": str(e)}))
             return 1
+
+    # Warn if any index is referenced in linkedIndexes (interactive mode only)
+    if not args.force and args.pretty:
+        try:
+            from cocosearch.management.clear import check_linked_index_references
+
+            ref_warnings = check_linked_index_references(index_names)
+            if ref_warnings:
+                for w in ref_warnings:
+                    console.print(f"  [yellow]Warning:[/yellow] {w}")
+                console.print()
+        except Exception:
+            pass
 
     # Show confirmation prompt unless --force
     if not args.force:

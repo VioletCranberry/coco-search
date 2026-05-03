@@ -192,7 +192,7 @@ export function updateWarnings(warnings) {
     const list = document.getElementById('warningList');
 
     if (warnings && warnings.length > 0) {
-        list.innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+        list.innerHTML = warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('');
         banner.classList.add('visible');
     } else {
         banner.classList.remove('visible');

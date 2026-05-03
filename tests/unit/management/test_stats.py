@@ -10,6 +10,7 @@ from unittest.mock import patch
 from cocosearch.management.stats import (
     IndexStats,
     check_branch_staleness,
+    check_linked_index_health,
     check_staleness,
     collect_warnings,
     format_bytes,
@@ -2102,3 +2103,135 @@ class TestParseStatsEnrichment:
         assert result.parse_stats["total_files"] == 50
         assert result.parse_stats["total_ok"] == 48
         assert result.parse_stats["parse_health_pct"] == 96.0
+
+
+class TestCheckLinkedIndexHealth:
+    """Tests for check_linked_index_health standalone function."""
+
+    def test_no_config_file_returns_empty(self):
+        with patch("cocosearch.config.find_config_file", return_value=None):
+            assert check_linked_index_health() == []
+
+    def test_no_linked_indexes_returns_empty(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": []})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/path",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+        ):
+            assert check_linked_index_health() == []
+
+    def test_missing_linked_index_returns_warning(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["missing_idx"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/path",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "other"}],
+            ),
+        ):
+            warnings = check_linked_index_health()
+            assert len(warnings) == 1
+            assert "Linked index 'missing_idx' not found" in warnings[0]
+
+    def test_stale_linked_index_returns_warning(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["stale_idx"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/path",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "stale_idx"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(True, 14),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value=None,
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            warnings = check_linked_index_health()
+            assert any("stale" in w and "14 days" in w for w in warnings)
+
+    def test_healthy_linked_index_returns_empty(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["healthy_idx"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/path",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "healthy_idx"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 2),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value=None,
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            assert check_linked_index_health() == []
+
+    def test_branch_drift_returns_warning(self):
+        mock_cfg = type("Cfg", (), {"linkedIndexes": ["drift_idx"]})()
+        with (
+            patch(
+                "cocosearch.config.find_config_file",
+                return_value="/fake/path",
+            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
+            patch(
+                "cocosearch.management.discovery.list_indexes",
+                return_value=[{"name": "drift_idx"}],
+            ),
+            patch(
+                "cocosearch.management.stats.check_staleness",
+                return_value=(False, 1),
+            ),
+            patch(
+                "cocosearch.management.stats.check_branch_staleness",
+                return_value={
+                    "branch_changed": True,
+                    "indexed_branch": "main",
+                    "current_branch": "develop",
+                },
+            ),
+            patch(
+                "cocosearch.management.stats.check_deps_staleness",
+                return_value=[],
+            ),
+        ):
+            warnings = check_linked_index_health()
+            assert any(
+                "indexed on branch 'main'" in w and "'develop'" in w for w in warnings
+            )
+
+    def test_exception_returns_empty(self):
+        with patch(
+            "cocosearch.config.find_config_file",
+            side_effect=RuntimeError("boom"),
+        ):
+            assert check_linked_index_health() == []

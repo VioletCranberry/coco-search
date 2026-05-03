@@ -18,6 +18,9 @@ A systematic workflow for adding new code to an existing codebase. This skill us
 2. `list_indexes()` to confirm project is indexed
 3. `index_stats(index_name="<resolved-name>")` to check freshness
 - Stale (>7 days) → warn: "Index is X days old -- I may miss recent patterns. Want me to reindex first?"
+4. **Linked index health** (if `cocosearch.yaml` has `linkedIndexes`):
+   - Check the `warnings` array from `index_stats()` for entries starting with "Linked index"
+   - If stale/missing: warn user — "Linked index 'X' is stale/missing. Cross-project results may be incomplete. Want me to reindex?"
 
 ## Step 1: Understand the Feature
 
