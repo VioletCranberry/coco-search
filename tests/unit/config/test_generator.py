@@ -110,7 +110,7 @@ class TestClaudeMdRouting:
 
         content = target.read_text()
         # Existing ends with \n, so separator is \n (one blank line between)
-        assert "\n\n" + CLAUDE_MD_DUPLICATE_MARKER in content
+        assert "\n\n## CocoSearch Tool Routing" in content
 
     def test_skips_when_marker_present(self, tmp_path):
         """Test that it skips if routing section already exists."""

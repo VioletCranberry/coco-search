@@ -67,10 +67,10 @@ def generate_config(path: Path) -> None:
     path.write_text(CONFIG_TEMPLATE)
 
 
-CLAUDE_MD_DUPLICATE_MARKER = "## CocoSearch Tool Routing"
+CLAUDE_MD_DUPLICATE_MARKER = "Tool Routing"
 
-CLAUDE_MD_ROUTING_SECTION = f"""\
-{CLAUDE_MD_DUPLICATE_MARKER}
+CLAUDE_MD_ROUTING_SECTION = """\
+## CocoSearch Tool Routing
 
 When CocoSearch MCP tools are available, ALWAYS use them instead of Grep, Glob, or Task/Explore agents for code search and exploration. These rules are mandatory, not advisory.
 
