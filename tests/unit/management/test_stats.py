@@ -2109,9 +2109,7 @@ class TestCheckLinkedIndexHealth:
     """Tests for check_linked_index_health standalone function."""
 
     def test_no_config_file_returns_empty(self):
-        with patch(
-            "cocosearch.config.find_config_file", return_value=None
-        ):
+        with patch("cocosearch.config.find_config_file", return_value=None):
             assert check_linked_index_health() == []
 
     def test_no_linked_indexes_returns_empty(self):
@@ -2121,9 +2119,7 @@ class TestCheckLinkedIndexHealth:
                 "cocosearch.config.find_config_file",
                 return_value="/fake/path",
             ),
-            patch(
-                "cocosearch.config.load_config", return_value=mock_cfg
-            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
         ):
             assert check_linked_index_health() == []
 
@@ -2134,9 +2130,7 @@ class TestCheckLinkedIndexHealth:
                 "cocosearch.config.find_config_file",
                 return_value="/fake/path",
             ),
-            patch(
-                "cocosearch.config.load_config", return_value=mock_cfg
-            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
             patch(
                 "cocosearch.management.discovery.list_indexes",
                 return_value=[{"name": "other"}],
@@ -2153,9 +2147,7 @@ class TestCheckLinkedIndexHealth:
                 "cocosearch.config.find_config_file",
                 return_value="/fake/path",
             ),
-            patch(
-                "cocosearch.config.load_config", return_value=mock_cfg
-            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
             patch(
                 "cocosearch.management.discovery.list_indexes",
                 return_value=[{"name": "stale_idx"}],
@@ -2183,9 +2175,7 @@ class TestCheckLinkedIndexHealth:
                 "cocosearch.config.find_config_file",
                 return_value="/fake/path",
             ),
-            patch(
-                "cocosearch.config.load_config", return_value=mock_cfg
-            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
             patch(
                 "cocosearch.management.discovery.list_indexes",
                 return_value=[{"name": "healthy_idx"}],
@@ -2212,9 +2202,7 @@ class TestCheckLinkedIndexHealth:
                 "cocosearch.config.find_config_file",
                 return_value="/fake/path",
             ),
-            patch(
-                "cocosearch.config.load_config", return_value=mock_cfg
-            ),
+            patch("cocosearch.config.load_config", return_value=mock_cfg),
             patch(
                 "cocosearch.management.discovery.list_indexes",
                 return_value=[{"name": "drift_idx"}],
@@ -2238,8 +2226,7 @@ class TestCheckLinkedIndexHealth:
         ):
             warnings = check_linked_index_health()
             assert any(
-                "indexed on branch 'main'" in w and "'develop'" in w
-                for w in warnings
+                "indexed on branch 'main'" in w and "'develop'" in w for w in warnings
             )
 
     def test_exception_returns_empty(self):

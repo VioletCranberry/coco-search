@@ -838,9 +838,7 @@ def check_linked_index_health() -> list[str]:
                     li_stale, li_days = check_staleness(li)
                     if li_stale:
                         if li_days == -1:
-                            warnings.append(
-                                f"Linked index '{li}': no metadata found"
-                            )
+                            warnings.append(f"Linked index '{li}': no metadata found")
                         else:
                             warnings.append(
                                 f"Linked index '{li}' is stale "

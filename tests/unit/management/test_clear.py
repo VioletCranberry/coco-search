@@ -120,9 +120,7 @@ class TestCheckLinkedIndexReferences:
             assert check_linked_index_references(["other_index"]) == []
 
     def test_no_config_returns_empty(self):
-        with patch(
-            "cocosearch.config.find_config_file", return_value=None
-        ):
+        with patch("cocosearch.config.find_config_file", return_value=None):
             assert check_linked_index_references(["anything"]) == []
 
     def test_empty_linked_indexes_returns_empty(self):
@@ -145,9 +143,7 @@ class TestCheckLinkedIndexReferences:
             ),
             patch("cocosearch.config.load_config", return_value=mock_cfg),
         ):
-            warnings = check_linked_index_references(
-                ["lib_a", "unrelated", "lib_b"]
-            )
+            warnings = check_linked_index_references(["lib_a", "unrelated", "lib_b"])
             assert len(warnings) == 2
             assert "lib_a" in warnings[0]
             assert "lib_b" in warnings[1]
