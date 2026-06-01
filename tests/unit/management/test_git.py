@@ -76,6 +76,15 @@ class TestDeriveIndexFromGit:
         result = derive_index_from_git()
         assert result is None
 
+    def test_passes_path_to_git(self, fp):
+        """A path argument is forwarded to git via -C (resolve from target)."""
+        fp.register(
+            ["git", "-C", "/other/repo", "rev-parse", "--git-common-dir"],
+            stdout="/other/repo/.git\n",
+        )
+        result = derive_index_from_git("/other/repo")
+        assert result == "repo"
+
     def test_uses_directory_name_not_full_path(self, fp):
         """Uses only the last directory component for index name."""
         fp.register(

@@ -35,7 +35,8 @@ document.getElementById('reindexBtn').addEventListener('click', () => reindex(fa
 document.getElementById('freshIndexBtn').addEventListener('click', () => reindex(true));
 document.getElementById('stopIndexBtn').addEventListener('click', stopIndexing);
 document.getElementById('deleteIndexBtn').addEventListener('click', deleteIndex);
-document.getElementById('extractDepsBtn').addEventListener('click', extractDeps);
+document.getElementById('extractDepsBtn').addEventListener('click', () => extractDeps(false));
+document.getElementById('freshExtractDepsBtn').addEventListener('click', () => extractDeps(true));
 
 // Search
 document.getElementById('searchInput').addEventListener('keydown', (e) => {

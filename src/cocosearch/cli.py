@@ -112,8 +112,10 @@ def _resolve_index_name(
     )
     if name:
         return name, source
-    # Auto-detect: try git root first, fall back to path
-    git_index = derive_index_from_git()
+    # Auto-detect: try git root first, fall back to path. Both anchor to
+    # fallback_path (the target codebase for path-based commands) so the
+    # name reflects the project being operated on, not the caller's cwd.
+    git_index = derive_index_from_git(fallback_path)
     if git_index:
         return git_index, "git"
     return derive_index_name(fallback_path or os.getcwd()), "derived"
@@ -155,8 +157,10 @@ def index_command(args: argparse.Namespace) -> int:
         )
         return 1
 
-    # Load config from cocosearch.yaml if present
-    config_path = find_config_file()
+    # Load config from cocosearch.yaml if present. Anchor to the target codebase
+    # so indexing /other/repo from a project dir uses that repo's config and
+    # index name, not the caller's cwd.
+    config_path = find_config_file(codebase_path)
     if config_path:
         console.print(f"[dim]Loading config from {config_path}[/dim]")
         try:
@@ -2316,7 +2320,13 @@ def deps_extract_command(args: argparse.Namespace) -> int:
     """
     console = Console()
 
-    config_path = find_config_file()
+    codebase_path = os.path.abspath(args.path)
+
+    # Anchor config and index-name resolution to the target codebase, not the
+    # caller's cwd. Otherwise `deps extract /other/repo` run from a project
+    # directory would resolve to *this* project's index and re-extract against
+    # the wrong files (with --fresh, wiping the wrong index's edges).
+    config_path = find_config_file(codebase_path)
     if config_path:
         try:
             project_config = load_project_config(config_path)
@@ -2326,9 +2336,9 @@ def deps_extract_command(args: argparse.Namespace) -> int:
         project_config = CocoSearchConfig()
 
     resolver = ConfigResolver(project_config, config_path)
-    index_name, _ = _resolve_index_name(resolver, cli_value=args.name)
-
-    codebase_path = os.path.abspath(args.path)
+    index_name, _ = _resolve_index_name(
+        resolver, cli_value=args.name, fallback_path=codebase_path
+    )
 
     fresh = getattr(args, "fresh", False)
 

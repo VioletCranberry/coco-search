@@ -90,6 +90,45 @@ class TestDepsExtractCommand:
         call_args = mock_extract.call_args[0]
         assert os.path.isabs(call_args[1])
 
+    @patch("cocosearch.cli.extract_dependencies")
+    @patch("cocosearch.cli._resolve_index_name", return_value=("myindex", "config"))
+    @patch("cocosearch.cli.load_project_config")
+    @patch("cocosearch.cli.find_config_file", return_value="/fake/cocosearch.yaml")
+    def test_resolves_index_from_target_path_not_cwd(
+        self, mock_find, mock_load, mock_resolve, mock_extract
+    ):
+        """Regression: config + index name must be anchored to the target path.
+
+        Previously the index name was resolved from the caller's cwd, so
+        `deps extract /other/repo --fresh` from a project dir would wipe and
+        re-extract *this* project's index against the wrong files.
+        """
+        import os
+
+        mock_extract.return_value = {
+            "files_processed": 0,
+            "files_skipped": 0,
+            "edges_found": 0,
+            "errors": 0,
+        }
+
+        args = MagicMock()
+        args.name = None
+        args.path = "/some/other/repo"
+        args.fresh = True
+
+        from cocosearch.cli import deps_extract_command
+
+        result = deps_extract_command(args)
+
+        assert result == 0
+        expected_path = os.path.abspath("/some/other/repo")
+        # Config discovery is anchored to the target codebase, not cwd.
+        mock_find.assert_called_once_with(expected_path)
+        # Index-name resolution falls back to the target codebase.
+        assert mock_resolve.call_args.kwargs["fallback_path"] == expected_path
+        mock_extract.assert_called_once_with("myindex", expected_path, fresh=True)
+
 
 # ============================================================================
 # Tests: deps_show_command

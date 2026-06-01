@@ -468,14 +468,18 @@ export async function indexCurrentProject() {
     }
 }
 
-export async function extractDeps() {
+export async function extractDeps(fresh) {
+    if (fresh && !confirm('Fresh Extract Deps re-extracts the entire dependency graph, ignoring the incremental cache. Continue?')) {
+        return;
+    }
+
     const select = document.getElementById('indexSelect');
     const indexIndex = parseInt(select.value);
     const stats = state.allIndexes[indexIndex];
     if (!stats) return;
 
     setButtonsDisabled(true);
-    showStatusBanner('Extracting dependencies...', 'info');
+    showStatusBanner(fresh ? 'Fresh extracting dependencies...' : 'Extracting dependencies...', 'info');
 
     try {
         const resp = await fetch('/api/extract-deps', {
@@ -483,6 +487,7 @@ export async function extractDeps() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 index_name: stats.name,
+                fresh: fresh,
                 source_path: stats.source_path || (state.projectContext && state.projectContext.project_path)
             })
         });

@@ -641,6 +641,7 @@ async def api_extract_deps(request) -> JSONResponse:
         return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
 
     index_name = body.get("index_name")
+    fresh = body.get("fresh", False)
     if not index_name:
         return JSONResponse({"error": "index_name is required"}, status_code=400)
 
@@ -659,7 +660,9 @@ async def api_extract_deps(request) -> JSONResponse:
     try:
         from cocosearch.deps.extractor import extract_dependencies
 
-        stats = await asyncio.to_thread(extract_dependencies, index_name, source_path)
+        stats = await asyncio.to_thread(
+            extract_dependencies, index_name, source_path, fresh=fresh
+        )
         edges = stats.get("edges_found", 0)
         return JSONResponse(
             {

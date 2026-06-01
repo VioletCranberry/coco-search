@@ -11,21 +11,29 @@ from .errors import format_validation_errors
 from .schema import CocoSearchConfig, ConfigError
 
 
-def find_config_file() -> Path | None:
-    """Find cocosearch.yaml in current directory or git root.
+def find_config_file(start_dir: str | Path | None = None) -> Path | None:
+    """Find cocosearch.yaml in a starting directory or its git root.
+
+    Args:
+        start_dir: Directory to anchor the search to. Defaults to the current
+            working directory. Path-based commands (``index``, ``deps extract``)
+            pass the target codebase path here so the config is resolved
+            relative to the project being operated on, not the caller's cwd.
 
     Returns:
         Path to config file, or None if not found.
     """
-    # Check current working directory first
-    cwd_config = Path.cwd() / "cocosearch.yaml"
-    if cwd_config.exists():
-        return cwd_config
+    base = Path(start_dir) if start_dir else Path.cwd()
 
-    # Try git root
+    # Check the starting directory first
+    direct_config = base / "cocosearch.yaml"
+    if direct_config.exists():
+        return direct_config
+
+    # Try git root of the starting directory
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
+            ["git", "-C", str(base), "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             check=True,
