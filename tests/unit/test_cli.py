@@ -99,6 +99,44 @@ class TestIndexCommand:
                     result = index_command(args)
         assert result == 0
 
+    def test_resolves_index_from_target_path_not_cwd(self, capsys, tmp_codebase):
+        """Regression: config + index name must be anchored to the target path.
+
+        Previously config discovery used the caller's cwd, so `index /other/repo`
+        run from a project dir would pick up *this* project's cocosearch.yaml and
+        index name instead of the target repo's. (deps_extract_command has the
+        equivalent regression test; this covers index_command for parity.)
+        """
+        import os
+
+        with (
+            patch("cocosearch.cli.run_index") as mock_run,
+            patch("cocosearch.cli.IndexingProgress"),
+            patch("cocosearch.cli.register_index_path"),
+            patch("cocosearch.cli.find_config_file", return_value=None) as mock_find,
+            patch(
+                "cocosearch.cli._resolve_index_name",
+                return_value=("myindex", "git"),
+            ) as mock_resolve,
+        ):
+            mock_run.return_value = MagicMock(stats={"files": {"num_insertions": 1}})
+            args = argparse.Namespace(
+                path=str(tmp_codebase),
+                name=None,
+                include=None,
+                exclude=None,
+                no_gitignore=False,
+                fresh=False,
+            )
+            result = index_command(args)
+
+        assert result == 0
+        expected_path = os.path.abspath(str(tmp_codebase))
+        # Config discovery is anchored to the target codebase, not cwd.
+        mock_find.assert_called_once_with(expected_path)
+        # Index-name resolution falls back to the target codebase.
+        assert mock_resolve.call_args.kwargs["fallback_path"] == expected_path
+
     def test_stores_branch_info(self, capsys, tmp_codebase):
         """index_command passes branch and commit_hash to register_index_path."""
         with (

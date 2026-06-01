@@ -214,16 +214,20 @@ def get_branch_commit_count(path: str | Path | None = None) -> int | None:
         return None
 
 
-def derive_index_from_git() -> str | None:
-    """Derive an index name from the current git repository.
+def derive_index_from_git(path: str | Path | None = None) -> str | None:
+    """Derive an index name from a git repository.
 
     Uses the main repo root (not the worktree root) so that all worktrees
     of the same repository derive the same index name.
 
+    Args:
+        path: Directory to resolve the git repo from. Defaults to the current
+            directory.
+
     Returns:
         Index name derived from git root directory, or None if not in a git repo.
     """
-    repo_root = get_main_repo_root()
+    repo_root = get_main_repo_root(path)
     if repo_root is None:
         return None
 

@@ -467,6 +467,47 @@ class TestApiExtractDepsSmoke:
         assert "42" in body["message"]
         assert body["stats"]["edges_found"] == 42
 
+    @pytest.mark.asyncio
+    async def test_default_extraction_is_incremental(self, client):
+        """Omitting fresh forwards fresh=False (incremental) to the extractor."""
+        metadata = {"canonical_path": "/projects/myproject"}
+        stats = {"edges_found": 42}
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=metadata):
+            with patch(
+                "cocosearch.deps.extractor.extract_dependencies",
+                return_value=stats,
+            ) as mock_extract:
+                response = await client.post(
+                    "/api/extract-deps", json={"index_name": "myindex"}
+                )
+
+        assert response.status_code == 200
+        mock_extract.assert_called_once_with(
+            "myindex", "/projects/myproject", fresh=False
+        )
+
+    @pytest.mark.asyncio
+    async def test_extraction_with_fresh_flag(self, client):
+        """fresh=True is forwarded to extract_dependencies (full re-extraction)."""
+        metadata = {"canonical_path": "/projects/myproject"}
+        stats = {"edges_found": 42}
+
+        with patch("cocosearch.mcp.server.get_index_metadata", return_value=metadata):
+            with patch(
+                "cocosearch.deps.extractor.extract_dependencies",
+                return_value=stats,
+            ) as mock_extract:
+                response = await client.post(
+                    "/api/extract-deps",
+                    json={"index_name": "myindex", "fresh": True},
+                )
+
+        assert response.status_code == 200
+        mock_extract.assert_called_once_with(
+            "myindex", "/projects/myproject", fresh=True
+        )
+
 
 class TestApiGrammarsSmoke:
     """Tests for GET /api/grammars through the ASGI stack."""

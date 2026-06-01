@@ -93,6 +93,45 @@ class TestFindConfigFile:
 
         assert result is None
 
+    def test_start_dir_anchors_search_to_target(self, tmp_path, monkeypatch):
+        """start_dir finds config in the target directory, not cwd."""
+        # cwd has its own config that must be ignored
+        cwd = tmp_path / "cwd"
+        cwd.mkdir()
+        (cwd / "cocosearch.yaml").write_text("indexName: cwd")
+        monkeypatch.chdir(cwd)
+
+        # Target directory has a different config
+        target = tmp_path / "target"
+        target.mkdir()
+        target_config = target / "cocosearch.yaml"
+        target_config.write_text("indexName: target")
+
+        result = find_config_file(target)
+        assert result == target_config
+
+    def test_start_dir_falls_back_to_target_git_root(self, tmp_path, monkeypatch):
+        """With start_dir, git discovery is run against the target directory."""
+        monkeypatch.chdir(tmp_path)
+        target = tmp_path / "target"
+        target.mkdir()
+        git_root = tmp_path / "repo"
+        git_root.mkdir()
+        git_config = git_root / "cocosearch.yaml"
+        git_config.write_text("indexName: repo")
+
+        with patch("subprocess.run") as mock_run:
+            mock_result = MagicMock()
+            mock_result.stdout = str(git_root) + "\n"
+            mock_run.return_value = mock_result
+            result = find_config_file(target)
+
+        # git was invoked with -C pointing at the target directory
+        called_cmd = mock_run.call_args[0][0]
+        assert "-C" in called_cmd
+        assert str(target) in called_cmd
+        assert result == git_config
+
 
 class TestLoadConfig:
     """Test config loading and validation."""
