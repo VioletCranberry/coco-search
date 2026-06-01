@@ -284,6 +284,63 @@ class TestSearch:
         # The mock ensures embed_query is patched and callable
         assert mock_code_to_embedding is not None
 
+    def test_rewrite_disabled_is_noop(self, mock_code_to_embedding, mock_db_pool):
+        """With the controller disabled (default), the query is unchanged."""
+        pool, _cursor, _conn = mock_db_pool(results=[])
+        rewrite_info: dict = {}
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.controller.rewrite_query",
+                return_value=("find auth", False),
+            ) as mock_rewrite:
+                search(
+                    query="find auth",
+                    index_name="testindex",
+                    rewrite_info=rewrite_info,
+                )
+
+        mock_rewrite.assert_called_once()
+        assert rewrite_info == {}
+
+    def test_skip_rewrite_bypasses_controller(
+        self, mock_code_to_embedding, mock_db_pool
+    ):
+        """_skip_rewrite=True must not invoke the controller at all."""
+        pool, _cursor, _conn = mock_db_pool(results=[])
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch("cocosearch.search.controller.rewrite_query") as mock_rewrite:
+                search(query="find auth", index_name="testindex", _skip_rewrite=True)
+
+        mock_rewrite.assert_not_called()
+
+    def test_enabled_rewrite_feeds_embedding_and_info(self, mock_db_pool):
+        """When enabled, the rewritten query is embedded and surfaced via rewrite_info."""
+        pool, _cursor, _conn = mock_db_pool(results=[])
+        rewrite_info: dict = {}
+
+        with patch("cocosearch.search.query.get_connection_pool", return_value=pool):
+            with patch(
+                "cocosearch.search.controller.rewrite_query",
+                return_value=("authentication session token", True),
+            ):
+                with patch(
+                    "cocosearch.search.query.embed_query", return_value=[0.1] * 768
+                ) as mock_embed:
+                    search(
+                        query="how does login work",
+                        index_name="testindex",
+                        use_hybrid=False,
+                        no_cache=True,
+                        rewrite_info=rewrite_info,
+                    )
+
+        # Embedding sees the rewritten query, not the original.
+        mock_embed.assert_called_once_with("authentication session token")
+        assert rewrite_info["original"] == "how does login work"
+        assert rewrite_info["rewritten"] == "authentication session token"
+
     def test_uses_correct_table_name(self, mock_code_to_embedding, mock_db_pool):
         """Should query the correct table based on index_name."""
         pool, cursor, _conn = mock_db_pool(results=[])

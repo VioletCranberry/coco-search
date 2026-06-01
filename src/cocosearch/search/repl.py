@@ -110,16 +110,22 @@ class SearchREPL(cmd.Cmd):
         lang = inline_lang or self.lang_filter
 
         try:
+            rewrite_info: dict = {}
             if self.index_names and len(self.index_names) >= 2:
                 from cocosearch.search.multi import multi_search
 
+                search_warnings: list[dict] = []
                 results = multi_search(
                     query=query,
                     index_names=self.index_names,
                     limit=self.limit,
                     min_score=self.min_score,
                     language_filter=lang,
+                    warnings=search_warnings,
                 )
+                for w in search_warnings:
+                    if w.get("type") == "query_rewrite":
+                        rewrite_info = w
             else:
                 results = search(
                     query=query,
@@ -127,6 +133,12 @@ class SearchREPL(cmd.Cmd):
                     limit=self.limit,
                     min_score=self.min_score,
                     language_filter=lang,
+                    rewrite_info=rewrite_info,
+                )
+            if rewrite_info:
+                self.console.print(
+                    f'[dim]Query rewritten: "{rewrite_info["original"]}" → '
+                    f'"{rewrite_info["rewritten"]}"[/dim]'
                 )
             format_pretty(
                 results, context_lines=self.context_lines, console=self.console

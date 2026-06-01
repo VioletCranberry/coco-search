@@ -53,6 +53,9 @@ class QueryAnalysisInfo:
     original_query: str
     has_identifier: bool
     normalized_keyword_query: str
+    rewrite_enabled: bool = False
+    rewritten: bool = False
+    effective_query: str = ""
 
 
 @dataclass
@@ -179,6 +182,7 @@ def analyze(
     symbol_type: str | list[str] | None = None,
     symbol_name: str | None = None,
     no_cache: bool = False,
+    skip_rewrite: bool = False,
 ) -> AnalysisResult:
     """Analyze the search pipeline for a query.
 
@@ -195,23 +199,39 @@ def analyze(
         symbol_type: Filter by symbol type.
         symbol_name: Filter by symbol name using glob pattern.
         no_cache: If True, bypass query cache (default False).
+        skip_rewrite: If True, the optional query-rewrite controller is not invoked.
 
     Returns:
         AnalysisResult with full pipeline diagnostics and search results.
     """
     total_start = time.perf_counter()
 
-    # --- Stage 1: Query analysis ---
+    # --- Stage 1: Query analysis (incl. optional rewrite) ---
     t0 = time.perf_counter()
     query = validate_query(query)
+    original_query = query
+
+    # Optional query-rewrite controller (default OFF). Mirrors search(): the
+    # rewrite happens before everything downstream so cache key, identifier
+    # detection, mode selection, and embedding all see the effective query.
+    from cocosearch.search.controller import _controller_enabled, rewrite_query
+
+    rewrite_enabled = _controller_enabled()
+    rewritten = False
+    if not skip_rewrite:
+        query, rewritten = rewrite_query(query)
+
     has_ident = has_identifier_pattern(query)
     normalized_kw = normalize_query_for_keyword(query)
     query_analysis_ms = (time.perf_counter() - t0) * 1000
 
     query_info = QueryAnalysisInfo(
-        original_query=query,
+        original_query=original_query,
         has_identifier=has_ident,
         normalized_keyword_query=normalized_kw,
+        rewrite_enabled=rewrite_enabled,
+        rewritten=rewritten,
+        effective_query=query,
     )
 
     # --- Stage 2: Cache check ---
@@ -583,6 +603,7 @@ def multi_analyze(
     symbol_type: str | list[str] | None = None,
     symbol_name: str | None = None,
     no_cache: bool = False,
+    skip_rewrite: bool = False,
 ) -> MultiAnalysisResult:
     """Analyze the search pipeline across multiple indexes.
 
@@ -619,6 +640,7 @@ def multi_analyze(
             symbol_type=symbol_type,
             symbol_name=symbol_name,
             no_cache=no_cache,
+            skip_rewrite=skip_rewrite,
         )
         return idx_name, result
 
@@ -670,6 +692,16 @@ def format_analysis_pretty(analysis: AnalysisResult, index_name: str) -> None:
     qa = analysis.query_analysis
     sm = analysis.search_mode
     qa_lines = []
+    if qa.rewritten:
+        qa_lines.append(
+            f"Query rewrite:   [green]on[/green] "
+            f'[dim]"{qa.original_query}" → "{qa.effective_query}"[/dim]'
+        )
+    else:
+        qa_lines.append(
+            f"Query rewrite:   [dim]{'enabled (no change)' if qa.rewrite_enabled else 'disabled'}"
+            f"[/dim]"
+        )
     qa_lines.append(
         f"Has identifier:  [{'green' if qa.has_identifier else 'dim'}]"
         f"{'Yes' if qa.has_identifier else 'No'}[/{'green' if qa.has_identifier else 'dim'}]"

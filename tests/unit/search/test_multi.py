@@ -193,3 +193,56 @@ class TestMultiSearch:
             warnings: list[dict] = []
             multi_search("test query", ["repo_a", "repo_b"], warnings=warnings)
             assert len(warnings) == 0
+
+
+class TestMultiSearchRewrite:
+    """Query-rewrite controller behavior in cross-index search."""
+
+    def test_rewrite_called_once_and_skips_per_index(
+        self, mock_list_indexes, mock_metadata, mock_embedding
+    ):
+        """The controller runs once, and each per-index search() skips its own rewrite."""
+        with patch(
+            "cocosearch.search.controller.rewrite_query",
+            return_value=("auth session token", True),
+        ) as mock_rewrite:
+            with patch("cocosearch.search.multi.search") as mock_search:
+                mock_search.return_value = []
+                warnings: list[dict] = []
+                multi_search(
+                    "how does auth work",
+                    ["repo_a", "repo_b"],
+                    warnings=warnings,
+                )
+
+        # Rewrite invoked exactly once for the whole fan-out.
+        mock_rewrite.assert_called_once()
+        # Embedding uses the rewritten query.
+        mock_embedding.assert_called_once_with("auth session token")
+        # Every per-index search() is told to skip its own rewrite.
+        for call in mock_search.call_args_list:
+            assert call.kwargs["_skip_rewrite"] is True
+        # Warning surfaced.
+        assert any(w["type"] == "query_rewrite" for w in warnings)
+
+    def test_skip_rewrite_param_bypasses_controller(
+        self, mock_list_indexes, mock_metadata, mock_embedding
+    ):
+        with patch("cocosearch.search.controller.rewrite_query") as mock_rewrite:
+            with patch("cocosearch.search.multi.search") as mock_search:
+                mock_search.return_value = []
+                multi_search("test query", ["repo_a", "repo_b"], skip_rewrite=True)
+
+        mock_rewrite.assert_not_called()
+
+    def test_single_index_skips_inner_rewrite(self, mock_metadata, mock_embedding):
+        """Single-index delegate passes _skip_rewrite=True to search()."""
+        with patch(
+            "cocosearch.search.controller.rewrite_query",
+            return_value=("rewritten", True),
+        ):
+            with patch("cocosearch.search.multi.search") as mock_search:
+                mock_search.return_value = []
+                multi_search("test query", ["repo_a"])
+
+        assert mock_search.call_args.kwargs["_skip_rewrite"] is True
