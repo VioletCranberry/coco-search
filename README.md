@@ -605,6 +605,14 @@ embedding:
   provider: ollama  # ollama (default), openai, openrouter
   model: nomic-embed-text  # default depends on provider
   # baseUrl: http://localhost:8080  # custom OpenAI-compatible endpoint
+
+# Optional query-rewrite controller (default: disabled)
+controller:
+  enabled: false        # when false, search is byte-for-byte unchanged
+  provider: ollama      # ollama (default), openai, openrouter
+  model: qwen2.5:3b     # default depends on provider
+  # baseUrl: http://localhost:11434
+  # timeout: 5.0        # seconds; on timeout, falls back to the original query
 ```
 
 ### Remote Embedding Providers
@@ -646,6 +654,47 @@ embedding:
 ```
 
 When `baseUrl` is set, the API key is not required. For the `ollama` provider, `baseUrl` overrides `COCOSEARCH_OLLAMA_URL`.
+
+### Query Rewrite (optional)
+
+> **CocoSearch retrieval is already adaptive without any LLM.** Per query, it auto-selects hybrid vs. vector-only search from code-identifier patterns, sizes prefetch dynamically, applies a definition boost, caches at two levels (exact + semantic), and auto-expands to linked indexes — all deterministic, local, and fast. The query-rewrite controller below is an **optional layer on top** for vague natural-language queries (mainly the CLI/REPL, where there's no LLM in front). It is **not** required and **not** a fix for anything. When you use CocoSearch via MCP, the calling agent already reformulates queries, so leave the controller off or opt out per call.
+
+When enabled, an LLM rewrites/expands a natural-language query into better search terms **before** retrieval:
+
+```
+"how does login work"  →  "authentication session credential login user token"
+```
+
+It is **disabled by default** — when off, search behaves exactly as before and no generative model is ever called. On any error, timeout, or empty output it falls back to the original query, so search never breaks. Configure it exactly like the embedding provider:
+
+```yaml
+# cocosearch.yaml
+controller:
+  enabled: true
+  provider: ollama        # ollama (default, local), openai, openrouter
+  model: qwen2.5:3b       # default depends on provider
+  # baseUrl: http://localhost:11434
+  # timeout: 5.0          # seconds
+```
+
+Or via environment variables:
+
+```bash
+export COCOSEARCH_CONTROLLER_ENABLED=true
+export COCOSEARCH_CONTROLLER_PROVIDER=openrouter
+export COCOSEARCH_CONTROLLER_MODEL=openai/gpt-4o-mini
+export COCOSEARCH_CONTROLLER_API_KEY=sk-...
+```
+
+| Provider | Default Model | API Key Required |
+|----------|--------------|-----------------|
+| `ollama` | `qwen2.5:3b` | No (local) |
+| `openai` | `gpt-4o-mini` | Yes (optional with `baseUrl`) |
+| `openrouter` | `openai/gpt-4o-mini` | Yes (optional with `baseUrl`) |
+
+> **Key reuse:** if you don't set `COCOSEARCH_CONTROLLER_API_KEY` and the controller uses the same provider as embedding, the embedding key is reused automatically — no need to duplicate it.
+
+**Opting out per query:** `cocosearch search --no-rewrite "<query>"`, `cocosearch analyze --no-rewrite "<query>"`, or the MCP `search_code(rewrite_query=False)` parameter (use the latter when the agent has already crafted precise terms). When enabled, the CLI/REPL print the `original → rewritten` query, and `cocosearch analyze` shows it as an explicit pipeline stage. The web dashboard header status line shows a `REWRITE: ON/OFF` indicator and, when a remote provider (e.g. OpenRouter) is in use, a `CREDITS:` readout of the remaining balance.
 
 ## Testing
 

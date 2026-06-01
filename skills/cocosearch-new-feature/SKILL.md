@@ -62,6 +62,8 @@ search_code(
 
 > **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For ad-hoc multi-project pattern discovery, pass `index_names=["project1", "project2"]`.
 
+> **Query rewrite:** If the optional query-rewrite controller is enabled, pass `rewrite_query=False` when you have already crafted precise terms (exact identifiers, `symbol_name`/`symbol_type` filters) to search them verbatim. No effect when the controller is disabled.
+
 **Search for the subsystem's existing entry points:**
 
 ```

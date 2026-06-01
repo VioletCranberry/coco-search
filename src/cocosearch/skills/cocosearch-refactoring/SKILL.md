@@ -95,6 +95,8 @@ search_code(
 
 > **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For ad-hoc multi-project refactoring, pass `index_names=["project1", "project2"]` to find usages across codebases.
 
+> **Query rewrite:** If the optional query-rewrite controller is enabled, pass `rewrite_query=False` when searching precise terms (exact identifiers, `symbol_name`/`symbol_type` filters) so they are matched verbatim. No effect when the controller is disabled.
+
 Use glob patterns in `symbol_name` to catch variants. For example:
 
 - Target: "User" → `symbol_name="User*"` finds User, UserProfile, UserService, UserRepository
