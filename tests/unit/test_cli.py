@@ -337,6 +337,70 @@ class TestSearchCommand:
         output = json.loads(captured.out)
         assert isinstance(output, list)
 
+    def test_no_rewrite_flag_skips_controller(self, make_search_result):
+        """--no-rewrite passes _skip_rewrite=True to search()."""
+        mock_results = [
+            make_search_result(
+                filename="/test/file.py", start_byte=0, end_byte=100, score=0.9
+            ),
+        ]
+        with patch("cocosearch.cli.search", return_value=mock_results) as mock_search:
+            args = argparse.Namespace(
+                query="test query",
+                index="testindex",
+                indexes=None,
+                limit=10,
+                lang=None,
+                min_score=0.3,
+                context=5,
+                before_context=None,
+                after_context=None,
+                no_smart=False,
+                pretty=False,
+                interactive=False,
+                hybrid=None,
+                symbol_type=None,
+                symbol_name=None,
+                no_cache=False,
+                no_rewrite=True,
+            )
+            result = search_command(args)
+
+        assert result == 0
+        assert mock_search.call_args.kwargs["_skip_rewrite"] is True
+
+    def test_rewrite_active_by_default(self, make_search_result):
+        """Without --no-rewrite, _skip_rewrite is False."""
+        mock_results = [
+            make_search_result(
+                filename="/test/file.py", start_byte=0, end_byte=100, score=0.9
+            ),
+        ]
+        with patch("cocosearch.cli.search", return_value=mock_results) as mock_search:
+            args = argparse.Namespace(
+                query="test query",
+                index="testindex",
+                indexes=None,
+                limit=10,
+                lang=None,
+                min_score=0.3,
+                context=5,
+                before_context=None,
+                after_context=None,
+                no_smart=False,
+                pretty=False,
+                interactive=False,
+                hybrid=None,
+                symbol_type=None,
+                symbol_name=None,
+                no_cache=False,
+                no_rewrite=False,
+            )
+            result = search_command(args)
+
+        assert result == 0
+        assert mock_search.call_args.kwargs["_skip_rewrite"] is False
+
 
 class TestListCommand:
     """Tests for list_command."""
