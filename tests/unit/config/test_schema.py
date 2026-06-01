@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from cocosearch.config import (
     CocoSearchConfig,
+    ControllerSection,
     EmbeddingSection,
     IndexingSection,
     LoggingSection,
@@ -177,6 +178,61 @@ class TestEmbeddingSection:
         """baseUrl rejects non-string values in strict mode."""
         with pytest.raises(ValidationError):
             EmbeddingSection(baseUrl=8080)
+
+
+class TestControllerSection:
+    """Test ControllerSection model (optional query-rewrite controller)."""
+
+    def test_default_values(self):
+        """Controller is disabled by default with ollama provider."""
+        section = ControllerSection()
+        assert section.enabled is False
+        assert section.provider == "ollama"
+        assert section.model == "qwen2.5:3b"
+        assert section.timeout == 5.0
+        assert section.baseUrl is None
+
+    def test_provider_openai_default_model(self):
+        """OpenAI provider defaults to gpt-4o-mini."""
+        section = ControllerSection(provider="openai")
+        assert section.model == "gpt-4o-mini"
+
+    def test_provider_openrouter_default_model(self):
+        """OpenRouter provider defaults to openai/gpt-4o-mini."""
+        section = ControllerSection(provider="openrouter")
+        assert section.model == "openai/gpt-4o-mini"
+
+    def test_custom_model_overrides_default(self):
+        """Explicit model overrides the provider default."""
+        section = ControllerSection(provider="ollama", model="llama3.2:3b")
+        assert section.model == "llama3.2:3b"
+
+    def test_invalid_provider_rejected(self):
+        """Invalid provider raises a validation error."""
+        with pytest.raises(ValidationError, match="Invalid controller provider"):
+            ControllerSection(provider="invalid-provider")
+
+    def test_unknown_field_rejected(self):
+        """Unknown fields are rejected (extra='forbid')."""
+        with pytest.raises(ValidationError) as exc_info:
+            ControllerSection(unknownField="value")
+        assert "Extra inputs are not permitted" in str(exc_info.value)
+
+    def test_timeout_must_be_positive(self):
+        """timeout must be greater than zero."""
+        with pytest.raises(ValidationError):
+            ControllerSection(timeout=0)
+
+    def test_enabled_accepts_bool(self):
+        """enabled accepts a boolean true."""
+        section = ControllerSection(enabled=True)
+        assert section.enabled is True
+
+    def test_root_config_has_controller_default(self):
+        """Root config includes a default (disabled) controller section."""
+        config = CocoSearchConfig()
+        assert config.controller.enabled is False
+        assert config.controller.provider == "ollama"
 
 
 class TestLoggingSection:

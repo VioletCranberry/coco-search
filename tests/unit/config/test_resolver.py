@@ -397,3 +397,77 @@ class TestBridgeEmbeddingConfig:
         resolver.bridge_embedding_config()
 
         assert "COCOSEARCH_EMBEDDING_BASE_URL" not in os.environ
+
+
+class TestBridgeControllerConfig:
+    """Test ConfigResolver.bridge_controller_config env var bridging."""
+
+    _ENV_KEYS = (
+        "COCOSEARCH_CONTROLLER_ENABLED",
+        "COCOSEARCH_CONTROLLER_PROVIDER",
+        "COCOSEARCH_CONTROLLER_MODEL",
+        "COCOSEARCH_CONTROLLER_BASE_URL",
+        "COCOSEARCH_CONTROLLER_TIMEOUT",
+    )
+
+    @pytest.fixture(autouse=True)
+    def _clean_bridge_env(self):
+        saved = {k: os.environ.pop(k) for k in self._ENV_KEYS if k in os.environ}
+        yield
+        for k in self._ENV_KEYS:
+            os.environ.pop(k, None)
+        os.environ.update(saved)
+
+    def test_disabled_by_default(self):
+        """Defaults bridge to disabled, ollama provider."""
+        config = CocoSearchConfig()
+        resolver = ConfigResolver(config)
+
+        enabled = resolver.bridge_controller_config()
+
+        assert enabled is False
+        assert os.environ["COCOSEARCH_CONTROLLER_ENABLED"] == "false"
+        assert os.environ["COCOSEARCH_CONTROLLER_PROVIDER"] == "ollama"
+        assert os.environ["COCOSEARCH_CONTROLLER_MODEL"] == "qwen2.5:3b"
+
+    def test_enabled_from_config(self):
+        """Enabled config is bridged and returned."""
+        config = CocoSearchConfig()
+        config.controller.enabled = True
+        config.controller.provider = "openrouter"
+        config.controller.model = "openai/gpt-4o-mini"
+        resolver = ConfigResolver(config, config_path=Path("/config.yaml"))
+
+        enabled = resolver.bridge_controller_config()
+
+        assert enabled is True
+        assert os.environ["COCOSEARCH_CONTROLLER_ENABLED"] == "true"
+        assert os.environ["COCOSEARCH_CONTROLLER_PROVIDER"] == "openrouter"
+        assert os.environ["COCOSEARCH_CONTROLLER_MODEL"] == "openai/gpt-4o-mini"
+
+    def test_env_takes_precedence(self):
+        """Env var overrides config value."""
+        os.environ["COCOSEARCH_CONTROLLER_PROVIDER"] = "openai"
+        config = CocoSearchConfig()  # default ollama
+        resolver = ConfigResolver(config)
+
+        resolver.bridge_controller_config()
+
+        assert os.environ["COCOSEARCH_CONTROLLER_PROVIDER"] == "openai"
+
+    def test_base_url_not_set_when_none(self):
+        config = CocoSearchConfig()
+        resolver = ConfigResolver(config)
+
+        resolver.bridge_controller_config()
+
+        assert "COCOSEARCH_CONTROLLER_BASE_URL" not in os.environ
+
+    def test_timeout_bridged(self):
+        config = CocoSearchConfig()
+        config.controller.timeout = 3.0
+        resolver = ConfigResolver(config, config_path=Path("/config.yaml"))
+
+        resolver.bridge_controller_config()
+
+        assert os.environ["COCOSEARCH_CONTROLLER_TIMEOUT"] == "3.0"

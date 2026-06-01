@@ -26,17 +26,21 @@ from .resolver import ConfigResolver, config_key_to_env_var, parse_env_value
 from .schema import (
     CocoSearchConfig,
     ConfigError,
+    ControllerSection,
     EmbeddingSection,
     IndexingSection,
     LoggingSection,
     SearchSection,
+    VALID_CONTROLLER_PROVIDERS,
     VALID_EMBEDDING_PROVIDERS,
+    default_controller_model_for_provider,
     default_model_for_provider,
 )
 
 __all__ = [
     "CocoSearchConfig",
     "ConfigError",
+    "ControllerSection",
     "EmbeddingSection",
     "IndexingSection",
     "LoggingSection",
@@ -65,5 +69,7 @@ __all__ = [
     "DEFAULT_DATABASE_URL",
     "get_database_url",
     "VALID_EMBEDDING_PROVIDERS",
+    "VALID_CONTROLLER_PROVIDERS",
     "default_model_for_provider",
+    "default_controller_model_for_provider",
 ]
