@@ -1045,34 +1045,42 @@ async def api_stop_indexing(request) -> JSONResponse:
     if not index_name:
         return JSONResponse({"error": "index_name is required"}, status_code=400)
 
+    live = False
     with _indexing_lock:
         entry = _active_indexing.get(index_name)
-        if entry is None:
-            return JSONResponse(
-                {"error": f"No active indexing found for '{index_name}'"},
-                status_code=404,
-            )
-        thread, cancel_event = entry
-        if not thread.is_alive():
-            # Dead thread — clean up stale entry
+        if entry is not None:
+            thread, cancel_event = entry
+            if thread.is_alive():
+                # Signal thread not to overwrite status in its finally block
+                cancel_event.set()
+                live = True
+            # Remove from registry (also cleans up a dead/stale entry) so
+            # _apply_thread_liveness_status won't override.
             _active_indexing.pop(index_name, None)
+
+    # No live thread in this process. Still allow clearing an ORPHANED
+    # 'indexing' status — e.g. left in the DB by a thread that died or a
+    # previous server process (after a dashboard restart the in-memory
+    # registry is empty but the DB row can be stuck at 'indexing').
+    if not live:
+        meta = get_index_metadata(index_name)
+        if not meta or meta.get("status") != "indexing":
             return JSONResponse(
                 {"error": f"No active indexing found for '{index_name}'"},
                 status_code=404,
             )
-        # Signal thread not to overwrite status in its finally block
-        cancel_event.set()
-        # Remove from registry so _apply_thread_liveness_status won't override
-        _active_indexing.pop(index_name, None)
 
     try:
         set_index_status(index_name, "indexed")
     except Exception as e:
         return JSONResponse({"error": f"Failed to update status: {e}"}, status_code=500)
 
-    return JSONResponse(
-        {"success": True, "message": f"Indexing stopped for '{index_name}'"}
+    message = (
+        f"Indexing stopped for '{index_name}'"
+        if live
+        else f"Cleared stale indexing status for '{index_name}'"
     )
+    return JSONResponse({"success": True, "message": message})
 
 
 @mcp.custom_route("/api/delete-index", methods=["POST"])

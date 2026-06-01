@@ -236,10 +236,22 @@ class TestStaleIndexingDetection:
 
     def test_stale_indexing_preserves_status(self, mock_db_pool):
         """get_index_metadata keeps 'indexing' status even when stale (no auto-recovery)."""
-        stale_time = datetime.now() - timedelta(seconds=300 + 60)
-        pool, cursor, conn = mock_db_pool(
-            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        # 12th column is the DB-computed EXTRACT(EPOCH FROM NOW()-updated_at).
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            "2024-01-01 00:00:00",
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            360.0,
         )
+        pool, cursor, conn = mock_db_pool(results=[row])
 
         with patch(
             "cocosearch.management.metadata.get_connection_pool", return_value=pool
@@ -248,7 +260,42 @@ class TestStaleIndexingDetection:
 
         # Status should remain "indexing" — read path must not mutate
         assert result["status"] == "indexing"
-        assert result["indexing_elapsed_seconds"] > 300
+        assert result["indexing_elapsed_seconds"] == 360.0
+
+    def test_elapsed_uses_db_value_not_local_clock(self, mock_db_pool):
+        """Regression: indexing_elapsed_seconds comes from the DB (NOW()-updated_at),
+        NOT a naive local datetime.now() recompute.
+
+        The metadata column is TIMESTAMP WITHOUT TIME ZONE storing UTC, returned
+        as a naive datetime. Comparing it against naive local datetime.now()
+        skewed elapsed by the machine's UTC offset (e.g. +7200s at UTC+2), which
+        tripped the 1h auto-recovery threshold during healthy reindexes. Here
+        updated_at is 3h in the LOCAL past but the DB reports only 300s elapsed;
+        the result must be the DB's 300.0, not ~10800.
+        """
+        naive_updated = datetime.now() - timedelta(hours=3)
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            naive_updated,
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            300.0,
+        )
+        pool, cursor, conn = mock_db_pool(results=[row])
+
+        with patch(
+            "cocosearch.management.metadata.get_connection_pool", return_value=pool
+        ):
+            result = get_index_metadata("myindex")
+
+        assert result["indexing_elapsed_seconds"] == 300.0
 
     def test_stale_indexing_no_db_update(self, mock_db_pool):
         """get_index_metadata never writes to DB (read-only operation)."""
@@ -267,10 +314,22 @@ class TestStaleIndexingDetection:
 
     def test_fresh_indexing_includes_elapsed(self, mock_db_pool):
         """get_index_metadata includes elapsed seconds for active indexing."""
-        fresh_time = datetime.now() - timedelta(seconds=60)
-        pool, cursor, conn = mock_db_pool(
-            results=[("myindex", "/path", "2024-01-01", fresh_time, "indexing")]
+        # 12th column = DB-computed EXTRACT(EPOCH FROM NOW()-updated_at).
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            "2024-01-01 00:00:00",
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            60.0,
         )
+        pool, cursor, conn = mock_db_pool(results=[row])
 
         with patch(
             "cocosearch.management.metadata.get_connection_pool", return_value=pool
@@ -278,7 +337,7 @@ class TestStaleIndexingDetection:
             result = get_index_metadata("myindex")
 
         assert result["status"] == "indexing"
-        assert 50 < result["indexing_elapsed_seconds"] < 120
+        assert result["indexing_elapsed_seconds"] == 60.0
         # No UPDATE should be issued
         assert len(cursor.calls) == 1
 
@@ -309,10 +368,21 @@ class TestAutoRecoverStaleIndexing:
 
     def test_recovers_stale_indexing_status(self, mock_db_pool):
         """auto_recover_stale_indexing flips 'indexing' to 'indexed' after threshold."""
-        stale_time = datetime.now() - timedelta(seconds=3600 + 60)
-        pool, cursor, conn = mock_db_pool(
-            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            "2024-01-01 00:00:00",
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            3660.0,
         )
+        pool, cursor, conn = mock_db_pool(results=[row])
         cursor.rowcount = 1
 
         with patch(
@@ -330,10 +400,21 @@ class TestAutoRecoverStaleIndexing:
 
     def test_skips_fresh_indexing_status(self, mock_db_pool):
         """auto_recover_stale_indexing does not recover fresh indexing."""
-        fresh_time = datetime.now() - timedelta(seconds=60)
-        pool, cursor, conn = mock_db_pool(
-            results=[("myindex", "/path", "2024-01-01", fresh_time, "indexing")]
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            "2024-01-01 00:00:00",
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            60.0,
         )
+        pool, cursor, conn = mock_db_pool(results=[row])
 
         with patch(
             "cocosearch.management.metadata.get_connection_pool", return_value=pool
@@ -372,11 +453,22 @@ class TestAutoRecoverStaleIndexing:
 
     def test_threshold_boundary(self, mock_db_pool):
         """auto_recover_stale_indexing does not recover below the threshold."""
-        # Just below threshold (299 seconds) - should NOT recover
-        boundary_time = datetime.now() - timedelta(seconds=299)
-        pool, cursor, conn = mock_db_pool(
-            results=[("myindex", "/path", "2024-01-01", boundary_time, "indexing")]
+        # Just below threshold - should NOT recover
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            "2024-01-01 00:00:00",
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            299.0,
         )
+        pool, cursor, conn = mock_db_pool(results=[row])
 
         with patch(
             "cocosearch.management.metadata.get_connection_pool", return_value=pool
@@ -388,10 +480,21 @@ class TestAutoRecoverStaleIndexing:
 
     def test_skips_already_recovered_index(self, mock_db_pool):
         """auto_recover_stale_indexing skips indexes already recovered this process."""
-        stale_time = datetime.now() - timedelta(seconds=3600 + 60)
-        pool, cursor, conn = mock_db_pool(
-            results=[("myindex", "/path", "2024-01-01", stale_time, "indexing")]
+        row = (
+            "myindex",
+            "/path",
+            "2024-01-01",
+            "2024-01-01 00:00:00",
+            "indexing",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            3660.0,
         )
+        pool, cursor, conn = mock_db_pool(results=[row])
         cursor.rowcount = 1
 
         with patch(
