@@ -5,6 +5,7 @@ This module provides common fixtures used across all test modules:
 - tmp_codebase: Creates temporary directory with sample Python files
 """
 
+import os
 import warnings
 
 import pytest
@@ -69,6 +70,35 @@ def reset_db_pool():
     db_module._pool = MockConnectionPool(connection=MockConnection(cursor=MockCursor()))
     yield
     db_module._pool = None
+
+
+_CONTROLLER_ENV_VARS = (
+    "COCOSEARCH_CONTROLLER_ENABLED",
+    "COCOSEARCH_CONTROLLER_PROVIDER",
+    "COCOSEARCH_CONTROLLER_MODEL",
+    "COCOSEARCH_CONTROLLER_BASE_URL",
+    "COCOSEARCH_CONTROLLER_TIMEOUT",
+    "COCOSEARCH_CONTROLLER_API_KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def isolate_controller_env():
+    """Keep the optional query-rewrite controller disabled and isolated per test.
+
+    Without this, a test that calls ``bridge_controller_config()`` (e.g. the CLI
+    search/analyze commands) reads the repo's real cocosearch.yaml — where the
+    controller is enabled for dogfooding — and writes COCOSEARCH_CONTROLLER_*
+    into os.environ, leaking into later tests that call search() and triggering
+    a real network rewrite. Snapshot and restore these vars (cleared by default)
+    so unit tests are deterministic; tests that need the controller set it via
+    monkeypatch.
+    """
+    saved = {k: os.environ.pop(k) for k in _CONTROLLER_ENV_VARS if k in os.environ}
+    yield
+    for k in _CONTROLLER_ENV_VARS:
+        os.environ.pop(k, None)
+    os.environ.update(saved)
 
 
 @pytest.fixture

@@ -407,6 +407,10 @@ def search_command(args: argparse.Namespace) -> int:
     # Create resolver with loaded config
     resolver = ConfigResolver(project_config, config_path)
 
+    # Bridge the optional query-rewrite controller config to env vars so the
+    # cocosearch.yaml `controller` block takes effect during search/REPL.
+    resolver.bridge_controller_config()
+
     # Check for cross-index search mode
     indexes_arg = getattr(args, "indexes", None)
     if indexes_arg and args.index:
@@ -571,6 +575,21 @@ def search_command(args: argparse.Namespace) -> int:
     # Get cache bypass flag
     no_cache = getattr(args, "no_cache", False)
 
+    # Query-rewrite controller opt-out (--no-rewrite). Default: controller active
+    # when enabled in config.
+    skip_rewrite = getattr(args, "no_rewrite", False)
+
+    def _print_rewrite(info: dict) -> None:
+        if not info:
+            return
+        msg = f'Query rewritten: "{info["original"]}" → "{info["rewritten"]}"'
+        if args.pretty:
+            console.print(f"[dim]{msg}[/dim]")
+        else:
+            import sys as _sys
+
+            print(msg, file=_sys.stderr)
+
     # Execute search
     try:
         if use_multi_search:
@@ -588,13 +607,17 @@ def search_command(args: argparse.Namespace) -> int:
                 symbol_name=symbol_name,
                 no_cache=no_cache,
                 warnings=search_warnings,
+                skip_rewrite=skip_rewrite,
             )
-            if search_warnings and args.pretty:
-                for w in search_warnings:
+            for w in search_warnings:
+                if w.get("type") == "query_rewrite":
+                    _print_rewrite(w)
+                elif args.pretty:
                     console.print(
                         f"[yellow]Warning: {w.get('message', w.get('warning', ''))}[/yellow]"
                     )
         else:
+            rewrite_info: dict = {}
             results = search(
                 query=query,
                 index_name=index_name,
@@ -605,7 +628,10 @@ def search_command(args: argparse.Namespace) -> int:
                 symbol_type=symbol_type,
                 symbol_name=symbol_name,
                 no_cache=no_cache,
+                _skip_rewrite=skip_rewrite,
+                rewrite_info=rewrite_info,
             )
+            _print_rewrite(rewrite_info)
     except Exception as e:
         if args.pretty:
             console.print(f"[bold red]Error:[/bold red] {e}")
@@ -660,6 +686,9 @@ def analyze_command(args: argparse.Namespace) -> int:
 
     resolver = ConfigResolver(project_config, config_path)
 
+    # Bridge the optional query-rewrite controller config to env vars.
+    resolver.bridge_controller_config()
+
     # Check for cross-index analysis mode
     indexes_arg = getattr(args, "indexes", None)
     if indexes_arg and args.index:
@@ -712,6 +741,9 @@ def analyze_command(args: argparse.Namespace) -> int:
     # Cache bypass
     no_cache = getattr(args, "no_cache", False)
 
+    # Query-rewrite controller opt-out
+    skip_rewrite = getattr(args, "no_rewrite", False)
+
     # Execute analysis
     try:
         if use_multi_analyze:
@@ -731,6 +763,7 @@ def analyze_command(args: argparse.Namespace) -> int:
                 symbol_type=symbol_type,
                 symbol_name=symbol_name,
                 no_cache=no_cache,
+                skip_rewrite=skip_rewrite,
             )
             if args.json:
                 print(format_multi_analysis_json(result))
@@ -747,6 +780,7 @@ def analyze_command(args: argparse.Namespace) -> int:
                 symbol_type=symbol_type,
                 symbol_name=symbol_name,
                 no_cache=no_cache,
+                skip_rewrite=skip_rewrite,
             )
             if args.json:
                 print(format_analysis_json(result))
@@ -2746,6 +2780,11 @@ def main() -> None:
         help="Bypass query cache (force fresh search)",
     )
     search_parser.add_argument(
+        "--no-rewrite",
+        action="store_true",
+        help="Skip the optional query-rewrite controller (no effect if disabled in config)",
+    )
+    search_parser.add_argument(
         "--indexes",
         help="Comma-separated index names for cross-index search (e.g., 'repo_a,repo_b'). "
         "Mutually exclusive with --index.",
@@ -2811,6 +2850,11 @@ def main() -> None:
         "--no-cache",
         action="store_true",
         help="Bypass query cache",
+    )
+    analyze_parser.add_argument(
+        "--no-rewrite",
+        action="store_true",
+        help="Skip the optional query-rewrite controller (no effect if disabled in config)",
     )
     analyze_parser.add_argument(
         "--indexes",

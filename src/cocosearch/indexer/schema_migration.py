@@ -65,7 +65,7 @@ def ensure_hybrid_search_schema(
 
         if tsvector_exists and gin_exists:
             results["already_exists"] = True
-            logger.info(f"Hybrid search schema already complete for {table_name}")
+            logger.debug(f"Hybrid search schema already complete for {table_name}")
             return results
 
         # Add TSVECTOR generated column if missing
@@ -90,7 +90,7 @@ def ensure_hybrid_search_schema(
             results["gin_index_added"] = True
             conn.commit()
 
-    logger.info(f"Hybrid search schema migration complete for {table_name}: {results}")
+    logger.debug(f"Hybrid search schema migration complete for {table_name}: {results}")
     return results
 
 
@@ -183,7 +183,7 @@ def ensure_symbol_columns(conn: psycopg.Connection, table_name: str) -> dict[str
 
         if len(existing) == len(symbol_columns):
             results["already_exists"] = True
-            logger.info(f"Symbol columns already exist for {table_name}")
+            logger.debug(f"Symbol columns already exist for {table_name}")
             return results
 
         # Add missing columns as TEXT NULL
@@ -195,7 +195,7 @@ def ensure_symbol_columns(conn: psycopg.Connection, table_name: str) -> dict[str
 
         conn.commit()
 
-    logger.info(f"Symbol schema migration complete for {table_name}: {results}")
+    logger.debug(f"Symbol schema migration complete for {table_name}: {results}")
     return results
 
 
@@ -263,5 +263,5 @@ def ensure_parse_results_table(
         """)
 
     conn.commit()
-    logger.info(f"Parse results table ensured: {table_name}")
+    logger.debug(f"Parse results table ensured: {table_name}")
     return {"table_created": table_name}

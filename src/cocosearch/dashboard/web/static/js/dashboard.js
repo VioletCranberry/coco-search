@@ -89,6 +89,21 @@ export function updateSummaryCards(stats) {
         embeddingEl.style.display = 'none';
     }
 
+    // Query-rewrite controller indicator in status line
+    const controllerEl = document.getElementById('controllerInfo');
+    if (controllerEl) {
+        if (stats.controller_enabled) {
+            const cProvider = escapeHtml(stats.controller_provider || 'ollama').toUpperCase();
+            const cModel = escapeHtml(stats.controller_model || 'default');
+            controllerEl.innerHTML = 'REWRITE: <span class="status-ok">ON</span> ('
+                + cProvider + ' ' + cModel + ')';
+            controllerEl.style.display = '';
+        } else {
+            controllerEl.innerHTML = 'REWRITE: <span class="status-dim">OFF</span>';
+            controllerEl.style.display = '';
+        }
+    }
+
     // Branch badge
     const branchBadge = document.getElementById('branchBadge');
     if (stats.branch) {
@@ -427,6 +442,29 @@ export function populateLanguageFilter(languages) {
     if (current) {
         select.value = current;
     }
+}
+
+export function updateProviderCredits(credits) {
+    const el = document.getElementById('providerCredits');
+    if (!el) return;
+
+    const remaining = credits && credits.ok ? credits.remaining : null;
+
+    // Hide for local-only setups or when no balance is available.
+    if (remaining == null) {
+        el.style.display = 'none';
+        return;
+    }
+
+    let valueText = `$${Number(remaining).toFixed(2)}`;
+    // Show "/ total" when the account total is known (account-level balance).
+    if (credits.total_credits != null) {
+        valueText += ` / $${Number(credits.total_credits).toFixed(2)}`;
+    }
+    const freeTier = credits.is_free_tier ? ' [free]' : '';
+    el.innerHTML = 'CREDITS: <span class="status-ok">' + escapeHtml(valueText)
+        + '</span>' + freeTier;
+    el.style.display = '';
 }
 
 export function updateDashboard(stats) {

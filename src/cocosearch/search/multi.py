@@ -36,6 +36,7 @@ def multi_search(
     no_cache: bool = False,
     include_deps: bool = False,
     warnings: list[dict] | None = None,
+    skip_rewrite: bool = False,
 ) -> list[SearchResult]:
     """Search across multiple indexes and return merged results.
 
@@ -55,6 +56,7 @@ def multi_search(
         no_cache: If True, bypass query cache.
         include_deps: If True, attach dependency info to results.
         warnings: Optional list to populate with warning dicts (e.g., model mismatch).
+        skip_rewrite: If True, the optional query-rewrite controller is not invoked.
 
     Returns:
         List of SearchResult ordered by score (highest first), each tagged
@@ -65,6 +67,24 @@ def multi_search(
     """
     if not index_names:
         return []
+
+    # Optional query-rewrite controller — applied ONCE for all indexes here, so the
+    # pre-computed embedding and every per-index search() use the same rewritten
+    # query. Each search() below is told to skip its own rewrite. No-op when the
+    # controller is disabled (the default).
+    if not skip_rewrite:
+        from cocosearch.search.controller import rewrite_query
+
+        original_query = query
+        query, was_rewritten = rewrite_query(query)
+        if was_rewritten and warnings is not None:
+            warnings.append(
+                {
+                    "type": "query_rewrite",
+                    "original": original_query,
+                    "rewritten": query,
+                }
+            )
 
     # Single index: just delegate directly
     if len(index_names) == 1:
@@ -79,6 +99,7 @@ def multi_search(
             symbol_name=symbol_name,
             no_cache=no_cache,
             include_deps=include_deps,
+            _skip_rewrite=True,
         )
         for r in results:
             r.index_name = index_names[0]
@@ -145,6 +166,7 @@ def multi_search(
             no_cache=no_cache,
             include_deps=include_deps,
             query_embedding=query_embedding,
+            _skip_rewrite=True,
         )
         for r in results:
             r.index_name = idx_name

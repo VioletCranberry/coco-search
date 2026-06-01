@@ -1294,15 +1294,42 @@ class TestApiStopIndexing:
 
     @pytest.mark.asyncio
     async def test_no_active_indexing_returns_404(self):
-        """Returns 404 when no active indexing thread exists for the index."""
+        """Returns 404 when no active thread and the DB status is not 'indexing'."""
         from cocosearch.mcp.server import api_stop_indexing
 
         request = _make_mock_request(body={"index_name": "myindex"})
-        response = await api_stop_indexing(request)
+        with patch(
+            "cocosearch.mcp.server.get_index_metadata",
+            return_value={"status": "indexed"},
+        ):
+            response = await api_stop_indexing(request)
 
         body = _parse_response(response)
         assert response.status_code == 404
         assert "No active indexing found" in body["error"]
+
+    @pytest.mark.asyncio
+    async def test_clears_orphaned_indexing_status(self):
+        """No live thread but DB stuck at 'indexing' -> clear it (success).
+
+        Reproduces the dashboard-restart case: the in-memory registry is empty
+        but the metadata row is stuck at 'indexing'. Stop must recover it.
+        """
+        from cocosearch.mcp.server import api_stop_indexing
+
+        request = _make_mock_request(body={"index_name": "myindex"})
+        with patch(
+            "cocosearch.mcp.server.get_index_metadata",
+            return_value={"status": "indexing"},
+        ):
+            with patch("cocosearch.mcp.server.set_index_status") as mock_set:
+                response = await api_stop_indexing(request)
+
+        body = _parse_response(response)
+        assert response.status_code == 200
+        assert body["success"] is True
+        assert "stale indexing status" in body["message"]
+        mock_set.assert_called_once_with("myindex", "indexed")
 
     @pytest.mark.asyncio
     async def test_dead_thread_returns_404_and_cleans_up(self):
@@ -1321,7 +1348,11 @@ class TestApiStopIndexing:
         srv._active_indexing["myindex"] = (thread, cancel_event)
 
         request = _make_mock_request(body={"index_name": "myindex"})
-        response = await api_stop_indexing(request)
+        with patch(
+            "cocosearch.mcp.server.get_index_metadata",
+            return_value={"status": "indexed"},
+        ):
+            response = await api_stop_indexing(request)
 
         body = _parse_response(response)
         assert response.status_code == 404

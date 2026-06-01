@@ -100,6 +100,74 @@ class TestAnalyzeReturnsResult:
         assert isinstance(result.results, list)
 
 
+class TestQueryRewriteStage:
+    """The optional query-rewrite controller appears as an analyze stage."""
+
+    def _patch_search_stages(self, mocker):
+        mocker.patch(
+            "cocosearch.search.analyze.execute_vector_search",
+            return_value=_make_vector_results(),
+        )
+        mocker.patch(
+            "cocosearch.search.analyze.execute_keyword_search",
+            return_value=_make_keyword_results(),
+        )
+        mocker.patch(
+            "cocosearch.search.analyze.apply_definition_boost",
+            side_effect=lambda results, *a, **kw: results,
+        )
+
+    def test_rewrite_disabled_default(self, mocker):
+        """With the controller disabled, the stage reports no rewrite."""
+        _patch_common(mocker)
+        self._patch_search_stages(mocker)
+        mocker.patch(
+            "cocosearch.search.controller._controller_enabled", return_value=False
+        )
+        mocker.patch(
+            "cocosearch.search.controller.rewrite_query",
+            side_effect=lambda q: (q, False),
+        )
+
+        result = analyze("getUserById", "test_index")
+
+        qa = result.query_analysis
+        assert qa.rewrite_enabled is False
+        assert qa.rewritten is False
+        assert qa.original_query == "getUserById"
+        assert qa.effective_query == "getUserById"
+
+    def test_rewrite_enabled_changes_effective_query(self, mocker):
+        """When enabled and the model rewrites, the stage reflects it."""
+        _patch_common(mocker)
+        self._patch_search_stages(mocker)
+        mocker.patch(
+            "cocosearch.search.controller._controller_enabled", return_value=True
+        )
+        mocker.patch(
+            "cocosearch.search.controller.rewrite_query",
+            return_value=("authentication session token", True),
+        )
+
+        result = analyze("how does login work", "test_index")
+
+        qa = result.query_analysis
+        assert qa.rewrite_enabled is True
+        assert qa.rewritten is True
+        assert qa.original_query == "how does login work"
+        assert qa.effective_query == "authentication session token"
+
+    def test_skip_rewrite_bypasses(self, mocker):
+        """skip_rewrite=True does not invoke the controller."""
+        _patch_common(mocker)
+        self._patch_search_stages(mocker)
+        mock_rewrite = mocker.patch("cocosearch.search.controller.rewrite_query")
+
+        analyze("getUserById", "test_index", skip_rewrite=True)
+
+        mock_rewrite.assert_not_called()
+
+
 class TestQueryAnalysis:
     """Tests for query analysis diagnostics."""
 

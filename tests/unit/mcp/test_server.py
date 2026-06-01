@@ -115,6 +115,76 @@ class TestSearchCode:
         )
 
 
+class TestSearchCodeRewrite:
+    """Tests for the rewrite_query opt-out on the search_code tool."""
+
+    @pytest.mark.asyncio
+    async def test_default_keeps_controller_active(self):
+        """Default rewrite_query=True passes _skip_rewrite=False to search()."""
+        with patch("cocosearch.mcp.server.search", return_value=[]) as mock_search:
+            with patch(
+                "cocosearch.mcp.server._ensure_cocoindex_init", return_value=True
+            ):
+                with patch(
+                    "cocosearch.mcp.server.get_index_metadata", return_value=None
+                ):
+                    await search_code(
+                        query="how does login work",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                    )
+
+        assert mock_search.call_args.kwargs["_skip_rewrite"] is False
+
+    @pytest.mark.asyncio
+    async def test_opt_out_skips_rewrite(self):
+        """rewrite_query=False passes _skip_rewrite=True to search()."""
+        with patch("cocosearch.mcp.server.search", return_value=[]) as mock_search:
+            with patch(
+                "cocosearch.mcp.server._ensure_cocoindex_init", return_value=True
+            ):
+                with patch(
+                    "cocosearch.mcp.server.get_index_metadata", return_value=None
+                ):
+                    await search_code(
+                        query="getUserById",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                        rewrite_query=False,
+                    )
+
+        assert mock_search.call_args.kwargs["_skip_rewrite"] is True
+
+    @pytest.mark.asyncio
+    async def test_rewrite_header_emitted(self):
+        """When search() reports a rewrite, a query_rewrite header is emitted."""
+
+        def _fake_search(*args, **kwargs):
+            info = kwargs.get("rewrite_info")
+            if info is not None:
+                info["original"] = "how does login work"
+                info["rewritten"] = "authentication session token"
+            return []
+
+        with patch("cocosearch.mcp.server.search", side_effect=_fake_search):
+            with patch(
+                "cocosearch.mcp.server._ensure_cocoindex_init", return_value=True
+            ):
+                with patch(
+                    "cocosearch.mcp.server.get_index_metadata", return_value=None
+                ):
+                    result = await search_code(
+                        query="how does login work",
+                        ctx=_make_mock_ctx(),
+                        index_name="testindex",
+                    )
+
+        headers = [r for r in result if r.get("type") == "query_rewrite"]
+        assert len(headers) == 1
+        assert headers[0]["original"] == "how does login work"
+        assert headers[0]["rewritten"] == "authentication session token"
+
+
 class TestSearchCodeMetadata:
     """Tests for metadata fields in search_code MCP response."""
 

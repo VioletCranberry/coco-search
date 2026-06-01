@@ -160,6 +160,20 @@ The indexing pipeline transforms raw code files into searchable chunks with embe
 
 The search pipeline retrieves relevant code chunks for a query through vector similarity, keyword matching, and intelligent fusion. Here's the complete end-to-end flow:
 
+### 0. Query Rewrite (optional, default OFF)
+
+**What It Does:** When the optional query-rewrite controller is enabled (`controller.enabled: true`), an LLM rewrites/expands the natural-language query into better search terms *before* anything else runs — so the cache key, identifier detection, and embedding all operate on the rewritten query.
+
+**How It Works:**
+
+- Disabled by default — when off, this stage is a complete no-op and the rest of the pipeline is byte-for-byte identical to before.
+- Configured exactly like the embedding provider (`provider`/`model`/`baseUrl`, env `COCOSEARCH_CONTROLLER_*`), defaulting to local Ollama (`qwen2.5:3b`).
+- Runs once per search (and once before fan-out in cross-index search).
+- **Total fallback:** on any error, timeout, or empty/garbage output, the controller returns the original query — search never breaks.
+- Opt out per call: CLI `--no-rewrite`, `analyze --no-rewrite`, or MCP `search_code(rewrite_query=False)`.
+
+**Why it's optional:** The rest of this pipeline is already deterministically adaptive without any LLM (auto hybrid-vs-vector selection, dynamic prefetch, definition boost, two-level cache). The controller is an additive layer mainly useful for vague human queries on the CLI/REPL; when CocoSearch is driven by an agent (via MCP), the agent already reformulates queries.
+
 ### 1. Query Cache Lookup
 
 **What It Does:** Checks if this query (or a semantically similar one) has been run recently to avoid redundant work.

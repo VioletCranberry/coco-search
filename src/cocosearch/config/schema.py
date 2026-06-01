@@ -16,6 +16,20 @@ def default_model_for_provider(provider: str) -> str:
     return _PROVIDER_DEFAULT_MODELS.get(provider, "nomic-embed-text")
 
 
+VALID_CONTROLLER_PROVIDERS = ("ollama", "openai", "openrouter")
+
+_CONTROLLER_DEFAULT_MODELS: dict[str, str] = {
+    "ollama": "qwen2.5:3b",
+    "openai": "gpt-4o-mini",
+    "openrouter": "openai/gpt-4o-mini",
+}
+
+
+def default_controller_model_for_provider(provider: str) -> str:
+    """Return the default query-rewrite controller model for a given provider."""
+    return _CONTROLLER_DEFAULT_MODELS.get(provider, "qwen2.5:3b")
+
+
 class ConfigError(Exception):
     """Exception raised for configuration errors."""
 
@@ -64,6 +78,35 @@ class EmbeddingSection(BaseModel):
         return self
 
 
+class ControllerSection(BaseModel):
+    """Configuration for the optional query-rewrite controller.
+
+    When ``enabled`` is False (the default), search behaves exactly as before —
+    no generative model is ever called. When enabled, an LLM rewrites/expands a
+    natural-language query into better search terms before retrieval. Configured
+    just like the embedding provider (provider/model/baseUrl + api key via env).
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool = Field(default=False)
+    provider: str = Field(default="ollama")
+    model: str | None = Field(default=None)
+    baseUrl: str | None = Field(default=None)
+    timeout: float = Field(default=5.0, gt=0)
+
+    @model_validator(mode="after")
+    def _validate_provider_and_defaults(self) -> "ControllerSection":
+        if self.provider not in VALID_CONTROLLER_PROVIDERS:
+            raise ValueError(
+                f"Invalid controller provider '{self.provider}'. "
+                f"Must be one of: {', '.join(VALID_CONTROLLER_PROVIDERS)}"
+            )
+        if self.model is None:
+            self.model = default_controller_model_for_provider(self.provider)
+        return self
+
+
 class LoggingSection(BaseModel):
     """Configuration for logging behavior."""
 
@@ -82,4 +125,5 @@ class CocoSearchConfig(BaseModel):
     indexing: IndexingSection = Field(default_factory=IndexingSection)
     search: SearchSection = Field(default_factory=SearchSection)
     embedding: EmbeddingSection = Field(default_factory=EmbeddingSection)
+    controller: ControllerSection = Field(default_factory=ControllerSection)
     logging: LoggingSection = Field(default_factory=LoggingSection)

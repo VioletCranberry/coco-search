@@ -34,6 +34,7 @@ export async function executeSearch() {
     document.getElementById('searchEmpty').style.display = 'none';
     document.getElementById('searchError').style.display = 'none';
     document.getElementById('searchResultsInfo').style.display = 'none';
+    document.getElementById('searchRewriteInfo').style.display = 'none';
     document.getElementById('searchResults').innerHTML = '';
     searchBtn.textContent = 'Cancel';
     searchBtn.classList.add('cancel-mode');
@@ -118,6 +119,7 @@ export function clearSearch() {
     document.getElementById('searchInput').value = '';
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('searchResultsInfo').style.display = 'none';
+    document.getElementById('searchRewriteInfo').style.display = 'none';
     document.getElementById('searchEmpty').style.display = 'none';
     document.getElementById('searchError').style.display = 'none';
     document.getElementById('searchLoading').style.display = 'none';
@@ -195,6 +197,20 @@ function displaySearchResults(data) {
     const container = document.getElementById('searchResults');
     const infoEl = document.getElementById('searchResultsInfo');
     const emptyEl = document.getElementById('searchEmpty');
+
+    // Show the query rewrite (when the controller rewrote the query) so the
+    // user sees what was actually searched. Shown even when there are 0 results.
+    const rewriteEl = document.getElementById('searchRewriteInfo');
+    if (rewriteEl) {
+        if (data.rewritten_query && data.original_query) {
+            rewriteEl.innerHTML = 'Rewritten: <span class="rewrite-orig">'
+                + escapeHtml(data.original_query) + '</span> &rarr; <span class="rewrite-new">'
+                + escapeHtml(data.rewritten_query) + '</span>';
+            rewriteEl.style.display = 'block';
+        } else {
+            rewriteEl.style.display = 'none';
+        }
+    }
 
     if (results.length === 0) {
         emptyEl.textContent = 'No results found. Try a different query or broader filters.';

@@ -1,6 +1,6 @@
 import { state } from './state.js';
-import { loadProjectContext, fetchStats, fetchProjects, fetchInfra } from './api.js';
-import { updateDashboard, updateSummaryCards, updateWarnings } from './dashboard.js';
+import { loadProjectContext, fetchStats, fetchProjects, fetchInfra, fetchCredits } from './api.js';
+import { updateDashboard, updateSummaryCards, updateWarnings, updateProviderCredits } from './dashboard.js';
 
 export function setButtonsDisabled(disabled) {
     document.getElementById('reindexBtn').disabled = disabled;
@@ -138,6 +138,9 @@ export async function loadDashboard(indexIndex) {
     document.getElementById('dashboardContent').style.display = 'block';
 
     updateDashboard(stats);
+
+    // Remote-provider credits (best-effort; hidden for local setups).
+    fetchCredits().then(updateProviderCredits).catch(() => {});
 }
 
 function showInfraBanner(infra) {

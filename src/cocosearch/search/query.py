@@ -259,6 +259,8 @@ def search(
     no_cache: bool = False,
     include_deps: bool = False,
     query_embedding: list[float] | None = None,
+    _skip_rewrite: bool = False,
+    rewrite_info: dict | None = None,
 ) -> list[SearchResult]:
     """Search for code similar to query.
 
@@ -285,6 +287,12 @@ def search(
         query_embedding: Pre-computed query embedding. When provided, skips
             embedding computation. Used by multi_search to avoid redundant
             embedding calls when searching N indexes with the same query.
+        _skip_rewrite: Internal flag. When True, the optional query-rewrite
+            controller is not invoked (e.g. multi_search already rewrote once,
+            or an MCP caller opted out). Defaults to False.
+        rewrite_info: Optional dict populated in-place with
+            ``{"original": ..., "rewritten": ...}`` when the controller rewrote
+            the query, so callers can surface the rewrite to the user.
 
     Returns:
         List of SearchResult ordered by similarity (highest first).
@@ -302,6 +310,18 @@ def search(
 
     # Validate query input
     query = validate_query(query)
+
+    # Optional query-rewrite controller (default OFF; no-op unless enabled).
+    # Runs once here, before the cache check and embedding, so the cache key,
+    # identifier detection, and embedding all operate on the same query.
+    if not _skip_rewrite:
+        from cocosearch.search.controller import rewrite_query
+
+        original_query = query
+        query, was_rewritten = rewrite_query(query)
+        if was_rewritten and rewrite_info is not None:
+            rewrite_info["original"] = original_query
+            rewrite_info["rewritten"] = query
 
     _get_cs_log().search(
         "Query received",

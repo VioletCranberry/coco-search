@@ -636,6 +636,7 @@ select option:checked {
 .status-partial { color: var(--accent-orange); }
 .status-error { color: var(--accent-red); }
 .status-no-grammar { color: var(--text-muted); }
+.status-dim { color: var(--text-muted); }
 
 .parse-details {
     margin-top: 16px;
@@ -876,6 +877,23 @@ select option:checked {
     font-size: 15px;
     color: var(--text-secondary);
     margin-bottom: 12px;
+}
+
+.search-rewrite-info {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-family: var(--font-mono, monospace);
+}
+
+.search-rewrite-info .rewrite-orig {
+    color: var(--text-secondary);
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
+.search-rewrite-info .rewrite-new {
+    color: var(--accent-green);
 }
 
 .search-loading {

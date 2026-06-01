@@ -281,6 +281,42 @@ class ConfigResolver:
 
         return provider, model
 
+    def bridge_controller_config(self) -> bool:
+        """Resolve query-rewrite controller config and bridge to env vars.
+
+        Ensures COCOSEARCH_CONTROLLER_ENABLED, _PROVIDER, _MODEL, _BASE_URL, and
+        _TIMEOUT env vars reflect the full precedence chain (CLI > env > config
+        file > default). Mirrors ``bridge_embedding_config``. Unlike embedding,
+        this must be called explicitly at every search entry point (CLI search /
+        analyze / REPL and MCP startup) for the cocosearch.yaml ``controller``
+        block to take effect during search.
+
+        Returns:
+            The resolved ``enabled`` flag.
+        """
+        enabled, _ = self.resolve(
+            "controller.enabled", None, "COCOSEARCH_CONTROLLER_ENABLED"
+        )
+        provider, _ = self.resolve(
+            "controller.provider", None, "COCOSEARCH_CONTROLLER_PROVIDER"
+        )
+        model, _ = self.resolve("controller.model", None, "COCOSEARCH_CONTROLLER_MODEL")
+        base_url, _ = self.resolve(
+            "controller.baseUrl", None, "COCOSEARCH_CONTROLLER_BASE_URL"
+        )
+        timeout, _ = self.resolve(
+            "controller.timeout", None, "COCOSEARCH_CONTROLLER_TIMEOUT"
+        )
+
+        os.environ["COCOSEARCH_CONTROLLER_ENABLED"] = "true" if enabled else "false"
+        os.environ["COCOSEARCH_CONTROLLER_PROVIDER"] = str(provider)
+        os.environ["COCOSEARCH_CONTROLLER_MODEL"] = str(model)
+        if base_url is not None:
+            os.environ["COCOSEARCH_CONTROLLER_BASE_URL"] = str(base_url)
+        os.environ["COCOSEARCH_CONTROLLER_TIMEOUT"] = str(timeout)
+
+        return bool(enabled)
+
     def all_field_paths(self) -> list[str]:
         """Get list of all resolvable field paths.
 

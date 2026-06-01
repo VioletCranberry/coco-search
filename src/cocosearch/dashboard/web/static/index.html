@@ -53,6 +53,8 @@
                     <span>STATUS: <span class="status-ok">ONLINE</span></span>
                     <span id="uptime">UPTIME: --:--:--</span>
                     <span id="embeddingInfo" style="display: none;"></span>
+                    <span id="controllerInfo" style="display: none;"></span>
+                    <span id="providerCredits" style="display: none;"></span>
                     <button class="theme-btn" id="themeToggleBtn" title="Toggle light/dark theme">[LIGHT]</button>
                     <button class="logs-btn">LOGS <span id="logBadge" class="log-badge"></span></button>
                     <button class="quit-btn" title="Shut down CocoSearch server">QUIT</button>
@@ -163,6 +165,7 @@
                     <div class="search-loading" id="searchLoading">Searching...</div>
                     <div class="search-empty" id="searchEmpty"></div>
                     <div class="search-error" id="searchError"></div>
+                    <div id="searchRewriteInfo" class="search-rewrite-info" style="display: none;"></div>
                     <div id="searchResultsInfo" class="search-results-info" style="display: none;"></div>
                     <div id="searchResults"></div>
                 </div>

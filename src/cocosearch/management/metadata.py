@@ -6,7 +6,6 @@ which projects are indexed under which names.
 """
 
 import logging
-from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
@@ -95,7 +94,8 @@ def get_index_metadata(index_name: str) -> dict | None:
                     """
                     SELECT index_name, canonical_path, created_at, updated_at, status,
                            branch, commit_hash, branch_commit_count,
-                           embedding_provider, embedding_model, deps_extracted_at
+                           embedding_provider, embedding_model, deps_extracted_at,
+                           EXTRACT(EPOCH FROM (NOW() - updated_at))
                     FROM cocosearch_index_metadata
                     WHERE index_name = %s
                     """,
@@ -123,17 +123,14 @@ def get_index_metadata(index_name: str) -> dict | None:
 
                 # Provide elapsed time so callers can warn about
                 # possibly-stale "indexing" status without mutating the DB.
-                if status == "indexing" and updated_at is not None:
-                    try:
-                        if not updated_at.tzinfo:
-                            now = datetime.now()
-                        else:
-                            now = datetime.now(timezone.utc)
-                        result["indexing_elapsed_seconds"] = (
-                            now - updated_at
-                        ).total_seconds()
-                    except Exception:
-                        pass
+                # Computed in SQL (NOW() - updated_at) so it is timezone-safe:
+                # the metadata column is TIMESTAMP WITHOUT TIME ZONE (naive UTC),
+                # and comparing it against a naive *local* datetime.now() skewed
+                # elapsed by the machine's UTC offset, tripping auto-recovery on
+                # healthy reindexes.
+                elapsed_seconds = row[11] if len(row) > 11 else None
+                if status == "indexing" and elapsed_seconds is not None:
+                    result["indexing_elapsed_seconds"] = float(elapsed_seconds)
 
                 return result
     except Exception:

@@ -556,3 +556,191 @@ class TestApiGrammarsSmoke:
 
         body = response.json()
         assert body[0]["deps"] is True
+
+
+class TestApiCreditsSmoke:
+    """Tests for GET /api/credits through the ASGI stack."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_credits_cache(self):
+        """Clear the in-process credits cache before each test."""
+        from cocosearch.mcp import server
+
+        server._CREDITS_CACHE["data"] = None
+        server._CREDITS_CACHE["ts"] = 0.0
+        yield
+        server._CREDITS_CACHE["data"] = None
+        server._CREDITS_CACHE["ts"] = 0.0
+
+    @pytest.mark.asyncio
+    async def test_ollama_reports_no_credits(self, client):
+        """Local-only (ollama) setups report ok=False with a reason."""
+        with patch(
+            "cocosearch.mcp.server._credits_sync",
+            return_value={
+                "ok": False,
+                "provider": "ollama",
+                "reason": "no remote provider with a credits API in use",
+            },
+        ):
+            response = await client.get("/api/credits")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is False
+        assert body["provider"] == "ollama"
+
+    @pytest.mark.asyncio
+    async def test_openrouter_returns_balance(self, client):
+        """OpenRouter account balance is surfaced as 'remaining'."""
+        with patch(
+            "cocosearch.mcp.server._credits_sync",
+            return_value={
+                "ok": True,
+                "provider": "openrouter",
+                "model": "openai/gpt-4o-mini",
+                "total_credits": 222.0,
+                "total_usage": 213.3,
+                "remaining": 8.7,
+                "is_free_tier": False,
+            },
+        ):
+            response = await client.get("/api/credits")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is True
+        assert body["provider"] == "openrouter"
+        assert body["remaining"] == 8.7
+        assert body["total_credits"] == 222.0
+
+    @pytest.mark.asyncio
+    async def test_failure_degrades_gracefully(self, client):
+        """A controller exception still returns 200 with ok=False."""
+        with patch(
+            "cocosearch.mcp.server._credits_sync",
+            side_effect=RuntimeError("boom"),
+        ):
+            response = await client.get("/api/credits")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["ok"] is False
+        assert "boom" in body.get("error", "")
+
+
+class TestFetchOpenRouterCredits:
+    """Unit tests for the OpenRouter credits helper (mocked urllib)."""
+
+    @staticmethod
+    def _resp_for(url_payloads):
+        """Return a urlopen side_effect that serves a payload per URL substring."""
+        import json
+
+        class _Resp:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def read(self):
+                return json.dumps(self._payload).encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def _side_effect(req, *a, **kw):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            for substr, payload in url_payloads.items():
+                if substr in url:
+                    return _Resp(payload)
+            raise OSError(f"unexpected url {url}")
+
+        return _side_effect
+
+    def test_account_balance_is_primary_remaining(self):
+        """Account total/usage from /credits yields the primary 'remaining'."""
+        from cocosearch.mcp import server
+
+        side = self._resp_for(
+            {
+                "/api/v1/credits": {
+                    "data": {"total_credits": 222.0, "total_usage": 213.3}
+                },
+                "/api/v1/key": {
+                    "data": {
+                        "limit": None,
+                        "limit_remaining": None,
+                        "usage": 1.14,
+                        "is_free_tier": False,
+                    }
+                },
+            }
+        )
+        with patch("urllib.request.urlopen", side_effect=side):
+            result = server._fetch_openrouter_credits("sk-test")
+
+        assert result["ok"] is True
+        assert result["total_credits"] == 222.0
+        assert round(result["remaining"], 1) == 8.7
+        assert result["is_free_tier"] is False
+
+    def test_falls_back_to_key_limit_remaining(self):
+        """When /credits has no totals, per-key limit_remaining is used."""
+        from cocosearch.mcp import server
+
+        side = self._resp_for(
+            {
+                "/api/v1/credits": {"data": {}},
+                "/api/v1/key": {
+                    "data": {
+                        "limit": 10.0,
+                        "limit_remaining": 6.0,
+                        "usage": 4.0,
+                        "is_free_tier": True,
+                    }
+                },
+            }
+        )
+        with patch("urllib.request.urlopen", side_effect=side):
+            result = server._fetch_openrouter_credits("sk-test")
+
+        assert result["ok"] is True
+        assert result["remaining"] == 6.0
+        assert result["is_free_tier"] is True
+
+    def test_network_error_returns_not_ok(self):
+        """Both endpoints failing returns ok=False with an error."""
+        from cocosearch.mcp import server
+
+        with patch("urllib.request.urlopen", side_effect=OSError("offline")):
+            result = server._fetch_openrouter_credits("sk-test")
+
+        assert result["ok"] is False
+        assert "error" in result
+
+
+class TestControllerStatusInStats:
+    """The configured controller status is injected into stats for the header."""
+
+    def test_controller_disabled_by_default(self, monkeypatch):
+        from cocosearch.mcp import server
+
+        monkeypatch.delenv("COCOSEARCH_CONTROLLER_ENABLED", raising=False)
+        result: dict = {}
+        server._inject_configured_embedding(result)
+        assert result["controller_enabled"] is False
+        assert "controller_provider" not in result
+
+    def test_controller_enabled_includes_provider_model(self, monkeypatch):
+        from cocosearch.mcp import server
+
+        monkeypatch.setenv("COCOSEARCH_CONTROLLER_ENABLED", "true")
+        monkeypatch.setenv("COCOSEARCH_CONTROLLER_PROVIDER", "openrouter")
+        monkeypatch.setenv("COCOSEARCH_CONTROLLER_MODEL", "openai/gpt-4o-mini")
+        result: dict = {}
+        server._inject_configured_embedding(result)
+        assert result["controller_enabled"] is True
+        assert result["controller_provider"] == "openrouter"
+        assert result["controller_model"] == "openai/gpt-4o-mini"

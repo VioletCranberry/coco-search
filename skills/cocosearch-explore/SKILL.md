@@ -67,6 +67,8 @@ search_code(
 
 > **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For ad-hoc multi-project exploration, pass `index_names=["project1", "project2"]`.
 
+> **Query rewrite:** If the optional query-rewrite controller is enabled, pass `rewrite_query=False` whenever you have already crafted precise terms (exact identifiers, `symbol_name`/`symbol_type` filters) to search them verbatim. Leave it at the default only for vague natural-language queries. No effect when the controller is disabled.
+
 **Symbol search if the question mentions specific identifiers:**
 
 ```

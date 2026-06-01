@@ -179,6 +179,8 @@ search_code(
 
 > **Cross-project search:** If `linkedIndexes` is configured in `cocosearch.yaml`, searches automatically expand to linked indexes. For cross-project connections, pass `index_names=["project1", "project2"]`.
 
+> **Query rewrite:** If the optional query-rewrite controller is enabled, pass `rewrite_query=False` when searching precise terms (exact identifiers, `symbol_name`/`symbol_type` filters) so they are matched verbatim. No effect when the controller is disabled.
+
 ## Step 2d: Hub Identification
 
 **Goal:** Find the most connected files in the project.

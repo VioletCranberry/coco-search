@@ -239,6 +239,23 @@ For a local OpenAI-compatible server, use `COCOSEARCH_EMBEDDING_BASE_URL` instea
 
 Supported providers: `ollama` (default), `openai`, `openrouter`. With a remote provider, you do not need Ollama running — only PostgreSQL is required. Use `COCOSEARCH_EMBEDDING_BASE_URL` (or `embedding.baseUrl` in config) to point any provider at a custom endpoint.
 
+### Query-Rewrite Controller (optional)
+
+The optional query-rewrite controller (disabled by default) can also be configured for the MCP server via environment variables, exactly like the embedding provider:
+
+```json
+{
+  "env": {
+    "COCOSEARCH_CONTROLLER_ENABLED": "true",
+    "COCOSEARCH_CONTROLLER_PROVIDER": "openrouter",
+    "COCOSEARCH_CONTROLLER_MODEL": "openai/gpt-4o-mini",
+    "COCOSEARCH_CONTROLLER_API_KEY": "sk-..."
+  }
+}
+```
+
+When enabled, `search_code` rewrites natural-language queries into better search terms before retrieval and emits a `query_rewrite` header showing `original → rewritten`. The calling agent can **opt out per call** with `search_code(rewrite_query=False)` — recommended when it has already crafted precise terms (exact identifiers, `symbol_name`/`symbol_type` filters). The controller falls back to the original query on any error, so search never breaks. The dashboard header status line shows a `REWRITE: ON/OFF` indicator and a `CREDITS:` readout (served at `/api/credits`) of the remaining balance when a remote provider like OpenRouter is in use.
+
 ### Project Detection
 
 CocoSearch determines which project to search using the following priority chain:

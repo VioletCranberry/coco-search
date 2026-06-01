@@ -361,7 +361,21 @@ def run_index(
         _get_cs_log().index("No changes detected", index=index_name)
         return {"files_indexed": 0, "files_deleted": 0, "chunks_total": 0}
 
+    total_to_index = len(files_to_index)
+    _get_cs_log().index(
+        "Changes detected",
+        index=index_name,
+        new=len(new_files),
+        changed=len(changed_files),
+        deleted=len(deleted_files),
+        to_index=total_to_index,
+    )
+
     splitter = RecursiveSplitter(custom_languages=get_custom_languages())
+
+    # Log progress roughly every 10% (at least every file for small sets,
+    # capped so large repos don't spam).
+    progress_step = max(1, min(50, total_to_index // 10 or 1))
 
     chunks_total = 0
     files_indexed = 0
@@ -388,6 +402,17 @@ def run_index(
                 )
                 chunks_total += n
                 files_indexed += 1
+
+                if (
+                    files_indexed % progress_step == 0
+                    or files_indexed == total_to_index
+                ):
+                    _get_cs_log().index(
+                        "Indexing progress",
+                        index=index_name,
+                        files=f"{files_indexed}/{total_to_index}",
+                        chunks=chunks_total,
+                    )
 
                 with conn.cursor() as cur:
                     cur.execute(
@@ -417,9 +442,20 @@ def run_index(
             conn.commit()
 
     if cancelled:
-        _get_cs_log().index("Indexing cancelled", index=index_name)
+        _get_cs_log().index(
+            "Indexing cancelled",
+            index=index_name,
+            files_indexed=files_indexed,
+            chunks=chunks_total,
+        )
     else:
-        _get_cs_log().index("Indexing completed", index=index_name)
+        _get_cs_log().index(
+            "Indexing completed",
+            index=index_name,
+            files_indexed=files_indexed,
+            files_deleted=len(deleted_files),
+            chunks=chunks_total,
+        )
 
     if files_indexed > 0 or deleted_files:
         try:
