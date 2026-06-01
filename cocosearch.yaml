@@ -2,3 +2,10 @@
 indexName: cocosearch
 linkedIndexes:
   - cocoindex
+
+# Optional query-rewrite controller (expands vague queries before retrieval).
+# Reuses COCOSEARCH_EMBEDDING_API_KEY since the provider matches openrouter.
+controller:
+  enabled: true
+  provider: openrouter
+  model: openai/gpt-4o-mini
