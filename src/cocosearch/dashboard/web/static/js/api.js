@@ -36,6 +36,20 @@ export async function fetchInfra() {
     }
 }
 
+export async function fetchCredits() {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+        const response = await fetch('/api/credits', { signal: controller.signal });
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 export async function fetchStats(indexName = null, includeFailures = true) {
     const params = new URLSearchParams();
     if (indexName) params.set('index', indexName);

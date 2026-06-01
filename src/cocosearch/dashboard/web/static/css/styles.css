@@ -636,6 +636,7 @@ select option:checked {
 .status-partial { color: var(--accent-orange); }
 .status-error { color: var(--accent-red); }
 .status-no-grammar { color: var(--text-muted); }
+.status-dim { color: var(--text-muted); }
 
 .parse-details {
     margin-top: 16px;

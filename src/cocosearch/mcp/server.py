@@ -181,7 +181,10 @@ def _register_with_git(index_name: str, project_path: str) -> None:
 
 def _inject_configured_embedding(result: dict) -> None:
     """Add currently configured embedding provider/model to stats dict."""
-    from cocosearch.config.schema import default_model_for_provider
+    from cocosearch.config.schema import (
+        default_controller_model_for_provider,
+        default_model_for_provider,
+    )
 
     provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
     model = os.environ.get(
@@ -189,6 +192,19 @@ def _inject_configured_embedding(result: dict) -> None:
     )
     result["configured_embedding_provider"] = provider
     result["configured_embedding_model"] = model
+
+    # Query-rewrite controller status (for the dashboard header indicator).
+    controller_enabled = os.environ.get(
+        "COCOSEARCH_CONTROLLER_ENABLED", "false"
+    ).lower() in ("true", "1", "yes")
+    result["controller_enabled"] = controller_enabled
+    if controller_enabled:
+        c_provider = os.environ.get("COCOSEARCH_CONTROLLER_PROVIDER", "ollama")
+        result["controller_provider"] = c_provider
+        result["controller_model"] = os.environ.get(
+            "COCOSEARCH_CONTROLLER_MODEL",
+            default_controller_model_for_provider(c_provider),
+        )
 
 
 def build_all_stats(include_failures: bool = False) -> list[dict]:
@@ -341,6 +357,139 @@ def _check_infra_sync() -> dict:
 async def api_infra(request) -> JSONResponse:
     """Infrastructure status — checks DB and embedding provider availability."""
     result = await asyncio.to_thread(_check_infra_sync)
+    return JSONResponse(result)
+
+
+# In-process cache for provider credits (credits change slowly).
+_CREDITS_CACHE: dict = {"data": None, "ts": 0.0}
+_CREDITS_TTL_SECONDS = 60.0
+
+
+def _fetch_openrouter_credits(api_key: str) -> dict:
+    """Fetch remaining credits/limits from OpenRouter using the stdlib only.
+
+    Queries BOTH endpoints and combines them:
+    - GET /api/v1/credits → account-level total_credits / total_usage. The
+      account remaining (total - usage) is the primary balance to display, and
+      is present even for keys with no per-key spending limit.
+    - GET /api/v1/key → per-key limit / limit_remaining / usage / is_free_tier.
+
+    `remaining` is the account balance when available, otherwise the per-key
+    limit_remaining. Returns {"ok": False, "error": ...} only if BOTH calls fail.
+    """
+    import json as _json
+    import urllib.request
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    def _get(url: str) -> dict:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310 - fixed host
+            return _json.loads(resp.read())
+
+    result: dict = {"ok": False}
+    errors: list[str] = []
+
+    # Account-level balance (the meaningful "credits remaining" for most keys).
+    try:
+        data = _get("https://openrouter.ai/api/v1/credits").get("data", {})
+        total = data.get("total_credits")
+        used = data.get("total_usage")
+        result["total_credits"] = total
+        result["total_usage"] = used
+        if isinstance(total, (int, float)) and isinstance(used, (int, float)):
+            result["remaining"] = total - used
+            result["ok"] = True
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"credits: {e}")
+
+    # Per-key details (limit, free-tier flag, per-key usage).
+    try:
+        data = _get("https://openrouter.ai/api/v1/key").get("data", {})
+        result["key_limit"] = data.get("limit")
+        result["key_limit_remaining"] = data.get("limit_remaining")
+        result["key_usage"] = data.get("usage")
+        result["is_free_tier"] = data.get("is_free_tier")
+        result["ok"] = True
+        # Fall back to the per-key remaining when there's no account balance.
+        if result.get("remaining") is None and isinstance(
+            data.get("limit_remaining"), (int, float)
+        ):
+            result["remaining"] = data.get("limit_remaining")
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"key: {e}")
+
+    if not result["ok"]:
+        return {"ok": False, "error": "; ".join(errors)}
+    return result
+
+
+def _credits_sync() -> dict:
+    """Resolve the active remote provider (if any) and report its credit balance.
+
+    Checks the embedding provider first, then the controller provider. Returns
+    {"ok": False, "reason": ...} for local-only (ollama) setups or when no API
+    key is configured — the dashboard hides the card in that case.
+    """
+    candidates = [
+        (
+            os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama"),
+            os.environ.get("COCOSEARCH_EMBEDDING_MODEL"),
+            os.environ.get("COCOSEARCH_EMBEDDING_API_KEY"),
+            "embedding",
+        ),
+        (
+            os.environ.get("COCOSEARCH_CONTROLLER_PROVIDER", "ollama"),
+            os.environ.get("COCOSEARCH_CONTROLLER_MODEL"),
+            os.environ.get("COCOSEARCH_CONTROLLER_API_KEY"),
+            "controller",
+        ),
+    ]
+
+    for provider, model, api_key, role in candidates:
+        if provider == "openrouter":
+            if not api_key:
+                return {
+                    "ok": False,
+                    "provider": provider,
+                    "model": model,
+                    "role": role,
+                    "reason": "no API key configured",
+                }
+            result = _fetch_openrouter_credits(api_key)
+            result.update({"provider": provider, "model": model, "role": role})
+            return result
+
+    # No remote provider with a credits API in use (e.g. ollama / openai).
+    provider = os.environ.get("COCOSEARCH_EMBEDDING_PROVIDER", "ollama")
+    return {
+        "ok": False,
+        "provider": provider,
+        "reason": "no remote provider with a credits API in use",
+    }
+
+
+@mcp.custom_route("/api/credits", methods=["GET"])
+async def api_credits(request) -> JSONResponse:
+    """Remaining credits for the active remote provider (OpenRouter).
+
+    Cached in-process for 60s. Always returns 200 with an ``ok`` flag so the
+    dashboard degrades gracefully — a flaky or forbidden credits call never
+    breaks the page.
+    """
+    _touch_activity()
+    now = _time.monotonic()
+    cached = _CREDITS_CACHE["data"]
+    if cached is not None and (now - _CREDITS_CACHE["ts"]) < _CREDITS_TTL_SECONDS:
+        return JSONResponse(cached)
+
+    try:
+        result = await asyncio.to_thread(_credits_sync)
+    except Exception as e:  # noqa: BLE001
+        result = {"ok": False, "error": str(e)}
+
+    _CREDITS_CACHE["data"] = result
+    _CREDITS_CACHE["ts"] = now
     return JSONResponse(result)
 
 
@@ -1235,9 +1384,11 @@ async def api_search(request) -> JSONResponse:
             pass  # Best-effort
 
     start_time = time.monotonic()
+    rewrite_info: dict = {}
 
     if is_multi:
         # Cross-index search
+        _api_warnings: list[dict] = []
         try:
             results = multi_search(
                 query=query,
@@ -1250,7 +1401,11 @@ async def api_search(request) -> JSONResponse:
                 symbol_name=symbol_name,
                 no_cache=no_cache,
                 include_deps=include_deps,
+                warnings=_api_warnings,
             )
+            for _w in _api_warnings:
+                if _w.get("type") == "query_rewrite":
+                    rewrite_info = _w
         except ValueError as e:
             return JSONResponse({"error": str(e)}, status_code=400)
         except Exception as e:
@@ -1277,6 +1432,7 @@ async def api_search(request) -> JSONResponse:
                 symbol_name=symbol_name,
                 no_cache=no_cache,
                 include_deps=include_deps,
+                rewrite_info=rewrite_info,
             )
         except ValueError as e:
             return JSONResponse({"error": str(e)}, status_code=400)
@@ -1383,14 +1539,17 @@ async def api_search(request) -> JSONResponse:
         if expander is not None:
             expander.clear_cache()
 
-    return JSONResponse(
-        {
-            "success": True,
-            "results": output,
-            "query_time_ms": query_time_ms,
-            "total": len(output),
-        }
-    )
+    response_payload = {
+        "success": True,
+        "results": output,
+        "query_time_ms": query_time_ms,
+        "total": len(output),
+    }
+    if rewrite_info:
+        response_payload["original_query"] = rewrite_info["original"]
+        response_payload["rewritten_query"] = rewrite_info["rewritten"]
+
+    return JSONResponse(response_payload)
 
 
 @mcp.custom_route("/api/open-in-editor", methods=["POST"])
@@ -1960,6 +2119,15 @@ async def search_code(
             "Mutually exclusive with index_name (index_names takes precedence)."
         ),
     ] = None,
+    rewrite_query: Annotated[
+        bool,
+        Field(
+            description="Apply the optional LLM query-rewrite controller before searching "
+            "(only when it is enabled in cocosearch.yaml). Set False to search the query "
+            "verbatim — recommended when you have already crafted precise terms (exact "
+            "identifiers, symbol filters). No effect if the controller is disabled."
+        ),
+    ] = True,
 ) -> list[dict]:
     """Search indexed code using natural language.
 
@@ -1997,6 +2165,7 @@ async def search_code(
             context_after=context_after,
             smart_context=smart_context,
             include_deps=include_deps,
+            skip_rewrite=not rewrite_query,
         )
     elif index_names is not None and len(index_names) == 1:
         index_name = index_names[0]
@@ -2110,6 +2279,7 @@ async def search_code(
                             include_deps=include_deps,
                             linked_indexes=_linked_indexes,
                             skipped_indexes=_skipped_indexes,
+                            skip_rewrite=not rewrite_query,
                         )
         except Exception:
             pass  # Best-effort — don't block search on config loading
@@ -2125,6 +2295,7 @@ async def search_code(
         ]
 
     # Execute search
+    rewrite_info: dict = {}
     try:
         results = search(
             query=query,
@@ -2135,6 +2306,8 @@ async def search_code(
             symbol_type=symbol_type,
             symbol_name=symbol_name,
             include_deps=include_deps,
+            _skip_rewrite=not rewrite_query,
+            rewrite_info=rewrite_info,
         )
     except ValueError as e:
         # Symbol filter errors (invalid type or pre-v1.7 index)
@@ -2158,6 +2331,17 @@ async def search_code(
         if metadata and metadata.get("updated_at"):
             search_header["last_indexed_at"] = str(metadata["updated_at"])
         output.append(search_header)
+
+    # Surface the query rewrite (when the controller rewrote the query) so the
+    # calling agent sees what was actually searched.
+    if rewrite_info:
+        output.append(
+            {
+                "type": "query_rewrite",
+                "original": rewrite_info["original"],
+                "rewritten": rewrite_info["rewritten"],
+            }
+        )
 
     # Resolve relative DB paths to absolute using the index's canonical_path
     source_path = metadata.get("canonical_path") if metadata else None
@@ -2324,6 +2508,7 @@ async def _multi_index_search(
     include_deps: bool,
     linked_indexes: list[str] | None = None,
     skipped_indexes: list[str] | None = None,
+    skip_rewrite: bool = False,
 ) -> list[dict]:
     """Execute cross-index search and format results."""
     if not _ensure_cocoindex_init():
@@ -2347,6 +2532,7 @@ async def _multi_index_search(
             symbol_name=symbol_name,
             include_deps=include_deps,
             warnings=search_warnings,
+            skip_rewrite=skip_rewrite,
         )
     except ValueError as e:
         return [{"error": "Cross-index search error", "message": str(e), "results": []}]
@@ -3211,12 +3397,16 @@ def run_server(
     )
     try:
         from cocosearch.config import find_config_file, load_config
+        from cocosearch.config.resolver import ConfigResolver
 
         cfg_path = find_config_file()
         if cfg_path:
             cfg = load_config(cfg_path)
             if cfg.logging.file:
                 log_file_enabled = True
+            # Bridge the optional query-rewrite controller config to env vars so
+            # the cocosearch.yaml `controller` block takes effect for search_code.
+            ConfigResolver(cfg, cfg_path).bridge_controller_config()
     except Exception:
         pass
 
