@@ -48,8 +48,37 @@ search: {}
 
 # Embedding settings
 embedding: {}
-  # Ollama model for embeddings
+  # Provider: ollama (default, local), openai, or openrouter
+  # provider: ollama
+  # Model (default depends on provider: ollama -> nomic-embed-text,
+  #   openai -> text-embedding-3-small, openrouter -> openai/text-embedding-3-small)
   # model: nomic-embed-text
+  # Custom / OpenAI-compatible endpoint (Infinity, TEI, vLLM). For the ollama
+  # provider this overrides COCOSEARCH_OLLAMA_URL.
+  # baseUrl: http://localhost:8080
+  # Override the embedding vector size (only if your model needs it)
+  # outputDimension: 768
+  # NOTE: remote providers also need COCOSEARCH_EMBEDDING_API_KEY (env var),
+  # unless baseUrl points at a local server. Switching provider/model requires
+  # a `cocosearch index . --fresh` reindex.
+
+# Optional query-rewrite controller (default: disabled)
+# An LLM expands vague natural-language queries into better search terms before
+# retrieval (e.g. "how does login work" -> "authentication session credential
+# login user token"). When disabled, search is byte-for-byte identical and no
+# generative model is ever called. Configured just like the embedding provider.
+# controller:
+#   enabled: false
+#   provider: ollama        # ollama (default), openai, openrouter
+#   model: qwen2.5:3b       # default depends on provider
+#   # baseUrl: http://localhost:11434   # custom / OpenAI-compatible endpoint
+#   # timeout: 5.0          # seconds; falls back to the original query on timeout
+
+# Logging (default: file output disabled)
+# When enabled, logs are written to ~/.cocosearch/logs/cocosearch.log
+# (10MB rotation, 3 backups). Equivalent to COCOSEARCH_LOG_FILE=true.
+# logging:
+#   file: false
 """
 
 
