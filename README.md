@@ -617,6 +617,10 @@ controller:
   model: qwen2.5:3b     # default depends on provider
   # baseUrl: http://localhost:11434
   # timeout: 5.0        # seconds; on timeout, falls back to the original query
+
+# Optional file logging (default: disabled)
+logging:
+  file: false           # true -> ~/.cocosearch/logs/cocosearch.log (10MB rotation)
 ```
 
 ### Remote Embedding Providers
