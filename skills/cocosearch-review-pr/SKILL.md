@@ -442,6 +442,9 @@ comments, so every diff finding should carry:
   - **GitHub:** `https://github.com/{owner}/{repo}/blob/{head_sha}/{path}#L{line}`
   - **GitLab:** `https://{host}/{group}/{project}/-/blob/{head_sha}/{path}#L{line}`
   - For a multi-line finding use `#L{start}-L{line}` (GitHub) / `#L{start}-{line}` (GitLab).
+  - **GitLab note:** the blob URL needs the human-readable `{group}/{project}` namespace from the
+    MR URL — not the `{id}` (numeric project ID or URL-encoded path) used for the API calls in
+    Step 1. Take the namespace from the original MR URL so you don't emit a broken `/{id}/-/blob/…` link.
 
 A finding without a specific line (e.g. "this whole file lacks tests") is fine — just omit `line`;
 Step 6 routes line-less findings into the summary comment instead of an inline one.
@@ -613,7 +616,10 @@ postable, unmappable = [], []
 for f in FINDINGS:
     right, left = maps.get(f["path"], (set(), set()))
     side = f.get("side", "RIGHT")
-    ok = (f.get("line") in right) if side == "RIGHT" else (f.get("line") in left)
+    pool = right if side == "RIGHT" else left
+    # validate both endpoints: a multi-line comment's start_line must also be in the diff,
+    # or GitHub 422s and rejects the entire atomic review.
+    ok = f.get("line") in pool and (f.get("start_line") is None or f["start_line"] in pool)
     (postable if ok else unmappable).append(f)
 
 print(f"POSTABLE (inline): {len(postable)}")
@@ -752,6 +758,11 @@ if not token:
 BASE_SHA, START_SHA, HEAD_SHA = "{base_sha}", "{start_sha}", "{head_sha}"
 
 # Filled in from 6.2/6.4. Set new_line for added/context lines, old_line for removed lines.
+# Path handling per file status (from the Step 1 diff flags):
+#   - modified:     new_path == old_path
+#   - renamed_file: new_path != old_path (set both)
+#   - new_file:     omit old_path (None) -- there is no old side; comment with new_line
+#   - deleted_file: omit new_path (None) -- comment with old_line on old_path
 INLINE = [
     {"new_path": "{path}", "old_path": "{path}",
      "new_line": 0, "old_line": None, "body": "{comment_body}"},
@@ -775,9 +786,12 @@ try:
                 "position[position_type]": "text",
                 "position[base_sha]": BASE_SHA,
                 "position[start_sha]": START_SHA,
-                "position[head_sha]": HEAD_SHA,
-                "position[new_path]": c["new_path"],
-                "position[old_path]": c["old_path"]}
+                "position[head_sha]": HEAD_SHA}
+        # Only send the path sides that exist for this file (see INLINE note above).
+        if c.get("new_path") is not None:
+            form["position[new_path]"] = c["new_path"]
+        if c.get("old_path") is not None:
+            form["position[old_path]"] = c["old_path"]
         if c.get("new_line") is not None:
             form["position[new_line]"] = c["new_line"]
         if c.get("old_line") is not None:
