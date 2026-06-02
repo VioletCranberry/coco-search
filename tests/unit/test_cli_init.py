@@ -8,6 +8,7 @@ from cocosearch.cli import init_command
 from cocosearch.config import (
     CLAUDE_MD_DUPLICATE_MARKER,
     COCOSEARCH_MCP_TOOL_PERMISSIONS,
+    COCOSEARCH_NUDGE_MARKER,
     ConfigError as ConfigLoadError,
 )
 
@@ -21,6 +22,7 @@ def _make_args(**kwargs):
         "no_opencode_skills": True,
         "no_claude_mcp": True,
         "no_claude_settings": True,
+        "no_claude_hook": True,
     }
     defaults.update(kwargs)
     return argparse.Namespace(**defaults)
@@ -1043,6 +1045,141 @@ def test_claude_settings_json_parse_error_does_not_fail_command(
         mock_stdin.isatty.return_value = True
         with patch("builtins.input", side_effect=["y", "1"]):
             result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Warning" in captured.out
+
+
+# --- Claude Code nudge hook tests ---
+
+
+def test_skips_claude_hook_prompt_with_flag(tmp_path, monkeypatch):
+    """Test that --no-claude-hook skips the nudge hook prompt."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=True)
+
+    with patch("builtins.input") as mock_input:
+        result = init_command(args)
+
+    assert result == 0
+    mock_input.assert_not_called()
+
+
+def test_user_accepts_local_claude_hook(tmp_path, monkeypatch, capsys):
+    """Test that accepting the hook prompt creates settings.local.json with it."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    target = tmp_path / ".claude" / "settings.local.json"
+    assert target.exists()
+    config = json.loads(target.read_text())
+    assert COCOSEARCH_NUDGE_MARKER in json.dumps(config["hooks"]["PreToolUse"])
+    captured = capsys.readouterr()
+    assert "Created" in captured.out
+
+
+def test_user_accepts_shared_claude_hook(tmp_path, monkeypatch):
+    """Test that choosing location 2 writes the hook to settings.json."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "2"]):
+            result = init_command(args)
+
+    assert result == 0
+    target = tmp_path / ".claude" / "settings.json"
+    assert target.exists()
+    config = json.loads(target.read_text())
+    assert "PreToolUse" in config["hooks"]
+
+
+def test_user_declines_claude_hook(tmp_path, monkeypatch):
+    """Test that declining 'n' skips nudge hook creation."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", return_value="n"):
+            result = init_command(args)
+
+    assert result == 0
+    assert not (tmp_path / ".claude" / "settings.local.json").exists()
+    assert not (tmp_path / ".claude" / "settings.json").exists()
+
+
+def test_invalid_claude_hook_choice_skips_gracefully(tmp_path, monkeypatch, capsys):
+    """Test that an invalid hook location choice skips without error."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "3"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "Invalid choice" in captured.out
+
+
+def test_claude_hook_coexists_with_settings(tmp_path, monkeypatch):
+    """Test that permissions and the nudge hook land in the same file together."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_settings=False, no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        # settings: y, 1   then   hook: y, 1  -> same file
+        with patch("builtins.input", side_effect=["y", "1", "y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    target = tmp_path / ".claude" / "settings.local.json"
+    config = json.loads(target.read_text())
+    assert len(config["permissions"]["allow"]) == 11
+    assert COCOSEARCH_NUDGE_MARKER in json.dumps(config["hooks"]["PreToolUse"])
+
+
+def test_claude_hook_skips_when_already_present(tmp_path, monkeypatch, capsys):
+    """Test that re-running the hook prompt is idempotent."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            init_command(args)
+        with patch("builtins.input", side_effect=["y", "1"]):
+            result = init_command(args)
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert "already present" in captured.out
+
+
+def test_claude_hook_write_error_does_not_fail_command(tmp_path, monkeypatch, capsys):
+    """Test that OSError on hook write still returns 0."""
+    monkeypatch.chdir(tmp_path)
+    args = _make_args(no_claude_hook=False)
+
+    with patch("sys.stdin") as mock_stdin:
+        mock_stdin.isatty.return_value = True
+        with patch("builtins.input", side_effect=["y", "1"]):
+            with patch(
+                "cocosearch.cli.generate_claude_hook",
+                side_effect=OSError("Permission denied"),
+            ):
+                result = init_command(args)
 
     assert result == 0
     captured = capsys.readouterr()

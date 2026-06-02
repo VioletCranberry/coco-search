@@ -27,6 +27,7 @@ from cocosearch.config import (
     config_key_to_env_var,
     find_config_file,
     generate_agents_md_routing,
+    generate_claude_hook,
     generate_claude_md_routing,
     generate_claude_settings,
     generate_config,
@@ -1899,6 +1900,53 @@ def init_command(args: argparse.Namespace) -> int:
                         f"[yellow]Warning:[/yellow] Could not update {target}: {e}"
                     )
 
+    # Offer to install the CocoSearch nudge hook (steers the agent toward
+    # search_code instead of grep/glob when CocoSearch is running)
+    no_claude_hook = getattr(args, "no_claude_hook", False)
+    if not no_claude_hook:
+        console.print()
+        response = input("Install CocoSearch nudge hook for Claude Code? [y/N] ")
+        if response.lower() == "y":
+            console.print()
+            console.print(
+                "  [cyan]1[/cyan]  Project .claude/settings.local.json (default)"
+            )
+            console.print("  [cyan]2[/cyan]  Project .claude/settings.json")
+            console.print()
+            choice = input("Location [1]: ").strip() or "1"
+
+            if choice == "1":
+                target = Path.cwd() / ".claude" / "settings.local.json"
+            elif choice == "2":
+                target = Path.cwd() / ".claude" / "settings.json"
+            else:
+                console.print("[dim]Invalid choice, skipping nudge hook.[/dim]")
+                target = None
+
+            if target:
+                try:
+                    result = generate_claude_hook(target)
+                    if result == "created":
+                        console.print(
+                            f"[green]Created {target} with CocoSearch nudge hook[/green]"
+                        )
+                    elif result == "added":
+                        console.print(
+                            f"[green]Added CocoSearch nudge hook to {target}[/green]"
+                        )
+                    else:
+                        console.print(
+                            f"[dim]CocoSearch nudge hook already present in {target}[/dim]"
+                        )
+                    console.print(
+                        "[dim]  Nudges the agent toward search_code instead of grep "
+                        "when CocoSearch is running; silent otherwise.[/dim]"
+                    )
+                except (OSError, ConfigLoadError) as e:
+                    console.print(
+                        f"[yellow]Warning:[/yellow] Could not update {target}: {e}"
+                    )
+
     return 0
 
 
@@ -3027,6 +3075,12 @@ def main() -> None:
         action="store_true",
         default=False,
         help="Skip the Claude Code tool permissions prompt",
+    )
+    init_parser.add_argument(
+        "--no-claude-hook",
+        action="store_true",
+        default=False,
+        help="Skip the Claude Code nudge hook prompt",
     )
 
     # MCP subcommand

@@ -586,6 +586,8 @@ Run `cocosearch init` to generate a starter config file and optionally set up CL
 uv run cocosearch init
 ```
 
+`init` also offers to install an optional **nudge hook** for Claude Code — a non-blocking `PreToolUse` hook that reminds the agent to prefer `search_code` over raw Grep/Glob/grep/find when CocoSearch is running, and stays completely silent when it isn't (so your normal grep fallback is never blocked). It's an opt-in prompt; skip it with `--no-claude-hook`.
+
 Or create `cocosearch.yaml` in your project root manually to customize indexing:
 
 ```yaml
