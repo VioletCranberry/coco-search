@@ -338,6 +338,22 @@ header {
     margin-bottom: 8px;
 }
 
+/* Index-name chip in the warning header — clarifies which index the warnings
+   belong to (e.g. a fallback index when the current project is unindexed).
+   White monospace on a translucent pill for legibility on the red banner. */
+.warning-index-chip {
+    display: inline-block;
+    font-family: var(--font-mono, monospace);
+    font-size: 14px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.22);
+    color: white;
+    padding: 1px 8px;
+    border-radius: 6px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
 .warning-banner ul {
     list-style: none;
     padding-left: 0;

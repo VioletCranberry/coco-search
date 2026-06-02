@@ -202,11 +202,23 @@ export function updateSummaryCards(stats) {
     }
 }
 
-export function updateWarnings(warnings) {
+export function updateWarnings(warnings, indexName) {
     const banner = document.getElementById('warningBanner');
     const list = document.getElementById('warningList');
+    const nameChip = document.getElementById('warningIndexName');
 
     if (warnings && warnings.length > 0) {
+        // Surface which index the warnings belong to — important when the
+        // current project is unindexed and a fallback index is shown.
+        if (nameChip) {
+            if (indexName) {
+                nameChip.textContent = indexName;
+                nameChip.style.display = '';
+            } else {
+                nameChip.textContent = '';
+                nameChip.style.display = 'none';
+            }
+        }
         list.innerHTML = warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('');
         banner.classList.add('visible');
     } else {
@@ -471,7 +483,7 @@ export function updateDashboard(stats) {
     state.parseFailuresData = stats.parse_failures || [];
     state.grammarFailuresData = stats.grammar_failures || [];
     updateSummaryCards(stats);
-    updateWarnings(stats.warnings);
+    updateWarnings(stats.warnings, stats.name);
     // Populate language filter before charts — charts depend on CDN libs
     // and a failure there must not prevent the filter from updating
     populateLanguageFilter(stats.languages || []);
