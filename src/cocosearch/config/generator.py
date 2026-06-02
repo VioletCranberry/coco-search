@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from copy import deepcopy
 from importlib.resources import files
 from pathlib import Path
 
@@ -358,6 +359,123 @@ def generate_claude_settings(path: Path) -> str:
             "allow": list(COCOSEARCH_MCP_TOOL_PERMISSIONS),
         },
     }
+    path.write_text(json.dumps(config, indent=2) + "\n")
+    return "created"
+
+
+# Marker embedded in the nudge hook command so (re)installation is idempotent:
+# its presence in an existing PreToolUse block means the hook is already there.
+COCOSEARCH_NUDGE_MARKER = "cocosearch-nudge"
+
+# Shell command for the PreToolUse nudge hook.
+#
+# It is availability-gated: a short TCP probe checks whether CocoSearch's
+# PostgreSQL backend is reachable. The host/port are read from
+# COCOSEARCH_DATABASE_URL at hook time (falling back to 127.0.0.1:5432), so the
+# gate stays accurate when the user runs Postgres on a non-default port/host. Only
+# when the probe succeeds does the hook emit `additionalContext` steering the agent
+# toward search_code instead of raw Grep/Glob/grep/find/rg. When CocoSearch is not
+# running the probe fails and the hook stays completely silent, so the agent keeps
+# its normal grep fallback.
+#
+# The hook NEVER blocks the tool call - it only injects a reminder. python3 is
+# guaranteed for any CocoSearch user (the package requires Python >=3.11), and the
+# `|| true` makes the hook a no-op if the probe fails for any reason (e.g. a
+# COCOSEARCH_DATABASE_URL with a non-numeric port). An unparseable URL falls back to
+# the default 127.0.0.1:5432 probe rather than erroring.
+COCOSEARCH_NUDGE_COMMAND = (
+    "python3 -c 'import os,socket,sys; from urllib.parse import urlparse; "
+    'u=urlparse(os.environ.get("COCOSEARCH_DATABASE_URL","")); '
+    'host=u.hostname or "127.0.0.1"; port=u.port or 5432; '
+    "s=socket.socket(); s.settimeout(0.3); "
+    "sys.exit(0 if s.connect_ex((host,port))==0 else 1)' 2>/dev/null "
+    "&& printf '%s' "
+    '\'{"hookSpecificOutput":{"hookEventName":"PreToolUse",'
+    '"additionalContext":"[cocosearch-nudge] CocoSearch MCP is available - prefer '
+    "search_code (hybrid semantic+keyword) over raw Grep/Glob/grep/find/rg for code "
+    "search. Reserve grep/glob for exact-literal strings, file-path globs, or "
+    "line-number lookups in a known file (see CLAUDE.md Tool Routing).\"}}' "
+    "|| true"
+)
+
+
+def _nudge_command_hook(if_pattern: str | None = None) -> dict:
+    """Build a single command-hook entry running the nudge command."""
+    entry: dict = {
+        "type": "command",
+        "command": COCOSEARCH_NUDGE_COMMAND,
+        "timeout": 5,
+    }
+    if if_pattern is not None:
+        entry["if"] = if_pattern
+    return entry
+
+
+# PreToolUse entries installed by generate_claude_hook. The Grep/Glob tools match
+# directly; raw shell search tools are matched via the per-hook `if` filter so the
+# probe only runs for search-like Bash commands (not every Bash call).
+COCOSEARCH_NUDGE_PRETOOLUSE = [
+    {"matcher": "Grep|Glob", "hooks": [_nudge_command_hook()]},
+    {
+        "matcher": "Bash",
+        "hooks": [
+            _nudge_command_hook(f"Bash({cmd}:*)")
+            for cmd in ("grep", "rg", "find", "ag", "fd")
+        ],
+    },
+]
+
+
+def generate_claude_hook(path: Path) -> str:
+    """Install the CocoSearch PreToolUse nudge hook into a Claude Code settings file.
+
+    The hook is non-blocking: when CocoSearch's PostgreSQL backend is reachable it
+    injects a reminder steering the agent toward search_code instead of raw
+    Grep/Glob/grep/find/rg; when CocoSearch is not running it stays silent and the
+    agent keeps its normal grep fallback. Merges into an existing settings file,
+    preserving all other configuration (including unrelated hooks).
+
+    Args:
+        path: Path to the settings file (e.g., .claude/settings.local.json).
+
+    Returns:
+        "created" if a new file was created,
+        "added" if the hook was added to an existing file,
+        "skipped" if the CocoSearch nudge hook is already present.
+    """
+    if path.exists():
+        raw = path.read_text()
+        try:
+            config = json.loads(raw)
+        except json.JSONDecodeError:
+            raise ConfigError(
+                f"Cannot parse {path} as JSON. "
+                "If it uses JSONC (comments), please add the hook manually."
+            )
+
+        if not isinstance(config, dict):
+            raise ConfigError(
+                f"Expected a JSON object in {path}, got {type(config).__name__}"
+            )
+
+        hooks = config.get("hooks")
+        if not isinstance(hooks, dict):
+            hooks = {}
+            config["hooks"] = hooks
+        pre_tool_use = hooks.get("PreToolUse")
+        if not isinstance(pre_tool_use, list):
+            pre_tool_use = []
+            hooks["PreToolUse"] = pre_tool_use
+
+        if COCOSEARCH_NUDGE_MARKER in json.dumps(pre_tool_use):
+            return "skipped"
+
+        pre_tool_use.extend(deepcopy(COCOSEARCH_NUDGE_PRETOOLUSE))
+        path.write_text(json.dumps(config, indent=2) + "\n")
+        return "added"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    config = {"hooks": {"PreToolUse": deepcopy(COCOSEARCH_NUDGE_PRETOOLUSE)}}
     path.write_text(json.dumps(config, indent=2) + "\n")
     return "created"
 

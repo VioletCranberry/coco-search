@@ -11,10 +11,12 @@ from cocosearch.config import (
     CLAUDE_MD_DUPLICATE_MARKER,
     CLAUDE_MD_ROUTING_SECTION,
     COCOSEARCH_MCP_TOOL_PERMISSIONS,
+    COCOSEARCH_NUDGE_MARKER,
     CONFIG_TEMPLATE,
     ConfigError,
     check_claude_plugin_installed,
     generate_agents_md_routing,
+    generate_claude_hook,
     generate_claude_md_routing,
     generate_claude_settings,
     generate_config,
@@ -757,3 +759,218 @@ class TestClaudeSettings:
         assert len(COCOSEARCH_MCP_TOOL_PERMISSIONS) == 11
         for perm in COCOSEARCH_MCP_TOOL_PERMISSIONS:
             assert perm.startswith("mcp__plugin_cocosearch_cocosearch__")
+
+
+class TestClaudeHook:
+    """Tests for generate_claude_hook (PreToolUse nudge hook)."""
+
+    def _pretool(self, config):
+        return config["hooks"]["PreToolUse"]
+
+    def test_creates_new_file(self, tmp_path):
+        """Creates a new settings file containing the PreToolUse nudge hook."""
+        target = tmp_path / ".claude" / "settings.local.json"
+
+        result = generate_claude_hook(target)
+
+        assert result == "created"
+        assert target.exists()
+        config = json.loads(target.read_text())
+        pretool = self._pretool(config)
+        matchers = {entry["matcher"] for entry in pretool}
+        assert "Grep|Glob" in matchers
+        assert "Bash" in matchers
+        # Marker is present so re-runs are idempotent
+        assert COCOSEARCH_NUDGE_MARKER in json.dumps(pretool)
+
+    def test_creates_parent_directories(self, tmp_path):
+        """Creates parent dirs (e.g. .claude/) when missing."""
+        target = tmp_path / "nested" / "dir" / "settings.local.json"
+
+        result = generate_claude_hook(target)
+
+        assert result == "created"
+        assert target.exists()
+
+    def test_bash_hooks_filter_search_commands(self, tmp_path):
+        """Bash hook entries carry `if` filters for grep/rg/find/ag/fd."""
+        target = tmp_path / "settings.local.json"
+
+        generate_claude_hook(target)
+
+        config = json.loads(target.read_text())
+        bash_entry = next(e for e in self._pretool(config) if e["matcher"] == "Bash")
+        if_patterns = {h["if"] for h in bash_entry["hooks"]}
+        assert if_patterns == {
+            "Bash(grep:*)",
+            "Bash(rg:*)",
+            "Bash(find:*)",
+            "Bash(ag:*)",
+            "Bash(fd:*)",
+        }
+
+    def test_command_is_non_blocking_and_availability_gated(self, tmp_path):
+        """The hook command probes Postgres and never sets a blocking decision."""
+        target = tmp_path / "settings.local.json"
+
+        generate_claude_hook(target)
+
+        config = json.loads(target.read_text())
+        command = self._pretool(config)[0]["hooks"][0]["command"]
+        # Availability gate (TCP probe) + non-blocking context injection
+        assert "connect_ex" in command
+        assert "additionalContext" in command
+        assert "|| true" in command
+        # A nudge must never deny/ask
+        assert "permissionDecision" not in command
+
+    def test_command_is_port_aware(self, tmp_path):
+        """The probe derives host/port from COCOSEARCH_DATABASE_URL, default 5432."""
+        target = tmp_path / "settings.local.json"
+
+        generate_claude_hook(target)
+
+        config = json.loads(target.read_text())
+        command = self._pretool(config)[0]["hooks"][0]["command"]
+        assert "COCOSEARCH_DATABASE_URL" in command
+        assert "urlparse" in command
+        # Falls back to the default host/port when the env var is unset
+        assert '"127.0.0.1"' in command
+        assert "5432" in command
+
+    def test_command_probe_executes_with_custom_port(self, tmp_path):
+        """End-to-end: the probe nudges on a reachable custom port, silent otherwise."""
+        import os
+        import socket
+        import subprocess
+
+        generate_claude_hook(tmp_path / "settings.local.json")
+        config = json.loads((tmp_path / "settings.local.json").read_text())
+        command = self._pretool(config)[0]["hooks"][0]["command"]
+
+        # Bind an ephemeral port so it is reachable, then probe it via the hook
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        open_port = listener.getsockname()[1]
+        try:
+            env = {
+                **os.environ,
+                "COCOSEARCH_DATABASE_URL": f"postgresql://u:p@127.0.0.1:{open_port}/db",
+            }
+            out = subprocess.run(
+                ["bash", "-c", command],
+                input="{}",
+                capture_output=True,
+                text=True,
+                env=env,
+            ).stdout
+            assert "additionalContext" in out  # reachable -> nudge
+        finally:
+            listener.close()
+
+        # Closed port -> silent (no output), and the command still exits 0
+        env_closed = {
+            **os.environ,
+            "COCOSEARCH_DATABASE_URL": f"postgresql://u:p@127.0.0.1:{open_port}/db",
+        }
+        result = subprocess.run(
+            ["bash", "-c", command],
+            input="{}",
+            capture_output=True,
+            text=True,
+            env=env_closed,
+        )
+        # Port now closed (listener released) -> silent
+        assert result.stdout.strip() == ""
+        assert result.returncode == 0
+
+    def test_adds_to_existing_settings(self, tmp_path):
+        """Adds the hook to an existing settings file, preserving other keys."""
+        target = tmp_path / "settings.local.json"
+        existing = {"permissions": {"allow": ["Bash(git *)"]}}
+        target.write_text(json.dumps(existing, indent=2))
+
+        result = generate_claude_hook(target)
+
+        assert result == "added"
+        config = json.loads(target.read_text())
+        assert "Bash(git *)" in config["permissions"]["allow"]
+        assert COCOSEARCH_NUDGE_MARKER in json.dumps(self._pretool(config))
+
+    def test_preserves_existing_unrelated_hooks(self, tmp_path):
+        """Existing PreToolUse hooks from other tools are not clobbered."""
+        target = tmp_path / "settings.local.json"
+        existing = {
+            "hooks": {
+                "PreToolUse": [
+                    {"matcher": "Write", "hooks": [{"type": "command", "command": "x"}]}
+                ],
+                "PostToolUse": [
+                    {"matcher": "Edit", "hooks": [{"type": "command", "command": "y"}]}
+                ],
+            }
+        }
+        target.write_text(json.dumps(existing, indent=2))
+
+        result = generate_claude_hook(target)
+
+        assert result == "added"
+        config = json.loads(target.read_text())
+        matchers = [e["matcher"] for e in self._pretool(config)]
+        assert "Write" in matchers  # pre-existing entry survived
+        assert "Grep|Glob" in matchers  # ours was appended
+        assert config["hooks"]["PostToolUse"][0]["matcher"] == "Edit"
+
+    def test_skips_when_hook_already_present(self, tmp_path):
+        """Returns 'skipped' on re-run; idempotent (no duplicate entries)."""
+        target = tmp_path / "settings.local.json"
+
+        first = generate_claude_hook(target)
+        before = json.loads(target.read_text())
+        second = generate_claude_hook(target)
+        after = json.loads(target.read_text())
+
+        assert first == "created"
+        assert second == "skipped"
+        assert before == after  # file unchanged on second run
+
+    def test_coexists_with_generate_claude_settings(self, tmp_path):
+        """Permissions and the hook can both live in the same file."""
+        target = tmp_path / "settings.local.json"
+
+        generate_claude_settings(target)
+        generate_claude_hook(target)
+
+        config = json.loads(target.read_text())
+        assert set(config["permissions"]["allow"]) == set(
+            COCOSEARCH_MCP_TOOL_PERMISSIONS
+        )
+        assert COCOSEARCH_NUDGE_MARKER in json.dumps(self._pretool(config))
+
+    def test_raises_on_invalid_json(self, tmp_path):
+        """Raises ConfigError on malformed JSON."""
+        target = tmp_path / "settings.local.json"
+        target.write_text("{ invalid json // with comments }")
+
+        with pytest.raises(ConfigError, match="Cannot parse"):
+            generate_claude_hook(target)
+
+    def test_raises_on_non_object_json(self, tmp_path):
+        """Raises ConfigError if JSON root is not an object."""
+        target = tmp_path / "settings.local.json"
+        target.write_text('"just a string"')
+
+        with pytest.raises(ConfigError, match="Expected a JSON object"):
+            generate_claude_hook(target)
+
+    def test_output_is_valid_pretty_json(self, tmp_path):
+        """Created file is valid, pretty-printed JSON with trailing newline."""
+        target = tmp_path / "settings.local.json"
+
+        generate_claude_hook(target)
+
+        raw = target.read_text()
+        assert raw.endswith("\n")
+        config = json.loads(raw)
+        assert raw == json.dumps(config, indent=2) + "\n"
