@@ -224,12 +224,14 @@ uv run cocosearch index . --deps
 
 **Initialize project configuration:** `uv run cocosearch init [options]`
 
-Creates a `cocosearch.yaml` starter configuration file in the current directory. After creating the config file, interactively offers to:
+Creates a `cocosearch.yaml` starter configuration file in the current directory. The generated config documents every section as commented examples — `indexing`, `search`, `embedding` (provider/model/baseUrl for ollama/openai/openrouter), the optional query-rewrite `controller`, and file `logging` — so it doubles as a config reference. After creating the config file, interactively offers to:
 1. Add a CocoSearch tool routing table to CLAUDE.md (local project or global `~/.claude/CLAUDE.md`)
 2. Add a CocoSearch tool routing table to AGENTS.md (local project or global `~/.config/opencode/AGENTS.md`)
 3. Register CocoSearch MCP server with OpenCode (local or global `opencode.json`)
 4. Install CocoSearch workflow skills for OpenCode (local or global skills directory)
 5. Install CocoSearch plugin for Claude Code (via `claude` CLI)
+6. Configure Claude Code tool permissions for CocoSearch (local `.claude/settings.local.json` or shared `.claude/settings.json`)
+7. Install the Claude Code nudge hook that steers the agent toward `search_code` instead of raw grep/glob (local or shared settings)
 
 | Flag | Description |
 | ---- | ----------- |
@@ -238,13 +240,15 @@ Creates a `cocosearch.yaml` starter configuration file in the current directory.
 | `--no-opencode-mcp` | Skip the OpenCode MCP server registration prompt |
 | `--no-opencode-skills` | Skip the OpenCode workflow skills installation prompt |
 | `--no-claude-mcp` | Skip the Claude Code plugin installation prompt |
+| `--no-claude-settings` | Skip the Claude Code tool permissions prompt |
+| `--no-claude-hook` | Skip the Claude Code nudge hook prompt |
 
 ```bash
 # Interactive: creates cocosearch.yaml, then prompts for all integrations
 uv run cocosearch init
 
 # Non-interactive: creates cocosearch.yaml only
-uv run cocosearch init --no-claude-md --no-agents-md --no-opencode-mcp --no-opencode-skills --no-claude-mcp
+uv run cocosearch init --no-claude-md --no-agents-md --no-opencode-mcp --no-opencode-skills --no-claude-mcp --no-claude-settings --no-claude-hook
 ```
 
 All interactive prompts are skipped automatically when stdin is not a TTY (e.g., in CI pipelines or when piping input).
