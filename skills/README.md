@@ -16,7 +16,7 @@ Reusable AI coding assistant skills for CocoSearch — semantic and symbol-aware
 | [cocosearch-add-language](./cocosearch-add-language/SKILL.md) | Add language support: handlers, symbol extraction, context expansion | Yes |
 | [cocosearch-add-grammar](./cocosearch-add-grammar/SKILL.md) | Add grammar handler: domain-specific formats within a base language | Yes |
 | [cocosearch-add-extractor](./cocosearch-add-extractor/SKILL.md) | Add dependency extractor: enables `deps tree`, `deps impact`, and dependency-enriched search | Yes |
-| [cocosearch-review-pr](./cocosearch-review-pr/SKILL.md) | Review GitHub PRs / GitLab MRs with blast radius and dependency analysis | Yes |
+| [cocosearch-review-pr](./cocosearch-review-pr/SKILL.md) | Review GitHub PRs / GitLab MRs with blast radius and dependency analysis; optionally push findings back as inline comments | Yes |
 | [cocosearch-commit](./cocosearch-commit/SKILL.md) | Smart commit messages: analyzes diffs with semantic search and dependency impact | Yes |
 
 ## Installation
