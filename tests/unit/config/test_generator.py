@@ -68,6 +68,20 @@ def test_config_template_contains_linked_indexes_comment():
     assert "common-utils" in CONFIG_TEMPLATE
 
 
+def _uncomment_block(marker: str) -> dict:
+    """Uncomment one '# ' level of the CONFIG_TEMPLATE block beginning at `marker`
+    (a fully-commented section like '# controller:') up to its trailing blank
+    line, then parse it as YAML. Double-commented sub-fields stay commented."""
+    lines = CONFIG_TEMPLATE.splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.strip() == marker)
+    block = []
+    for ln in lines[start:]:
+        if not ln.startswith("#"):  # blank line ends the block
+            break
+        block.append(ln[2:] if ln.startswith("# ") else ln)
+    return yaml.safe_load("\n".join(block))
+
+
 def test_config_template_contains_controller_comment():
     """Test that CONFIG_TEMPLATE documents the optional query-rewrite controller."""
     assert "# controller:" in CONFIG_TEMPLATE
@@ -79,17 +93,32 @@ def test_config_template_contains_controller_comment():
 def test_config_template_controller_example_is_schema_valid():
     """The commented controller example must validate against ControllerSection
     once uncommented — guards the docs from drifting out of sync with the schema."""
-    lines = CONFIG_TEMPLATE.splitlines()
-    start = next(i for i, ln in enumerate(lines) if ln.strip() == "# controller:")
-    # Uncomment one level: strip a single leading "# " from each block line.
-    # baseUrl/timeout are double-commented, so they stay commented (optional).
-    block = [ln[2:] if ln.startswith("# ") else ln for ln in lines[start:]]
-    data = yaml.safe_load("\n".join(block))
-
-    config = CocoSearchConfig(**data)
+    config = CocoSearchConfig(**_uncomment_block("# controller:"))
     assert config.controller.enabled is False
     assert config.controller.provider == "ollama"
     assert config.controller.model == "qwen2.5:3b"
+
+
+def test_config_template_documents_embedding_provider():
+    """Test that CONFIG_TEMPLATE documents the multi-provider embedding options."""
+    assert "provider: ollama" in CONFIG_TEMPLATE
+    assert "baseUrl" in CONFIG_TEMPLATE
+    assert "openrouter" in CONFIG_TEMPLATE
+    assert "COCOSEARCH_EMBEDDING_API_KEY" in CONFIG_TEMPLATE
+
+
+def test_config_template_contains_logging_comment():
+    """Test that CONFIG_TEMPLATE documents the optional file logging toggle."""
+    assert "# logging:" in CONFIG_TEMPLATE
+    assert "file: false" in CONFIG_TEMPLATE
+    assert "COCOSEARCH_LOG_FILE" in CONFIG_TEMPLATE
+
+
+def test_config_template_logging_example_is_schema_valid():
+    """The commented logging example must validate against LoggingSection once
+    uncommented — guards the docs from drifting out of sync with the schema."""
+    config = CocoSearchConfig(**_uncomment_block("# logging:"))
+    assert config.logging.file is False
 
 
 class TestClaudeMdRouting:
