@@ -160,6 +160,8 @@ This project was originally built for personal use — a solo experiment in loca
 
 - 🔬 **Pipeline analysis** -- `cocosearch analyze` runs the search pipeline with full diagnostics: see identifier detection, mode selection, RRF fusion breakdown, definition boost effects, and per-stage timings. Available as CLI and MCP tool. Cross-index analysis with per-index breakdowns.
 
+- 🤖 **Workflow skills** -- reusable [Claude SKILLS](https://code.claude.com/docs/en/skills) that drive structured workflows on top of the MCP tools: onboarding, exploration, debugging, dependency analysis, refactoring, feature scaffolding, smart commits, and **PR/MR review**. The review skill goes beyond reading the diff — it adds blast-radius and dependency analysis, and can optionally **push findings back as inline GitHub/GitLab comments** on the exact lines that need changes (interactive, comment-only, always previews before posting). See [Skills](#available-skills).
+
 - 🔒 **Privacy-first** -- runs entirely on your machine by default — Ollama generates embeddings locally, PostgreSQL stores vectors locally, no telemetry. Optional remote embedding providers (OpenAI, OpenRouter) send only chunk text for embedding; all indexing, storage, and search remain local. Your code never leaves your machine.
 
 ## Quick Start
@@ -436,7 +438,7 @@ For codebases of meaningful size, CocoSearch reduces the number of MCP tool call
 - **cocosearch-add-grammar** ([SKILL.md](./skills/cocosearch-add-grammar/SKILL.md)): Use when adding a grammar handler for domain-specific formats within a base language (e.g., GitHub Actions within YAML). Guides matches() design, separator spec, metadata extraction, and testing.
 - **cocosearch-deps** ([SKILL.md](./skills/cocosearch-deps/SKILL.md)): Use when exploring dependency relationships, tracing file connections, analyzing change impact, or identifying hub files. Guides dependency graph exploration using CocoSearch.
 - **cocosearch-add-extractor** ([SKILL.md](./skills/cocosearch-add-extractor/SKILL.md)): Use when adding a dependency extractor for a language or grammar. Guides through pre-checks, extractor implementation, optional module resolver, tests, and registration.
-- **cocosearch-review-pr** ([SKILL.md](./skills/cocosearch-review-pr/SKILL.md)): Use when reviewing a GitHub PR or GitLab MR by URL. Fetches diff and metadata via API, then uses CocoSearch for blast radius analysis, dependency impact, pattern consistency, and test coverage assessment.
+- **cocosearch-review-pr** ([SKILL.md](./skills/cocosearch-review-pr/SKILL.md)): Use when reviewing a GitHub PR or GitLab MR by URL. Fetches diff and metadata via API, then uses CocoSearch for blast radius analysis, dependency impact, pattern consistency, and test coverage assessment. Read-only by default; optionally pushes findings back as inline PR/MR comments after your confirmation.
 
 ## How Search Works
 

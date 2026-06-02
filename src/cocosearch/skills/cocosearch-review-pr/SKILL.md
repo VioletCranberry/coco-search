@@ -1,11 +1,13 @@
 ---
 name: cocosearch-review-pr
-description: Use when reviewing a GitHub PR or GitLab MR by URL. Fetches diff and metadata via API, then uses CocoSearch for blast radius analysis, dependency impact, pattern consistency, and test coverage assessment.
+description: Use when reviewing a GitHub PR or GitLab MR by URL. Fetches diff and metadata via API, then uses CocoSearch for blast radius analysis, dependency impact, pattern consistency, and test coverage assessment. Read-only by default; optionally pushes findings back as inline PR/MR comments after your confirmation.
 ---
 
 # PR/MR Review with CocoSearch
 
 A structured workflow for reviewing pull requests (GitHub) or merge requests (GitLab) using CocoSearch's semantic search and dependency analysis. Goes beyond line-by-line diff reading to assess blast radius, dependency impact, pattern consistency, and test coverage.
+
+**Read-only by default.** The review itself only reads the PR/MR and the codebase. The final step (Step 6) is an **optional, confirmation-gated write-back** that posts findings as inline comments on the lines that need changes plus an overall summary — nothing is posted without an explicit dry-run preview and your approval.
 
 **What this skill adds over manual review:**
 
@@ -14,6 +16,7 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
 - **Pattern consistency:** Find similar patterns elsewhere to check if changes are consistent
 - **Test coverage:** Verify that tests exist for the changed code
 - **Missing changes:** Identify files that should have changed but didn't
+- **Push back (optional):** After review, post findings as inline GitHub/GitLab comments on the exact lines — interactive, comment-only, never auto-approves
 
 ## Pre-flight Check
 
@@ -63,6 +66,8 @@ A structured workflow for reviewing pull requests (GitHub) or merge requests (Gi
 8. **Match platform to tokens:**
    - **GitHub:** prefer `GITHUB_TOKEN` over `GH_TOKEN`. If neither set: "Set `GITHUB_TOKEN` (or `GH_TOKEN`) to access the GitHub API. Create one at https://github.com/settings/tokens (needs `repo` scope for private repos, no scope needed for public repos)." Stop.
    - **GitLab:** prefer `GITLAB_TOKEN` over `GITLAB_PAT`. If neither set: "Set `GITLAB_TOKEN` (or `GITLAB_PAT`) to access the GitLab API. Create one at `https://{host}/-/user_settings/personal_access_tokens` (needs `read_api` scope)." Stop.
+
+   > **Write scope (only if you'll push comments — Step 6):** Reviewing is read-only and the read scopes above are enough. Posting comments back to the PR/MR requires a **write-scoped** token: GitHub classic PAT `repo` (or `public_repo` for public repos), or fine-grained PAT **Pull requests: Read and write**; GitLab the full **`api`** scope (`read_api` cannot post). Do NOT block here on write scope — most reviews never post. If the read token turns out to lack write access, Step 6 reports the 403 cleanly.
 9. Verify API access with a lightweight call (fetch PR/MR metadata -- Step 1 below). If it fails with 401/403, report the auth error and stop.
 
 ## Step 1: Fetch PR/MR Data
@@ -97,6 +102,7 @@ try:
             "state": data["state"],
             "base_branch": data["base"]["ref"],
             "head_branch": data["head"]["ref"],
+            "head_sha": data["head"]["sha"],  # used as commit_id when posting comments (Step 6)
             "additions": data["additions"],
             "deletions": data["deletions"],
             "changed_files": data["changed_files"],
@@ -163,6 +169,8 @@ curl -sf -H "Authorization: Bearer ${GITHUB_TOKEN:-$GH_TOKEN}" \
 
 For PRs with >100 files, pagination is handled automatically by the Python script (follows `Link` header). With curl, paginate manually with `&page=2`, `&page=3`, etc.
 
+> **Truncation note:** the `patch` is truncated to `[:2000]` chars above — fine for reading findings, but line mapping built from a truncated patch is wrong past the cutoff. If you proceed to **Step 6** (posting inline comments), re-fetch the affected files *without* the `[:2000]` cap first so hunk line numbers are accurate.
+
 ### GitLab
 
 **Fetch metadata (Python -- primary):**
@@ -189,6 +197,9 @@ try:
             "target_branch": data["target_branch"],
             "source_branch": data["source_branch"],
             "changes_count": data.get("changes_count"),
+            # diff_refs (base_sha/start_sha/head_sha) is required to anchor inline
+            # comments when posting (Step 6). It may be null on very fresh MRs.
+            "diff_refs": data.get("diff_refs"),
         }, indent=2))
 except urllib.error.HTTPError as e:
     print(f"GitLab API error {e.code}: {e.read().decode()}", file=sys.stderr)
@@ -250,6 +261,8 @@ curl -sf -H "PRIVATE-TOKEN: ${GITLAB_TOKEN:-$GITLAB_PAT}" \
 ```
 
 For MRs with >100 diffs, pagination is handled automatically by the Python script (follows `x-next-page` header). With curl, paginate manually with `&page=2`, etc.
+
+> **Truncation note:** the `diff` is truncated to `[:2000]` chars above. If you proceed to **Step 6** (posting inline comments), re-fetch the affected files *without* the `[:2000]` cap first so hunk line numbers are accurate.
 
 ### Present PR Summary
 
@@ -408,12 +421,33 @@ For each HIGH-priority file, produce:
 **Dependencies:** Relies on {M} internal modules.
 
 **Diff findings:**
-- {finding description} [severity: CRITICAL/IMPORTANT/MINOR]
-- {finding description} [severity: ...]
+- L{line} [{side}] {finding description} [severity: CRITICAL/IMPORTANT/MINOR] -> {line_url}
+  - suggestion: {replacement code, if a concrete fix exists -- omit otherwise}
+- L{line} [{side}] {finding description} [severity: ...] -> {line_url}
 
 **Pattern check:** {Consistent with codebase patterns / Diverges from pattern in X, Y, Z}
 **Test coverage:** {Covered / Partially covered / Missing}
 ```
+
+**Make each diff finding machine-mappable.** This structure is what Step 6 turns into inline
+comments, so every diff finding should carry:
+
+- `line` — the line number the finding is about
+- `side` — `RIGHT` for added/current code, `LEFT` for removed code (default `RIGHT`)
+- `severity` — `CRITICAL` / `IMPORTANT` / `MINOR`
+- `suggestion` (optional) — concrete replacement code when you can propose an exact fix; this is
+  what becomes a one-click `` ```suggestion `` block in Step 6
+- `line_url` — a clickable deep link to the exact line, so the reviewer can jump there (and add a
+  comment by hand) even if they skip the auto-post. Use the stable blob-at-reviewed-SHA form:
+  - **GitHub:** `https://github.com/{owner}/{repo}/blob/{head_sha}/{path}#L{line}`
+  - **GitLab:** `https://{host}/{group}/{project}/-/blob/{head_sha}/{path}#L{line}`
+  - For a multi-line finding use `#L{start}-L{line}` (GitHub) / `#L{start}-{line}` (GitLab).
+  - **GitLab note:** the blob URL needs the human-readable `{group}/{project}` namespace from the
+    MR URL — not the `{id}` (numeric project ID or URL-encoded path) used for the API calls in
+    Step 1. Take the namespace from the original MR URL so you don't emit a broken `/{id}/-/blob/…` link.
+
+A finding without a specific line (e.g. "this whole file lacks tests") is fine — just omit `line`;
+Step 6 routes line-less findings into the summary comment instead of an inline one.
 
 ## Step 4: Cross-Cutting Analysis
 
@@ -515,9 +549,295 @@ Assemble the full review in this structure:
 
 **Checkpoint:** "Want me to dig deeper into any file or finding? I can also check specific patterns or trace additional dependencies."
 
-### Branch Cleanup
+## Step 6: Push Review to PR/MR (Optional, Interactive)
 
-After presenting the review, handle branch lifecycle cleanup.
+This is the only write-capable part of the skill. It is **opt-in, comment-only, and always
+previews before posting.** It never approves or requests changes — the human clicks the verdict
+button. Skip this step entirely if the user only wanted a read-only review.
+
+### 6.0 Opt-in gate
+
+Ask: **"Want me to push this review back to the PR/MR as inline comments?"** Default is **no**.
+
+If yes, warn once: "Posting needs a write-scoped token (GitHub `repo` / fine-grained Pull requests
+RW; GitLab `api`). A read-only review token will get a 403 — I'll report it cleanly if so."
+
+### 6.1 Build the comment set (line mapping)
+
+Inline comments must target lines that are actually in the diff. Build the valid-line sets from
+the **untruncated** patches:
+
+1. Re-fetch just the files that have findings, **without** the `[:2000]` truncation from Step 1
+   (raise/remove the cap). Truncated patches produce wrong line numbers.
+2. Parse each hunk header `@@ -a,b +c,d @@` and walk the body to collect valid `(line, side)`
+   pairs: context lines (` `) are valid on both sides, `+` lines on `RIGHT` (new-file line), `-`
+   lines on `LEFT` (old-file line).
+3. Partition findings into **postable** (line ∈ the matching side's set) and **unmappable**.
+
+```bash
+python3 << 'PYEOF'
+import json, re
+
+# Fill in from 6.1: changed files with their UNTRUNCATED patch/diff text, and the
+# Step 5 findings (path, line, side, severity, body, optional suggestion).
+FILES = {
+    "{path}": r"""{untruncated_patch_or_diff_text}""",
+}
+FINDINGS = [
+    {"path": "{path}", "line": 0, "side": "RIGHT", "severity": "IMPORTANT",
+     "body": "{finding text}", "suggestion": None},
+]
+
+HUNK_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+def valid_lines(patch):
+    """Return (right_lines, left_lines) sets that exist in the diff."""
+    right, left = set(), set()
+    old_ln = new_ln = 0
+    for raw in patch.splitlines():
+        m = HUNK_RE.match(raw)
+        if m:
+            old_ln, new_ln = int(m.group(1)), int(m.group(2))
+            continue
+        if not raw:
+            continue
+        tag = raw[0]
+        if tag == " ":
+            right.add(new_ln); left.add(old_ln); new_ln += 1; old_ln += 1
+        elif tag == "+":
+            right.add(new_ln); new_ln += 1
+        elif tag == "-":
+            left.add(old_ln); old_ln += 1
+        # '\ No newline at end of file' and any other lines: ignore
+    return right, left
+
+maps = {p: valid_lines(patch) for p, patch in FILES.items()}
+postable, unmappable = [], []
+for f in FINDINGS:
+    right, left = maps.get(f["path"], (set(), set()))
+    side = f.get("side", "RIGHT")
+    pool = right if side == "RIGHT" else left
+    # validate both endpoints: a multi-line comment's start_line must also be in the diff,
+    # or GitHub 422s and rejects the entire atomic review.
+    ok = f.get("line") in pool and (f.get("start_line") is None or f["start_line"] in pool)
+    (postable if ok else unmappable).append(f)
+
+print(f"POSTABLE (inline): {len(postable)}")
+for f in postable:
+    print(f"  {f['path']}:{f['line']} [{f.get('side','RIGHT')}] {f['body'][:80]}")
+print(f"UNMAPPABLE (-> summary): {len(unmappable)}")
+for f in unmappable:
+    print(f"  {f['path']}:{f.get('line','?')} {f['body'][:80]}")
+print(json.dumps({"postable": postable, "unmappable": unmappable}))
+PYEOF
+```
+
+### 6.2 Format comments
+
+- **Postable findings → inline comments.** If a finding has a concrete `suggestion`, build the
+  body as the finding text followed by a one-click suggestion block (works on both GitHub and
+  GitLab); otherwise plain text:
+
+  ````
+  {finding text} [severity]
+
+  ```suggestion
+  {replacement code}
+  ```
+  ````
+
+- **Unmappable findings → summary body.** Never drop them and never let them block the post.
+  List them in the summary as `path:line — text` with their line URL so the user can place them
+  by hand.
+- **Summary body** = the Step 5 verdict + 1-2 sentence overview + the unmappable-findings list.
+- **Author the comments as the user.** The review is posted under the user's own account, so it
+  must read as their own words. Do NOT add tool/AI/skill attribution, "posted via" / "generated
+  by" lines, emoji sign-offs, "dogfooding"/"feature under test" meta-commentary, or any mention of
+  CocoSearch or this skill. Just the findings and the verdict — nothing about how they were produced.
+
+### 6.3 Dry-run preview (mandatory)
+
+Print, and do not post yet:
+
+```
+Target: {GitHub|GitLab} {owner/repo|host/id} #{number/iid} @ {head_sha}
+Event:  COMMENT (comment-only — does not approve or request changes)
+
+Inline comments ({N}):
+  src/foo.py:42 [RIGHT] — Off-by-one in loop bound [IMPORTANT]  -> {line_url}
+      (suggestion: range(n) -> range(n + 1))
+  ...
+
+Findings going into the summary ({M}, not anchorable to the diff):
+  src/bar.py:integration — extract shared helper  -> {line_url}
+
+Summary body:
+  {full summary text}
+```
+
+For GitHub, also print the literal JSON payload so there are no surprises.
+
+### 6.4 Single confirmation
+
+Ask: **"Post these {N} inline comments + summary as a COMMENT review? (yes/no)"** Only proceed on
+an explicit yes.
+
+### 6.5 Post
+
+#### GitHub — single atomic review
+
+One `POST /pulls/{number}/reviews` carries the summary + all inline comments and shows up as one
+review/notification. Pre-validation in 6.1 prevents the 422 that a single off-diff line would
+otherwise trigger for the whole review.
+
+```bash
+python3 << 'PYEOF'
+import json, os, sys, urllib.request, urllib.error
+
+token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN", "")
+if not token:
+    print("Error: No GitHub token found (checked GITHUB_TOKEN, GH_TOKEN)", file=sys.stderr)
+    sys.exit(1)
+
+# Filled in from 6.2/6.4. EVENT stays COMMENT (comment-only policy).
+EVENT = "COMMENT"
+COMMIT_ID = "{head_sha}"           # pin to the reviewed revision; set to "" to target latest
+SUMMARY_BODY = r"""{summary_markdown}"""
+COMMENTS = [
+    # single-line on added/current code:
+    {"path": "{path}", "line": 0, "side": "RIGHT", "body": "{comment_body}"},
+    # multi-line: add "start_line"/"start_side" alongside "line"/"side"
+    # on removed code: "side": "LEFT"
+]
+
+payload = {"event": EVENT, "body": SUMMARY_BODY, "comments": COMMENTS}
+if COMMIT_ID:
+    payload["commit_id"] = COMMIT_ID
+
+url = "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/reviews"
+req = urllib.request.Request(
+    url, data=json.dumps(payload).encode(), method="POST",
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+    },
+)
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode())
+        print(f"Posted review ({len(COMMENTS)} inline comments, event={EVENT}): {data.get('html_url')}")
+except urllib.error.HTTPError as e:
+    body = e.read().decode()
+    if e.code == 403:
+        print("GitHub 403: token lacks write scope. Classic PAT needs 'repo'; "
+              "fine-grained PAT needs 'Pull requests: Read and write'.", file=sys.stderr)
+    elif e.code == 422:
+        print("GitHub 422: a comment targets a line not in the diff (or bad start_line/line "
+              "order). Nothing was posted -- drop the offending line or move it to the summary.",
+              file=sys.stderr)
+        print(body, file=sys.stderr)
+    else:
+        print(f"GitHub API error {e.code}: {body}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+```
+
+#### GitLab — discussions + summary note
+
+GitLab has no atomic batch: post each inline comment as its own discussion, collect any per-comment
+failures, then post the summary note last (appending failures to it). Inline positions need the
+`diff_refs` SHAs captured in Step 1.
+
+```bash
+python3 << 'PYEOF'
+import json, os, sys, urllib.parse, urllib.request, urllib.error
+
+token = os.environ.get("GITLAB_TOKEN") or os.environ.get("GITLAB_PAT", "")
+if not token:
+    print("Error: No GitLab token found (checked GITLAB_TOKEN, GITLAB_PAT)", file=sys.stderr)
+    sys.exit(1)
+
+# diff_refs from Step 1 MR metadata:
+BASE_SHA, START_SHA, HEAD_SHA = "{base_sha}", "{start_sha}", "{head_sha}"
+
+# Filled in from 6.2/6.4. Set new_line for added/context lines, old_line for removed lines.
+# Path handling per file status (from the Step 1 diff flags):
+#   - modified:     new_path == old_path
+#   - renamed_file: new_path != old_path (set both)
+#   - new_file:     omit old_path (None) -- there is no old side; comment with new_line
+#   - deleted_file: omit new_path (None) -- comment with old_line on old_path
+INLINE = [
+    {"new_path": "{path}", "old_path": "{path}",
+     "new_line": 0, "old_line": None, "body": "{comment_body}"},
+]
+SUMMARY_BODY = r"""{summary_markdown}"""
+
+API = "https://{host}/api/v4/projects/{id}/merge_requests/{iid}"
+
+def post(path, form):
+    req = urllib.request.Request(
+        API + path, data=urllib.parse.urlencode(form, doseq=True).encode(), method="POST",
+        headers={"PRIVATE-TOKEN": token, "Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode())
+
+posted, failed = 0, []
+try:
+    for c in INLINE:
+        form = {"body": c["body"],
+                "position[position_type]": "text",
+                "position[base_sha]": BASE_SHA,
+                "position[start_sha]": START_SHA,
+                "position[head_sha]": HEAD_SHA}
+        # Only send the path sides that exist for this file (see INLINE note above).
+        if c.get("new_path") is not None:
+            form["position[new_path]"] = c["new_path"]
+        if c.get("old_path") is not None:
+            form["position[old_path]"] = c["old_path"]
+        if c.get("new_line") is not None:
+            form["position[new_line]"] = c["new_line"]
+        if c.get("old_line") is not None:
+            form["position[old_line]"] = c["old_line"]
+        try:
+            post("/discussions", form)
+            posted += 1
+        except urllib.error.HTTPError as e:
+            failed.append((c, e.code, e.read().decode()[:200]))
+
+    summary = SUMMARY_BODY
+    if failed:
+        summary += "\n\n---\nInline comments that could not be anchored to the diff:\n"
+        summary += "\n".join(f"- {c['new_path']}:{c.get('new_line') or c.get('old_line')} — {c['body'][:120]}"
+                             for c, _, _ in failed)
+    note = post("/notes", {"body": summary})
+    print(f"Posted {posted} inline discussions + summary note (id={note.get('id')}).")
+    for c, code, b in failed:
+        print(f"  inline failed [{code}] {c['new_path']}:{c.get('new_line') or c.get('old_line')}: {b}",
+              file=sys.stderr)
+except urllib.error.HTTPError as e:
+    body = e.read().decode()
+    if e.code in (401, 403):
+        print("GitLab 401/403: token lacks 'api' (read-write) scope. 'read_api' cannot post -- "
+              "create a token with 'api' scope.", file=sys.stderr)
+    else:
+        print(f"GitLab API error {e.code}: {body}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+```
+
+### 6.6 After posting
+
+- On success, print the posted review/note URL.
+- On a scope error (GitHub 403 / GitLab 401/403): report the message above and stop — do not
+  retry. GitHub's review is atomic (nothing partial); a GitLab top-level 403 means nothing posted.
+- If GitHub returns 422 despite pre-validation, drop the line GitHub names (or move it to the
+  summary) and re-run; do not loop blindly.
+
+## Branch Cleanup
+
+After presenting the review (and any push), handle branch lifecycle cleanup.
 
 1. **If `SWITCHED_BRANCH=false`:** Skip -- nothing to clean up.
 
@@ -540,6 +860,9 @@ After presenting the review, handle branch lifecycle cleanup.
 - **Branch lifecycle.** The workflow automatically offers to switch to the PR's branch for accurate analysis and switch back when done. If you skip the switch, blast radius results are based on your current branch.
 - **Large PRs benefit from scoping.** Ask the user to focus on specific areas rather than reviewing 50+ files superficially.
 - **Re-index if stale.** Blast radius analysis is only as good as the index. If the codebase changed significantly since last index, reindex first.
+- **Pushing comments is opt-in and always previews.** Step 6 never posts without the dry-run + an explicit yes, and it's comment-only — it never approves or requests changes on your behalf.
+- **Line URLs work even without posting.** Every finding carries a clickable line link, so the user can hand-place comments if they decline the auto-post or for findings that don't map onto a diff line.
+- **Posted comments are the user's, not the tool's.** Never attach attribution, "posted via", AI/skill mentions, or sign-off emoji to anything you post — the review reads as the user's own.
 
 For common search tips (hybrid search, smart_context, symbol filtering), see `skills/README.md`.
 
