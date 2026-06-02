@@ -50,6 +50,18 @@ search: {}
 embedding: {}
   # Ollama model for embeddings
   # model: nomic-embed-text
+
+# Optional query-rewrite controller (default: disabled)
+# An LLM expands vague natural-language queries into better search terms before
+# retrieval (e.g. "how does login work" -> "authentication session credential
+# login user token"). When disabled, search is byte-for-byte identical and no
+# generative model is ever called. Configured just like the embedding provider.
+# controller:
+#   enabled: false
+#   provider: ollama        # ollama (default), openai, openrouter
+#   model: qwen2.5:3b       # default depends on provider
+#   # baseUrl: http://localhost:11434   # custom / OpenAI-compatible endpoint
+#   # timeout: 5.0          # seconds; falls back to the original query on timeout
 """
 
 

@@ -13,6 +13,7 @@ from cocosearch.config import (
     COCOSEARCH_MCP_TOOL_PERMISSIONS,
     COCOSEARCH_NUDGE_MARKER,
     CONFIG_TEMPLATE,
+    CocoSearchConfig,
     ConfigError,
     check_claude_plugin_installed,
     generate_agents_md_routing,
@@ -65,6 +66,30 @@ def test_config_template_contains_linked_indexes_comment():
     assert "linkedIndexes" in CONFIG_TEMPLATE
     assert "shared-lib" in CONFIG_TEMPLATE
     assert "common-utils" in CONFIG_TEMPLATE
+
+
+def test_config_template_contains_controller_comment():
+    """Test that CONFIG_TEMPLATE documents the optional query-rewrite controller."""
+    assert "# controller:" in CONFIG_TEMPLATE
+    assert "enabled: false" in CONFIG_TEMPLATE
+    assert "provider: ollama" in CONFIG_TEMPLATE
+    assert "qwen2.5:3b" in CONFIG_TEMPLATE
+
+
+def test_config_template_controller_example_is_schema_valid():
+    """The commented controller example must validate against ControllerSection
+    once uncommented — guards the docs from drifting out of sync with the schema."""
+    lines = CONFIG_TEMPLATE.splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.strip() == "# controller:")
+    # Uncomment one level: strip a single leading "# " from each block line.
+    # baseUrl/timeout are double-commented, so they stay commented (optional).
+    block = [ln[2:] if ln.startswith("# ") else ln for ln in lines[start:]]
+    data = yaml.safe_load("\n".join(block))
+
+    config = CocoSearchConfig(**data)
+    assert config.controller.enabled is False
+    assert config.controller.provider == "ollama"
+    assert config.controller.model == "qwen2.5:3b"
 
 
 class TestClaudeMdRouting:
