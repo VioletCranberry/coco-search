@@ -650,6 +650,10 @@ PYEOF
   List them in the summary as `path:line — text` with their line URL so the user can place them
   by hand.
 - **Summary body** = the Step 5 verdict + 1-2 sentence overview + the unmappable-findings list.
+- **Author the comments as the user.** The review is posted under the user's own account, so it
+  must read as their own words. Do NOT add tool/AI/skill attribution, "posted via" / "generated
+  by" lines, emoji sign-offs, "dogfooding"/"feature under test" meta-commentary, or any mention of
+  CocoSearch or this skill. Just the findings and the verdict — nothing about how they were produced.
 
 ### 6.3 Dry-run preview (mandatory)
 
@@ -858,6 +862,7 @@ After presenting the review (and any push), handle branch lifecycle cleanup.
 - **Re-index if stale.** Blast radius analysis is only as good as the index. If the codebase changed significantly since last index, reindex first.
 - **Pushing comments is opt-in and always previews.** Step 6 never posts without the dry-run + an explicit yes, and it's comment-only — it never approves or requests changes on your behalf.
 - **Line URLs work even without posting.** Every finding carries a clickable line link, so the user can hand-place comments if they decline the auto-post or for findings that don't map onto a diff line.
+- **Posted comments are the user's, not the tool's.** Never attach attribution, "posted via", AI/skill mentions, or sign-off emoji to anything you post — the review reads as the user's own.
 
 For common search tips (hybrid search, smart_context, symbol filtering), see `skills/README.md`.
 
