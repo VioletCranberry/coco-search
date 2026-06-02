@@ -292,3 +292,25 @@ def test_crt_effects_disabled_in_light_mode():
     assert ':root[data-theme="light"] body::after' in content, (
         "Missing rule to hide body::after vignette in light mode"
     )
+
+
+def test_warning_banner_has_index_name_chip(soup):
+    """The warning banner header must carry the index-name chip span so the
+    dashboard can show which index the warnings belong to."""
+    banner = soup.find(id="warningBanner")
+    assert banner is not None, "warningBanner element missing"
+    chip = banner.find(id="warningIndexName")
+    assert chip is not None, "warningIndexName chip span missing from warning banner"
+    assert "warning-index-chip" in chip.get("class", []), (
+        "warningIndexName span missing the warning-index-chip class"
+    )
+    # The literal 'Index Warnings' header text must remain alongside the chip
+    assert "Index Warnings" in banner.get_text()
+
+
+def test_warning_index_chip_styled():
+    """styles.css must define the .warning-index-chip rule (monospace pill)."""
+    content = (CSS_DIR / "styles.css").read_text()
+    assert ".warning-index-chip {" in content, (
+        "Missing .warning-index-chip rule in styles.css"
+    )
