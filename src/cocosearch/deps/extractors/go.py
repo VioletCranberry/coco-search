@@ -11,19 +11,14 @@ Handles all standard import forms:
 """
 
 from tree_sitter import Parser
-from tree_sitter_language_pack import get_parser
 
 from cocosearch.deps.models import DependencyEdge, DepType
-
-_parser: Parser | None = None
+from cocosearch.ts_parsers import get_parser
 
 
 def _get_parser() -> Parser:
-    """Get or create the cached Go tree-sitter parser."""
-    global _parser
-    if _parser is None:
-        _parser = get_parser("go")
-    return _parser
+    """Get the Go tree-sitter parser (cached per thread)."""
+    return get_parser("go")
 
 
 def _node_text(source: bytes, node) -> str:

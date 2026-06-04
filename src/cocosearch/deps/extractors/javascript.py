@@ -12,29 +12,18 @@ Handles all standard import forms:
 """
 
 from tree_sitter import Parser
-from tree_sitter_language_pack import get_parser
 
 from cocosearch.deps.models import DependencyEdge, DepType
-
-# Lazy parser caches (one per grammar)
-_js_parser: Parser | None = None
-_ts_parser: Parser | None = None
+from cocosearch.ts_parsers import get_parser
 
 _TS_EXTENSIONS = frozenset({"ts", "tsx", "mts", "cts"})
 
 
 def _get_parser(ext: str) -> Parser:
-    """Get or create the cached tree-sitter parser for the given extension."""
-    global _js_parser, _ts_parser
-
+    """Get the tree-sitter parser for the given extension (cached per thread)."""
     if ext in _TS_EXTENSIONS:
-        if _ts_parser is None:
-            _ts_parser = get_parser("typescript")
-        return _ts_parser
-
-    if _js_parser is None:
-        _js_parser = get_parser("javascript")
-    return _js_parser
+        return get_parser("typescript")
+    return get_parser("javascript")
 
 
 def _node_text(source: bytes, node) -> str:

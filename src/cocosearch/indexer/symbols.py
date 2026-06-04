@@ -30,8 +30,10 @@ import dataclasses
 import logging
 import importlib.resources
 from pathlib import Path
-from tree_sitter import Parser, Query, QueryCursor
-from tree_sitter_language_pack import get_parser as pack_get_parser, get_language
+from tree_sitter import Query, QueryCursor
+from tree_sitter_language_pack import get_language
+
+from cocosearch.ts_parsers import get_parser
 
 logger = logging.getLogger(__name__)
 
@@ -102,33 +104,6 @@ LANGUAGE_MAP = {
     # Dockerfile
     "dockerfile": "dockerfile",
 }
-
-# ============================================================================
-# Module-level parser cache (lazy, one-time setup per language)
-# ============================================================================
-
-_PARSERS: dict[str, Parser] = {}
-
-
-def _get_parser(language: str) -> Parser:
-    """Get or initialize a tree-sitter parser for the given language.
-
-    Lazy initialization to avoid overhead if language not used.
-    Parsers are cached by tree-sitter language name (not file extension).
-
-    Args:
-        language: Tree-sitter language name (e.g., "python", "javascript").
-
-    Returns:
-        Parser configured for the specified language.
-    """
-    global _PARSERS
-
-    if language not in _PARSERS:
-        _PARSERS[language] = pack_get_parser(language)
-
-    return _PARSERS[language]
-
 
 # ============================================================================
 # Query File Resolution
@@ -391,7 +366,7 @@ def _extract_symbols_with_query(
         List of symbol dicts with symbol_type, symbol_name, symbol_signature.
     """
     lang = get_language(language)
-    parser = _get_parser(language)
+    parser = get_parser(language)
     tree = parser.parse(bytes(chunk_text, "utf8"))
 
     query = Query(lang, query_text)

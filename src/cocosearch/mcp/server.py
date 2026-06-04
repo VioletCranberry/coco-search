@@ -748,7 +748,11 @@ async def api_reindex(request) -> JSONResponse:
                         deps_extracted = True
                     except Exception as e:
                         logger.warning(f"Dependency extraction failed: {e}")
-            except Exception as exc:
+            except BaseException as exc:
+                # BaseException (not just Exception) so a pyo3 PanicException —
+                # e.g. a tree-sitter parser used off its creating thread — can't
+                # silently kill this worker and leave the index stuck in
+                # "indexing" forever. The finally block resets status to "error".
                 failed = True
                 logger.error(f"Background reindex failed: {exc}")
             finally:

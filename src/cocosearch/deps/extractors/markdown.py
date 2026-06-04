@@ -14,13 +14,9 @@ import re
 
 import yaml
 from tree_sitter import Parser
-from tree_sitter_language_pack import get_parser
 
 from cocosearch.deps.models import DependencyEdge, DepType
-
-# Module-level parser caches (lazy, one-time setup)
-_md_parser: Parser | None = None
-_inline_parser: Parser | None = None
+from cocosearch.ts_parsers import get_parser
 
 # Pattern for path-like strings in code blocks (comment lines)
 _CODE_BLOCK_PATH_RE = re.compile(
@@ -91,19 +87,13 @@ _PATH_EXTENSIONS = frozenset(
 
 
 def _get_md_parser() -> Parser:
-    """Get or create the cached Markdown tree-sitter parser."""
-    global _md_parser
-    if _md_parser is None:
-        _md_parser = get_parser("markdown")
-    return _md_parser
+    """Get the Markdown tree-sitter parser (cached per thread)."""
+    return get_parser("markdown")
 
 
 def _get_inline_parser() -> Parser:
-    """Get or create the cached Markdown inline tree-sitter parser."""
-    global _inline_parser
-    if _inline_parser is None:
-        _inline_parser = get_parser("markdown_inline")
-    return _inline_parser
+    """Get the Markdown inline tree-sitter parser (cached per thread)."""
+    return get_parser("markdown_inline")
 
 
 def _node_text(source: bytes, node) -> str:
