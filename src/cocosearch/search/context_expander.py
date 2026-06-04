@@ -16,7 +16,8 @@ from functools import lru_cache
 from pathlib import Path
 
 from tree_sitter import Parser
-from tree_sitter_language_pack import get_language
+
+from cocosearch.ts_parsers import get_parser
 
 logger = logging.getLogger(__name__)
 
@@ -165,8 +166,9 @@ class ContextExpander:
     """Manages context expansion with caching.
 
     Provides smart context expansion using tree-sitter to find enclosing
-    function/class boundaries. Caches file content and parser instances
-    for efficient repeated access during search sessions.
+    function/class boundaries. Caches file content per instance and reuses
+    thread-local tree-sitter parsers for efficient repeated access during
+    search sessions.
 
     Usage:
         expander = ContextExpander()
@@ -182,24 +184,24 @@ class ContextExpander:
 
     def __init__(self):
         """Initialize context expander with empty caches."""
-        self._parsers: dict[str, Parser] = {}
         # Create instance-level LRU cache for file reading
         self._read_file_cached = lru_cache(maxsize=128)(self._read_file_impl)
 
     def _get_parser(self, language: str) -> Parser:
-        """Get or create parser for language.
+        """Get a tree-sitter parser for the language (cached per thread).
+
+        Delegates to the centralized thread-local provider rather than caching
+        on the instance: tree-sitter ``Parser`` objects are unsendable across
+        threads, so a ContextExpander shared across a thread pool must never
+        hand a parser from one thread to another. See :mod:`cocosearch.ts_parsers`.
 
         Args:
             language: Tree-sitter language name.
 
         Returns:
-            Parser instance configured for the language.
+            Parser instance configured for the language, owned by this thread.
         """
-        if language not in self._parsers:
-            lang = get_language(language)
-            parser = Parser(lang)
-            self._parsers[language] = parser
-        return self._parsers[language]
+        return get_parser(language)
 
     def _read_file_impl(self, filepath: str) -> list[str]:
         """Read file lines (implementation for LRU cache).

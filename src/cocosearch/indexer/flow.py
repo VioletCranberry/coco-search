@@ -14,6 +14,7 @@ import hashlib
 import os
 import pathlib
 import logging
+from collections.abc import Callable
 
 import pathspec
 import psycopg
@@ -239,6 +240,7 @@ def run_index(
     respect_gitignore: bool = True,
     fresh: bool = False,
     stop_event=None,
+    progress_callback: Callable[[int, int, int], None] | None = None,
 ):
     """Run indexing for a codebase.
 
@@ -257,6 +259,11 @@ def run_index(
         fresh: If True, drop and recreate all tables.
         stop_event: Optional threading.Event checked between files to allow
             cancellation from the dashboard or MCP server.
+        progress_callback: Optional callable invoked as
+            ``progress_callback(files_done, files_total, chunks_total)`` at the
+            start and at the same cadence as progress logging. Lets callers
+            (e.g. the dashboard) surface live indexing progress. Exceptions
+            raised by the callback are swallowed so it can never break indexing.
 
     Returns:
         Dict with indexing statistics.
@@ -377,9 +384,20 @@ def run_index(
     # capped so large repos don't spam).
     progress_step = max(1, min(50, total_to_index // 10 or 1))
 
+    def _report_progress(done: int, chunks: int) -> None:
+        """Invoke the caller's progress_callback, never letting it break indexing."""
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(done, total_to_index, chunks)
+        except Exception as e:  # pragma: no cover - defensive
+            logger.debug("progress_callback raised: %s", e)
+
     chunks_total = 0
     files_indexed = 0
     cancelled = False
+    # Emit an initial 0/total so the dashboard can show the work scope at once.
+    _report_progress(0, 0)
     with psycopg.connect(db_url) as conn:
         register_vector(conn)
         tracking_table = f"cocosearch_index_tracking_{index_name}"
@@ -413,6 +431,7 @@ def run_index(
                         files=f"{files_indexed}/{total_to_index}",
                         chunks=chunks_total,
                     )
+                    _report_progress(files_indexed, chunks_total)
 
                 with conn.cursor() as cur:
                     cur.execute(
