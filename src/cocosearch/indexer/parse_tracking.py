@@ -14,8 +14,8 @@ import logging
 from pathlib import Path
 
 import psycopg
-from tree_sitter_language_pack import get_parser as pack_get_parser
 
+from cocosearch.ts_parsers import get_parser
 from cocosearch.indexer.symbols import LANGUAGE_MAP
 from cocosearch.handlers import get_registered_grammars
 from cocosearch.validation import validate_index_name
@@ -74,7 +74,7 @@ def detect_parse_status(file_content: str, language_ext: str) -> tuple[str, str 
         return ("no_grammar", None)
 
     try:
-        parser = pack_get_parser(ts_language)
+        parser = get_parser(ts_language)
         tree = parser.parse(bytes(file_content, "utf8"))
 
         if not tree.root_node.has_error:
