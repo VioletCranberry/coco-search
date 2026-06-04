@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 _active_indexing: dict[str, tuple[threading.Thread, threading.Event]] = {}
 _indexing_lock = threading.Lock()
+# Live indexing progress per index, surfaced on the dashboard status card via
+# /api/stats while an index is being (re)built. Guarded by _indexing_lock.
+# Shape: {index_name: {"files_done": int, "files_total": int, "chunks": int}}
+_indexing_progress: dict[str, dict[str, int]] = {}
 _last_activity: float = _time.monotonic()
 _IDLE_TIMEOUT_DEFAULT = 1800  # 30 minutes
 _COCOINDEX_RETRY_COOLDOWN = 30.0  # seconds before retrying after failure
@@ -143,15 +147,36 @@ def _apply_thread_liveness_status(
     """
     with _indexing_lock:
         entry = _active_indexing.get(index_name)
+        progress = _indexing_progress.get(index_name)
     if entry is not None:
         thread, _cancel = entry
         if thread.is_alive():
             result["status"] = "indexing"
+            if progress is not None:
+                result["indexing_progress"] = dict(progress)
             if db_status != "indexing":
                 try:
                     set_index_status(index_name, "indexing", update_timestamp=False)
                 except Exception:
                     pass
+
+
+def _set_indexing_progress(
+    index_name: str, files_done: int, files_total: int, chunks: int
+) -> None:
+    """Record live indexing progress for the dashboard status card."""
+    with _indexing_lock:
+        _indexing_progress[index_name] = {
+            "files_done": files_done,
+            "files_total": files_total,
+            "chunks": chunks,
+        }
+
+
+def _clear_indexing_progress(index_name: str) -> None:
+    """Drop live indexing progress once (re)indexing finishes."""
+    with _indexing_lock:
+        _indexing_progress.pop(index_name, None)
 
 
 def _register_with_git(index_name: str, project_path: str) -> None:
@@ -737,6 +762,9 @@ async def api_reindex(request) -> JSONResponse:
                     config=IndexingConfig(),
                     fresh=fresh,
                     stop_event=cancel_event,
+                    progress_callback=lambda done, total, chunks: (
+                        _set_indexing_progress(index_name, done, total, chunks)
+                    ),
                 )
                 _register_with_git(index_name, source_path)
                 # Always extract dependencies after indexing
@@ -769,6 +797,7 @@ async def api_reindex(request) -> JSONResponse:
                         logger.warning(
                             f"Failed to update status for '{index_name}': {e}"
                         )
+                _clear_indexing_progress(index_name)
                 with _indexing_lock:
                     entry = _active_indexing.get(index_name)
                     if entry is not None and entry[1] is cancel_event:
@@ -994,6 +1023,9 @@ async def api_index(request) -> JSONResponse:
                     respect_gitignore=not no_gitignore,
                     fresh=fresh,
                     stop_event=cancel_event,
+                    progress_callback=lambda done, total, chunks: (
+                        _set_indexing_progress(index_name, done, total, chunks)
+                    ),
                 )
                 _register_with_git(index_name, project_path)
                 # Always extract dependencies after indexing
@@ -1004,7 +1036,11 @@ async def api_index(request) -> JSONResponse:
                         extract_dependencies(index_name, project_path)
                     except Exception as e:
                         logger.warning(f"Dependency extraction failed: {e}")
-            except Exception as exc:
+            except BaseException as exc:
+                # BaseException (not just Exception) so a pyo3 PanicException —
+                # e.g. a tree-sitter parser used off its creating thread — can't
+                # silently kill this worker and leave the index stuck in
+                # "indexing" forever. The finally block resets status to "error".
                 failed = True
                 logger.error(f"Background indexing failed: {exc}")
             finally:
@@ -1019,6 +1055,7 @@ async def api_index(request) -> JSONResponse:
                         logger.warning(
                             f"Failed to update status for '{index_name}': {e}"
                         )
+                _clear_indexing_progress(index_name)
                 with _indexing_lock:
                     entry = _active_indexing.get(index_name)
                     if entry is not None and entry[1] is cancel_event:

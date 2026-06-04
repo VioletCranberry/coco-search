@@ -156,6 +156,38 @@ class TestRunIndex:
 
         assert result["files_indexed"] < 10
 
+    def test_progress_callback_reports_files_and_chunks(self, tmp_path, _mock_db):
+        """run_index invokes progress_callback with (done, total, chunks)."""
+        from cocosearch.indexer.flow import run_index
+
+        for i in range(3):
+            (tmp_path / f"file{i}.py").write_text(f"x = {i}\n")
+
+        calls = []
+
+        with patch(
+            "cocosearch.indexer.flow.embed_batch",
+            side_effect=lambda texts: [[0.1] * 768] * len(texts),
+        ):
+            with patch(
+                "cocosearch.management.metadata.get_index_metadata", return_value=None
+            ):
+                with patch("cocosearch.indexer.flow.invalidate_index_cache"):
+                    with patch("cocosearch.indexer.flow.track_parse_results"):
+                        run_index(
+                            index_name="testindex",
+                            codebase_path=str(tmp_path),
+                            progress_callback=lambda done, total, chunks: calls.append(
+                                (done, total, chunks)
+                            ),
+                        )
+
+        assert calls, "progress_callback was never invoked"
+        # Total is always the file count; final call reports all files done.
+        assert all(total == 3 for _done, total, _chunks in calls)
+        final_done, _final_total, _final_chunks = calls[-1]
+        assert final_done == 3
+
 
 class TestCustomLanguageIntegration:
     """Tests for custom language integration in flow module."""

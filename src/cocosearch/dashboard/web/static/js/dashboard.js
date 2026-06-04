@@ -162,9 +162,15 @@ export function updateSummaryCards(stats) {
     const isStaleState = status === 'indexed' &&
         (stats.is_stale || (stats.commits_behind !== null && stats.commits_behind > 0));
     if (status === 'indexing') {
-        statusEl.textContent = 'Indexing...';
+        const prog = stats.indexing_progress;
+        if (prog && prog.files_total > 0) {
+            statusEl.textContent = `${formatNumber(prog.files_done)}/${formatNumber(prog.files_total)}`;
+            statusLabelEl.textContent = `${formatNumber(prog.chunks)} chunks · indexing`;
+        } else {
+            statusEl.textContent = 'Indexing...';
+            statusLabelEl.textContent = 'In progress';
+        }
         statusEl.style.color = 'var(--accent-orange)';
-        statusLabelEl.textContent = 'In progress';
     } else if (status === 'error') {
         statusEl.textContent = 'Error';
         statusEl.style.color = 'var(--accent-red, #ef4444)';

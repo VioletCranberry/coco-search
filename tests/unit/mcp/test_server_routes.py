@@ -1508,3 +1508,63 @@ class TestApiStopIndexing:
         finally:
             keep_alive.set()
             thread.join(timeout=1)
+
+
+class TestIndexingProgress:
+    """Live indexing progress surfaced via _apply_thread_liveness_status."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_state(self):
+        from cocosearch.mcp import server as srv
+
+        srv._active_indexing.clear()
+        srv._indexing_progress.clear()
+        yield
+        srv._active_indexing.clear()
+        srv._indexing_progress.clear()
+
+    def test_set_and_clear_progress(self):
+        from cocosearch.mcp import server as srv
+
+        srv._set_indexing_progress("myindex", 9, 10, 332)
+        assert srv._indexing_progress["myindex"] == {
+            "files_done": 9,
+            "files_total": 10,
+            "chunks": 332,
+        }
+        srv._clear_indexing_progress("myindex")
+        assert "myindex" not in srv._indexing_progress
+
+    def test_progress_attached_when_indexing(self):
+        """While the index thread is alive, stats gain indexing_progress."""
+        from cocosearch.mcp import server as srv
+        from cocosearch.mcp.server import _apply_thread_liveness_status
+
+        keep_alive = threading.Event()
+        thread = threading.Thread(target=keep_alive.wait)
+        thread.start()
+        try:
+            srv._active_indexing["myindex"] = (thread, threading.Event())
+            srv._set_indexing_progress("myindex", 9, 10, 332)
+
+            result = {"status": "indexed"}
+            with patch("cocosearch.mcp.server.set_index_status"):
+                _apply_thread_liveness_status("myindex", result, "indexing")
+
+            assert result["status"] == "indexing"
+            assert result["indexing_progress"] == {
+                "files_done": 9,
+                "files_total": 10,
+                "chunks": 332,
+            }
+        finally:
+            keep_alive.set()
+            thread.join(timeout=1)
+
+    def test_no_progress_key_when_not_indexing(self):
+        """No active thread → no indexing_progress key on the stats dict."""
+        from cocosearch.mcp.server import _apply_thread_liveness_status
+
+        result = {"status": "indexed"}
+        _apply_thread_liveness_status("myindex", result, "indexed")
+        assert "indexing_progress" not in result
