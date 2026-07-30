@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
     "cocoindex>=1.0.1,<2.0",
     "litellm>=1.81.0",
-    "mcp[cli]>=1.26.0",
+    "mcp[cli]>=1.26.0,<2.0.0",
     "pathspec>=1.0.3",
     "pgvector>=0.4.2",
     "psycopg[binary,pool]>=3.3.2",
@@ -69,7 +69,7 @@ dev = [
     "pytest-mock>=3.15.1",
     "pytest-subprocess>=1.5.3",
     "pytest-timeout>=2.3.1",
-    "ruff>=0.14.14",
+    "ruff>=0.14.14,<0.16",
 ]
 
 [tool.pytest.ini_options]

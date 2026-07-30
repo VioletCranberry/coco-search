@@ -59,11 +59,15 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
 
+      # Pinned: `uvx ruff` is unversioned and resolves to the newest release, so
+      # 0.16.0 (2026-07-23) expanded the default rule set under us and turned
+      # Lint red on every PR. Keep in step with the dev-group cap in
+      # pyproject.toml so CI and local runs agree.
       - name: Ruff check
-        run: uvx ruff check src/ tests/
+        run: uvx ruff@0.15.0 check src/ tests/
 
       - name: Ruff format check
-        run: uvx ruff format --check src/ tests/
+        run: uvx ruff@0.15.0 format --check src/ tests/
 
   validate-versions:
     name: Validate Versions
