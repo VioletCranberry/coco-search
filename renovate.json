@@ -2,5 +2,21 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "Hold mcp below 2.0. The 2.0 SDK removed mcp.server.fastmcp (renamed to mcp.server.mcpserver, FastMCP to MCPServer), which src/cocosearch/mcp/server.py and mcp/project_detection.py import from. An unbounded range let uvx resolve 2.0.0 and the server died at import, surfacing only as '-32000: Connection closed'. Lift this together with the port to MCPServer.",
+      "matchPackageNames": [
+        "mcp"
+      ],
+      "allowedVersions": "<2.0.0"
+    },
+    {
+      "description": "Hold ruff below 0.16. The 0.16 release expanded its default rule selection, and with no [tool.ruff] section in this repo we run on defaults, so the new rules applied retroactively to the whole tree: 1087 findings, led by RUF059, SIM117 and BLE001. Lift this together with an explicit select list and the resulting fixes.",
+      "matchPackageNames": [
+        "ruff"
+      ],
+      "allowedVersions": "<0.16"
+    }
   ]
 }
