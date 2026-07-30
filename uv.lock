@@ -433,7 +433,7 @@ dev = [
     { name = "pytest-mock", specifier = ">=3.15.1" },
     { name = "pytest-subprocess", specifier = ">=1.5.3" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
-    { name = "ruff", specifier = ">=0.14.14" },
+    { name = "ruff", specifier = ">=0.14.14,<0.16" },
 ]
 
 [[package]]
