@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -414,7 +414,7 @@ dev = [
 requires-dist = [
     { name = "cocoindex", specifier = ">=1.0.1,<2.0" },
     { name = "litellm", specifier = ">=1.81.0" },
-    { name = "mcp", extras = ["cli"], specifier = ">=1.26.0" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.26.0,<2.0.0" },
     { name = "pathspec", specifier = ">=1.0.3" },
     { name = "pgvector", specifier = ">=0.4.2" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.2" },
