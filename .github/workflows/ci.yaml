@@ -28,6 +28,13 @@ jobs:
               - 'tests/**'
               - 'pyproject.toml'
               - 'uv.lock'
+              # A change to the workflows or to the interpreter version can
+              # break lint and tests without touching a line of src/. Left out
+              # of this filter, such a PR skips every job and reports all
+              # checks green having run none of them.
+              - '.github/workflows/**'
+              - '.python-version'
+              - 'Dockerfile'
             versions:
               - 'pyproject.toml'
               - 'src/cocosearch/__init__.py'
