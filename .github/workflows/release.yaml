@@ -49,11 +49,15 @@ jobs:
           enable-cache: true
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Pinned to match ci.yaml and the dev-group cap in pyproject.toml.
+      # Unversioned `uvx ruff` resolves to the newest release, and 0.16.0
+      # expanded the default rule set — here that would fail `test`, which
+      # publish-testpypi depends on, so a release would build nothing.
       - name: Ruff check
-        run: uvx ruff check src/ tests/
+        run: uvx ruff@0.15.0 check src/ tests/
 
       - name: Ruff format check
-        run: uvx ruff format --check src/ tests/
+        run: uvx ruff@0.15.0 format --check src/ tests/
 
       - name: Restore cached virtual environment
         uses: actions/cache@v5
