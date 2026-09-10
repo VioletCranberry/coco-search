@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@v8.3.2
 
       # Pinned: `uvx ruff` is unversioned and resolves to the newest release, so
       # 0.16.0 (2026-07-23) expanded the default rule set under us and turned
@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@v8.3.2
         with:
           enable-cache: true
           python-version: ${{ env.PYTHON_VERSION }}
