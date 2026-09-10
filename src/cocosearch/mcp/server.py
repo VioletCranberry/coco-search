@@ -90,14 +90,54 @@ def _touch_activity():
     _last_activity = _time.monotonic()
 
 
+def _release_interrupted_indexing(index_names: list[str], *, reason: str) -> None:
+    """Reset the status of indexes this process was still building.
+
+    The background indexing workers skip their own status write when their
+    cancel event is set, so that a user-initiated ``/api/stop-indexing`` owns
+    the final status. Every shutdown path sets that same cancel event, so
+    shutdown has to release the status itself — otherwise the metadata row
+    stays 'indexing' and the index reads as stuck until the 1-hour
+    auto-recovery in ``management.metadata`` kicks in.
+
+    ``updated_at`` is deliberately left untouched: the table holds whatever
+    the interrupted run managed to write, so staleness and branch-drift
+    checks must keep comparing against the last *complete* index.
+    """
+    for name in index_names:
+        try:
+            current = get_index_metadata(name)
+            if current and current.get("status") == "indexing":
+                set_index_status(name, "indexed", update_timestamp=False)
+                _get_cs_log().index(
+                    "Released interrupted indexing status",
+                    level="WARNING",
+                    index=name,
+                    reason=reason,
+                )
+        except Exception as e:
+            logger.warning(f"Failed to release indexing status for '{name}': {e}")
+
+
+def _cancel_active_indexing(*, reason: str) -> None:
+    """Stop indexing workers and release the status they were holding.
+
+    Joins outside ``_indexing_lock``: a worker's finally block takes that lock
+    to deregister itself, so holding it here would deadlock every worker until
+    the join times out.
+    """
+    with _indexing_lock:
+        entries = list(_active_indexing.items())
+    for _name, (_thread, stop_event) in entries:
+        stop_event.set()
+    for _name, (thread, _stop_event) in entries:
+        thread.join(timeout=2.0)
+    _release_interrupted_indexing([name for name, _entry in entries], reason=reason)
+
+
 def _graceful_shutdown():
     """Cancel indexing, stop dashboard, close DB, exit."""
-    with _indexing_lock:
-        for name, (thread, stop_event) in list(_active_indexing.items()):
-            stop_event.set()
-    with _indexing_lock:
-        for name, (thread, stop_event) in list(_active_indexing.items()):
-            thread.join(timeout=2.0)
+    _cancel_active_indexing(reason="shutdown")
     from cocosearch.dashboard.server import stop_dashboard_server
 
     stop_dashboard_server()
@@ -105,6 +145,15 @@ def _graceful_shutdown():
 
     close_pool()
     os._exit(0)
+
+
+def _sigterm_handler(signum, frame):
+    """Handle SIGTERM in stdio mode.
+
+    A broken pipe can otherwise kill the process without running the lifespan
+    teardown, leaving DB connections open and the index status at 'indexing'.
+    """
+    _graceful_shutdown()
 
 
 def _start_idle_watchdog(timeout_seconds: int):
@@ -302,18 +351,15 @@ async def _server_lifespan(app: FastMCP) -> AsyncIterator[None]:
 
     Teardown closes the DB connection pool and cancels active indexing threads
     so PostgreSQL connections are released promptly on server shutdown — even
-    when atexit handlers don't fire (e.g. SIGTERM/SIGKILL).
+    when atexit handlers don't fire (e.g. SIGTERM/SIGKILL). Interrupted indexes
+    also get their 'indexing' status released, so a client disconnect mid-index
+    doesn't leave the index looking stuck.
     """
     yield
     # --- teardown ---
     _get_cs_log().system("Server shutting down — releasing resources")
-    # Cancel active indexing threads
-    with _indexing_lock:
-        for name, (thread, stop_event) in list(_active_indexing.items()):
-            stop_event.set()
-    with _indexing_lock:
-        for name, (thread, stop_event) in list(_active_indexing.items()):
-            thread.join(timeout=2.0)
+    # Cancel active indexing threads and release their status
+    _cancel_active_indexing(reason="client_disconnect")
     # Close the database connection pool
     from cocosearch.search.db import close_pool
 
@@ -3480,13 +3526,6 @@ def run_server(
     # SIGTERM handler for stdio mode: a broken pipe may cause abrupt exit
     # without the finally block running.
     if transport == "stdio":
-
-        def _sigterm_handler(signum, frame):
-            from cocosearch.search.db import close_pool
-
-            close_pool()
-            sys.exit(0)
-
         signal.signal(signal.SIGTERM, _sigterm_handler)
 
     try:
